@@ -1,0 +1,115 @@
+@import url('https://rsms.me/inter/inter.css');
+@import "tailwindcss";
+
+@theme {
+  /* Цвета темы */
+  --color-blue-50: #EAF2FC;
+  --color-blue-100: #D5E5F8;
+  --color-blue-200: #A4C5F4;
+  --color-blue-300: #7EABEF;
+  --color-blue-400: #5F96EB;
+  --color-blue-500: #4A86E8;
+  --color-blue-600: #2A5DB0;
+  --color-blue-700: #1E4484;
+  --color-blue-800: #163366;
+  --color-blue-900: #0E2244;
+  
+  /* Светло-голубая цветовая схема */
+  --color-primary-50: #EAF2FC;
+  --color-primary-100: #D5E5F8;
+  --color-primary-200: #A4C5F4;
+  --color-primary-300: #7EABEF;
+  --color-primary-400: #5F96EB;
+  --color-primary-500: #4A86E8;
+  --color-primary-600: #2A5DB0;
+  --color-primary-700: #1E4484;
+  --color-primary-800: #163366;
+  --color-primary-900: #0E2244;
+  
+  /* Функциональные цвета */
+  --color-success: #66B2FF;
+  --color-warning: #FFB366;
+  --color-error: #FF6666;
+  --color-info: #8CD9FF;
+  
+  /* Нейтральные цвета */
+  --color-gray-50: #F5F8FA;
+  --color-gray-100: #E9EFF5;
+  --color-gray-200: #D9E2EC;
+  --color-gray-300: #CBD5E0;
+  --color-gray-400: #9FB3C8;
+  --color-gray-500: #7D8FAF;
+  --color-gray-600: #546785;
+  --color-gray-700: #3D4B66;
+  --color-gray-800: #2D3748;
+  --color-gray-900: #1A202C;
+  
+  /* Размеры и отступы */
+  --spacing-0: 0px;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  
+  /* Другие переменные */
+  --font-family-sans: 'Inter var', sans-serif;
+  --shadow-soft: 0 2px 15px -3px rgba(74, 134, 232, 0.15), 0 10px 20px -2px rgba(74, 134, 232, 0.08);
+  --shadow-card: 0 5px 15px rgba(74, 134, 232, 0.08);
+  --shadow-dropdown: 0 10px 25px -5px rgba(74, 134, 232, 0.15);
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.5rem;
+  --border-radius-lg: 0.75rem;
+  --border-radius-xl: 1rem;
+  --border-radius-2xl: 1.5rem;
+  --border-radius-4xl: 2rem;
+  
+  /* Переходы и анимации */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+}
+
+/* Базовые стили */
+html {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: var(--font-family-sans);
+}
+
+body {
+  background-color: var(--color-gray-50);
+  color: var(--color-gray-900);
+  margin: 0;
+  padding: 0;
+}
+
+/* Добавляем несколько глобальных утилитарных классов */
+@utilities {
+  /* Слайдер с кастомными стилями */
+  .slider-track {
+    height: 4px;
+    background: linear-gradient(90deg, #4A86E8, #A4C5F4);
+    border-radius: 2px;
+  }
+
+  .slider-thumb {
+    width: 16px;
+    height: 16px;
+    background: #2A5DB0;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+
+  .slider-thumb:hover {
+    transform: scale(1.2);
+  }
+}
