@@ -9,6 +9,9 @@ function bufferToBase64(buffer) {
 }
 
 export default async function handler(req, res) {
+  console.log(`[FontsourceAPI] Запрос к API: ${req.url}`);
+  console.log(`[FontsourceAPI] Query параметры:`, req.query);
+  
   // Извлекаем основные параметры запроса
   const { fontFamily } = req.query;
   const weight = req.query.weight || '400'; // Используем 400 как значение по умолчанию
@@ -16,171 +19,152 @@ export default async function handler(req, res) {
   const subset = req.query.subset || 'latin'; // Используем latin как значение по умолчанию
   const metaOnly = req.query.meta === 'true'; // Проверяем, нужны ли только метаданные
 
-  // 1. Валидация и очистка имени семейства
-  if (!fontFamily || typeof fontFamily !== 'string') {
-    return res.status(400).json({ error: 'Неверное имя семейства шрифта.' });
-  }
-  // Простое регулярное выражение для базовой безопасности
-  const sanitizedFamily = fontFamily.replace(/[^a-zA-Z0-9\s-]/g, '');
-  if (!sanitizedFamily) {
-    return res.status(400).json({ error: 'Неверное имя семейства шрифта после очистки.' });
-  }
-  const packageName = sanitizedFamily.toLowerCase().replace(/\s+/g, '-');
+  console.log(`[FontsourceAPI] Обрабатываем шрифт: ${fontFamily}, вес: ${weight}, стиль: ${style}, subset: ${subset}, только мета: ${metaOnly}`);
 
-  console.log(`[API] Запрос шрифта: ${packageName}, вес: ${weight}, стиль: ${style}, подмножество: ${subset}`);
+  if (!fontFamily) {
+    console.error(`[FontsourceAPI] Отсутствует fontFamily в запросе`);
+    return res.status(400).json({ error: 'fontFamily обязателен' });
+  }
 
   try {
-    // 2. Находим путь к пакету Fontsource
-    const packagePath = await findFontsourcePackagePath(packageName);
+    // Ищем пакет с помощью утилиты
+    console.log(`[FontsourceAPI] Ищем пакет для: ${fontFamily}`);
+    const packagePath = await findFontsourcePackagePath(fontFamily);
+    
     if (!packagePath) {
-        return res.status(404).json({ error: `Пакет @fontsource/${packageName} не найден.` });
+      console.error(`[FontsourceAPI] Пакет для ${fontFamily} не найден`);
+      return res.status(404).json({ error: `Пакет fontsource для ${fontFamily} не найден` });
     }
+    
+    console.log(`[FontsourceAPI] Найден пакет по пути: ${packagePath}`);
 
-    // 3. Читаем metadata.json для получения информации о доступных стилях
+    // Читаем метаданные
     const metadataPath = path.join(packagePath, 'metadata.json');
-    let metadata;
-    try {
-      const metadataContent = await fs.readFile(metadataPath, 'utf-8');
-      metadata = JSON.parse(metadataContent);
-    } catch (e) {
-      console.error(`Ошибка чтения или парсинга metadata.json для ${packageName}:`, e);
-      return res.status(500).json({ error: `Ошибка чтения метаданных для ${packageName}.` });
-    }
+    console.log(`[FontsourceAPI] Читаем метаданные из: ${metadataPath}`);
+    
+    const metadataContent = await fs.readFile(metadataPath, 'utf8');
+    const metadata = JSON.parse(metadataContent);
+    
+    console.log(`[FontsourceAPI] Метаданные прочитаны успешно для: ${metadata.family}`);
 
-    // Если запрашиваются только метаданные, возвращаем их
+    // Если запрошены только метаданные, возвращаем их
     if (metaOnly) {
-      console.log(`[API] Возвращаем только метаданные для ${packageName}`);
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json({
-        metadata: metadata
-      });
+      console.log(`[FontsourceAPI] Возвращаем только метаданные для: ${fontFamily}`);
+      return res.status(200).json(metadata);
     }
 
-    // 4. Определяем путь к файлу шрифта для заданных weight, style и subset
-    const filesDirPath = path.join(packagePath, 'files');
+    // Логика поиска файла шрифта
+    const filesDir = path.join(packagePath, 'files');
+    console.log(`[FontsourceAPI] Ищем файлы шрифтов в: ${filesDir}`);
     
-    // Проверяем, есть ли директория файлов
+    // Проверяем, что директория files существует
     try {
-      await fs.access(filesDirPath, fs.constants.F_OK);
-    } catch (e) {
-      console.error(`Директория 'files' не найдена в пакете ${packageName}: ${filesDirPath}`);
-      return res.status(404).json({ error: `Директория файлов шрифтов не найдена для ${packageName}.` });
+      await fs.access(filesDir);
+      console.log(`[FontsourceAPI] Директория files найдена`);
+    } catch (error) {
+      console.error(`[FontsourceAPI] Директория files не найдена: ${error.message}`);
+      return res.status(404).json({ error: `Директория files не найдена для ${fontFamily}` });
     }
 
-    // Исправляем формат имени файла для fontsource
-    // Реальный формат: roboto-latin-400-normal.woff2 (не roboto-latin-400-normal.woff2)
-    const normalizedStyle = style === 'italic' ? 'italic' : 'normal';
-    const fontFileName = `${packageName}-${subset}-${weight}-${normalizedStyle}.woff2`;
-    let fontFilePath = path.join(filesDirPath, fontFileName);
+    // Строим предполагаемое имя файла
+    const expectedFileName = `${fontFamily.toLowerCase()}-${subset}-${weight}-${style}.woff2`;
+    const expectedFilePath = path.join(filesDir, expectedFileName);
     
-    console.log(`[API] Ищем файл шрифта: ${fontFilePath}`);
-    
-    // Проверяем наличие файла
-    let foundFile = null;
+    console.log(`[FontsourceAPI] Ищем файл: ${expectedFileName} по пути: ${expectedFilePath}`);
+
+    let fontFile = null;
+    let actualFileName = null;
+
+    // Сначала пробуем точное совпадение
     try {
-      await fs.access(fontFilePath, fs.constants.F_OK);
-      foundFile = fontFileName;
-      console.log(`[API] Найден запрошенный файл шрифта: ${fontFilePath}`);
-    } catch (e) {
-      console.log(`[API] Запрошенный файл не найден: ${fontFilePath}. Поиск альтернатив...`);
+      await fs.access(expectedFilePath);
+      fontFile = await fs.readFile(expectedFilePath);
+      actualFileName = expectedFileName;
+      console.log(`[FontsourceAPI] ✅ Найден точный файл: ${expectedFileName}`);
+    } catch (error) {
+      console.log(`[FontsourceAPI] ⚠️ Точный файл не найден: ${error.message}`);
       
-      // Если файл не найден, пробуем найти альтернативы
-      try {
-        const files = await fs.readdir(filesDirPath);
-        const woff2Files = files.filter(file => file.endsWith('.woff2'));
+      // Если точный файл не найден, ищем альтернативы
+      console.log(`[FontsourceAPI] Ищем альтернативные файлы...`);
+      
+      const allFiles = await fs.readdir(filesDir);
+      console.log(`[FontsourceAPI] Доступные файлы в директории:`, allFiles.slice(0, 10)); // Показываем первые 10 файлов
+      
+      // Пробуем разные комбинации параметров
+      const searchPatterns = [
+        // Другие subsets с теми же параметрами
+        `${fontFamily.toLowerCase()}-latin-${weight}-${style}.woff2`,
+        `${fontFamily.toLowerCase()}-cyrillic-${weight}-${style}.woff2`,
+        `${fontFamily.toLowerCase()}-greek-${weight}-${style}.woff2`,
         
-        console.log(`[API] Доступные woff2 файлы (всего ${woff2Files.length})`);
+        // Fallback веса с тем же subset
+        `${fontFamily.toLowerCase()}-${subset}-400-${style}.woff2`,
+        `${fontFamily.toLowerCase()}-${subset}-${weight}-normal.woff2`,
         
-        // Попробуем разные варианты поиска
-        const searchPatterns = [
-          // Точное совпадение
-          `${packageName}-${subset}-${weight}-${normalizedStyle}.woff2`,
-          // Альтернативный subset
-          ...['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext', 'greek', 'greek-ext'].map(s => 
-            `${packageName}-${s}-${weight}-${normalizedStyle}.woff2`
-          ),
-          // Альтернативный стиль
-          `${packageName}-${subset}-${weight}-normal.woff2`,
-          // Альтернативный вес
-          ...['400', '300', '500', '700'].map(w => 
-            `${packageName}-${subset}-${w}-${normalizedStyle}.woff2`
-          )
-        ];
+        // Популярные комбинации
+        `${fontFamily.toLowerCase()}-latin-400-normal.woff2`,
+        `${fontFamily.toLowerCase()}-cyrillic-400-normal.woff2`,
+      ];
+
+      for (const pattern of searchPatterns) {
+        const patternPath = path.join(filesDir, pattern);
+        console.log(`[FontsourceAPI] Проверяем паттерн: ${pattern}`);
         
-        for (const pattern of searchPatterns) {
-          if (woff2Files.includes(pattern)) {
-            foundFile = pattern;
-            fontFilePath = path.join(filesDirPath, pattern);
-            console.log(`[API] Найден альтернативный файл: ${pattern}`);
-            break;
-          }
+        try {
+          await fs.access(patternPath);
+          fontFile = await fs.readFile(patternPath);
+          actualFileName = pattern;
+          console.log(`[FontsourceAPI] ✅ Найден альтернативный файл: ${pattern}`);
+          break;
+        } catch (patternError) {
+          // Продолжаем поиск
         }
+      }
+
+      // Если ничего не нашли с точными паттернами, ищем любой подходящий файл
+      if (!fontFile) {
+        console.log(`[FontsourceAPI] Ищем любой подходящий файл с помощью регулярного выражения...`);
         
-        // Если ничего не нашли, берем первый доступный файл с подходящими параметрами
-        if (!foundFile) {
-          const matchingFiles = woff2Files.filter(file => {
-            return file.includes(`-${weight}-`) || file.includes(`-${subset}-`) || file.includes(`-${normalizedStyle}`);
-          });
+        const fontNameRegex = new RegExp(`^${fontFamily.toLowerCase()}-.*\\.woff2$`, 'i');
+        const matchingFiles = allFiles.filter(file => fontNameRegex.test(file));
+        
+        console.log(`[FontsourceAPI] Найдено подходящих файлов:`, matchingFiles.slice(0, 5));
+        
+        if (matchingFiles.length > 0) {
+          const firstMatchingFile = matchingFiles[0];
+          const firstMatchingPath = path.join(filesDir, firstMatchingFile);
           
-          if (matchingFiles.length > 0) {
-            foundFile = matchingFiles[0];
-            fontFilePath = path.join(filesDirPath, foundFile);
-            console.log(`[API] Использую частично подходящий файл: ${foundFile}`);
-          } else if (woff2Files.length > 0) {
-            foundFile = woff2Files[0];
-            fontFilePath = path.join(filesDirPath, foundFile);
-            console.log(`[API] Использую первый доступный файл: ${foundFile}`);
+          try {
+            fontFile = await fs.readFile(firstMatchingPath);
+            actualFileName = firstMatchingFile;
+            console.log(`[FontsourceAPI] ✅ Использован первый подходящий файл: ${firstMatchingFile}`);
+          } catch (readError) {
+            console.error(`[FontsourceAPI] Ошибка чтения файла ${firstMatchingFile}: ${readError.message}`);
           }
         }
-        
-        if (!foundFile) {
-          return res.status(404).json({ 
-            error: `Не найден подходящий файл шрифта для ${packageName} с параметрами weight=${weight}, style=${style}, subset=${subset}.`,
-            availableFiles: woff2Files.slice(0, 10),
-            requestedFile: fontFileName
-          });
-        }
-        
-      } catch (dirError) {
-        console.error(`Ошибка при чтении директории ${filesDirPath}:`, dirError);
-        return res.status(500).json({ error: `Ошибка при чтении директории файлов шрифтов.` });
       }
     }
 
-    // 5. Читаем файл шрифта
-    console.log(`[API] Читаем файл шрифта: ${fontFilePath}`);
-    
-    let fontBuffer;
-    try {
-      fontBuffer = await fs.readFile(fontFilePath);
-      console.log(`[API] Файл шрифта успешно прочитан, размер: ${fontBuffer.length} байт`);
-    } catch (e) {
-      console.error(`Ошибка чтения файла шрифта ${fontFilePath}:`, e);
-      return res.status(500).json({ error: `Ошибка чтения файла шрифта для ${packageName}.` });
+    if (!fontFile) {
+      console.error(`[FontsourceAPI] ❌ Не найден ни один подходящий файл шрифта для ${fontFamily}`);
+      return res.status(404).json({ error: `Файл шрифта не найден для ${fontFamily} ${weight} ${style} ${subset}` });
     }
 
-    // Извлекаем реальные параметры из имени найденного файла
-    const actualParams = foundFile.replace('.woff2', '').split('-');
-    const actualSubset = actualParams[1] || subset;
-    const actualWeight = actualParams[2] || weight;
-    const actualStyle = actualParams[3] || style;
+    console.log(`[FontsourceAPI] ✅ Успешно найден и прочитан файл: ${actualFileName}, размер: ${fontFile.length} байт`);
 
-    // 6. Отправляем ответ
-    res.setHeader('Content-Type', 'application/json');
-    const response = {
-      metadata: metadata,
-      fontBufferBase64: bufferToBase64(fontBuffer),
-      fileName: foundFile,
-      weight: actualWeight,
-      style: actualStyle,
-      subset: actualSubset
+    // Возвращаем результат
+    const result = {
+      metadata,
+      fontData: bufferToBase64(fontFile),
+      actualFileName: actualFileName,
+      requestedParams: { weight, style, subset }
     };
-    
-    console.log(`[API] Отправляем ответ для ${packageName}, найденный файл: ${foundFile}`);
-    return res.status(200).json(response);
+
+    console.log(`[FontsourceAPI] Возвращаем результат для ${fontFamily}, использован файл: ${actualFileName}`);
+    res.status(200).json(result);
 
   } catch (error) {
-    console.error(`Непредвиденная ошибка в API route /api/fontsource/${packageName}:`, error);
-    return res.status(500).json({ error: 'Внутренняя ошибка сервера.' });
+    console.error(`[FontsourceAPI] ❌ Критическая ошибка при обработке ${fontFamily}:`, error);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера', details: error.message });
   }
 } 
