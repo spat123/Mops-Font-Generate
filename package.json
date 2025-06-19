@@ -1,7 +1,7 @@
 {
   "name": "font-gauntlet-clone",
-  "version": "1.0.0",
-  "description": "A font testing and comparison tool",
+  "version": "1.0.1",
+  "description": "A font testing and comparison tool with fontsource support",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
@@ -52,5 +52,9 @@
     "autoprefixer": "^10.4.21",
     "postcss": "^8.4.31",
     "tailwindcss": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
   }
 }

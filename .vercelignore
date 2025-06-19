@@ -1,0 +1,8 @@
+# Vercel ignore file
+# Не игнорируем node_modules - они нужны для fontsource пакетов
+
+# Игнорируем только временные файлы
+.next
+.vercel
+temp/
+*.log 
