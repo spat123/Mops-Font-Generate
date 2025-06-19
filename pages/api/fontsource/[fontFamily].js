@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
     // Если запрашиваются только метаданные, возвращаем их
     if (metaOnly) {
-      console.log(`[API] Возвращаем только метаданные для ${packageName}`, metadata);
+      console.log(`[API] Возвращаем только метаданные для ${packageName}`);
       res.setHeader('Content-Type', 'application/json');
       return res.status(200).json({
         metadata: metadata
@@ -67,83 +67,80 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: `Директория файлов шрифтов не найдена для ${packageName}.` });
     }
 
-    // Строим имя файла на основе запрошенных параметров
-    const fontFileName = `${packageName}-${subset}-${weight}-${style}.woff2`;
-    const fontFileRelativePath = `files/${fontFileName}`;
-    let fontFilePath = path.join(packagePath, fontFileRelativePath);
+    // Исправляем формат имени файла для fontsource
+    // Реальный формат: roboto-latin-400-normal.woff2 (не roboto-latin-400-normal.woff2)
+    const normalizedStyle = style === 'italic' ? 'italic' : 'normal';
+    const fontFileName = `${packageName}-${subset}-${weight}-${normalizedStyle}.woff2`;
+    let fontFilePath = path.join(filesDirPath, fontFileName);
     
     console.log(`[API] Ищем файл шрифта: ${fontFilePath}`);
     
     // Проверяем наличие файла
+    let foundFile = null;
     try {
       await fs.access(fontFilePath, fs.constants.F_OK);
+      foundFile = fontFileName;
       console.log(`[API] Найден запрошенный файл шрифта: ${fontFilePath}`);
     } catch (e) {
       console.log(`[API] Запрошенный файл не найден: ${fontFilePath}. Поиск альтернатив...`);
       
-      // Если файл не найден, пробуем найти альтернативы или вывести список доступных файлов
+      // Если файл не найден, пробуем найти альтернативы
       try {
         const files = await fs.readdir(filesDirPath);
         const woff2Files = files.filter(file => file.endsWith('.woff2'));
         
-        console.log(`[API] Доступные woff2 файлы (первые 10): ${woff2Files.slice(0, 10).join(', ')}`);
+        console.log(`[API] Доступные woff2 файлы (всего ${woff2Files.length})`);
         
-        // Пытаемся найти ближайшую подходящую альтернативу
-        let alternativeFile = null;
+        // Попробуем разные варианты поиска
+        const searchPatterns = [
+          // Точное совпадение
+          `${packageName}-${subset}-${weight}-${normalizedStyle}.woff2`,
+          // Альтернативный subset
+          ...['latin', 'latin-ext', 'cyrillic', 'cyrillic-ext', 'greek', 'greek-ext'].map(s => 
+            `${packageName}-${s}-${weight}-${normalizedStyle}.woff2`
+          ),
+          // Альтернативный стиль
+          `${packageName}-${subset}-${weight}-normal.woff2`,
+          // Альтернативный вес
+          ...['400', '300', '500', '700'].map(w => 
+            `${packageName}-${subset}-${w}-${normalizedStyle}.woff2`
+          )
+        ];
         
-        // Приоритеты поиска: 1) тот же вес, 2) тот же стиль, 3) тот же subset
-        const sameWeightFiles = woff2Files.filter(f => f.includes(`-${weight}-`));
-        const sameStyleFiles = woff2Files.filter(f => f.includes(`-${style}.woff2`));
-        const sameSubsetFiles = woff2Files.filter(f => f.includes(`-${subset}-`));
-        
-        if (sameWeightFiles.length > 0 && sameStyleFiles.length > 0) {
-          // Ищем файл с тем же весом и стилем, но, возможно, другим subset
-          for (const file of sameWeightFiles) {
-            if (file.includes(`-${style}.woff2`)) {
-              alternativeFile = file;
-              break;
-            }
+        for (const pattern of searchPatterns) {
+          if (woff2Files.includes(pattern)) {
+            foundFile = pattern;
+            fontFilePath = path.join(filesDirPath, pattern);
+            console.log(`[API] Найден альтернативный файл: ${pattern}`);
+            break;
           }
-        } 
-        
-        // Если не нашли подходящую комбинацию, берем любой файл с тем же весом
-        if (!alternativeFile && sameWeightFiles.length > 0) {
-          alternativeFile = sameWeightFiles[0];
-        } 
-        // Или с тем же стилем
-        else if (!alternativeFile && sameStyleFiles.length > 0) {
-          alternativeFile = sameStyleFiles[0];
-        }
-        // Или с тем же подмножеством символов
-        else if (!alternativeFile && sameSubsetFiles.length > 0) {
-          alternativeFile = sameSubsetFiles[0];
-        }
-        // Если ничего не нашли, берем первый доступный файл
-        else if (!alternativeFile && woff2Files.length > 0) {
-          alternativeFile = woff2Files[0];
         }
         
-        if (alternativeFile) {
-          console.log(`[API] Используем альтернативный файл: ${alternativeFile}`);
-          // Получаем параметры из имени альтернативного файла
-          const fileNameParts = alternativeFile.replace('.woff2', '').split('-');
-          // Предполагаем формат: packageName-subset-weight-style
-          const actualWeight = fileNameParts.length >= 3 ? fileNameParts[fileNameParts.length - 2] : '400';
-          const actualStyle = fileNameParts.length >= 4 ? fileNameParts[fileNameParts.length - 1] : 'normal';
-          const actualSubset = fileNameParts.length >= 2 ? fileNameParts[1] : 'latin';
+        // Если ничего не нашли, берем первый доступный файл с подходящими параметрами
+        if (!foundFile) {
+          const matchingFiles = woff2Files.filter(file => {
+            return file.includes(`-${weight}-`) || file.includes(`-${subset}-`) || file.includes(`-${normalizedStyle}`);
+          });
           
-          fontFilePath = path.join(filesDirPath, alternativeFile);
-          
-          // Сохраняем фактические параметры для отправки клиенту
-          res.setHeader('X-Font-Weight', actualWeight);
-          res.setHeader('X-Font-Style', actualStyle);
-          res.setHeader('X-Font-Subset', actualSubset);
-        } else {
+          if (matchingFiles.length > 0) {
+            foundFile = matchingFiles[0];
+            fontFilePath = path.join(filesDirPath, foundFile);
+            console.log(`[API] Использую частично подходящий файл: ${foundFile}`);
+          } else if (woff2Files.length > 0) {
+            foundFile = woff2Files[0];
+            fontFilePath = path.join(filesDirPath, foundFile);
+            console.log(`[API] Использую первый доступный файл: ${foundFile}`);
+          }
+        }
+        
+        if (!foundFile) {
           return res.status(404).json({ 
             error: `Не найден подходящий файл шрифта для ${packageName} с параметрами weight=${weight}, style=${style}, subset=${subset}.`,
-            availableFiles: woff2Files.slice(0, 20) // Показываем первые 20 файлов
+            availableFiles: woff2Files.slice(0, 10),
+            requestedFile: fontFileName
           });
         }
+        
       } catch (dirError) {
         console.error(`Ошибка при чтении директории ${filesDirPath}:`, dirError);
         return res.status(500).json({ error: `Ошибка при чтении директории файлов шрифтов.` });
@@ -162,19 +159,28 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: `Ошибка чтения файла шрифта для ${packageName}.` });
     }
 
+    // Извлекаем реальные параметры из имени найденного файла
+    const actualParams = foundFile.replace('.woff2', '').split('-');
+    const actualSubset = actualParams[1] || subset;
+    const actualWeight = actualParams[2] || weight;
+    const actualStyle = actualParams[3] || style;
+
     // 6. Отправляем ответ
     res.setHeader('Content-Type', 'application/json');
-    res.status(200).json({
+    const response = {
       metadata: metadata,
       fontBufferBase64: bufferToBase64(fontBuffer),
-      fileName: path.basename(fontFilePath),
-      weight: res.getHeader('X-Font-Weight') || weight,
-      style: res.getHeader('X-Font-Style') || style,
-      subset: res.getHeader('X-Font-Subset') || subset
-    });
+      fileName: foundFile,
+      weight: actualWeight,
+      style: actualStyle,
+      subset: actualSubset
+    };
+    
+    console.log(`[API] Отправляем ответ для ${packageName}, найденный файл: ${foundFile}`);
+    return res.status(200).json(response);
 
   } catch (error) {
     console.error(`Непредвиденная ошибка в API route /api/fontsource/${packageName}:`, error);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера.' });
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера.' });
   }
 } 
