@@ -15,18 +15,41 @@ async function findProjectRoot(startDir) {
   let currentDir = startDir;
   console.log(`[ServerUtils] Ищем корень проекта, начиная с: ${startDir}`);
   
+  // Специальная логика для Vercel - попробуем несколько стандартных путей
+  const vercelPaths = [
+    '/var/task',           // Стандартный путь для Vercel Functions
+    process.cwd(),         // Текущая рабочая директория
+    path.join(process.cwd(), '..'), // На уровень выше
+    '/vercel/path0',       // Возможный путь на Vercel
+  ];
+  
+  // Сначала пробуем стандартные пути для Vercel
+  for (const vercelPath of vercelPaths) {
+    try {
+      const packageJsonPath = path.join(vercelPath, 'package.json');
+      await fs.access(packageJsonPath, fs.constants.F_OK);
+      console.log(`[ServerUtils] ✅ Найден корень проекта (Vercel): ${vercelPath}`);
+      return vercelPath;
+    } catch (e) {
+      console.log(`[ServerUtils] ⚠️ Vercel путь не подошел: ${vercelPath}`);
+    }
+  }
+  
+  // Если Vercel пути не сработали, используем обычный поиск вверх по дереву
   while (currentDir !== path.parse(currentDir).root) {
     const packageJsonPath = path.join(currentDir, 'package.json');
     try {
       await fs.access(packageJsonPath, fs.constants.F_OK);
-      console.log(`[ServerUtils] Найден корень проекта: ${currentDir}`);
+      console.log(`[ServerUtils] ✅ Найден корень проекта (обычный поиск): ${currentDir}`);
       return currentDir; // Нашли package.json, это корень
     } catch (e) {
       // Игнорируем ошибку и идем на уровень выше
     }
     currentDir = path.dirname(currentDir);
   }
-  console.error(`[ServerUtils] Корень проекта не найден, начиная с: ${startDir}`);
+  
+  console.error(`[ServerUtils] ❌ Корень проекта не найден, начиная с: ${startDir}`);
+  console.error(`[ServerUtils] Попробованные пути:`, vercelPaths.concat([startDir]));
   return null; // Дошли до корня файловой системы и не нашли
 }
 
@@ -54,6 +77,7 @@ export async function findFontsourcePackagePath(packageName) {
   const variablePackageName = `@fontsource-variable/${baseName}`;
   
   console.log(`[ServerUtils] Проверяем пакеты: ${normalPackageName}, ${variablePackageName}`);
+  console.log(`[ServerUtils] Корень проекта: ${projectRoot}`);
   
   let packageDir;
   let metadataPath;
