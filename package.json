@@ -11,15 +11,16 @@
     "format": "prettier --write ."
   },
   "dependencies": {
-    "@fontsource/roboto": "^5.2.5",
     "@fontsource/inter": "^5.2.5",
-    "@fontsource/poppins": "^5.2.5",
     "@fontsource/montserrat": "^5.2.5",
     "@fontsource/open-sans": "^5.2.5",
+    "@fontsource/poppins": "^5.2.5",
+    "@fontsource/roboto": "^5.2.5",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@tailwindcss/postcss": "^4.0.17",
+    "@web-alchemy/fonttools": "^1.4.0",
     "lightningcss": "^1.30.1",
     "lodash.debounce": "^4.0.8",
     "next": "^14.1.0",

@@ -7,5 +7,10 @@
   "regions": ["sfo1"],
   "github": {
     "autoAlias": false
+  },
+  "functions": {
+    "pages/api/generate-static-font.js": {
+      "maxDuration": 60
+    }
   }
 } 

@@ -1,17 +1,26 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { promisify } from 'util';
 
 const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
 
+/** Временные файлы только под /tmp — на Vercel serverless в корень проекта писать нельзя. */
+function getTempDir() {
+  return path.join(os.tmpdir(), 'mops-generate-static-font');
+}
+
 /**
- * Интерпретатор Python из локального venv fonttools.
- * На Windows нельзя вызывать fonttools-env/bin/python из Unix-venv (shebang-скрипт) — spawn даёт EFTYPE.
+ * Интерпретатор Python из локального venv fonttools (dev).
+ * На Vercel задайте FONTTOOLS_PYTHON или используется fallback без Python.
  */
 function resolveFontToolsPython() {
+  if (process.env.FONTTOOLS_PYTHON && fs.existsSync(process.env.FONTTOOLS_PYTHON)) {
+    return process.env.FONTTOOLS_PYTHON;
+  }
   const root = process.cwd();
   if (process.platform === 'win32') {
     const winCandidates = [
@@ -35,9 +44,43 @@ function resolveFontToolsPython() {
   return null;
 }
 
+function isWoff2Buffer(buf) {
+  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  return b.length >= 4 && b[0] === 0x77 && b[1] === 0x4f && b[2] === 0x46 && b[3] === 0x32;
+}
+
+/** Опции для fontTools.varLib.instancer / instantiateVariableFont */
+function toInstancerOptions(variableSettings) {
+  const out = {};
+  for (const [axis, value] of Object.entries(variableSettings || {})) {
+    if (value === null || value === undefined) continue;
+    if (value === 'drop' || value === 'DROP') {
+      out[axis] = null;
+      continue;
+    }
+    const n = typeof value === 'number' ? value : parseFloat(String(value));
+    out[axis] = Number.isFinite(n) ? n : value;
+  }
+  return out;
+}
+
+/**
+ * Генерация через @web-alchemy/fonttools (Pyodide) — работает на Vercel без Python.
+ */
+async function generateWithWebAlchemy(buffer, variableSettings, format) {
+  const { instantiateVariableFont, subset } = await import('@web-alchemy/fonttools');
+  const options = toInstancerOptions(variableSettings);
+  let out = await instantiateVariableFont(Buffer.from(buffer), options);
+  const want = (format || 'woff2').toLowerCase();
+  if (want === 'woff2' && !isWoff2Buffer(out)) {
+    out = await subset(Buffer.from(out), { '*': true, flavor: 'woff2' });
+  }
+  return out;
+}
+
 /**
  * API для генерации статических шрифтов из вариативных
- * Использует Python fonttools для настоящей статической генерации
+ * Локально: Python fonttools из venv; на Vercel: @web-alchemy/fonttools.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -50,85 +93,74 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing fontData or variableSettings' });
   }
 
-  const tempDir = path.join(process.cwd(), 'temp');
-  const inputPath = path.join(tempDir, `input-${Date.now()}.ttf`);
-  const outputPath = path.join(tempDir, `output-${Date.now()}.${format}`);
+  const tempDir = getTempDir();
+  const stamp = Date.now();
+  const inputPath = path.join(tempDir, `input-${stamp}.bin`);
+  const outputPath = path.join(tempDir, `output-${stamp}.${format}`);
 
   try {
-    // Создаем temp директорию если не существует
     if (!fs.existsSync(tempDir)) {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    // Сохраняем входной файл
     const buffer = Buffer.from(fontData, 'base64');
     await writeFile(inputPath, buffer);
 
-    // Формируем команду для fonttools
-    const axisArgs = Object.entries(variableSettings)
-      .map(([axis, value]) => `${axis}=${value}`);
-
     const fontToolsPython = resolveFontToolsPython();
-    if (!fontToolsPython) {
-      return res.status(503).json({
-        error: 'Python fonttools не найден',
-        details:
-          'На Windows: py -3.13 -m venv fonttools-env (или ваша версия из py --list), затем .\\\\fonttools-env\\\\Scripts\\\\pip.exe install fonttools brotli. Не используйте fonttools-env от macOS. На macOS/Linux: fonttools-env/bin/python3.12. См. STATIC_FONT_SETUP.md',
+
+    if (fontToolsPython) {
+      const axisArgs = Object.entries(variableSettings).map(([axis, value]) => `${axis}=${value}`);
+
+      const args = [
+        '-m',
+        'fontTools.varLib.instancer',
+        inputPath,
+        ...axisArgs,
+        '--output',
+        outputPath,
+      ];
+
+      await new Promise((resolve, reject) => {
+        const child = spawn(fontToolsPython, args, { windowsHide: true });
+        let stderr = '';
+
+        child.on('error', reject);
+
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        child.on('close', (code) => {
+          if (code === 0) resolve();
+          else reject(new Error(`fonttools failed with code ${code}: ${stderr}`));
+        });
+      });
+
+      const staticFontData = fs.readFileSync(outputPath);
+      await unlink(inputPath).catch(() => {});
+      await unlink(outputPath).catch(() => {});
+
+      return res.status(200).json({
+        success: true,
+        data: staticFontData.toString('base64'),
+        size: staticFontData.length,
+        format,
+        engine: 'python',
       });
     }
 
-    const args = [
-      '-m', 'fontTools.varLib.instancer',
-      inputPath,
-      ...axisArgs,  // Разворачиваем массив аргументов
-      '--output',
-      outputPath
-    ];
+    // Vercel / окружение без venv
+    const staticFontData = await generateWithWebAlchemy(buffer, variableSettings, format);
+    await unlink(inputPath).catch(() => {});
 
-    // Выполняем команду
-    const result = await new Promise((resolve, reject) => {
-      const child = spawn(fontToolsPython, args, { windowsHide: true });
-      let stdout = '';
-      let stderr = '';
-
-      child.on('error', (err) => {
-        reject(err);
-      });
-
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve({ stdout, stderr });
-        } else {
-          reject(new Error(`fonttools failed with code ${code}: ${stderr}`));
-        }
-      });
-    });
-
-    // Читаем результат
-    const staticFontData = fs.readFileSync(outputPath);
-    
-    // Очищаем временные файлы
-    await unlink(inputPath);
-    await unlink(outputPath);
-
-    // Возвращаем результат
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: staticFontData.toString('base64'),
+      data: Buffer.from(staticFontData).toString('base64'),
       size: staticFontData.length,
-      format
+      format,
+      engine: 'web-alchemy',
     });
-
   } catch (error) {
-    // Очищаем временные файлы в случае ошибки
     try {
       if (fs.existsSync(inputPath)) await unlink(inputPath);
       if (fs.existsSync(outputPath)) await unlink(outputPath);
@@ -137,9 +169,9 @@ export default async function handler(req, res) {
     }
 
     console.error('Static font generation error:', error);
-    res.status(500).json({ 
+    return res.status(500).json({
       error: 'Failed to generate static font',
-      details: error.message 
+      details: error.message,
     });
   }
 }
@@ -150,4 +182,5 @@ export const config = {
       sizeLimit: '10mb',
     },
   },
-} 
+  maxDuration: 60,
+};
