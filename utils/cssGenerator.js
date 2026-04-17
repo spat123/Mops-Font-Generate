@@ -112,14 +112,61 @@ const updateBufferedFontCss = (fontId, cssRule) => {
 const fontFaceCache = new Map();
 
 /**
+ * Дескрипторы FontFace для variable fonts (диапазон веса/ширины), иначе движок может
+ * сопоставлять глифы только с «одним» начертанием.
+ * @param {Record<string, { min?: number, max?: number }>|null|undefined} variableAxes
+ * @returns {FontFaceDescriptors}
+ */
+export const buildVariableFontFaceDescriptors = (variableAxes) => {
+  const descriptors = {};
+  if (!variableAxes || typeof variableAxes !== 'object') return descriptors;
+
+  const wght = variableAxes.wght;
+  if (wght && typeof wght === 'object') {
+    const min = Number(wght.min);
+    const max = Number(wght.max);
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      if (max > min) descriptors.weight = `${Math.round(min)} ${Math.round(max)}`;
+      else descriptors.weight = `${Math.round(min)}`;
+    }
+  }
+
+  const wdth = variableAxes.wdth;
+  if (wdth && typeof wdth === 'object') {
+    const min = Number(wdth.min);
+    const max = Number(wdth.max);
+    if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
+      descriptors.stretch = `${min}% ${max}%`;
+    }
+  }
+
+  return descriptors;
+};
+
+/**
  * Загружает шрифт с использованием FontFace API и кэширования
- * @param {string} fontFamily - Имя семейства шрифтов
- * @param {string} url - URL шрифта
+ * @param {string} fontFamily - Имя семейства шрифтов (без CSS-кавычек вокруг имени)
+ * @param {string|ArrayBuffer|ArrayBufferView} urlOrBuffer - blob/data URL или бинарные данные шрифта
  * @param {Object} settings - Настройки вариативных осей (опционально)
+ * @param {string} [binaryCacheId] - уникальный суффикс ключа кэша при передаче ArrayBuffer (например id шрифта из IndexedDB)
+ * @param {FontFaceDescriptors} [faceDescriptors] - дескрипторы FontFace (например weight: "100 900" для VF)
  * @returns {Promise<FontFace>} - Промис с объектом FontFace
  */
-export const loadFontFaceIfNeeded = async (fontFamily, url, settings = {}) => {
-  const cacheKey = `${fontFamily}_${url}`;
+export const loadFontFaceIfNeeded = async (
+  fontFamily,
+  urlOrBuffer,
+  settings = {},
+  binaryCacheId = '',
+  faceDescriptors = {}
+) => {
+  const isUrl = typeof urlOrBuffer === 'string';
+  const descKey =
+    faceDescriptors && typeof faceDescriptors === 'object' && Object.keys(faceDescriptors).length
+      ? JSON.stringify(faceDescriptors)
+      : '';
+  const cacheKey = isUrl
+    ? `${fontFamily}_${urlOrBuffer}_${descKey}`
+    : `${fontFamily}_binary_${binaryCacheId || urlOrBuffer.byteLength || '0'}_${descKey}`;
   
   // Проверяем кэш
   if (fontFaceCache.has(cacheKey)) {
@@ -143,12 +190,16 @@ export const loadFontFaceIfNeeded = async (fontFamily, url, settings = {}) => {
     try {
       // ИСПРАВЛЕНИЕ: НЕ устанавливаем variationSettings в FontFace опциях!
       // Это позволит динамически изменять оси через CSS font-variation-settings
-      const options = {};
-      // УДАЛЕНО: if (Object.keys(settings).length > 0) { ... }
-      
+      const options =
+        faceDescriptors && typeof faceDescriptors === 'object' && Object.keys(faceDescriptors).length
+          ? { ...faceDescriptors }
+          : {};
+
       console.log(`[loadFontFaceIfNeeded] Создаем FontFace для ${fontFamily} БЕЗ фиксированных variationSettings`);
       
-      const fontFace = new FontFace(fontFamily, `url(${url})`, options);
+      const fontFace = isUrl
+        ? new FontFace(fontFamily, `url(${urlOrBuffer})`, options)
+        : new FontFace(fontFamily, urlOrBuffer, options);
       await fontFace.load();
       if (typeof document !== 'undefined' && document.fonts) {
           document.fonts.add(fontFace);

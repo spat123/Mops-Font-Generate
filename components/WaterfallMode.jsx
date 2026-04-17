@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useSettings } from '../contexts/SettingsContext';
 import { useFontContext } from '../contexts/FontContext';
@@ -18,20 +18,27 @@ const WaterfallMode = () => {
     textColor 
   } = useSettings();
   
-  const { selectedFont, getFontFamily, getVariationSettings } = useFontContext();
-  // const { selectedFont } = useFontManager(); // This seems unused now
+  const { selectedFont, getFontFamily, fontCssProperties } = useFontContext();
 
-  // console.log("WaterfallMode rendering with text:", text, "Settings:", settings); // Удаляем закомментированный лог
-
-  // Стили для текста, зависящие от выбранного шрифта И НАСТРОЕК
-  const baseTextStyle = {
-    fontFamily: getFontFamily(),
-    fontVariationSettings: getVariationSettings(),
-    textAlign: textAlignment,
-    textTransform: textCase === 'none' ? 'none' : textCase, 
-    color: textColor, // Добавляем цвет текста
-    // lineHeight применяется в itemStyle ниже, чтобы он зависел от размера
-  };
+  // Как в FontPreview: полный font-family (с sans fallback) + вес/стиль для статики + FVS для VF.
+  const baseTextStyle = useMemo(() => {
+    const fromHook =
+      fontCssProperties && typeof fontCssProperties === 'object' && fontCssProperties.fontFamily
+        ? { ...fontCssProperties }
+        : { fontFamily: getFontFamily() };
+    return {
+      ...fromHook,
+      textAlign: textAlignment,
+      textTransform: textCase === 'none' ? 'none' : textCase,
+      color: textColor,
+    };
+  }, [
+    fontCssProperties,
+    getFontFamily,
+    textAlignment,
+    textCase,
+    textColor,
+  ]);
 
   // Оборачиваем renderItem в useCallback
   const renderItem = useCallback((index, size) => {
@@ -68,7 +75,7 @@ const WaterfallMode = () => {
   }, [
     // Добавляем все зависимости, используемые внутри renderItem
     selectedFont, 
-    baseTextStyle, // baseTextStyle зависит от getFontFamily, getVariationSettings, textCase, textColor
+    baseTextStyle,
     lineHeight, 
     textAlignment, 
     // text (из useSettings) используется в EditableText, но передается через initialText, 

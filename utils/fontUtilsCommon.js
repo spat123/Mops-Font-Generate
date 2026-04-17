@@ -25,6 +25,81 @@ export const PRESET_STYLES = [
 ];
 
 /**
+ * Есть ли у VF смысл показывать курсивные пресеты (ось ital или реальный slnt).
+ * @param {Record<string, { min?: number, max?: number }>|null|undefined} variableAxes
+ */
+export function variableFontAllowsItalicPresets(variableAxes) {
+  if (!variableAxes || typeof variableAxes !== 'object') return false;
+  const ital = variableAxes.ital;
+  if (ital && typeof ital === 'object') {
+    const mx = Number(ital.max);
+    if (Number.isFinite(mx) && mx > 0) return true;
+  }
+  const slnt = variableAxes.slnt;
+  if (slnt && typeof slnt === 'object') {
+    const mn = Number(slnt.min);
+    const mx = Number(slnt.max);
+    if (Number.isFinite(mn) && Number.isFinite(mx) && mn < mx && (mn < 0 || mx < 0)) return true;
+  }
+  return false;
+}
+
+/**
+ * Оставляет только пресеты, совместимые с осями вариативного шрифта (в первую очередь wght).
+ * @param {Record<string, { min?: number, max?: number, default?: number }>|null|undefined} variableAxes
+ * @param {typeof PRESET_STYLES} [presets]
+ */
+export function filterPresetStylesForVariableAxes(variableAxes, presets = PRESET_STYLES) {
+  const list = Array.isArray(presets) ? presets : PRESET_STYLES;
+  if (!variableAxes || typeof variableAxes !== 'object') {
+    return [...list];
+  }
+
+  const wght = variableAxes.wght;
+  const wMin = wght && Number.isFinite(Number(wght.min)) ? Number(wght.min) : null;
+  const wMax = wght && Number.isFinite(Number(wght.max)) ? Number(wght.max) : null;
+  const hasWght = wMin != null && wMax != null;
+  const lo = hasWght ? Math.min(wMin, wMax) : null;
+  const hi = hasWght ? Math.max(wMin, wMax) : null;
+
+  const allowItalic = variableFontAllowsItalicPresets(variableAxes);
+
+  const filtered = list.filter((p) => {
+    if (!p || typeof p.weight !== 'number') return false;
+    if (p.style === 'italic' && !allowItalic) return false;
+    if (!hasWght) return true;
+    return p.weight >= lo && p.weight <= hi;
+  });
+
+  return filtered.length > 0 ? filtered : [...list];
+}
+
+/**
+ * Если имя пресета не входит в допустимые для VF, подбирает ближайший по весу и стилю.
+ */
+export function clampPresetNameForVariableAxes(
+  presetName,
+  variableAxes,
+  hintWeight = 400,
+  hintStyle = 'normal',
+) {
+  const allowed = filterPresetStylesForVariableAxes(variableAxes);
+  if (allowed.some((p) => p.name === presetName)) return presetName;
+
+  const w = Number.isFinite(Number(hintWeight)) ? Number(hintWeight) : 400;
+  const style = hintStyle === 'italic' ? 'italic' : 'normal';
+  const pool = allowed.filter((p) => p.style === style);
+  const list = pool.length ? pool : allowed;
+  if (!list.length) return 'Regular';
+
+  let best = list[0];
+  for (const p of list) {
+    if (Math.abs(p.weight - w) < Math.abs(best.weight - w)) best = p;
+  }
+  return best.name;
+}
+
+/**
  * Находит информацию о стиле по весу и типу шрифта
  * @param {number} weight - Вес шрифта (100-900)
  * @param {string} style - Стиль шрифта ('normal', 'italic')

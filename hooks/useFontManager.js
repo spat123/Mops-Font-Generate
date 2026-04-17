@@ -1,7 +1,12 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 // import opentype from 'opentype.js';
 import { toast } from 'react-toastify';
-import { findStyleInfoByWeightAndStyle, PRESET_STYLES } from '../utils/fontUtilsCommon';
+import {
+  findStyleInfoByWeightAndStyle,
+  PRESET_STYLES,
+  filterPresetStylesForVariableAxes,
+  clampPresetNameForVariableAxes,
+} from '../utils/fontUtilsCommon';
 import { debouncedUpdateVariableFontSettings } from '../utils/cssGenerator';
 import { deleteFontDB } from '../utils/db';
 import { revokeObjectURL } from '../utils/localFontProcessor'; // <<< Добавляем импорт revokeObjectURL
@@ -254,27 +259,40 @@ export function useFontManager() {
         return 'Regular';
       }
       
-      // Приоритет 2: Для вариативных шрифтов с настройками осей, определяем пресет по осям
-      if (selectedFont.isVariableFont && variableSettings && Object.keys(variableSettings).length > 0) {
-        // Пытаемся найти пресет, который соответствует текущим настройкам осей
-        const currentWeight = variableSettings.wght || 400;
-        const currentStyle = (variableSettings.ital === 1 || (variableSettings.slnt && variableSettings.slnt < 0)) ? 'italic' : 'normal';
-        
-        const matchedPreset = findStyleInfoByWeightAndStyle(currentWeight, currentStyle);
-        if (matchedPreset) {
-          console.log(`[selectedPresetName] Вариативный шрифт по осям: ${matchedPreset.name}`);
-          return matchedPreset.name;
+      // Вариативный: имя пресета по осям + приведение к допустимым для диапазона wght
+      if (selectedFont.isVariableFont) {
+        const liveAxes = variableSettings && Object.keys(variableSettings).length > 0 ? variableSettings : null;
+        const storedAxes = selectedFont.lastUsedVariableSettings && typeof selectedFont.lastUsedVariableSettings === 'object' && Object.keys(selectedFont.lastUsedVariableSettings).length > 0
+          ? selectedFont.lastUsedVariableSettings
+          : null;
+        const axisSource = liveAxes || storedAxes;
+        let candidate = 'Regular';
+        let hintW = 400;
+        let hintStyle = 'normal';
+        if (axisSource) {
+          hintW = axisSource.wght != null ? Number(axisSource.wght) : 400;
+          hintStyle = (axisSource.ital === 1 || (axisSource.slnt != null && Number(axisSource.slnt) < 0)) ? 'italic' : 'normal';
+          const matchedPreset = findStyleInfoByWeightAndStyle(hintW, hintStyle);
+          if (matchedPreset) candidate = matchedPreset.name;
+        } else if (selectedFont.lastUsedPresetName) {
+          candidate = selectedFont.lastUsedPresetName;
+          hintW =
+            selectedFont.currentWeight != null && Number.isFinite(Number(selectedFont.currentWeight))
+              ? Number(selectedFont.currentWeight)
+              : 400;
+          hintStyle = selectedFont.currentStyle === 'italic' ? 'italic' : 'normal';
         }
+        const clamped = clampPresetNameForVariableAxes(
+          candidate,
+          selectedFont.variableAxes,
+          hintW,
+          hintStyle,
+        );
+        console.log(`[selectedPresetName] Вариативный: ${candidate} → ${clamped}`);
+        return clamped;
       }
-      
-      // Приоритет 3: Если есть сохраненный пресет, используем его
-      if (selectedFont.lastUsedPresetName) {
-        console.log(`[selectedPresetName] Сохраненный пресет: ${selectedFont.lastUsedPresetName}`);
-        return selectedFont.lastUsedPresetName;
-      }
-      
-      // Приоритет 4: По умолчанию Regular
-      console.log(`[selectedPresetName] По умолчанию: Regular`);
+
+      console.warn('[selectedPresetName] Неожиданное состояние шрифта, Regular');
       return 'Regular';
   }, [selectedFont, variableSettings]);
 
@@ -373,30 +391,22 @@ export function useFontManager() {
         return styles;
       } else */ 
       
-      // Если шрифт вариативный, возвращаем все пресеты (для UI выбора)
+      // Вариативный: только пресеты, попадающие в диапазон wght (и курсив — если есть ital/slnt)
       if (selectedFont.isVariableFont) {
-          return PRESET_STYLES;
+          return filterPresetStylesForVariableAxes(selectedFont.variableAxes);
       // Если у шрифта есть поле availableStyles (из Fontsource или локального парсинга)
-      } else if (selectedFont.availableStyles && Array.isArray(selectedFont.availableStyles)) {
-          // Убедимся, что стили имеют нужный формат {name, weight, style}
-          // Если формат уже правильный, просто возвращаем
-          if (selectedFont.availableStyles.every(s => s.name && s.weight && s.style)) {
-          return selectedFont.availableStyles;
+      } else if (selectedFont.availableStyles && Array.isArray(selectedFont.availableStyles) && selectedFont.availableStyles.length > 0) {
+          const isValid = selectedFont.availableStyles.every(
+            (s) => s && s.name != null && s.weight != null && s.style != null
+          );
+          if (isValid) {
+            return selectedFont.availableStyles;
           }
-          // Если формат другой (например, из Fontsource metadata), нужно будет его преобразовать
-          // Пока просто возвращаем пустой массив или базовые, если преобразование не реализовано
-          // TODO: Добавить преобразование из формата Fontsource metadata, если он отличается
-          console.warn('Формат availableStyles отличается от ожидаемого, требуется преобразование.');
-          return [
-              PRESET_STYLES.find(p => p.name === 'Regular'),
-              PRESET_STYLES.find(p => p.name === 'Bold')
-          ].filter(Boolean);
-      // Иначе возвращаем базовые стили
+          console.warn('Формат availableStyles отличается от ожидаемого, используем стандартные пресеты.');
+          return [...PRESET_STYLES];
+      // Нет своих стилей (или пустой массив — раньше [] давал пустой UI из-за Array.every на [])
       } else {
-          return [
-              PRESET_STYLES.find(p => p.name === 'Regular'),
-              PRESET_STYLES.find(p => p.name === 'Bold')
-          ].filter(Boolean);
+          return [...PRESET_STYLES];
       }
   }, [selectedFont]);
 

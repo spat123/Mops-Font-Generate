@@ -1,6 +1,11 @@
 import { useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
-import { loadFontFaceIfNeeded, updateVariableFontSettings, debouncedUpdateVariableFontSettings } from '../utils/cssGenerator';
+import {
+  loadFontFaceIfNeeded,
+  updateVariableFontSettings,
+  debouncedUpdateVariableFontSettings,
+  buildVariableFontFaceDescriptors,
+} from '../utils/cssGenerator';
 
 /**
  * Хук для управления CSS стилями шрифтов.
@@ -23,25 +28,27 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     const targetFont = font || selectedFont;
     if (!targetFont) return 'inherit';
 
-    // Используем fontFamily из объекта шрифта, если он есть
+    const q = (s) => String(s).replace(/"/g, '\\"');
+
+    // Используем fontFamily из объекта шрифта, если он есть (реальное имя FontFace: font-xxxxx и т.д.)
     if (targetFont.fontFamily) {
-      return `"${targetFont.fontFamily}"`;
+      return `"${q(targetFont.fontFamily)}"`;
     }
 
     // Для Fontsource шрифтов генерируем имя на основе name
     if (targetFont.source === 'fontsource' && targetFont.name) {
-      return `"${targetFont.name}"`;
+      return `"${q(targetFont.name)}"`;
     }
 
-    // Для локальных шрифтов используем name или filename
+    // Для локальных / Google после парсинга — display name
     if (targetFont.name) {
-      return `"${targetFont.name}"`;
+      return `"${q(targetFont.name)}"`;
     }
 
     // Если есть filename (без расширения), используем его
     if (targetFont.filename) {
       const nameWithoutExt = targetFont.filename.replace(/\.[^/.]+$/, '');
-      return `"${nameWithoutExt}"`;
+      return `"${q(nameWithoutExt)}"`;
     }
 
     // Если ничего не найдено, используем ID как fallback
@@ -91,8 +98,12 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
       return { fontFamily: 'inherit' };
     }
 
+    const primaryFamily = getFontFamily();
+    // Запасной sans-serif: иначе при несовпадении имени с FontFace браузер берёт serif (Times)
     const properties = {
-      fontFamily: getFontFamily()
+      fontFamily: primaryFamily === 'inherit'
+        ? 'inherit'
+        : `${primaryFamily}, ui-sans-serif, system-ui, sans-serif`
     };
 
     if (isSelectedFontVariable) {
@@ -112,7 +123,15 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
 
     console.log(`[fontCssProperties] Обновляем CSS для ${selectedFont.name}:`, properties);
     return properties;
-  }, [selectedFont, selectedFont?.currentWeight, selectedFont?.currentStyle, isSelectedFontVariable, getFontFamily, getVariationSettings]);
+  }, [
+    selectedFont,
+    selectedFont?.currentWeight,
+    selectedFont?.currentStyle,
+    isSelectedFontVariable,
+    getFontFamily,
+    getVariationSettings,
+    variableSettings,
+  ]);
 
   /**
    * Генерирует CSS свойства для применения к элементам.
@@ -144,10 +163,20 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
         return null;
       }
 
+      // Только имя семейства для FontFace (без fallback-стека из CSS)
+      const familyForFace = fontFamily.replace(/"/g, '').split(',')[0].trim();
+
+      const faceDescriptors =
+        font.isVariableFont && font.variableAxes
+          ? buildVariableFontFaceDescriptors(font.variableAxes)
+          : {};
+
       const fontFace = await loadFontFaceIfNeeded(
-        fontFamily.replace(/"/g, ''), // Убираем кавычки
+        familyForFace,
         url,
-        settings
+        settings,
+        font.id || '',
+        faceDescriptors
       );
 
       return fontFace;

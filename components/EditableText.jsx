@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, memo, useCallback } from 'react';
+import React, { useRef, useEffect, useLayoutEffect, memo, useCallback } from 'react';
 // Импортируем useSettings
 import { useSettings } from '../contexts/SettingsContext';
 import { useFontContext } from '../contexts/FontContext';
@@ -43,6 +43,20 @@ const EditableText = memo(({
     }
   }, [isWaterfall, isStyles]);
   
+  // После смены семейства / FVS / веса иногда нужен reflow, иначе contenteditable + FontFace API
+  // оставляют часть глифов на fallback до следующей перерисовки.
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el || !style) return;
+    void el.offsetHeight;
+  }, [
+    style?.fontFamily,
+    style?.fontVariationSettings,
+    style?.fontWeight,
+    style?.fontStyle,
+    style?.fontFeatureSettings,
+  ]);
+
   // Синхронизируем локальный текст с глобальным при изменении текста извне или смене режима
   useEffect(() => {
     if (contentRef.current && localTextRef.current !== text) {

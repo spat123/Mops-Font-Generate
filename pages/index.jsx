@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import FontPreview from '../components/FontPreview';
@@ -6,6 +6,14 @@ import CSSModal from '../components/CSSModal';
 import { toast } from 'react-toastify';
 import { useFontContext } from '../contexts/FontContext';
 import { useSettings } from '../contexts/SettingsContext';
+import GoogleFontsCatalogPanel from '../components/GoogleFontsCatalogPanel';
+import FontsourceCatalogPanel from '../components/FontsourceCatalogPanel';
+
+function fontSourceLabel(font) {
+  if (font.source === 'google') return 'Google Font';
+  if (font.source === 'fontsource') return 'Fontsource';
+  return 'Пользовательский';
+}
 
 export default function Home() {
   // Получаем настройки из контекста
@@ -30,6 +38,8 @@ export default function Home() {
   const [animationSpeed, setAnimationSpeed] = useState(1);
   const [cssString, setCssString] = useState('');
   const [activeTab, setActiveTab] = useState('preview'); // 'preview' или 'fonts'
+  /** Подвкладка внутри «Все шрифты»: карточки по источнику */
+  const [fontsLibraryTab, setFontsLibraryTab] = useState('google'); // 'google' | 'fontsource'
   const [isCSSModalOpen, setIsCSSModalOpen] = useState(false);
   // Эти состояния больше не используются или не нужны здесь
   // const [isChangingTab, setIsChangingTab] = useState(false);
@@ -58,6 +68,10 @@ export default function Home() {
   // Добавляем ref для input загрузки файлов
   const fileInputRef = useRef(null);
 
+  const localFonts = useMemo(
+    () => fonts.filter((f) => f.source === 'local'),
+    [fonts],
+  );
   // Получаем формат шрифта по расширению файла
   const getFontFormat = (filename) => {
     if (!filename) return 'truetype';
@@ -296,8 +310,12 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           </div>
         </div>
         
-        {/* Контент вкладок */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden flex">
+        {/* Контент вкладок: «Все шрифты» — внутренний скролл у каталога, не вся страница */}
+        <div
+          className={`flex min-h-0 flex-1 flex-col overflow-x-hidden ${
+            activeTab === 'fonts' ? 'overflow-hidden' : 'overflow-y-auto'
+          }`}
+        >
           {activeTab === 'preview' && (
             <>
             <FontPreview 
@@ -305,6 +323,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               getFontFamily={getFontFamily}
               getVariationSettings={getVariationSettings}
               handleFontsUploaded={handleFontsUploaded}
+              selectOrAddFontsourceFont={selectOrAddFontsourceFont}
               handleCSSClick={handleCSSClick}
               fontCssProperties={fontCssProperties}
             />
@@ -312,38 +331,46 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           )}
           
           {activeTab === 'fonts' && (
-            <div className="bg-white h-full w-full p-6 overflow-x-hidden">
-              <h2 className="font-medium text-lg text-blue-700 mb-4 pt-10">Все шрифты</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 max-w-full">
-                {fonts.map((font, index) => (
-                  <div 
-                    key={index} 
+            <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white p-6 pt-16">
+              <h2 className="shrink-0 font-medium text-lg text-blue-700 mb-4">Загруженные</h2>
+              <p className="shrink-0 text-sm text-gray-500 mb-3">
+                Файлы с диска (локальные). Шрифты из Google и Fontsource — в блоке «Все шрифты» ниже.
+              </p>
+              <div className="mb-10 grid max-w-full shrink-0 grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                {localFonts.map((font) => (
+                  <div
+                    key={font.id}
                     className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 relative ${
-                      selectedFont === font 
-                        ? 'bg-blue-50 border-blue-300 shadow-sm' 
+                      selectedFont === font
+                        ? 'bg-blue-50 border-blue-300 shadow-sm'
                         : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50'
                     }`}
                     onClick={() => {
                       safeSelectFont(font);
-                      setActiveTab('preview'); // Переключаемся на просмотр при выборе шрифта
+                      setActiveTab('preview');
                     }}
                   >
-                    <div className="font-medium text-sm truncate">{font.name}</div>
-                    <div 
-                      className="mt-2 truncate" 
-                      style={{ fontFamily: font.fontFamily ? `'${font.fontFamily}'` : `'${font.name}'`, fontSize: '20px' }}
+                    <div className="font-medium text-sm truncate">
+                      {font.displayName || font.name}
+                    </div>
+                    <div
+                      className="mt-2 truncate"
+                      style={{
+                        fontFamily: font.fontFamily
+                          ? `'${font.fontFamily}'`
+                          : `'${font.displayName || font.name}'`,
+                        fontSize: '20px',
+                      }}
                     >
                       AaBbCcDdEe
                     </div>
-                    <div className="mt-1 text-xs text-gray-500">
-                      {font.source === 'google' ? 'Google Font' : 'Пользовательский'}
-                    </div>
-                    {/* Кнопка удаления */}
-                    <button 
+                    <div className="mt-1 text-xs text-gray-500">{fontSourceLabel(font)}</div>
+                    <button
+                      type="button"
                       className="absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors"
                       onClick={(e) => {
-                        e.stopPropagation(); // Предотвращаем всплытие события клика
-                        removeFont(font.id); // Вызываем функцию удаления шрифта
+                        e.stopPropagation();
+                        removeFont(font.id);
                       }}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -352,10 +379,11 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                     </button>
                   </div>
                 ))}
-                
-                {/* Кнопка для загрузки нового шрифта */}
-                <div className="p-4 rounded-lg border border-dashed border-blue-300 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50 transition-colors duration-200"
-                  onClick={() => fileInputRef.current?.click()}>
+
+                <div
+                  className="p-4 rounded-lg border border-dashed border-blue-300 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50 transition-colors duration-200"
+                  onClick={() => fileInputRef.current?.click()}
+                >
                   <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-blue-500">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -365,6 +393,60 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                   <div className="text-xs text-gray-500 mt-1">TTF, OTF, WOFF или WOFF2</div>
                 </div>
               </div>
+
+              <h2 className="mb-2 shrink-0 font-medium text-lg text-blue-700">Все шрифты</h2>
+              <div className="mb-3 flex shrink-0 border-b border-blue-100">
+                <button
+                  type="button"
+                  onClick={() => setFontsLibraryTab('google')}
+                  className={`px-4 py-3 font-medium text-sm transition-colors duration-200 ${
+                    fontsLibraryTab === 'google'
+                      ? 'text-blue-600 border-b-2 border-blue-500 -mb-px'
+                      : 'text-gray-500 hover:text-blue-500'
+                  }`}
+                >
+                  Гугл
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFontsLibraryTab('fontsource')}
+                  className={`px-4 py-3 font-medium text-sm transition-colors duration-200 ${
+                    fontsLibraryTab === 'fontsource'
+                      ? 'text-blue-600 border-b-2 border-blue-500 -mb-px'
+                      : 'text-gray-500 hover:text-blue-500'
+                  }`}
+                >
+                  Fontsource
+                </button>
+              </div>
+
+              {fontsLibraryTab === 'google' ? (
+                <div className="min-h-0 flex-1">
+                  <GoogleFontsCatalogPanel
+                    fonts={fonts}
+                    selectedFont={selectedFont}
+                    safeSelectFont={safeSelectFont}
+                    removeFont={removeFont}
+                    handleFontsUploaded={handleFontsUploaded}
+                    setActiveTab={setActiveTab}
+                  />
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <p className="mb-2 max-w-3xl text-xs text-gray-500">
+                    Пакеты @fontsource из package.json всегда в списке. Удаление из сессии не убирает строку — снова
+                    нажмите «Добавить в сессию».
+                  </p>
+                  <FontsourceCatalogPanel
+                    fonts={fonts}
+                    selectedFont={selectedFont}
+                    safeSelectFont={safeSelectFont}
+                    removeFont={removeFont}
+                    selectOrAddFontsourceFont={selectOrAddFontsourceFont}
+                    setActiveTab={setActiveTab}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

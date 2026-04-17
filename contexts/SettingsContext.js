@@ -35,6 +35,9 @@ const DEFAULT_SETTINGS = {
   TEXT_FILL: false
 };
 
+/** Текст превью по умолчанию (как при сбросе настроек). */
+export const DEFAULT_PREVIEW_TEXT = DEFAULT_SETTINGS.TEXT;
+
 // <<< Функция для безопасного чтения из localStorage >>>
 const getLocalStorageItem = (key, defaultValue) => {
   if (typeof window !== 'undefined') { // Убедимся, что localStorage доступен (не на сервере)

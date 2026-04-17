@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import FontUploader from './FontUploader';
 import VariableFontControls from './VariableFontControls';
@@ -13,7 +13,7 @@ import {
   rgbStringToHex 
 } from '../utils/colorUtils'; // Исправляем импорт утилит цвета
 import { useFontManager } from '../hooks/useFontManager';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings, DEFAULT_PREVIEW_TEXT } from '../contexts/SettingsContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFolderOpen, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
 import ResetButton from './ResetButton';
@@ -87,6 +87,8 @@ export default function Sidebar({
   
   const [activeTab, setActiveTab] = useState('sample'); // 'sample' или 'glyphs'
   const [activeGlyphSet, setActiveGlyphSet] = useState('entire'); // текущий набор глифов
+  /** Последний авто-подставленный googleFontRecommendedSample (чтобы сбросить при смене на шрифт без образца). */
+  const prevGoogleAutoSampleRef = useRef('');
   const [activeColorTab, setActiveColorTab] = useState('foreground'); // foreground или background
   const [searchTerm, setSearchTerm] = useState('');
   const [fontsList, setFontsList] = useState(FONTSOURCE_FONTS);
@@ -155,11 +157,42 @@ export default function Sidebar({
     selectOrAddFontsourceFont(baseFontName, isVariable);
   };
 
+  const glyphSetsMerged = useMemo(() => {
+    const g = { ...glyphSets };
+    const sample = selectedFont?.googleFontRecommendedSample?.trim();
+    if (sample) {
+      g.google_script = sample;
+    }
+    return g;
+  }, [selectedFont?.id, selectedFont?.googleFontRecommendedSample]);
+
   // Обработчик выбора набора глифов
-  const handleGlyphSetChange = (setKey) => {
-    setActiveGlyphSet(setKey);
-    setText(glyphSets[setKey]);
-  };
+  const handleGlyphSetChange = useCallback(
+    (setKey) => {
+      setActiveGlyphSet(setKey);
+      const content = glyphSetsMerged[setKey];
+      if (content) setText(content);
+    },
+    [glyphSetsMerged, setText],
+  );
+
+  // Google-образец при выборе шрифта; при смене на шрифт без образца убираем «хвост» чужого языка, если текст не трогали.
+  useEffect(() => {
+    const sample = selectedFont?.googleFontRecommendedSample?.trim();
+    if (sample) {
+      prevGoogleAutoSampleRef.current = sample;
+      setActiveGlyphSet('google_script');
+      setText(sample);
+      return;
+    }
+    setActiveGlyphSet('entire');
+    setText((prev) => {
+      const last = prevGoogleAutoSampleRef.current;
+      if (last && prev === last) return DEFAULT_PREVIEW_TEXT;
+      return prev;
+    });
+    prevGoogleAutoSampleRef.current = '';
+  }, [selectedFont?.id, selectedFont?.googleFontRecommendedSample, setText]);
 
   // Получаем название пресета из веса и стиля
   // Удаляем локальную функцию
@@ -531,7 +564,6 @@ export default function Sidebar({
                 
                 {showPresetDropdown && (
                   <div className="absolute z-10 mt-1 w-full bg-white border border-blue-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {console.log("[Sidebar] Rendering availableStyles:", availableStyles)}
                     {availableStyles.map((preset, index) => (
                       <button
                         key={index}
@@ -1074,6 +1106,16 @@ export default function Sidebar({
                 >
                   Latin Supplement
                 </button>
+                {glyphSetsMerged.google_script ? (
+                  <button
+                    type="button"
+                    className={`col-span-2 px-3 py-1.5 text-xs rounded-md transition-all duration-150 
+                    ${activeGlyphSet === 'google_script' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
+                    onClick={() => handleGlyphSetChange('google_script')}
+                  >
+                    Образец языка (Google)
+                  </button>
+                ) : null}
               </div>
             </div>
           )}

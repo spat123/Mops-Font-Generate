@@ -8,6 +8,34 @@ const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
 
 /**
+ * Интерпретатор Python из локального venv fonttools.
+ * На Windows нельзя вызывать fonttools-env/bin/python из Unix-venv (shebang-скрипт) — spawn даёт EFTYPE.
+ */
+function resolveFontToolsPython() {
+  const root = process.cwd();
+  if (process.platform === 'win32') {
+    const winCandidates = [
+      path.join(root, 'fonttools-env', 'Scripts', 'python.exe'),
+      path.join(root, 'fonttools-env', 'Scripts', 'python3.exe'),
+      path.join(root, 'fonttools-env', 'Scripts', 'python3.12.exe'),
+    ];
+    for (const p of winCandidates) {
+      if (fs.existsSync(p)) return p;
+    }
+    return null;
+  }
+  const unixCandidates = [
+    path.join(root, 'fonttools-env', 'bin', 'python3.12'),
+    path.join(root, 'fonttools-env', 'bin', 'python3'),
+    path.join(root, 'fonttools-env', 'bin', 'python'),
+  ];
+  for (const p of unixCandidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+/**
  * API для генерации статических шрифтов из вариативных
  * Использует Python fonttools для настоящей статической генерации
  */
@@ -40,9 +68,15 @@ export default async function handler(req, res) {
     const axisArgs = Object.entries(variableSettings)
       .map(([axis, value]) => `${axis}=${value}`);
 
-    // Используем путь к fonttools в виртуальном окружении
-    const fontToolsPath = path.join(process.cwd(), 'fonttools-env', 'bin', 'python');
-    const command = fontToolsPath;
+    const fontToolsPython = resolveFontToolsPython();
+    if (!fontToolsPython) {
+      return res.status(503).json({
+        error: 'Python fonttools не найден',
+        details:
+          'На Windows: py -3.13 -m venv fonttools-env (или ваша версия из py --list), затем .\\\\fonttools-env\\\\Scripts\\\\pip.exe install fonttools brotli. Не используйте fonttools-env от macOS. На macOS/Linux: fonttools-env/bin/python3.12. См. STATIC_FONT_SETUP.md',
+      });
+    }
+
     const args = [
       '-m', 'fontTools.varLib.instancer',
       inputPath,
@@ -53,19 +87,23 @@ export default async function handler(req, res) {
 
     // Выполняем команду
     const result = await new Promise((resolve, reject) => {
-      const process = spawn(command, args);
+      const child = spawn(fontToolsPython, args, { windowsHide: true });
       let stdout = '';
       let stderr = '';
 
-      process.stdout.on('data', (data) => {
+      child.on('error', (err) => {
+        reject(err);
+      });
+
+      child.stdout.on('data', (data) => {
         stdout += data.toString();
       });
 
-      process.stderr.on('data', (data) => {
+      child.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
-      process.on('close', (code) => {
+      child.on('close', (code) => {
         if (code === 0) {
           resolve({ stdout, stderr });
         } else {

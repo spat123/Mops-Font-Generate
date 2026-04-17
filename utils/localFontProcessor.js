@@ -1,8 +1,8 @@
 // Функции для обработки локально загруженных шрифтов (кэширование, FontFace)
 import { toast } from 'react-toastify';
-import { parseFontBuffer, isVariableFont } from './fontParser';
+import { parseFontBuffer, isVariableFont, mergeFvarAxesFromFontInputs, normalizeFvarAxisTag } from './fontParser';
 import { findStyleInfoByWeightAndStyle, getFormatFromExtension } from './fontUtilsCommon';
-import { loadFontFaceIfNeeded } from './cssGenerator';
+import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGenerator';
 
 /**
  * Кэш для хранения результатов анализа локальных шрифтов
@@ -26,6 +26,48 @@ export const revokeObjectURL = (url) => {
     }
   }
 };
+
+/** Дескрипторы FontFace для одного сабсета статического Google Fonts (unicode-range + вес). */
+export const buildGoogleStaticSliceFaceDescriptors = (slice) => {
+  const w = Number(slice?.weight);
+  const weight = Number.isFinite(w) ? Math.round(w) : 400;
+  const desc = {
+    weight: String(weight),
+    style: slice?.style === 'italic' ? 'italic' : 'normal',
+  };
+  const ur = slice?.unicodeRange != null ? String(slice.unicodeRange).trim() : '';
+  if (ur) desc.unicodeRange = ur;
+  return desc;
+};
+
+/**
+ * VF-сабсет Google (отдельный woff2 на unicode-range): диапазон веса из fvar + unicode-range из CSS.
+ * Без unicode-range браузер не сопоставит глифы с нужным файлом → fallback на системный шрифт.
+ */
+export const buildGoogleVariableSliceFaceDescriptors = (sliceMeta, variableAxes) => {
+  const base = buildVariableFontFaceDescriptors(variableAxes || {});
+  const ur =
+    sliceMeta && sliceMeta.unicodeRange != null ? String(sliceMeta.unicodeRange).trim() : '';
+  if (!ur) return base;
+  return { ...base, unicodeRange: ur };
+};
+
+async function registerGoogleFontSlices(fontFamilyName, slices, fontObj, initialSettings) {
+  await Promise.all(
+    slices.map(async (sl) => {
+      if (!sl?.blob) return;
+      const sliceUrl = URL.createObjectURL(sl.blob);
+      try {
+        const faceDesc = fontObj.isVariableFont
+          ? buildGoogleVariableSliceFaceDescriptors(sl, fontObj.variableAxes)
+          : buildGoogleStaticSliceFaceDescriptors(sl);
+        await loadFontFaceIfNeeded(fontFamilyName, sliceUrl, initialSettings, '', faceDesc);
+      } finally {
+        revokeObjectURL(sliceUrl);
+      }
+    }),
+  );
+}
 
 /**
  * Асинхронно вычисляет SHA-256 хеш для Blob файла.
@@ -57,15 +99,48 @@ const calculateFileHash = async (file) => {
  * @param {Object} fontInput - Объект шрифта с file (Blob) и name (string)
  * @returns {Promise<Object|null>} - Промис с обработанным объектом шрифта или null при критической ошибке.
  */
-export const processLocalFont = async (fontInput) => {
-  if (!fontInput || !(fontInput.file instanceof Blob) || !fontInput.name) {
+export const processLocalFont = async (incomingFontInput) => {
+  if (!incomingFontInput || !(incomingFontInput.file instanceof Blob) || !incomingFontInput.name) {
     toast.error('Неверные входные данные для обработки локального шрифта.');
     return null;
   }
 
+  let fontInput = incomingFontInput;
+  const cleanedName = fontInput.name.replace(/\.[^/.]+$/, '');
+  const source = fontInput.source === 'google' ? 'google' : 'local';
+
+  /** gstatic-сабсеты: в fvar только wght; полный variable TTF — google/fonts на GitHub. */
+  if (
+    source === 'google' &&
+    Array.isArray(fontInput.googleFontAxesFromCatalog) &&
+    fontInput.googleFontAxesFromCatalog.length >= 2 &&
+    Array.isArray(fontInput.googleFontSlices) &&
+    fontInput.googleFontSlices.length > 0
+  ) {
+    try {
+      const res = await fetch(`/api/google-font-github-vf?family=${encodeURIComponent(cleanedName)}`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('font') || ct.includes('ttf') || ct.includes('octet')) {
+          const blob = await res.blob();
+          if (blob instanceof Blob && blob.size > 10_000) {
+            fontInput = {
+              ...fontInput,
+              file: blob,
+              name: `${cleanedName}.ttf`,
+              googleFontSlices: undefined,
+              googleFontAxesFromCatalog: null,
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[localFontProcessor] Полный VF с GitHub:', cleanedName, e);
+    }
+  }
+
   const { file, name } = fontInput;
   const fontId = Math.random().toString(36).substring(2, 9); // Короткий ID для читаемости
-  const cleanedName = name.replace(/\.[^/.]+$/, '');
   let objectUrl = null;
   let cacheKey = null; // Инициализируем cacheKey
 
@@ -77,8 +152,8 @@ export const processLocalFont = async (fontInput) => {
       toast.warning('Не удалось создать ключ кэша для шрифта, кэширование будет пропущено.');
     }
 
-    // 2. Проверка кэша (теперь по хешу)
-    if (cacheKey && localFontCache[cacheKey]) {
+    // 2. Проверка кэша (теперь по хешу). Google multi-subset не кэшируем здесь — метаданные без доп. файлов.
+    if (cacheKey && localFontCache[cacheKey] && !fontInput.googleFontSlices?.length) {
       console.log(`Using cached metadata for ${name} (hash: ${cacheKey.substring(0, 8)}...)`); // Лог для отладки
       objectUrl = URL.createObjectURL(file); // Свежий URL нужен всегда
       const cachedMetadata = { ...localFontCache[cacheKey] }; // Получаем метаданные из кэша
@@ -90,7 +165,7 @@ export const processLocalFont = async (fontInput) => {
         id: fontId,
         name: cachedMetadata.preferredFamily || cachedMetadata.names?.fontFamily || cleanedName, // Используем имена из кэша
         originalName: name,
-        source: 'local',
+        source,
         currentWeight: 400, // Будет уточнено ниже
         currentStyle: 'normal', // Будет уточнено ниже
         isVariableFont: cachedMetadata.isVariable || false, // Используем флаг из кэша
@@ -155,11 +230,15 @@ export const processLocalFont = async (fontInput) => {
 
       // !!! Используем loadFontFaceIfNeeded напрямую !!!
       try {
+        const faceDescriptors = fontObj.isVariableFont
+          ? buildVariableFontFaceDescriptors(fontObj.variableAxes)
+          : {};
         // Вызываем функцию через именованный импорт
-        await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings);
+        await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings, '', faceDescriptors);
         console.log(`Font ${fontFamilyName} loaded successfully from cache using FontFace API.`);
-        // Успешно загрузили, возвращаем fontObj
-        revokeObjectURL(objectUrl); // Освобождаем blob URL после успешной загрузки
+        revokeObjectURL(objectUrl);
+        // Новый blob URL: старый отозван, иначе fontObj.url указывал бы на невалидный адрес → NetworkError в FontFace/CSS
+        fontObj.url = URL.createObjectURL(file);
         return fontObj;
       } catch (error) {
         console.error(`Failed to load font ${fontFamilyName} from cache using FontFace API:`, error);
@@ -195,7 +274,7 @@ export const processLocalFont = async (fontInput) => {
       id: fontId,
       name: cleanedName, // Уточним из metadata
       originalName: name,
-      source: 'local',
+      source,
       currentWeight: 400,
       currentStyle: 'normal',
       isVariableFont: false, // Уточним из metadata
@@ -212,6 +291,9 @@ export const processLocalFont = async (fontInput) => {
     const fontFamilyName = `font-${fontId}`;
     fontObj.url = objectUrl;
     fontObj.fontFamily = fontFamilyName;
+    if (fontInput.googleFontRecommendedSample && typeof fontInput.googleFontRecommendedSample === 'string') {
+      fontObj.googleFontRecommendedSample = fontInput.googleFontRecommendedSample.trim();
+    }
 
     // 5. Заполнение fontObj из данных парсинга, если парсинг успешен
     if (parsedFontData) { // Новая проверка
@@ -227,8 +309,8 @@ export const processLocalFont = async (fontInput) => {
       if (fontObj.isVariableFont && parsedFontData.tables?.fvar?.axes) {
          // Заполняем информацию об осях из parsedFontData.tables.fvar.axes
          fontObj.variableAxes = parsedFontData.tables.fvar.axes.reduce((acc, axis) => {
-                const tag = axis.tag;
-                // Используем имя из axis.name?.en, если оно есть
+                const tag = normalizeFvarAxisTag(axis.tag);
+                if (!tag) return acc;
                 const axisName = axis.name?.en || tag.toUpperCase();
                  acc[tag] = { name: axisName, min: axis.minValue, max: axis.maxValue, default: axis.defaultValue };
                 return acc;
@@ -238,6 +320,28 @@ export const processLocalFont = async (fontInput) => {
             .map(([tag, value]) => `\"${tag}\" ${value.default || 400}`) // Запасное значение для веса
             .join(', ');
          fontObj.availableStyles = [{ name: 'Default', weight: 400, style: 'normal' }]; // Заглушка
+
+        const gfSlices = fontInput.googleFontSlices;
+        if (Array.isArray(gfSlices) && gfSlices.length > 1) {
+          try {
+            const extraBlobs = gfSlices.slice(1).map((s) => s.blob).filter((b) => b instanceof Blob);
+            const mergedAxes = await mergeFvarAxesFromFontInputs([parsedFontData, ...extraBlobs]);
+            if (mergedAxes && Object.keys(mergedAxes).length > 0) {
+              fontObj.variableAxes = mergedAxes;
+              fontObj.supportedAxes = Object.keys(mergedAxes);
+              fontObj.variationSettings = Object.entries(mergedAxes)
+                .map(([tag, v]) => {
+                  const d = v?.default;
+                  const num = typeof d === 'number' && Number.isFinite(d) ? d : 0;
+                  return `\"${tag}\" ${num}`;
+                })
+                .join(', ');
+            }
+          } catch (e) {
+            console.warn('[localFontProcessor] Объединение fvar по слайсам Google:', e);
+          }
+        }
+
       } else if (fontObj.isVariableFont && !parsedFontData.tables?.fvar?.axes) {
          // Вариативный, но оси не извлеклись
          console.warn(`Variable font ${name} parsed without axes info.`);
@@ -268,7 +372,7 @@ export const processLocalFont = async (fontInput) => {
       }
 
       // 6. Кэширование результата (метаданных - извлекаем из parsedFontData для совместимости кэша)
-      if (cacheKey && parsedFontData) { // Добавили проверку parsedFontData
+      if (cacheKey && parsedFontData && !fontInput.googleFontSlices?.length) {
         // Кэшируем объект, похожий на старый metadata, для обратной совместимости?
         // Или кэшировать весь parsedFontData? Пока оставим как было, извлекая нужное
         const metadataToCache = {
@@ -301,13 +405,37 @@ export const processLocalFont = async (fontInput) => {
       }, {});
     }
 
-    // !!! Используем loadFontFaceIfNeeded напрямую !!!
+    // !!! Используем loadFontFaceIfNeeded напрямую (или несколько сабсетов Google static) !!!
     try {
-      // Вызываем функцию через именованный импорт
-      await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings);
+      const googleSlices =
+        Array.isArray(fontInput.googleFontSlices) && fontInput.googleFontSlices.length > 0
+          ? fontInput.googleFontSlices
+          : null;
+
+      if (googleSlices) {
+        await registerGoogleFontSlices(fontFamilyName, googleSlices, fontObj, initialSettings);
+        fontObj.googleFontFirstSliceMeta = {
+          unicodeRange: googleSlices[0].unicodeRange || null,
+          weight: googleSlices[0].weight ?? 400,
+          style: googleSlices[0].style === 'italic' ? 'italic' : 'normal',
+        };
+        if (googleSlices.length > 1) {
+          fontObj.googleFontExtraSliceBlobs = googleSlices.slice(1).map((s) => s.blob);
+          fontObj.googleFontExtraSliceMeta = googleSlices.slice(1).map((s) => ({
+            unicodeRange: s.unicodeRange || null,
+            weight: s.weight ?? 400,
+            style: s.style === 'italic' ? 'italic' : 'normal',
+          }));
+        }
+      } else {
+        const faceDescriptors = fontObj.isVariableFont
+          ? buildVariableFontFaceDescriptors(fontObj.variableAxes)
+          : {};
+        await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings, '', faceDescriptors);
+      }
       console.log(`Font ${fontFamilyName} loaded successfully using FontFace API.`);
-      // Успешно загрузили, возвращаем fontObj
-      revokeObjectURL(objectUrl); // Освобождаем blob URL после успешной загрузки
+      revokeObjectURL(objectUrl);
+      fontObj.url = URL.createObjectURL(file);
       return fontObj;
   } catch (error) {
       console.error(`Failed to load font ${fontFamilyName} using FontFace API:`, error);

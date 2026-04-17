@@ -123,7 +123,6 @@ function GlyphsMode({
       }
 
       const fontId = selectedFont?.id;
-      const fontSource = selectedFont?.source;
       const loadId = Math.random().toString(36).substring(2, 10);
       currentLoadId.current = loadId; 
 
@@ -145,14 +144,6 @@ function GlyphsMode({
       if (!selectedFont.file || !(selectedFont.file instanceof Blob)) {
         resetState(`Invalid font file for ${selectedFont.name}, resetting state.`);
         console.warn(`[GlyphsMode] Attempted to load glyphs for ${selectedFont.name} without a valid file object.`);
-        return;
-      }
-
-      if (fontSource === 'google') {
-        if (!glyphsData && !isLoadingGlyphs.current) {
-          toast.info("Просмотр глифов пока недоступен для Google Fonts.");
-        }
-        resetState("Google Font selected, resetting state.");
         return;
       }
 

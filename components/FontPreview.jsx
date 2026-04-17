@@ -9,6 +9,8 @@ import { useFontContext } from '../contexts/FontContext';
 // Импортируем новые компоненты
 import EditableText from './EditableText';
 import dynamic from 'next/dynamic';
+import { fetchGoogleVariableFontSlicesAll } from '../utils/googleFontLoader';
+import { GOOGLE_PRESET_FONT_NAMES } from '../utils/googlePresetFonts';
 
 // --- Ленивая загрузка компонентов режимов --- 
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -193,6 +195,8 @@ export default function FontPreview({
   exportedFont, 
   handleExport,
   handleFontsUploaded,
+  /** Fallback: Fontsource, если Google недоступен */
+  selectOrAddFontsourceFont,
   handleScreenshotClick, 
   handleCSSClick,
   getFontFamily,
@@ -238,13 +242,19 @@ export default function FontPreview({
   
   const { letterSpacingValue, lineHeightValue, fontStyleValue, fontWeightValue } = styleValues;
   
+  // Без rvrn/rclt: на части шрифтов (VF, Google сабсеты) «required variation alternates» дают
+  // рваную отрисовку — часть глифов уходит в fallback, пока выглядит как «два шрифта в одной строке».
   const featureSettingsValue = useMemo(() => {
-    return '"calt", "liga", "rlig", "rvrn", "kern", "rclt"';
+    return '"calt", "liga", "rlig", "kern"';
   }, []);
   
+  // Должно совпадать с useFontCss.fontCssProperties (fallback-стек, вариативные оси), иначе превью обходило хук
   const fontFamilyValue = useMemo(() => {
+    if (selectedFont && fontCssProperties?.fontFamily) {
+      return fontCssProperties.fontFamily;
+    }
     return getFontFamily(selectedFont);
-  }, [selectedFont, getFontFamily]);
+  }, [selectedFont, getFontFamily, fontCssProperties?.fontFamily]);
   
   const variationSettingsValue = useMemo(() => {
     return getVariationSettings(selectedFont, variableSettings);
@@ -253,7 +263,48 @@ export default function FontPreview({
   const displayText = useMemo(() => {
     return text || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   }, [text]);
-  
+
+  /** Первое семейство из стека (без fallback) — для document.fonts.load */
+  const primaryFontFamilyForLoad = useMemo(() => {
+    if (!fontFamilyValue || fontFamilyValue === 'inherit') return '';
+    return fontFamilyValue.split(',')[0].trim();
+  }, [fontFamilyValue]);
+
+  // Дождаться реальной подгрузки глифов под текущий текст, иначе contenteditable часто рисует
+  // смесь кастомного шрифта и ui-sans-serif до «ленивого» докрута FontFace.
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedFont || !primaryFontFamilyForLoad || typeof document === 'undefined') return;
+    if (!document.fonts || typeof document.fonts.load !== 'function') return;
+
+    const sample = displayText.length > 500 ? displayText.slice(0, 500) : displayText;
+    const spec = `${fontSize}px ${primaryFontFamilyForLoad}`;
+
+    (async () => {
+      try {
+        await document.fonts.load(spec, sample);
+      } catch {
+        /* ignore */
+      }
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        document.querySelectorAll('.editable-sync-plain').forEach((el) => {
+          void el.offsetHeight;
+        });
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedFont?.id,
+    primaryFontFamilyForLoad,
+    fontSize,
+    displayText,
+    variationSettingsValue,
+  ]);
+
   const baseTextStyle = useMemo(() => {
     const styles = {
       fontFamily: fontFamilyValue,
@@ -268,8 +319,9 @@ export default function FontPreview({
     };
     
     if (selectedFont?.isVariableFont) {
-      // Для вариативных шрифтов используем только font-variation-settings
-      if (variationSettingsValue) {
+      // Напрямую из variableSettings (через variationSettingsValue), а не только из fontCssProperties —
+      // иначе при смене осей useMemo fontCssProperties мог отставать и превью «залипало».
+      if (variationSettingsValue && variationSettingsValue !== 'normal') {
         styles.fontVariationSettings = variationSettingsValue;
       }
     } else {
@@ -281,7 +333,8 @@ export default function FontPreview({
     return styles;
   }, [
     fontFamilyValue, fontSize, letterSpacingValue, fontStyleValue, fontWeightValue, 
-    lineHeightValue, textColor, featureSettingsValue, selectedFont, variationSettingsValue,
+    lineHeightValue, textColor, featureSettingsValue, selectedFont,
+    variationSettingsValue,
     textDirection, textAlignment, textCase
   ]);
   
@@ -320,10 +373,9 @@ export default function FontPreview({
 
   const glyphDisplayStyle = useMemo(() => {
     if (selectedFont?.isVariableFont) {
-      // Для вариативных шрифтов используем только font-variation-settings
-      return {
-        ...(variationSettingsValue ? { fontVariationSettings: variationSettingsValue } : {})
-      };
+      const fvs =
+        variationSettingsValue && variationSettingsValue !== 'normal' ? variationSettingsValue : null;
+      return fvs ? { fontVariationSettings: fvs } : {};
     } else {
       // Для НЕвариативных шрифтов используем font-weight и font-style
       return {
@@ -334,136 +386,36 @@ export default function FontPreview({
   }, [fontStyleValue, fontWeightValue, selectedFont, variationSettingsValue]);
 
   const loadPresetFont = useCallback(async (fontName) => {
-    const fontLink = document.createElement('link');
-    fontLink.rel = 'stylesheet';
-    
-    fontLink.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap`;
-    
-    const fontLinkVariable = document.createElement('link');
-    fontLinkVariable.rel = 'stylesheet';
-    fontLinkVariable.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:ital,wght@0,100..900;1,100..900&display=swap`;
-    
-    document.head.appendChild(fontLinkVariable);
-    
-    const loadingIndicator = document.createElement('div');
-    loadingIndicator.id = 'font-loading-indicator';
-    loadingIndicator.style.position = 'fixed';
-    loadingIndicator.style.top = '50%';
-    loadingIndicator.style.left = '50%';
-    loadingIndicator.style.transform = 'translate(-50%, -50%)';
-    loadingIndicator.style.background = 'rgba(255, 255, 255, 0.9)';
-    loadingIndicator.style.padding = '20px';
-    loadingIndicator.style.borderRadius = '8px';
-    loadingIndicator.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
-    loadingIndicator.style.zIndex = '9999';
-    loadingIndicator.innerHTML = `<div style="text-align: center;">
-      <div style="margin-bottom: 10px; font-weight: bold; color: #3B82F6;">Загрузка шрифта ${fontName}...</div>
-      <div style="height: 4px; width: 200px; background: #EEF2FF; overflow: hidden; border-radius: 4px;">
-        <div id="progress-bar" style="height: 100%; width: 0%; background: #3B82F6; transition: width 0.3s;"></div>
-      </div>
-    </div>`;
-    
-    document.body.appendChild(loadingIndicator);
-    
-    let loadProgress = 0;
-    const updateProgress = () => {
-      loadProgress += 20;
-      const progressBar = document.getElementById('progress-bar');
-      if (progressBar) {
-        progressBar.style.width = `${Math.min(loadProgress, 90)}%`;
+    try {
+      const slices = await fetchGoogleVariableFontSlicesAll(fontName);
+      if (!slices?.[0]?.blob?.size) {
+        throw new Error('Пустой файл шрифта');
       }
-    };
-    
-    const progressInterval = setInterval(updateProgress, 100);
-    
-    fontLink.onload = async () => {
-      clearInterval(progressInterval);
-      
-      if (document.getElementById('progress-bar')) {
-        document.getElementById('progress-bar').style.width = '100%';
-      }
-      
-      try {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        const fontObj = await processGoogleFont(fontName, 400, 'normal');
-        
-        const loadingIndicator = document.getElementById('font-loading-indicator');
-        if (loadingIndicator) {
-          document.body.removeChild(loadingIndicator);
-        }
-        
-        handleFontsUploaded([fontObj]);
-        
-        if (toast) {
-          toast.success(`Шрифт ${fontName} успешно загружен`, {
-            position: "bottom-right",
-            autoClose: 3000
-          });
-        }
-      } catch (error) {
-        const basicFontObj = {
-          id: Math.random().toString(36).substring(2, 15),
-          name: fontName,
+      await handleFontsUploaded([
+        {
+          file: slices[0].blob,
+          name: `${fontName}.woff2`,
           source: 'google',
-          family: fontName,
-          currentWeight: 400,
-          currentStyle: 'normal',
-          availableStyles: [
-            { name: 'Regular', weight: 400, style: 'normal' },
-            { name: 'Bold', weight: 700, style: 'normal' }
-          ],
-          isVariableFont: false,
-          file: new Blob([''], { type: 'font/ttf' }),
-          url: fontLink.href
-        };
-        
-        const loadingIndicator = document.getElementById('font-loading-indicator');
-        if (loadingIndicator) {
-          document.body.removeChild(loadingIndicator);
+          googleFontSlices: slices,
+        },
+      ]);
+    } catch (e) {
+      console.warn('[FontPreview] Google Fonts, fallback Fontsource:', fontName, e);
+      if (typeof selectOrAddFontsourceFont === 'function') {
+        try {
+          await selectOrAddFontsourceFont(fontName, false);
+          toast.info(`Google недоступен, загружен Fontsource: ${fontName}`);
+        } catch (e2) {
+          console.error('[FontPreview] Fontsource:', fontName, e2);
+          toast.error(`Не удалось загрузить ${fontName}`);
         }
-        
-        handleFontsUploaded([basicFontObj]);
-        
-        if (toast) {
-          toast.error(`Проблема при инициализации шрифта ${fontName}. Некоторые функции могут быть недоступны.`, {
-            position: "bottom-right",
-            autoClose: 5000
-          });
-        }
+      } else {
+        toast.error(`Не удалось загрузить ${fontName} с Google Fonts`);
       }
-    };
-    
-    fontLink.onerror = (error) => {
-      clearInterval(progressInterval);
-      
-      const loadingIndicator = document.getElementById('font-loading-indicator');
-      if (loadingIndicator) {
-        loadingIndicator.innerHTML = `<div style="text-align: center; color: #EF4444;">
-          <div>Ошибка загрузки шрифта ${fontName}</div>
-        </div>`;
-        
-        setTimeout(() => {
-          if (document.getElementById('font-loading-indicator')) {
-            document.body.removeChild(document.getElementById('font-loading-indicator'));
-          }
-        }, 2000);
-      }
-      
-      if (toast) {
-        toast.error(`Не удалось загрузить шрифт ${fontName}`, {
-          position: "bottom-right",
-          autoClose: 5000
-        });
-      }
-    };
-    
-    document.head.appendChild(fontLink);
-  }, [handleFontsUploaded]);
+    }
+  }, [handleFontsUploaded, selectOrAddFontsourceFont]);
   
-  const presetFonts = useMemo(() => {
-    return ['Roboto', 'Inter', 'Open Sans', 'Lato'];
-  }, []);
+  const presetFonts = useMemo(() => [...GOOGLE_PRESET_FONT_NAMES], []);
   
   const waterfallSizes = useMemo(() => {
     return [160, 144, 128, 112, 96, 80, 72, 64, 56, 48, 40, 36, 32, 28, 24, 20, 18, 16, 14, 12];
@@ -502,8 +454,8 @@ export default function FontPreview({
               <button 
                 key={fontName}
                 onClick={() => loadPresetFont(fontName)}
-                className="bg-white py-3 px-4 rounded-md border border-blue-200 text-blue-700 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-400"
-                style={{ fontFamily: fontName }}
+                type="button"
+                className="bg-white py-3 px-4 rounded-md border border-blue-200 text-blue-700 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-400 font-sans font-medium"
               >
                 {fontName}
               </button>

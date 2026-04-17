@@ -46,6 +46,95 @@ export const isVariableFont = (fontData) => {
   return !!(fontData && fontData.tables && fontData.tables.fvar);
 };
 
+/** Тег оси в fvar → 4-символьная строка (opentype может отдавать string или массив байт). */
+export function normalizeFvarAxisTag(tag) {
+  if (tag == null) return '';
+  if (typeof tag === 'string') {
+    const t = tag.trim();
+    return t.length <= 4 ? t : t.slice(0, 4);
+  }
+  if (Array.isArray(tag)) {
+    return tag
+      .map((c) => (typeof c === 'number' ? String.fromCharCode(c & 0xff) : typeof c === 'string' ? c : ''))
+      .join('')
+      .slice(0, 4);
+  }
+  return String(tag).slice(0, 4);
+}
+
+function axisDisplayName(axis, tag) {
+  const n = axis?.name;
+  if (n && typeof n === 'object' && n.en) return n.en;
+  if (typeof n === 'string' && n.trim()) return n.trim();
+  return String(tag).toUpperCase();
+}
+
+/**
+ * У региональных woff2-слайсов Google VF часто урезанный fvar (например только wght).
+ * Собираем объединение осей по всем слайсам: min/max по всем файлам; default и имя — из самого «полного» fvar.
+ *
+ * @param {Array<object|Blob|ArrayBuffer|null|undefined>} inputs — уже распарсенный Font opentype или бинарник слайса
+ * @returns {Promise<Record<string, { name: string, min: number, max: number, default: number }>|null>}
+ */
+export async function mergeFvarAxesFromFontInputs(inputs) {
+  if (!Array.isArray(inputs) || inputs.length === 0) return null;
+
+  const parseBag = [];
+  for (const inp of inputs) {
+    if (!inp) continue;
+    let parsed = null;
+    if (typeof inp === 'object' && inp.tables && inp.tables.fvar && Array.isArray(inp.tables.fvar.axes)) {
+      parsed = inp;
+    } else if (inp instanceof Blob) {
+      const buf = await inp.arrayBuffer();
+      parsed = await parseFontBuffer(buf, 'merge-fvar');
+    } else if (inp instanceof ArrayBuffer) {
+      parsed = await parseFontBuffer(inp, 'merge-fvar');
+    }
+    const axes = parsed?.tables?.fvar?.axes;
+    if (!axes?.length) continue;
+    parseBag.push({ n: axes.length, axes });
+  }
+  if (!parseBag.length) return null;
+
+  parseBag.sort((a, b) => b.n - a.n);
+
+  const merged = {};
+  for (const { axes } of parseBag) {
+    for (const axis of axes) {
+      const tag = normalizeFvarAxisTag(axis.tag);
+      if (!tag) continue;
+      const mn = Number(axis.minValue);
+      const mx = Number(axis.maxValue);
+      const def = Number(axis.defaultValue);
+      const name = axisDisplayName(axis, tag);
+      if (!merged[tag]) {
+        merged[tag] = {
+          name,
+          min: Number.isFinite(mn) ? mn : 0,
+          max: Number.isFinite(mx) ? mx : 0,
+          default: Number.isFinite(def) ? def : 0,
+        };
+      } else {
+        if (Number.isFinite(mn)) merged[tag].min = Math.min(merged[tag].min, mn);
+        if (Number.isFinite(mx)) merged[tag].max = Math.max(merged[tag].max, mx);
+      }
+    }
+  }
+
+  const richest = parseBag[0].axes;
+  for (const axis of richest) {
+    const tag = normalizeFvarAxisTag(axis.tag);
+    if (!merged[tag]) continue;
+    const def = Number(axis.defaultValue);
+    if (Number.isFinite(def)) merged[tag].default = def;
+    const nm = axisDisplayName(axis, tag);
+    if (nm) merged[tag].name = nm;
+  }
+
+  return merged;
+}
+
 /**
  * [Только основной поток] Асинхронно парсит ArrayBuffer шрифта.
  * Декомпрессирует WOFF2 при необходимости.

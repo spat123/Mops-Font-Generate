@@ -54,6 +54,10 @@ export async function saveFont(fontObj) {
       console.warn("Попытка сохранить некорректный fontObj в IndexedDB", fontObj);
       return;
   }
+  if (!(fontObj.file instanceof Blob) || fontObj.file.size === 0) {
+      console.warn("Пропуск сохранения шрифта: пустой или невалидный Blob", fontObj.id, fontObj.name);
+      return;
+  }
   try {
     const db = await openDB();
     const transaction = db.transaction(STORE_NAME, 'readwrite');

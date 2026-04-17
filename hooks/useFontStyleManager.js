@@ -93,9 +93,15 @@ export function useFontStyleManager(
 
       // Обновляем 'wght', если ось существует
       if ('wght' in currentAxes) {
-        // Применяем вес из пресета
-        if (newSettings.wght !== weight) {
-          newSettings.wght = weight;
+        const wAxis = currentAxes.wght;
+        let w = weight;
+        if (wAxis && typeof wAxis === 'object' && Number.isFinite(Number(wAxis.min)) && Number.isFinite(Number(wAxis.max))) {
+          const a = Math.min(Number(wAxis.min), Number(wAxis.max));
+          const b = Math.max(Number(wAxis.min), Number(wAxis.max));
+          w = Math.min(b, Math.max(a, w));
+        }
+        if (newSettings.wght !== w) {
+          newSettings.wght = w;
           settingsChanged = true;
         }
       }

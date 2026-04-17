@@ -63,7 +63,10 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         throw new Error('API вернул пустой или undefined ответ');
       }
       
-      const { fontBufferBase64, fileName } = JSON.parse(responseText);
+      const parsed = JSON.parse(responseText);
+      // Статический API ([fontFamily].js) отдаёт fontData / actualFileName; variable — fontBufferBase64 / fileName
+      const fontBufferBase64 = parsed.fontBufferBase64 ?? parsed.fontData;
+      const fileName = parsed.fileName ?? parsed.actualFileName;
       if (!fontBufferBase64) throw new Error("Пустой буфер шрифта");
 
       const fontBuffer = base64ToArrayBuffer(fontBufferBase64);
@@ -140,7 +143,11 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       const metadata = JSON.parse(metaResponseText);
 
       const actualIsVariableFont = metadata?.metadata?.variable && forceVariableFont;
-      const displayName = actualIsVariableFont ? `${fontFamily} Variable` : fontFamily;
+      const familyLabel =
+        metadata?.family || metadata?.metadata?.family || fontFamily;
+      const displayName = actualIsVariableFont
+        ? `${familyLabel} Variable`
+        : familyLabel;
       const fontId = `fontsource-${fontFamily}-${actualIsVariableFont ? 'variable' : 'static'}`;
 
       const fontObj = {
@@ -148,7 +155,8 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         name: fontFamily,
         displayName: displayName,
         source: 'fontsource',
-        fontFamily: `'${displayName}'`,
+        // Имя для FontFace/CSS без лишних кавычек; кавычки добавляет useFontCss.getFontFamily
+        fontFamily: displayName,
         variableAxes: actualIsVariableFont ? metadata?.metadata?.axes : {},
         isVariableFont: actualIsVariableFont,
         availableStyles: [],
@@ -174,7 +182,7 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
           // TODO: Перенести логику добавления @font-face в useFontCss
           const fontFaceRule = `
               @font-face {
-                  font-family: ${fontObj.fontFamily};
+                  font-family: ${JSON.stringify(displayName)};
                   src: url('${fontObj.url}') format('${fileExtension === 'ttf' ? 'truetype' : fileExtension === 'otf' ? 'opentype' : fileExtension}');
                   font-display: swap;
               }
@@ -258,10 +266,10 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     setIsLoading(true); // Показываем индикатор загрузки
     try {
       const processedFonts = await Promise.all(newFonts.map(async (font) => {
-        if (font.file instanceof Blob) {
+        if (font.file instanceof Blob && font.file.size > 0) {
           return await processLocalFont(font); // processLocalFont ожидает { file: Blob, name: string, ... }
         } else {
-          console.warn('[FontLoader] Пропущен элемент в handleLocalFontsUpload, так как отсутствует Blob:', font);
+          console.warn('[FontLoader] Пропущен элемент в handleLocalFontsUpload (нет Blob или размер 0):', font);
           return null;
         }
       }));
