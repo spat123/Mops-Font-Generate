@@ -154,7 +154,6 @@ export const processLocalFont = async (incomingFontInput) => {
 
     // 2. Проверка кэша (теперь по хешу). Google multi-subset не кэшируем здесь — метаданные без доп. файлов.
     if (cacheKey && localFontCache[cacheKey] && !fontInput.googleFontSlices?.length) {
-      console.log(`Using cached metadata for ${name} (hash: ${cacheKey.substring(0, 8)}...)`); // Лог для отладки
       objectUrl = URL.createObjectURL(file); // Свежий URL нужен всегда
       const cachedMetadata = { ...localFontCache[cacheKey] }; // Получаем метаданные из кэша
 
@@ -235,7 +234,6 @@ export const processLocalFont = async (incomingFontInput) => {
           : {};
         // Вызываем функцию через именованный импорт
         await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings, '', faceDescriptors);
-        console.log(`Font ${fontFamilyName} loaded successfully from cache using FontFace API.`);
         revokeObjectURL(objectUrl);
         // Новый blob URL: старый отозван, иначе fontObj.url указывал бы на невалидный адрес → NetworkError в FontFace/CSS
         fontObj.url = URL.createObjectURL(file);
@@ -266,7 +264,7 @@ export const processLocalFont = async (incomingFontInput) => {
     } catch (e) {
         console.error(`Error reading or parsing font buffer for ${name}:`, e);
         toast.error(`Ошибка чтения или анализа файла шрифта ${name}.`);
-        // Не возвращаем null сразу, т.к. addFontFace может работать с базовым fontObj
+        // Ниже всё равно собираем fontObj из метаданных, даже если parse не удался
     }
 
     // Создаем базовый объект шрифта (как и раньше)
@@ -387,7 +385,6 @@ export const processLocalFont = async (incomingFontInput) => {
             // Добавить другие нужные поля если необходимо
         };
         localFontCache[cacheKey] = metadataToCache;
-        // console.log(`Metadata cached for ${name} (hash: ${cacheKey.substring(0, 8)}...)`); // Удаляем лог
       }
 
     } else {
@@ -433,7 +430,6 @@ export const processLocalFont = async (incomingFontInput) => {
           : {};
         await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings, '', faceDescriptors);
       }
-      console.log(`Font ${fontFamilyName} loaded successfully using FontFace API.`);
       revokeObjectURL(objectUrl);
       fontObj.url = URL.createObjectURL(file);
       return fontObj;

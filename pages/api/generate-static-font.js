@@ -1,5 +1,5 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { spawn } from 'child_process';
+import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -84,10 +84,14 @@ async function generateWithWebAlchemy(buffer, variableSettings, format) {
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonMethodNotAllowed(res, 'POST');
   }
 
-  const { fontData, variableSettings, format = 'woff2' } = req.body;
+  const { fontData, variableSettings, format = 'woff2', probe } = req.body;
+
+  if (probe === true) {
+    return res.status(200).json({ ok: true, probe: true });
+  }
 
   if (!fontData || !variableSettings) {
     return res.status(400).json({ error: 'Missing fontData or variableSettings' });

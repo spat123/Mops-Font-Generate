@@ -1,28 +1,8 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
-import { generateStaticFont } from '../utils/staticFontGenerator';
 
-/**
- * Хук для экспорта и скачивания шрифтов и CSS
- * 
- * Включает в себя:
- * - Универсальную логику скачивания файлов
- * - Экспорт CSS с возможностью скачивания
- * - Создание статических версий вариативных шрифтов
- * - Подготовка к будущей логике генерации статических шрифтов
- * 
- * @param {Function} exportToCSSFromHook - Функция генерации CSS из useFontCss
- * @returns {Object} Объект с методами экспорта
- */
+/** Скачивание файлов, CSS-экспорт, псевдо/реальная генерация статики из VF. */
 export function useFontExport(exportToCSSFromHook) {
-  /**
-   * Универсальная функция скачивания файлов
-   * 
-   * @param {string|Blob} content - Содержимое файла (строка или Blob)
-   * @param {string} filename - Имя файла для скачивания
-   * @param {string} mimeType - MIME тип файла (игнорируется если content это Blob)
-   * @returns {boolean} Успешность операции
-   */
   const downloadFile = useCallback((content, filename, mimeType = 'text/plain') => {
     try {
       let blob;
@@ -54,27 +34,14 @@ export function useFontExport(exportToCSSFromHook) {
     }
   }, []);
 
-  /**
-   * Создает статическую версию вариативного шрифта с текущими настройками осей
-   * 
-   * @param {Object} selectedFont - Выбранный шрифт
-   * @param {string} selectedFontName - Имя выбранного шрифта
-   * @param {Object} variableSettings - Настройки вариативных осей
-   * @param {Function} setExportedFont - Функция установки экспортированного шрифта
-   * @returns {Object|undefined} Объект статического шрифта или undefined
-   */
   const createStaticFont = useCallback((selectedFont, selectedFontName, variableSettings, setExportedFont) => {
     if (!selectedFont) {
       return;
     }
-    
-    // Создаем новое имя для статической версии шрифта
+
     const staticName = `${selectedFontName.replace(/\.[^/.]+$/, '')}-static`;
-    
-    // Определяем текущие настройки
     const settings = { ...variableSettings };
-    
-    // Создаем статический экспортированный шрифт
+
     const newExportedFont = {
       name: staticName,
       settings: settings,
@@ -90,16 +57,7 @@ export function useFontExport(exportToCSSFromHook) {
     return newExportedFont;
   }, []);
 
-  /**
-   * Экспортирует текущие настройки шрифта в CSS с возможностью скачивания
-   * 
-   * @param {Object} selectedFont - Выбранный шрифт
-   * @param {string} selectedFontName - Имя выбранного шрифта
-   * @param {boolean} download - Если true, автоматически скачивает CSS файл
-   * @returns {string} CSS-код для текущего шрифта с примененными настройками
-   */
   const exportToCSS = useCallback((selectedFont, selectedFontName, download = false) => {
-    // Используем функцию из useFontCss для генерации CSS
     const cssCode = exportToCSSFromHook(selectedFont, selectedFontName);
     
     if (download && cssCode) {
@@ -114,14 +72,6 @@ export function useFontExport(exportToCSSFromHook) {
     return cssCode;
   }, [exportToCSSFromHook, downloadFile]);
 
-  /**
-   * Генерирует статический шрифт из вариативного используя современные методы
-   * 
-   * @param {Object} selectedFont - Вариативный шрифт
-   * @param {Object} variableSettings - Настройки осей
-   * @param {string} format - Формат выходного файла ('woff2', 'woff', 'ttf', 'otf')
-   * @returns {Promise<Blob|null>} Blob статического шрифта или null при ошибке
-   */
   const generateStaticFontFile = useCallback(async (selectedFont, variableSettings, format = 'woff2') => {
     if (!selectedFont || !selectedFont.isVariableFont) {
       toast.error('Выберите вариативный шрифт для создания статической версии');
@@ -134,22 +84,15 @@ export function useFontExport(exportToCSSFromHook) {
     }
 
     try {
-      // 1. Импортируем новую утилиту для генерации
       const { generateStaticFont, checkGenerationCapabilities } = await import('../utils/staticFontGenerator');
-      
-      // 2. Проверяем доступные методы
+
       const capabilities = await checkGenerationCapabilities();
-      
-      // Показываем пользователю информацию о методе
-      if (capabilities.harfbuzz) {
-        toast.info('Используется HarfBuzz для качественной генерации');
-      } else if (capabilities.server) {
+      if (capabilities.server) {
         toast.info('Используется серверная генерация');
       } else {
         toast.warning('Используется псевдо-статический метод (ограниченная функциональность)');
       }
-      
-      // 3. Получаем данные шрифта
+
       let fontData;
       if (selectedFont.arrayBuffer) {
         fontData = selectedFont.arrayBuffer;
@@ -163,23 +106,19 @@ export function useFontExport(exportToCSSFromHook) {
         throw new Error('Нет доступных данных шрифта');
       }
 
-      // Проверяем что fontData это действительно ArrayBuffer
       if (!fontData || !(fontData instanceof ArrayBuffer)) {
         throw new Error(`Неправильный тип данных шрифта. Ожидается ArrayBuffer, получен: ${typeof fontData}`);
       }
 
-      // 4. Генерируем статический шрифт с помощью новой утилиты
       const result = await generateStaticFont(fontData, variableSettings, {
         format,
         fontName: selectedFont.name || 'VariableFont'
       });
-      
-      // Показываем предупреждение если это псевдо-статический шрифт
+
       if (result.warning) {
         toast.warning(result.warning);
       }
-      
-      // Если есть CSS (для псевдо-статического), предлагаем его скачать
+
       if (result.css) {
         const downloadCSS = window.confirm('Создан псевдо-статический шрифт с CSS. Скачать CSS файл?');
         if (downloadCSS) {
@@ -187,7 +126,6 @@ export function useFontExport(exportToCSSFromHook) {
         }
       }
 
-      // Определяем MIME тип
       let mimeType;
       switch (format.toLowerCase()) {
         case 'ttf':
@@ -206,7 +144,6 @@ export function useFontExport(exportToCSSFromHook) {
           mimeType = 'font/ttf';
       }
 
-      // 5. Создаем Blob
       const blob = new Blob([result.buffer], { type: mimeType });
 
       const statusMessage = result.isRealStatic 
@@ -221,16 +158,8 @@ export function useFontExport(exportToCSSFromHook) {
       toast.error(`Ошибка генерации статического шрифта: ${error.message}`);
       return null;
     }
-  }, []);
+  }, [downloadFile]);
 
-  /**
-   * Скачивает статический шрифт, сгенерированный из вариативного
-   * 
-   * @param {Object} selectedFont - Вариативный шрифт
-   * @param {Object} variableSettings - Настройки осей
-   * @param {string} format - Формат файла
-   * @returns {Promise<boolean>} Успешность операции
-   */
   const downloadStaticFont = useCallback(async (selectedFont, variableSettings, format = 'ttf') => {
     if (!selectedFont || !selectedFont.isVariableFont) {
       toast.error('Выберите вариативный шрифт для создания статической версии');
@@ -243,16 +172,13 @@ export function useFontExport(exportToCSSFromHook) {
       const fontBlob = await generateStaticFontFile(selectedFont, variableSettings, format);
       
       if (fontBlob) {
-        // Создаем описательное имя файла с настройками осей
         const fontBaseName = (selectedFont.name || selectedFont.fontFamily || 'font')
           .replace(/\s+/g, '-')
           .toLowerCase()
           .replace(/[^a-z0-9\-]/g, '');
-        
-        // Добавляем информацию об основных осях в имя файла
+
         let axisInfo = '';
-        
-        // Основные оси (стандартные)
+
         if (variableSettings.wght && variableSettings.wght !== 400) {
           axisInfo += `_w${Math.round(variableSettings.wght)}`;
         }
@@ -268,8 +194,7 @@ export function useFontExport(exportToCSSFromHook) {
         if (variableSettings.GRAD && variableSettings.GRAD !== 0) {
           axisInfo += `_grad${Math.round(variableSettings.GRAD)}`;
         }
-        
-        // Параметрические оси (если отличаются от дефолтных значений)
+
         const parametricAxes = ['XOPQ', 'YOPQ', 'XTRA', 'YTUC', 'YTLC', 'YTAS', 'YTDE', 'YTFI'];
         parametricAxes.forEach(axis => {
           if (variableSettings[axis] !== undefined) {
@@ -277,8 +202,7 @@ export function useFontExport(exportToCSSFromHook) {
             axisInfo += `_${axis.toLowerCase()}${value}`;
           }
         });
-        
-        // Ограничиваем длину имени файла (если слишком много осей)
+
         if (axisInfo.length > 50) {
           axisInfo = axisInfo.substring(0, 47) + '...';
         }
@@ -302,17 +226,10 @@ export function useFontExport(exportToCSSFromHook) {
   }, [generateStaticFontFile, downloadFile]);
 
   return {
-    // Универсальные функции
     downloadFile,
-    
-    // CSS экспорт
     exportToCSS,
-    
-    // Работа со статическими версиями
     createStaticFont,
-    
-    // Будущая функциональность генерации статических шрифтов
     generateStaticFontFile,
     downloadStaticFont,
   };
-} 
+}

@@ -3,6 +3,7 @@
  * Запрос CSS выполняется на сервере с «браузерным» User-Agent, чтобы в ответе были woff2, а не TTF.
  */
 import { CHROME_UA, buildGoogleFontsCss2Url, parseGoogleFontFacesFromCss } from '../../utils/googleFontsCssShared';
+import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 /**
  * Скачивает первый woff2 из CSS Google Fonts.
@@ -32,8 +33,7 @@ async function fetchWoff2BufferFromGoogleCss(cssUrl) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonMethodNotAllowed(res, 'GET');
   }
 
   const family = typeof req.query.family === 'string' ? req.query.family : '';

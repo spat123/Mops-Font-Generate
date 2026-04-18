@@ -1,20 +1,8 @@
 import { useCallback, useRef } from 'react';
-import { toast } from 'react-toastify';
-// import opentype from 'opentype.js'; // opentype нужен для getVariableAxes, если парсим файл
 
-// Кэш для хранения метаданных шрифтов (перенесен из useFontManager)
 const fontMetadataCache = new Map();
 
-/**
- * Хук для управления настройками вариативных шрифтов.
- * @param {Object} selectedFont - Текущий выбранный объект шрифта.
- * @param {Object} variableSettings - Текущие настройки вариативных осей.
- * @param {Function} setVariableSettings - Функция для обновления состояния настроек осей.
- * @param {Function} setSelectedFont - Функция для обновления состояния выбранного шрифта.
- * @param {Function} setFonts - Функция для обновления всего массива шрифтов (для сохранения lastUsedVariableSettings).
- * @param {Function} debouncedUpdateCssSettings - Debounced функция для обновления CSS (переименована из debouncedUpdateVariableFontSettings).
- * @param {Function} saveLastVariableSettings - Функция для сохранения настроек в localStorage.
- */
+/** Оси VF: применение, сброс, список осей для UI. */
 export function useVariableFontControls(
   selectedFont,
   variableSettings,
@@ -25,16 +13,8 @@ export function useVariableFontControls(
   saveLastVariableSettings
 ) {
 
-  // Реф для applyVariableSettings, если он будет вызываться из других функций этого хука
   const applyVariableSettingsRef = useRef(null);
 
-  /**
-   * Применяет новые настройки к вариативному шрифту.
-   * (Перенесено из useFontManager, переименовано из handleVariableSettingsChange)
-   * @param {Object} newSettings - Новые значения осей.
-   * @param {boolean} isFinalUpdate - Флаг финального обновления (для CSS).
-   * @param {Object|null} font - Шрифт для применения (по умолчанию selectedFont).
-   */
   const applyVariableSettings = useCallback((newSettings, isFinalUpdate = false, font = null) => {
     const fontToApply = font || selectedFont;
     if (!fontToApply || !fontToApply.isVariableFont) return;
@@ -81,14 +61,12 @@ export function useVariableFontControls(
 
     // Сохраняем настройки в localStorage при финальном обновлении
     if (isFinalUpdate && typeof saveLastVariableSettings === 'function') {
-      console.log(`[VarControls] Сохраняем настройки в localStorage:`, updatedSettings);
       saveLastVariableSettings(updatedSettings);
     }
 
     // Обновляем lastUsedVariableSettings в общем массиве шрифтов
     setFonts(currentFonts => currentFonts.map(f => {
       if (f.id === fontToApply.id) {
-        console.log(`[VarControls] Обновляем lastUsedVariableSettings для ${f.name}:`, updatedSettings);
         return { ...f, lastUsedVariableSettings: updatedSettings, lastUsedPresetName: null };
       }
       return f;
@@ -96,13 +74,8 @@ export function useVariableFontControls(
 
   }, [selectedFont, variableSettings, setVariableSettings, setSelectedFont, setFonts, debouncedUpdateCssSettings, saveLastVariableSettings]);
 
-  // Обновляем реф при каждом изменении функции
   applyVariableSettingsRef.current = applyVariableSettings;
 
-  /**
-   * Получает дефолтные значения осей для текущего шрифта.
-   * (Перенесено из useFontManager)
-   */
   const getDefaultAxisValues = useCallback(() => {
     if (!selectedFont || !selectedFont.variableAxes) return {};
     
@@ -117,24 +90,15 @@ export function useVariableFontControls(
     return defaultSettings;
   }, [selectedFont]);
 
-  /**
-   * Сбрасывает настройки осей к дефолтным значениям.
-   * (Перенесено из useFontManager)
-   */
   const resetVariableSettings = useCallback(() => {
     const defaultSettings = getDefaultAxisValues();
     if (Object.keys(defaultSettings).length > 0) {
-      // Используем applyVariableSettings через реф
-      applyVariableSettingsRef.current?.(defaultSettings, true); // isFinalUpdate = true для обновления CSS
+      applyVariableSettingsRef.current?.(defaultSettings, true);
     }
-    return defaultSettings; // Возвращаем на всякий случай
+    return defaultSettings;
   }, [getDefaultAxisValues]);
 
-  /**
-   * Извлекает информацию о вариативных осях шрифта.
-   * (Перенесено из useFontManager)
-   * TODO: Рассмотреть возможность использования opentype.js здесь или вынести в утилиты.
-   */
+  /** Оси из объекта шрифта / кэша; парсинг файла не реализован. */
   const getVariableAxesInfo = useCallback(async (font) => {
     const targetFont = font || selectedFont;
     if (!targetFont) return [];
@@ -163,40 +127,19 @@ export function useVariableFontControls(
       return filteredAxes;
     }
 
-    // 2. Используем кэш
     if (fontId && fontMetadataCache.has(fontId)) {
       return fontMetadataCache.get(fontId);
     }
 
-    // 3. Парсим файл (если есть и если opentype.js доступен)
-    // TODO: Добавить проверку на opentype.js и реализовать парсинг, если нужно
-    /*
-    if (targetFont.file instanceof Blob && typeof opentype !== 'undefined') {
-      try {
-        const fontData = await parseFontFile(targetFont.file); // Нужна функция parseFontFile
-        if (fontData?.tables?.fvar) {
-          const axes = fontData.tables.fvar.axes.map(axis => ({ ... }));
-          if (fontId) fontMetadataCache.set(fontId, axes);
-          return axes;
-        } else {
-          if (fontId) fontMetadataCache.set(fontId, []);
-          return [];
-        }
-      } catch (error) {
-        toast.error(`Ошибка парсинга шрифта: ${error.message}`);
-        return [];
-      }
-    }
-    */
-
     console.warn(`[VarControls] Не удалось получить оси для ${targetFont.name}. Нет данных в объекте или кэше, парсинг файла не реализован.`);
-    return []; // Возвращаем пустой массив, если оси не найдены/не спарсены
-  }, [selectedFont]); // Зависит только от selectedFont (для дефолта) и кэша
+    return [];
+  }, [selectedFont]);
 
   return {
     applyVariableSettings,
     getDefaultAxisValues,
     resetVariableSettings,
-    getVariableAxesInfo, // Переименовано из getVariableAxes
+    getVariableAxesInfo,
   };
-} 
+}
+ 

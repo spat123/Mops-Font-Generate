@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import EditableText from './EditableText';
 import { findStyleInfoByWeightAndStyle } from '../utils/fontUtilsCommon';
 import { useSettings } from '../contexts/SettingsContext';
+import { getPreviewChromeFromBackground } from '../utils/previewChromeTheme';
 
 /**
  * Генерирует строку значений font-variation-settings на основе объекта стилей и поддерживаемых осей
@@ -75,28 +76,31 @@ function StylesMode({
   const hasVariableAxes = selectedFont.isVariableFont && selectedFont.variableAxes && Object.keys(selectedFont.variableAxes).length > 0;
   const showStaticStyles = hasStaticStyles && (!selectedFont.isVariableFont || !hasVariableAxes);
   
-  const safeFontFamily = fontFamilyValue || selectedFont.name || 'sans-serif'; 
-  
+  const safeFontFamily = fontFamilyValue || selectedFont.name || 'sans-serif';
+
+  /** Подписи и рамки под фон превью; rgba учитывается при смешивании с белой подложкой */
+  const chrome = useMemo(() => getPreviewChromeFromBackground(backgroundColor), [backgroundColor]);
+
   return (
-    <div className="pt-8 styles-mode">
+    <div className="px-4 pb-8 pt-4 sm:px-6">
       {/* Статические стили шрифта */}
       {showStaticStyles && (
         <div className="mb-8 overflow-x-hidden">
-          <h3 className="text-lg font-medium text-blue-700 mb-4 pl-8 pr-8">Доступные стили</h3>
-          
+          <h3 className={`${chrome.sectionTitle} mb-3`}>Доступные стили</h3>
+
           {/* Обычные стили */}
           {selectedFont.availableStyles.filter(s => s.style === 'normal').length > 0 && (
             <div className="mb-8">
-              <h4 className="text-md font-medium text-blue-600 mb-2 pl-8 pr-8">Normal</h4>
+              <h4 className={`${chrome.subsectionTitle} mb-2`}>Normal</h4>
               <div className="space-y-4">
                 {selectedFont.availableStyles
                   .filter(style => style.style === 'normal')
                   .sort((a, b) => a.weight - b.weight)
                   .map((style, index) => (
-                    <div key={`static-normal-${index}`} className="border-t border-blue-100 pt-4">
-                      <div className="flex justify-between items-baseline pr-8 pl-8">
-                        <div className="text-sm font-medium text-blue-700">{style.name}</div>
-                        <div className="text-xs text-gray-500">Weight: {style.weight}</div>
+                    <div key={`static-normal-${index}`} className={`border-t ${chrome.divider} pt-4`}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className={chrome.rowTitle}>{style.name}</div>
+                        <div className={chrome.meta}>Weight: {style.weight}</div>
                       </div>
                       <EditableText 
                         style={{
@@ -126,16 +130,16 @@ function StylesMode({
           {/* Курсивные стили */}
           {selectedFont.availableStyles.filter(s => s.style === 'italic').length > 0 && (
             <div>
-              <h4 className="text-md font-medium text-blue-600 mb-2 pl-8 pr-8">Italic</h4>
+              <h4 className={`${chrome.subsectionTitle} mb-2`}>Italic</h4>
               <div className="space-y-4">
                 {selectedFont.availableStyles
                   .filter(style => style.style === 'italic')
                   .sort((a, b) => a.weight - b.weight)
                   .map((style, index) => (
-                    <div key={`static-italic-${index}`} className="border-t border-blue-100 pt-4">
-                      <div className="flex justify-between items-baseline pr-8 pl-8">
-                        <div className="text-sm font-medium text-blue-700">{style.name}</div>
-                        <div className="text-xs text-gray-500">Weight: {style.weight}, Style: italic</div>
+                    <div key={`static-italic-${index}`} className={`border-t ${chrome.divider} pt-4`}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className={chrome.rowTitle}>{style.name}</div>
+                        <div className={chrome.meta}>Weight: {style.weight}, Style: italic</div>
                       </div>
                       <EditableText 
                         style={{
@@ -167,18 +171,18 @@ function StylesMode({
       {/* Вариативные возможности шрифта */}
       {hasVariableAxes && (
         <div className="overflow-x-hidden">
-          <h3 className="text-lg font-medium text-blue-700 mb-4 pl-8 pr-8">Вариативные возможности</h3>
-          
+          <h3 className={`${chrome.sectionTitle} mb-3`}>Вариативные возможности</h3>
+
           {/* Группа Weight стилей */}
           {selectedFont.variableAxes['wght'] !== undefined && (
             <div className="mb-8">
-              <h4 className="text-md font-medium text-blue-600 mb-2 pl-8 pr-8">Weight Variations</h4>
+              <h4 className={`${chrome.subsectionTitle} mb-2`}>Вес (wght)</h4>
               <div className="space-y-4">
                 {weightVariations.map((style, index) => (
-                  <div key={`var-weight-${index}`} className="border-t border-blue-100 pt-4">
-                    <div className="flex justify-between items-baseline pl-8 pr-8">
-                      <div className="text-sm font-medium text-blue-700">{style.name}</div>
-                      <div className="text-xs text-gray-500">Weight: {style.wght}</div>
+                  <div key={`var-weight-${index}`} className={`border-t ${chrome.divider} pt-4`}>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className={chrome.rowTitle}>{style.name}</div>
+                      <div className={chrome.meta}>Weight: {style.wght}</div>
                     </div>
                     <EditableText 
                       style={{
@@ -207,13 +211,13 @@ function StylesMode({
           {/* Группа Italic/Slant стилей */}
           {(selectedFont.variableAxes['ital'] !== undefined || selectedFont.variableAxes['slnt'] !== undefined) && (
             <div className="mb-8 ">
-              <h4 className="text-md font-medium text-blue-600 mb-2 pl-8 pr-8">Italic/Slant Variations</h4>
+              <h4 className={`${chrome.subsectionTitle} mb-2`}>Курсив / наклон</h4>
               <div className="space-y-4">
                 {italicVariations.map((style, index) => (
-                  <div key={`var-italic-${index}`} className="border-t border-blue-100 pt-4">
-                    <div className="flex justify-between items-baseline mb-2 pl-8 pr-8">
-                      <div className="text-sm font-medium text-blue-700">{style.name}</div>
-                      <div className="text-xs text-gray-500">
+                  <div key={`var-italic-${index}`} className={`border-t ${chrome.divider} pt-4`}>
+                    <div className="mb-2 flex items-baseline justify-between gap-3">
+                      <div className={chrome.rowTitle}>{style.name}</div>
+                      <div className={chrome.meta}>
                         Weight: {style.wght},
                         {selectedFont.variableAxes['ital'] !== undefined && ` Italic: ${style.ital},`}
                         {selectedFont.variableAxes['slnt'] !== undefined && ` Slant: ${style.slnt}`}
@@ -247,7 +251,7 @@ function StylesMode({
             .filter(axis => !['wght', 'ital', 'slnt'].includes(axis))
             .map(axis => (
               <div key={axis} className="mb-8">
-                <h4 className="text-md font-medium text-blue-600 mb-2 pl-8 pr-8">Axis: {axis.toUpperCase()}</h4>
+                <h4 className={`${chrome.subsectionTitle} mb-2`}>Ось {axis.toUpperCase()}</h4>
                 <div className="space-y-4">
                   {axisRatios.map((ratio, index) => {
                     const axisInfo = selectedFont.variableAxes[axis];
@@ -255,9 +259,11 @@ function StylesMode({
                     const style = { [axis]: value };
                     
                     return (
-                      <div key={`var-${axis}-${index}`} className="border-t border-blue-100 pt-4">
-                        <div className="flex justify-between items-baseline pr-8 pl-8">
-                          <div className="text-sm font-medium text-blue-700">{axis.toUpperCase()}: {value}</div>
+                      <div key={`var-${axis}-${index}`} className={`border-t ${chrome.divider} pt-4`}>
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className={chrome.rowTitle}>
+                            {axis.toUpperCase()}: {value}
+                          </div>
                         </div>
                         <EditableText 
                           style={{
@@ -288,20 +294,22 @@ function StylesMode({
       
       {/* Сообщение, если нет ни статических, ни вариативных стилей */}
       {!showStaticStyles && !hasVariableAxes && (
-        <div className="mt-8 pl-8 pr-8">
-           <div className="bg-blue-50 p-4 rounded-md">
-             <p className="text-sm text-blue-700">
-               <strong>Информация о стилях:</strong> Не удалось определить доступные статические стили или вариативные возможности для этого шрифта.
+        <div className="mt-6">
+           <div className={chrome.noteBox}>
+             <p className={chrome.noteText}>
+               <span className={chrome.noteStrong}>Информация о стилях:</span>{' '}
+               Не удалось определить доступные статические стили или вариативные возможности для этого шрифта.
                Отображается текущий активный стиль: {findStyleInfoByWeightAndStyle(selectedFont.currentWeight, selectedFont.currentStyle).name}.
              </p>
            </div>
         </div>
       )}
       
-      <div className="mt-8 pl-8 pr-8 pb-8">
-        <div className="bg-blue-50 p-4 rounded-md">
-          <p className="text-sm text-blue-700">
-            <strong>Примечание:</strong> Показаны только обнаруженные стили и возможности шрифта.
+      <div className="mt-6 pb-2">
+        <div className={chrome.noteBox}>
+          <p className={chrome.noteText}>
+            <span className={chrome.noteStrong}>Примечание:</span>{' '}
+            Показаны только обнаруженные стили и возможности шрифта.
             Если вы не видите некоторые стили или настройки, возможно, шрифт их не поддерживает или они не были корректно распознаны.
           </p>
         </div>

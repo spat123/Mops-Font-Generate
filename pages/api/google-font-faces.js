@@ -3,11 +3,11 @@
  * Статика и VF: у Google часто несколько файлов woff2 с разными unicode-range — нужны все.
  */
 import { CHROME_UA, buildGoogleFontsCss2Url, parseGoogleFontFacesFromCss } from '../../utils/googleFontsCssShared';
+import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonMethodNotAllowed(res, 'GET');
   }
 
   const family = typeof req.query.family === 'string' ? req.query.family : '';

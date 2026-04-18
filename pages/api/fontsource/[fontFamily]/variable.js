@@ -28,9 +28,7 @@ export default async function handler(req, res) {
     
     // Нормализуем имя шрифта для поиска пакета
     const packageName = fontFamily.toLowerCase().replace(/\s+/g, '-');
-    
-    console.log(`[API Variable] Запрос вариативного шрифта для: ${packageName}, подмножество: ${subset}, принудительно вариативный: ${forceVariableRequest}`);
-    
+
     // Шаг 1: Пробуем найти пакет в зависимости от параметра forceVariableRequest
     let packagePath;
     if (forceVariableRequest) {
@@ -57,9 +55,7 @@ export default async function handler(req, res) {
     
     // Определяем, был ли найден вариативный пакет
     const variablePackageFound = packagePath.includes('@fontsource-variable');
-    
-    console.log(`[API Variable] Используем пакет: ${packagePath}, специализированный вариативный пакет: ${variablePackageFound}`);
-    
+
     // Проверяем наличие файлов
     let filesDirPath;
     if (variablePackageFound) {
@@ -74,7 +70,6 @@ export default async function handler(req, res) {
     let files;
     try {
       files = await fs.readdir(filesDirPath);
-      console.log(`[API Variable] Найдено ${files.length} файлов в директории`);
     } catch (e) {
       console.error(`[API Variable] Ошибка чтения директории ${filesDirPath}:`, e);
       return res.status(500).json({ error: `Ошибка чтения директории файлов.` });
@@ -101,14 +96,11 @@ export default async function handler(req, res) {
       console.error(`[API Variable] Вариативный файл шрифта для ${packageName} не найден. Доступные файлы:`, files);
       return res.status(404).json({ error: `Вариативный файл шрифта для ${packageName} не найден.` });
     }
-    
-    console.log(`[API Variable] Найден вариативный файл шрифта: ${variableFontFile}`);
-    
+
     // Читаем файл шрифта
     let fontBuffer;
     try {
       fontBuffer = await fs.readFile(path.join(filesDirPath, variableFontFile));
-      console.log(`[API Variable] Файл шрифта успешно прочитан, размер: ${fontBuffer.length} байт`);
     } catch (e) {
       console.error(`[API Variable] Ошибка чтения файла шрифта:`, e);
       return res.status(500).json({ error: `Ошибка чтения файла шрифта.` });

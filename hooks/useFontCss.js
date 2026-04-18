@@ -7,23 +7,9 @@ import {
   buildVariableFontFaceDescriptors,
 } from '../utils/cssGenerator';
 
-/**
- * Хук для управления CSS стилями шрифтов.
- * 
- * @param {Object} selectedFont - Текущий выбранный объект шрифта.
- * @param {Object} variableSettings - Текущие настройки вариативных осей.
- * @param {boolean} isSelectedFontVariable - Флаг, является ли выбранный шрифт вариативным.
- * @returns {Object} - Объект с CSS функциями и свойствами.
- */
+/** CSS для превью: font-family, variation-settings, FontFace, экспорт строки. */
 export function useFontCss(selectedFont, variableSettings, isSelectedFontVariable) {
 
-  /**
-   * Возвращает строку font-family для текущего или указанного шрифта.
-   * (Перенесено из useFontManager)
-   * 
-   * @param {Object|null} font - Шрифт для получения font-family (по умолчанию selectedFont).
-   * @returns {string} - Строка font-family для CSS.
-   */
   const getFontFamily = useCallback((font = null) => {
     const targetFont = font || selectedFont;
     if (!targetFont) return 'inherit';
@@ -60,14 +46,6 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     return 'inherit';
   }, [selectedFont]);
 
-  /**
-   * Возвращает строку font-variation-settings для текущего или указанного шрифта.
-   * (Перенесено из useFontManager)
-   * 
-   * @param {Object|null} font - Шрифт для получения настроек (по умолчанию selectedFont).
-   * @param {Object|null} settings - Настройки осей (по умолчанию variableSettings).
-   * @returns {string} - Строка font-variation-settings для CSS.
-   */
   const getVariationSettings = useCallback((font = null, settings = null) => {
     const targetFont = font || selectedFont;
     const targetSettings = settings || variableSettings;
@@ -89,10 +67,6 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     return variationString || 'normal';
   }, [selectedFont, variableSettings]);
 
-  /**
-   * Мемоизированные CSS свойства для текущего шрифта.
-   * (Перенесено из useFontManager)
-   */
   const fontCssProperties = useMemo(() => {
     if (!selectedFont) {
       return { fontFamily: 'inherit' };
@@ -121,7 +95,6 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
       }
     }
 
-    console.log(`[fontCssProperties] Обновляем CSS для ${selectedFont.name}:`, properties);
     return properties;
   }, [
     selectedFont,
@@ -133,24 +106,10 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     variableSettings,
   ]);
 
-  /**
-   * Генерирует CSS свойства для применения к элементам.
-   * (Перенесено из useFontManager)
-   * 
-   * @returns {Object} - Объект с CSS свойствами.
-   */
   const generateCSS = useCallback(() => {
     return fontCssProperties;
   }, [fontCssProperties]);
 
-  /**
-   * Загружает шрифт с использованием FontFace API.
-   * (Перенесено из useFontManager)
-   * 
-   * @param {Object} font - Объект шрифта для загрузки.
-   * @param {Object} settings - Настройки вариативных осей (опционально).
-   * @returns {Promise<FontFace|null>} - Промис с объектом FontFace или null.
-   */
   const loadFontFace = useCallback(async (font, settings = {}) => {
     if (!font) return null;
 
@@ -187,14 +146,6 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     }
   }, [getFontFamily]);
 
-  /**
-   * Обновляет CSS для вариативного шрифта.
-   * (Перенесено из useFontManager)
-   * 
-   * @param {Object} font - Объект шрифта.
-   * @param {Object} currentSettings - Текущие настройки осей.
-   * @param {Object} prevSettings - Предыдущие настройки осей.
-   */
   const updateVariableFontCss = useCallback((font, currentSettings, prevSettings = null) => {
     if (!font || !font.isVariableFont) return;
 
@@ -205,10 +156,6 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     }
   }, []);
 
-  /**
-   * Debounced версия обновления CSS для вариативного шрифта.
-   * (Перенесено из useFontManager)
-   */
   const debouncedUpdateVariableFontCss = useCallback((font, currentSettings, prevSettings = null) => {
     if (!font || !font.isVariableFont) return;
 
@@ -219,14 +166,6 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     }
   }, []);
 
-  /**
-   * Генерирует CSS строку для экспорта.
-   * (Перенесено из useFontManager)
-   * 
-   * @param {Object} font - Объект шрифта (по умолчанию selectedFont).
-   * @param {string} selectedFontName - Имя выбранного шрифта.
-   * @returns {string} - CSS строка для экспорта.
-   */
   const exportToCSS = useCallback((font = null, selectedFontName = '') => {
     const targetFont = font || selectedFont;
     const targetFontName = selectedFontName || targetFont?.name || 'Unknown Font';
@@ -252,22 +191,13 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
   }, [selectedFont, generateCSS]);
 
   return {
-    // CSS функции
     getFontFamily,
     getVariationSettings,
     generateCSS,
-    
-    // FontFace API
     loadFontFace,
-    
-    // Обновление CSS
     updateVariableFontCss,
     debouncedUpdateVariableFontCss,
-    
-    // Экспорт
     exportToCSS,
-    
-    // Мемоизированные свойства
     fontCssProperties,
   };
 } 

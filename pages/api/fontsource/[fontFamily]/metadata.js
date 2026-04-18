@@ -23,9 +23,7 @@ export default async function handler(req, res) {
     
     // Нормализуем имя шрифта для поиска пакета
     const packageName = fontFamily.toLowerCase().replace(/\s+/g, '-');
-    
-    console.log(`[API Metadata] Запрос метаданных для пакета: ${packageName}, вариативный: ${isVariableRequest}`);
-    
+
     // Находим путь к пакету Fontsource
     // Для вариативных шрифтов используем префикс variable/
     const packagePath = await findFontsourcePackagePath(isVariableRequest ? `variable/${packageName}` : packageName);
@@ -33,16 +31,13 @@ export default async function handler(req, res) {
       console.error(`[API Metadata] Пакет для ${packageName} не найден (${isVariableRequest ? 'вариативный' : 'обычный'}).`);
       return res.status(404).json({ error: `Пакет ${isVariableRequest ? '@fontsource-variable/' : '@fontsource/'}${packageName} не найден.` });
     }
-    
-    console.log(`[API Metadata] Найден путь к пакету: ${packagePath}`);
-    
+
     // Читаем metadata.json
     const metadataPath = path.join(packagePath, 'metadata.json');
     let metadata;
     try {
       const metadataContent = await fs.readFile(metadataPath, 'utf-8');
       metadata = JSON.parse(metadataContent);
-      console.log(`[API Metadata] Успешно прочитан metadata.json для ${packageName}`);
     } catch (e) {
       console.error(`[API Metadata] Ошибка чтения или парсинга metadata.json для ${packageName}:`, e);
       return res.status(500).json({ error: `Ошибка чтения метаданных для ${packageName}.` });

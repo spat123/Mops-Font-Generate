@@ -57,7 +57,7 @@ const WaterfallMode = () => {
 
     // Возвращаем ТОЧНУЮ JSX-структуру из оригинального кода
     return (
-      <div key={uniqueKey} className="border-t border-blue-100 pt-4 pb-4">
+      <div key={uniqueKey} className="border-t border-gray-200 pt-4 pb-4">
         <div className="flex items-center">
           <div className="text-xs text-gray-500 pl-8 font-medium shrink-0 text-right">{size}px</div>
           <div className="flex-1 overflow-hidden"> {/* Обертка для EditableText */} 
@@ -85,7 +85,7 @@ const WaterfallMode = () => {
 
   return (
     <div
-      className="font-preview-area pt-1.5 overflow-y-auto w-full h-full"
+      className="font-preview-area overflow-y-auto w-full h-full"
       style={{ backgroundColor: backgroundColor }} // Применяем фон здесь
     >
       {selectedFont ? (

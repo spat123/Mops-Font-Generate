@@ -16,7 +16,7 @@ function TextMode({
   fontFamily,
   variationSettingsValue,
 }) {
-  const { text, setText } = useSettings();
+  const { text } = useSettings();
   const textContainerRef = useRef(null);
 
   useEffect(() => {

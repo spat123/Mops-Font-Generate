@@ -1,44 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useFontManager } from '../hooks/useFontManager';
+import { useFontContext } from '../contexts/FontContext';
 import { toast } from 'react-toastify';
-// Импортируем оптимизированные функции из cssGenerator
-import { debouncedUpdateFontFaceIfNeeded, hasSignificantChanges } from '../utils/cssGenerator';
-
-// Стили для скрытия стандартного маркера в range input
-const sliderStyles = `
-  /* Ограничиваем область действия стилей только нашим компонентом */
-  .variable-font-slider-container input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 0;
-    height: 0;
-    opacity: 0;
-  }
-  
-  .variable-font-slider-container input[type="range"]::-moz-range-thumb {
-    width: 0;
-    height: 0;
-    opacity: 0;
-    border: none;
-  }
-  
-  .variable-font-slider-container input[type="range"]::-ms-thumb {
-    width: 0;
-    height: 0;
-    opacity: 0;
-  }
-
-  /* Стили для скрытия стрелок в числовом поле ввода */
-  input[type="number"].no-arrows::-webkit-inner-spin-button,
-  input[type="number"].no-arrows::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-  
-  input[type="number"].no-arrows {
-    -moz-appearance: textfield;
-  }
-`;
+import { hasSignificantChanges } from '../utils/cssGenerator';
+import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
+import { NativeSelect } from './ui/NativeSelect';
+import { nativeSelectFieldClass } from './ui/nativeSelectFieldClasses';
 
 // Функция для обрезания длинного текста и добавления многоточия
 const truncateText = (text, maxLength = 15) => {
@@ -57,16 +23,6 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   const isUpdatingFromExternal = useRef(false);
   // Для отслеживания редактируемого маркера
   const [editingAxis, setEditingAxis] = useState(null);
-  const [editValue, setEditValue] = useState("");
-  // Создаем объект для хранения рефов для каждой оси
-  const inputRefs = useRef({});
-  
-  // Для перетаскивания маркера
-  const [isDragging, setIsDragging] = useState(false);
-  const [activeAxis, setActiveAxis] = useState(null); 
-  const dragInfo = useRef(null);
-  const clickTimer = useRef(null);
-  const markerRefs = useRef({});
   
   // Локальное состояние для скорости анимации (используется, если не передан setAnimationSpeed)
   const [localAnimationSpeed, setLocalAnimationSpeed] = useState(animationSpeed);
@@ -76,27 +32,30 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   
   // Актуальное значение скорости анимации
   const effectiveAnimationSpeed = useMemo(() => {
-    // Если передано внешнее значение, используем его, иначе используем локальное
-    return animationSpeed || localAnimationSpeed;
-  }, [animationSpeed, localAnimationSpeed]);
+    // Контролируемый режим: значение из родителя (иначе слайдер «залипает» на дефолте при отсутствии setAnimationSpeed)
+    if (typeof setAnimationSpeed === 'function') {
+      const v = animationSpeed;
+      return Number.isFinite(v) ? v : localAnimationSpeed;
+    }
+    return localAnimationSpeed;
+  }, [animationSpeed, localAnimationSpeed, setAnimationSpeed]);
   
   // Сохраняем ID загруженного шрифта, чтобы не перезагружать его повторно
   const loadedFontId = useRef(null);
   
-  // Используем хук useFontManager для доступа к общим функциям работы со шрифтами
-  const { 
-    getVariableAxes, 
-    handleVariableSettingsChange, 
+  const {
+    getVariableAxes,
+    handleVariableSettingsChange,
     createStaticFont,
     downloadStaticFont,
     variableSettings,
-    resetVariableSettings
-  } = useFontManager();
+    resetVariableSettings,
+  } = useFontContext();
 
   // Для хранения предыдущих настроек (для сравнения)
   const prevSettingsRef = useRef({});
 
-  // Синхронизация между локальным состоянием и глобальным из useFontManager
+  // Синхронизация между локальным состоянием и глобальным variableSettings
   useEffect(() => {
     // Если идет обновление из внешнего источника - игнорируем
     if (isUpdatingFromExternal.current) {
@@ -196,7 +155,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       }
     }
     
-    // ПРИОРИТЕТ 2 и 3: Используем getVariableAxes из хука useFontManager
+    // ПРИОРИТЕТ 2 и 3: getVariableAxes из контекста шрифтов
     const loadFontAxes = async () => {
       try {
         // Получаем оси шрифта через централизованную функцию
@@ -372,12 +331,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       // Для обычных кликов используем полное обновление с ререндерингом
       handleVariableSettingsChange(newSettings, true);
     }
-    
-    // Если значение изменилось значительно, логируем (для отладки)
-    if (isSignificant && !isDragging) {
-      // console.log(`Значимое изменение оси ${tag}: ${roundedValue}`); // Удаляем лог
-    }
-    
+
     // Уведомляем родителя об изменениях
     if (typeof onSettingsChange === 'function') {
       onSettingsChange(newSettings);
@@ -449,275 +403,9 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   // Мемоизированное значение для проверки наличия осей
   const hasAxes = useMemo(() => axes.length > 0, [axes]);
 
-  // Функции для перетаскивания маркера
-  const handleMarkerMouseDown = useCallback((e, axis, value, sliderWidth) => {
-    if (isAnimating) return;
-    
-    console.log(`[MarkerMouseDown] Начало для оси ${axis.tag}, значение: ${value}`);
-    
-    // Сразу устанавливаем активную ось и фиксируем отсутствие перетаскивания
-    console.log(`[MarkerMouseDown] Устанавливаем activeAxis: ${axis.tag}`);
-    setActiveAxis(axis.tag);
-    setIsDragging(false);
-    
-    // Получаем размеры и позицию слайдера для более точных расчетов
-    const sliderRect = e.currentTarget.parentElement.getBoundingClientRect();
-    const markerWidth = e.currentTarget.offsetWidth;
-    const effectiveSliderWidth = sliderRect.width;
-    
-    // Учитываем отступы для маркера (5% с каждой стороны)
-    const effectiveMin = axis.min;
-    const effectiveMax = axis.max;
-    const paddingPercent = 5; // 5% отступ с каждой стороны
-    const paddingPx = (effectiveSliderWidth * paddingPercent) / 100;
-    
-    // Сохраняем начальную информацию для перетаскивания
-    const startX = e.clientX;
-    const startValue = value;
-    
-    // Сохраняем информацию для перетаскивания
-    dragInfo.current = {
-      axis: axis.tag,
-      startX,
-      startValue,
-      sliderWidth: effectiveSliderWidth,
-      range: effectiveMax - effectiveMin,
-      minValue: effectiveMin,
-      maxValue: effectiveMax,
-      moveStarted: false, // Флаг, указывающий, было ли начато перетаскивание
-      sliderRect,
-      markerWidth,
-      paddingPx,
-      lastUpdateTime: 0, // Время последнего обновления для троттлинга
-      animationFrameId: null, // ID requestAnimationFrame для отмены
-      pendingValue: null, // Ожидающее значение для обновления в следующем кадре анимации
-      lastValue: startValue, // Последнее обновленное значение для финального сохранения
-      updateCounter: 0, // Счетчик обновлений для отладки
-      activeAxis: axis.tag // Сохраняем activeAxis в dragInfo для надежности
-    };
-    
-    // Начинаем таймер для активации режима редактирования, если не начнется перетаскивание
-    clickTimer.current = setTimeout(() => {
-      // Только если не начали перетаскивание и это все еще активная ось
-      if (!dragInfo.current?.moveStarted && activeAxis === axis.tag) {
-        // Активируем режим редактирования
-        setEditingAxis(axis.tag);
-        setEditValue(Math.round(value).toString());
-        
-        // Используем setTimeout, чтобы дать React время отрендерить инпут перед фокусировкой
-        setTimeout(() => {
-          if (inputRefs.current[axis.tag]) {
-            inputRefs.current[axis.tag].focus();
-            inputRefs.current[axis.tag].select();
-          }
-        }, 50);
-        
-        // Сбрасываем таймер
-        clickTimer.current = null;
-      }
-    }, 300); // Задержка для режима редактирования
-    
-    // Функция для обновления значения с использованием requestAnimationFrame
-    const scheduleValueUpdate = (newValue) => {
-      // Отменяем предыдущий запрос анимации, если он есть
-      if (dragInfo.current.animationFrameId) {
-        cancelAnimationFrame(dragInfo.current.animationFrameId);
-      }
-      
-      // Сохраняем ожидающее значение
-      dragInfo.current.pendingValue = newValue;
-      dragInfo.current.lastValue = newValue; // Сохраняем как последнее значение
-      
-      // Планируем обновление в следующем кадре анимации
-      dragInfo.current.animationFrameId = requestAnimationFrame(() => {
-        if (!dragInfo.current) return; // Проверка на случай, если перетаскивание завершилось
-        
-        // Увеличиваем счетчик обновлений
-        dragInfo.current.updateCounter++;
-        
-        // Применяем обновление с флагом isDragging, чтобы оптимизировать обработку
-        if (dragInfo.current.pendingValue !== null) {
-          handleSliderChange(axis.tag, dragInfo.current.pendingValue, true);
-          dragInfo.current.pendingValue = null;
-          dragInfo.current.animationFrameId = null;
-        }
-      });
-    };
-    
-    // Функция обработки движения мыши с троттлингом
-    const handleMouseMove = (moveEvent) => {
-      // Если активная ось не соответствует или нет информации о перетаскивании, игнорируем
-      if (!dragInfo.current || dragInfo.current.axis !== axis.tag) return;
-      
-      // Проверяем, что кнопка мыши все еще нажата
-      if (moveEvent.buttons === 0) {
-        // Кнопка отпущена, очищаем всё
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        
-        if (clickTimer.current) {
-          clearTimeout(clickTimer.current);
-          clickTimer.current = null;
-        }
-        
-        // Отменяем запланированное обновление
-        if (dragInfo.current.animationFrameId) {
-          cancelAnimationFrame(dragInfo.current.animationFrameId);
-        }
-        
-        dragInfo.current = null;
-        setIsDragging(false);
-        
-        // НЕ сбрасываем activeAxis здесь - это должно происходить в handleMouseUp
-        
-        return;
-      }
-      
-      // Определяем величину перемещения
-      const moveX = moveEvent.clientX - dragInfo.current.startX;
-      
-      // Если перемещение достаточно большое, начинаем перетаскивание
-      if (!dragInfo.current.moveStarted && Math.abs(moveX) > 3) {
-        // Отмечаем начало перетаскивания
-        dragInfo.current.moveStarted = true;
-        setIsDragging(true);
-        
-        // Отменяем таймер для редактирования, так как начали перетаскивание
-        if (clickTimer.current) {
-          clearTimeout(clickTimer.current);
-          clickTimer.current = null;
-        }
-      }
-      
-      // Если перетаскивание еще не начато, выходим
-      if (!dragInfo.current.moveStarted) return;
-      
-      // Рассчитываем новое значение на основе перемещения, учитывая отступы
-      const effectiveWidth = dragInfo.current.sliderWidth - (dragInfo.current.paddingPx * 2);
-      const mouseXRelative = moveEvent.clientX - dragInfo.current.sliderRect.left;
-      
-      // Ограничиваем позицию мыши в пределах эффективной области слайдера
-      const boundedX = Math.max(
-        dragInfo.current.paddingPx, 
-        Math.min(mouseXRelative, dragInfo.current.sliderWidth - dragInfo.current.paddingPx)
-      );
-      
-      // Рассчитываем процент от эффективной ширины
-      const effectivePercent = (boundedX - dragInfo.current.paddingPx) / effectiveWidth;
-      
-      // Вычисляем значение на основе процента
-      let newValue = dragInfo.current.minValue + (effectivePercent * dragInfo.current.range);
-      
-      // Ограничиваем значение в допустимых пределах
-      newValue = Math.max(dragInfo.current.minValue, Math.min(dragInfo.current.maxValue, newValue));
-      
-      // Применяем троттлинг, чтобы ограничить частоту обновлений
-      const now = performance.now();
-      const timeSinceLastUpdate = now - (dragInfo.current.lastUpdateTime || 0);
-      
-      // Обновляем не чаще чем каждые 16.7мс (60fps) для предотвращения моргания
-      if (timeSinceLastUpdate >= 16.7) {
-        dragInfo.current.lastUpdateTime = now;
-        
-        // Планируем обновление значения в следующем кадре анимации
-        scheduleValueUpdate(newValue);
-      }
-    };
-    
-    // Функция обработки отпускания кнопки мыши
-    const handleMouseUp = () => {
-      console.log(`[MouseUp] isDragging: ${isDragging}, activeAxis: ${activeAxis}, dragInfo:`, dragInfo.current);
-      
-      // Если не было перетаскивания, это простой клик
-      if (!isDragging && activeAxis && clickTimer.current) {
-        clearTimeout(clickTimer.current);
-        // Устанавливаем ось для редактирования и значение
-        setEditingAxis(activeAxis);
-        const value = settings[activeAxis];
-        setEditValue(value !== undefined ? value.toString() : "");
-      }
-      
-      // Отменяем запланированное обновление, если оно есть
-      if (dragInfo.current?.animationFrameId) {
-        cancelAnimationFrame(dragInfo.current.animationFrameId);
-        dragInfo.current.animationFrameId = null;
-      }
-      
-      // Проверяем было ли перетаскивание по moveStarted в dragInfo
-      const wasDragging = isDragging || (dragInfo.current && dragInfo.current.moveStarted);
-      // Используем activeAxis из dragInfo.current для надежности, если React состояние не готово
-      const effectiveActiveAxis = activeAxis || dragInfo.current?.activeAxis;
-      
-      console.log(`[MouseUp] wasDragging: ${wasDragging}, moveStarted: ${dragInfo.current?.moveStarted}, activeAxis: ${activeAxis}, effectiveActiveAxis: ${effectiveActiveAxis}`);
-      
-      // Если было перетаскивание и есть изменения, принудительно обновляем CSS
-      if (wasDragging && effectiveActiveAxis) {
-        console.log(`[MouseUp] Финальное обновление для оси ${effectiveActiveAxis}`);
-        
-        // Получаем АКТУАЛЬНОЕ значение из dragInfo.current.lastValue или из последнего обновления
-        // Это необходимо, потому что React состояние может быть устаревшим из-за асинхронности
-        const actualValue = dragInfo.current?.lastValue !== undefined 
-          ? dragInfo.current.lastValue 
-          : settings[effectiveActiveAxis];
-        
-        console.log(`[MouseUp] Актуальное значение для ${effectiveActiveAxis}: ${actualValue} (из settings: ${settings[effectiveActiveAxis]})`);
-        
-        // Формируем настройки с актуальным значением
-        const currentSettings = { 
-          ...settings,
-          [effectiveActiveAxis]: actualValue
-        };
-        
-        // Отправляем финальное обновление с флагом isFinalUpdate для визуальной синхронизации
-        handleVariableSettingsChange(currentSettings, true);
-        
-        // Если был счетчик обновлений в dragInfo, выводим его для отладки
-        if (dragInfo.current?.updateCounter) {
-          console.log(`[MouseUp] Завершено перетаскивание оси ${effectiveActiveAxis} с ${dragInfo.current.updateCounter} обновлениями`);
-        }
-        
-        // Добавляем задержку перед разблокировкой UI для предотвращения моргания
-        setTimeout(() => {
-          setIsDragging(false);
-          setActiveAxis(null);
-          dragInfo.current = null;
-        }, 100);
-      } else {
-        console.log(`[MouseUp] Простое событие без перетаскивания`);
-        // Сбрасываем состояние перетаскивания
-        setIsDragging(false);
-        setActiveAxis(null);
-        dragInfo.current = null;
-      }
-      
-      // Удаляем глобальные обработчики
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    
-    // Добавляем обработчики для перетаскивания
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    console.log(`[MarkerMouseDown] Обработчики добавлены для оси ${axis.tag}`);
-    
-    e.preventDefault();
-    e.stopPropagation();
-  }, [isAnimating, activeAxis, isDragging, handleSliderChange, settings]);
-
-  // Отписываемся от событий при размонтировании компонента
-  useEffect(() => {
-    return () => {
-      if (clickTimer.current) {
-        clearTimeout(clickTimer.current);
-        clickTimer.current = null;
-      }
-    };
-  }, []);
-
   if (!hasAxes) {
     return (
-      <div className="text-sm text-gray-500 p-4 border border-blue-100 rounded-md bg-white text-center">
+      <div className="text-sm text-gray-500 p-4 border border-gray-200 rounded-md bg-white text-center">
         Шрифт не имеет вариативных осей
       </div>
     );
@@ -725,12 +413,9 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
 
   return (
     <div className="space-y-4">
-      {/* Внедряем стили непосредственно в компонент */}
-      <style>{sliderStyles}</style>
-      
       <div className="flex items-center gap-2 mb-3">
         <button 
-          className={`flex items-center justify-center w-8 h-8 rounded-full ${isAnimating ? 'bg-blue-500 text-white' : 'bg-white border border-blue-300 text-blue-500'}`}
+          className={`flex items-center justify-center w-8 h-8 rounded-full ${isAnimating ? 'bg-accent text-white' : 'bg-white border border-gray-200 text-accent'}`}
           onClick={toggleAnimation}
           title={isAnimating ? "Остановить анимацию" : "Воспроизвести анимацию"}
         >
@@ -746,7 +431,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         </button>
 
         <button 
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-blue-300 text-blue-500 hover:bg-blue-50 transition-colors relative group"
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-200 text-accent hover:bg-accent-soft transition-colors relative group"
           onClick={handleResetAll}
           title="Сбросить все настройки"
         >
@@ -759,7 +444,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         </button>
 
         <button 
-          className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-blue-300 text-blue-500"
+          className="flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-200 text-accent"
           title="Аудио режим"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
@@ -767,25 +452,27 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
           </svg>
         </button>
       </div>
-      
-      {isAnimating && (
-        <div className="animation-speed variable-font-slider-container">
-          <label>Скорость анимации</label>
-          <input
-            type="range"
-            min="0.1"
-            max="5"
-            step="0.1"
-            value={effectiveAnimationSpeed}
-            onChange={(e) => handleAnimationSpeedChange(parseFloat(e.target.value))}
-          />
-          <span>{effectiveAnimationSpeed.toFixed(1)}</span>
+
+      <div className="mb-4 rounded-lg bg-gray-50 p-3">
+        <div className="mb-2">
+          <p className="text-xs font-semibold text-gray-900">Скорость анимации</p>
+          <p className="mt-0.5 text-[0.65rem] leading-snug text-gray-500">
+          </p>
         </div>
-      )}
-      
+        <div className="variable-font-slider-container">
+          <DraggableValueRangeSlider
+            min={0.1}
+            max={5}
+            step={0.1}
+            value={Math.min(5, Math.max(0.1, Number(effectiveAnimationSpeed) || 1))}
+            onChange={handleAnimationSpeedChange}
+            formatDisplay={(v) => Number(v).toFixed(1)}
+          />
+        </div>
+      </div>
+
       {axes.map(axis => {
         const value = settings[axis.tag] !== undefined ? settings[axis.tag] : axis.default;
-        const percent = ((value - axis.min) / (axis.max - axis.min)) * 100;
         
         // Получаем имя оси с учетом возможных форматов
         const axisName = typeof axis.name === 'object' 
@@ -798,12 +485,12 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         return (
           <div key={axis.tag} className="mb-4">
             <div className="flex justify-between mb-1">
-              <div className="text-[0.75rem] font-medium text-blue-700 flex items-center h-5 max-w-[80%] hover:text-blue-800 transition-colors">
+              <div className="text-[0.75rem] font-medium text-gray-900 flex items-center h-5 max-w-[80%] hover:text-gray-950 transition-colors">
                 <span className="truncate mr-1" title={axisName}>{truncatedName}</span>
-                <span className="text-[0.6rem] font-medium text-gray-500 bg-blue-50 border border-blue-100 px-0.5 py-px rounded-sm whitespace-nowrap flex-shrink-0 leading-tight">({axis.tag})</span>
+                <span className="text-[0.7rem] font-normal text-gray-500 px-0.5 py-px rounded-sm whitespace-nowrap flex-shrink-0 leading-tight">({axis.tag})</span>
               </div>
               <button 
-                className={`text-blue-400 hover:text-blue-600 w-4 h-4 flex items-center justify-center ${isAnimating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`text-gray-400 hover:text-accent w-4 h-4 flex items-center justify-center ${isAnimating ? 'opacity-50 cursor-not-allowed' : ''}`}
                 onClick={() => {
                   if (!isAnimating) {
                     // Сбрасываем только эту ось к дефолтному значению
@@ -819,124 +506,48 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
               </button>
             </div>
             
-            <div className="relative h-10 flex items-center variable-font-slider-container">
-              <div className="absolute left-0 right-0 h-1 bg-gray-200 rounded-full">
-                {/* Линия прогресса */}
-                <div 
-                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-blue-300 rounded-full" 
-                  style={{ width: `${percent}%` }}
-                ></div>
-                
-                {/* Маркер дефолтного значения */}
-                <div 
-                  className="absolute h-4 w-1 bg-yellow-400 rounded-full top-1/2 transform -translate-y-1/2" 
-                  style={{ left: `${((axis.default - axis.min) / (axis.max - axis.min)) * 95}%` }}
-                  title="Значение по умолчанию"
-                ></div>
-              </div>
-              
-              <input 
-                type="range"
-                min={axis.min}
-                max={axis.max}
-                step="1"
-                value={value}
-                onChange={e => handleSliderChange(axis.tag, parseFloat(e.target.value))}
-                disabled={isAnimating}
-                className="absolute left-0 right-0 h-5 appearance-none bg-transparent cursor-pointer z-20"
-                style={{
-                  WebkitAppearance: 'none',
-                  appearance: 'none'
-                }}
-              />
-              
-              <div 
-                ref={el => markerRefs.current[axis.tag] = el}
-                className={`absolute w-10 h-6 ${activeAxis === axis.tag ? 'bg-blue-700' : 'bg-blue-600'} rounded-full border-2 border-white z-30 transform -translate-x-1/2 hover:scale-110 transition-transform flex items-center justify-center text-white text-[0.65rem] font-medium cursor-pointer`}
-                style={{ 
-                  // Используем абсолютный отступ слева (20px) и процентное соотношение для основной шкалы
-                  left: `calc(20px + (${percent} * (100% - 40px) / 100))`
-                }}
-                onMouseDown={(e) => {
-                  const sliderContainer = e.currentTarget.parentElement;
-                  const sliderWidth = sliderContainer.querySelector('input[type="range"]').offsetWidth;
-                  handleMarkerMouseDown(e, axis, value, sliderWidth);
-                }}
-                onDoubleClick={() => {
-                  setEditingAxis(axis.tag);
-                  setEditValue(Math.round(value).toString());
-                  // Используем setTimeout, чтобы дать React время отрендерить инпут перед фокусировкой
-                  setTimeout(() => {
-                    if (inputRefs.current[axis.tag]) {
-                      inputRefs.current[axis.tag].focus();
-                      inputRefs.current[axis.tag].select();
-                    }
-                  }, 50);
-                }}
-              >
-                {editingAxis === axis.tag ? (
-                  <input
-                    ref={el => inputRefs.current[axis.tag] = el}
-                    type="number"
-                    min={axis.min}
-                    max={axis.max}
-                    step="1"
-                    className="w-10 h-6 text-[0.65rem] bg-white text-blue-600 border-0 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300 px-1 text-center appearance-none no-arrows"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const newValue = parseFloat(editValue);
-                        if (!isNaN(newValue) && newValue >= axis.min && newValue <= axis.max) {
-                          const roundedValue = handleSliderChange(axis.tag, newValue);
-                          // Обновляем отображаемое значение 
-                          setEditValue(roundedValue.toString());
-                        }
-                        setEditingAxis(null);
-                      } else if (e.key === 'Escape') {
-                        setEditingAxis(null);
-                      }
-                    }}
-                    onBlur={() => {
-                      const newValue = parseFloat(editValue);
-                      if (!isNaN(newValue) && newValue >= axis.min && newValue <= axis.max) {
-                        handleSliderChange(axis.tag, newValue);
-                      }
-                      setEditingAxis(null);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    autoFocus
-                  />
-                ) : (
-                  <span className="pointer-events-none select-none w-full h-full flex items-center justify-center">
-                    {!isNaN(value) ? Math.round(value) : axis.default}
-                  </span>
-                )}
-              </div>
-            </div>
+            <DraggableValueRangeSlider
+              min={axis.min}
+              max={axis.max}
+              step={1}
+              value={value}
+              disabled={isAnimating}
+              defaultMarkerValue={axis.default}
+              formatDisplay={(v) => String(Math.round(v))}
+              interactionLockId={axis.tag}
+              onInteractionLock={setEditingAxis}
+              onChange={(v) => handleSliderChange(axis.tag, v, false)}
+              onMarkerDrag={(v) => handleSliderChange(axis.tag, v, true)}
+              onMarkerDragEnd={(v) => {
+                const rounded = Math.round(v);
+                const currentSettings = { ...settings, [axis.tag]: rounded };
+                handleVariableSettingsChange(currentSettings, true);
+              }}
+            />
           </div>
         );
       })}
       
-      <div className="pt-4 mt-4 border-t border-blue-100">
+      <div className="pt-4 mt-4 border-t border-gray-200">
         <div className="mb-3">
-          <label className="block text-xs font-medium text-blue-700 mb-1">
+          <label className="block text-xs font-medium text-gray-800 mb-1">
             Формат экспорта:
           </label>
-          <select 
-            className="w-full px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
+          <NativeSelect
+            id="vf-export-format"
+            className={nativeSelectFieldClass({ compact: true })}
             value={exportFormat || 'ttf'}
             onChange={(e) => setExportFormat(e.target.value)}
+            aria-label="Формат экспорта статического файла"
           >
             <option value="ttf">TTF (TrueType Font)</option>
             <option value="otf">OTF (OpenType Font)</option>
             <option value="woff">WOFF (Web Open Font)</option>
             <option value="woff2">WOFF2 (Web Open Font 2)</option>
-          </select>
+          </NativeSelect>
         </div>
         <button 
-          className="w-full py-2 text-center bg-blue-500 text-white rounded-md font-medium hover:bg-blue-600 transition-colors shadow-sm hover:shadow"
+          className="w-full py-2 text-xs text-center bg-accent text-white rounded-md font-normal hover:bg-accent-hover transition-colors shadow-sm hover:shadow"
           onClick={handleCreateStaticFont}
         >
           Generate Static Font File

@@ -11,17 +11,9 @@ const fontFaceCache = new Map();
 // Хеш-функция для создания уникальных ключей кэширования
 const createCacheKey = (fontFamily, weight, style) => `fontsource_${fontFamily}_${weight}_${style}`;
 
-/**
- * Хук для управления загрузкой шрифтов из различных источников.
- * @param {Function} setFonts - Функция для обновления состояния массива шрифтов.
- * @param {Function} setIsLoading - Функция для установки состояния загрузки.
- * @param {Function} safeSelectFont - Функция для безопасного выбора шрифта после загрузки.
- * @param {Array} currentFonts - Текущий массив шрифтов (для проверки дубликатов).
- */
+/** Локальные файлы и Fontsource: парсинг, стили, выбор после загрузки. */
 export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFonts) {
 
-  // Вспомогательная функция для загрузки одного статического варианта стиля Fontsource
-  // (Перенесена из useFontManager)
   const loadFontStyleVariant = useCallback(async (fontFamily, weight, style, fontObj, returnBlob = false) => {
     // НЕ загружаем статические стили, если шрифт определен как вариативный
     if (fontObj.isVariableFont) {
@@ -31,7 +23,6 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     const cacheKey = createCacheKey(fontFamily, weight, style);
 
     if (!returnBlob && fontFaceCache.has(cacheKey)) {
-      console.log(`[FontLoader] Используем кэшированные данные для ${fontFamily} ${weight} ${style}`);
       const cachedData = fontFaceCache.get(cacheKey);
       if (fontObj.loadedStyles && !fontObj.loadedStyles.some(s => s.weight === weight && s.style === style)) {
         fontObj.loadedStyles.push({ weight, style, cached: true });
@@ -45,20 +36,17 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     try {
       const fontFamilyName = fontObj.fontFamily || fontFamily;
       const apiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?weight=${weight}&style=${style}&subset=latin`;
-      console.log(`[FontLoader] Запрос к API: ${apiUrl}`);
-      
+
       const response = await fetch(apiUrl);
       if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
       
       // Проверяем, что ответ содержит JSON
       const contentType = response.headers.get('content-type');
-      console.log(`[FontLoader] Content-Type ответа: ${contentType}`);
       if (!contentType || !contentType.includes('application/json')) {
         throw new Error(`Неожиданный тип ответа: ${contentType}`);
       }
       
       const responseText = await response.text();
-      console.log(`[FontLoader] Ответ API (первые 100 символов): ${responseText.substring(0, 100)}`);
       if (!responseText || responseText === 'undefined') {
         throw new Error('API вернул пустой или undefined ответ');
       }
@@ -97,7 +85,6 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         if (fontObj.loadedStyles && !fontObj.loadedStyles.some(s => s.weight === weight && s.style === style)) {
           fontObj.loadedStyles.push({ weight, style, cached: false });
         }
-        console.log(`[FontLoader] Загружен стиль ${fontFamily} ${weight} ${style}`);
         return returnBlob ? blob : undefined;
       } catch (loadError) {
         console.warn(`Не удалось загрузить FontFace для ${fontFamily} ${weight} ${style}:`, loadError);
@@ -109,33 +96,23 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       if (fontDataUrl) URL.revokeObjectURL(fontDataUrl);
       if (returnBlob) return null;
       else throw error;
-    } finally {
-      if (!returnBlob && fontDataUrl) {
-        // URL.revokeObjectURL(fontDataUrl); // Пока не удаляем, чтобы стили не пропадали
-        console.warn(`[FontLoader] Blob URL ${fontDataUrl} для ${fontFamily} ${weight} ${style} НЕ удален (для стабильности стилей).`)
-      }
     }
-  }, [base64ToArrayBuffer, getFormatFromExtension]); // Добавляем зависимости утилит
+  }, []);
 
-  // Загружает все стили/вариативный файл для шрифта Fontsource
-  // (Перенесена из useFontManager)
   const loadAllFontsourceStyles = useCallback(async (fontFamily, forceVariableFont = false) => {
     try {
       const metaApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?meta=true`;
-      console.log(`[FontLoader] Запрос метаданных к API: ${metaApiUrl}`);
-      
+
       const metaResponse = await fetch(metaApiUrl);
       if (!metaResponse.ok) throw new Error(`Метаданные для ${fontFamily} не найдены (статус ${metaResponse.status})`);
       
       // Проверяем, что ответ содержит JSON
       const metaContentType = metaResponse.headers.get('content-type');
-      console.log(`[FontLoader] Content-Type метаданных: ${metaContentType}`);
       if (!metaContentType || !metaContentType.includes('application/json')) {
         throw new Error(`Неожиданный тип ответа от API метаданных: ${metaContentType}`);
       }
       
       const metaResponseText = await metaResponse.text();
-      console.log(`[FontLoader] Ответ API метаданных (первые 100 символов): ${metaResponseText.substring(0, 100)}`);
       if (!metaResponseText || metaResponseText === 'undefined') {
         throw new Error('API метаданных вернул пустой или undefined ответ');
       }
@@ -166,7 +143,6 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       };
 
       if (actualIsVariableFont && metadata.variable && metadata.variable.url) {
-        console.log(`[FontLoader] Загружаем вариативный шрифт ${displayName} по URL: ${metadata.variable.url}`);
         try {
           const fontFileResponse = await fetch(metadata.variable.url);
           if (!fontFileResponse.ok) throw new Error(`Не удалось загрузить файл вариативного шрифта (статус ${fontFileResponse.status})`);
@@ -177,9 +153,7 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
 
           fontObj.file = blob;
           fontObj.url = URL.createObjectURL(blob);
-          console.log(`[FontLoader] Вариативный шрифт ${displayName} загружен, Blob создан, URL: ${fontObj.url}`);
 
-          // TODO: Перенести логику добавления @font-face в useFontCss
           const fontFaceRule = `
               @font-face {
                   font-family: ${JSON.stringify(displayName)};
@@ -190,7 +164,6 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
           const styleElement = document.createElement('style');
           styleElement.textContent = fontFaceRule;
           document.head.appendChild(styleElement);
-          console.log(`[FontLoader] Вариативный шрифт ${displayName} добавлен через <style> tag.`);
 
         } catch (loadError) {
           console.error(`[FontLoader] Ошибка при загрузке/обработке вариативного файла ${displayName}:`, loadError);
@@ -215,12 +188,10 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         const regularStyle = stylesArray.includes('normal') ? 'normal' : (stylesArray[0] || 'normal');
 
         try {
-          console.log(`[FontLoader] Загружаем основной статический стиль ${fontFamily} ${regularWeight} ${regularStyle}`);
           const mainStyleBlob = await loadFontStyleVariant(fontFamily, parseInt(regularWeight, 10), regularStyle, fontObj, true);
           if (mainStyleBlob instanceof Blob) {
             fontObj.file = mainStyleBlob;
             fontObj.url = URL.createObjectURL(mainStyleBlob);
-            console.log(`[FontLoader] Основной статический стиль ${displayName} загружен, Blob сохранен, URL: ${fontObj.url}`);
           } else {
             console.warn(`[FontLoader] Не удалось получить Blob для основного стиля ${displayName}. Глифы могут быть недоступны.`);
           }
@@ -240,7 +211,6 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
             }
           }
           await Promise.allSettled(promises);
-          console.log(`[FontLoader] Фоновая загрузка всех стилей для ${fontFamily} завершена.`);
           setFonts(currentFonts => currentFonts.map(f => f.id === fontId ? { ...f } : f));
         }, 100);
       }
@@ -251,18 +221,13 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       toast.error(`Не удалось загрузить шрифт ${fontFamily}: ${error.message}`);
       throw error; // Пробрасываем ошибку для обработки в вызывающей функции
     }
-  }, [setFonts, loadFontStyleVariant, findStyleInfoByWeightAndStyle]); // Добавляем зависимости
+  }, [setFonts, loadFontStyleVariant, findStyleInfoByWeightAndStyle]);
 
-  // Обрабатывает загруженные локальные шрифты
-  // (Переименована из handleFontsUploaded)
   const handleLocalFontsUpload = useCallback(async (newFonts) => {
-    console.log('[handleLocalFontsUpload] Начало обработки:', newFonts);
     if (!Array.isArray(newFonts) || newFonts.length === 0) {
-      console.log('[handleLocalFontsUpload] Ошибка: пустой массив или не массив');
       toast.error('Ошибка: Не указаны файлы шрифтов');
-      return;
+      return null;
     }
-    console.log('[handleLocalFontsUpload] Устанавливаем isLoading=true');
     setIsLoading(true); // Показываем индикатор загрузки
     try {
       const processedFonts = await Promise.all(newFonts.map(async (font) => {
@@ -280,8 +245,6 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         // Определяем новые шрифты ДО вызова setFonts
         const currentIds = new Set(currentFonts.map(f => f.id).filter(Boolean));
         const trulyNewFonts = validFonts.filter(f => !f.id || !currentIds.has(f.id));
-        
-        console.log(`[handleLocalFontsUpload] Найдено новых шрифтов: ${trulyNewFonts.length} из ${validFonts.length}`);
 
         if (trulyNewFonts.length > 0) {
           // Обновляем состояние
@@ -289,29 +252,28 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
 
           // Сохраняем новые шрифты в IndexedDB
           await Promise.all(trulyNewFonts.map(fontToSave => saveFont(fontToSave)));
-          console.log(`[FontLoader/DB] ${trulyNewFonts.length} локальных шрифтов сохранено.`);
           toast.success(`Успешно загружено и сохранено новых локальных шрифтов: ${trulyNewFonts.length}`);
           
           // Выбираем первый из *только что добавленных*
           if (typeof safeSelectFont === 'function') {
             safeSelectFont(trulyNewFonts[0]);
           }
-        } else {
-             toast.info("Загруженные локальные шрифты уже были добавлены ранее.");
+          return trulyNewFonts[0];
         }
-      } else {
-        toast.warning('Не удалось обработать ни одного из загруженных локальных файлов.');
+        toast.info("Загруженные локальные шрифты уже были добавлены ранее.");
+        return null;
       }
+      toast.warning('Не удалось обработать ни одного из загруженных локальных файлов.');
+      return null;
     } catch (error) {
       toast.error(`Ошибка при загрузке локальных шрифтов: ${error.message}`);
       console.error('[FontLoader] Ошибка в handleLocalFontsUpload:', error);
+      return null;
     } finally {
       setIsLoading(false); // Убираем индикатор загрузки
     }
-  }, [setFonts, setIsLoading, safeSelectFont, processLocalFont, saveFont, currentFonts]); // Добавляем зависимости
+  }, [setFonts, setIsLoading, safeSelectFont, processLocalFont, saveFont, currentFonts]);
 
-  // Выбирает или загружает шрифт Fontsource
-  // (Переименована из selectOrAddFontsourceFont)
   const loadAndSelectFontsourceFont = useCallback(async (fontFamilyName, forceVariableFont = false) => {
     try {
       // Проверяем существующие шрифты (переданные как currentFonts)
@@ -328,7 +290,7 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
           safeSelectFont(existingFont);
           toast.info(`Шрифт ${existingFont.displayName} уже загружен.`);
         }
-        return;
+        return existingFont;
       }
 
       setIsLoading(true);
@@ -341,20 +303,22 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
              safeSelectFont(fontObj); // Выбираем новый шрифт
         }
         toast.success(`Шрифт ${fontObj.displayName} успешно загружен и добавлен`);
+        return fontObj;
       }
       // Ошибка уже обработана и показана в loadAllFontsourceStyles
+      return null;
     } catch (error) {
       // Ошибка уже залогирована и показана в loadAllFontsourceStyles
       // toast.error(`Не удалось загрузить шрифт ${fontFamilyName}`); // Можно добавить общее сообщение
+      return null;
     } finally {
       setIsLoading(false);
     }
-  }, [currentFonts, setIsLoading, setFonts, safeSelectFont, loadAllFontsourceStyles, saveFont]); // Добавляем зависимости
+  }, [currentFonts, setIsLoading, setFonts, safeSelectFont, loadAllFontsourceStyles, saveFont]);
 
   return {
     handleLocalFontsUpload,
     loadAndSelectFontsourceFont,
-    loadFontsourceStyleVariant: loadFontStyleVariant, // Экспортируем для useFontStyleManager
-    // loadAllFontsourceStyles // Не экспортируем, используется внутри loadAndSelectFontsourceFont
+    loadFontsourceStyleVariant: loadFontStyleVariant,
   };
-} 
+}

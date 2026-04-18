@@ -12,28 +12,20 @@ const ResetButton = () => {
     // Запрашиваем подтверждение у пользователя
     if (window.confirm('Вы уверены, что хотите сбросить все настройки и удалить все локально сохраненные шрифты? Это действие необратимо.')) {
       try {
-        console.log('[ResetButton] Начинаем сброс...');
-        // Вызываем сброс настроек интерфейса
         resetSettings();
-        console.log('[ResetButton] Настройки SettingsContext сброшены.');
-        // Вызываем сброс состояния шрифтов (включая IndexedDB и localStorage для шрифтов)
-        resetApplicationState(); // Эта функция уже содержит toast.success
-        console.log('[ResetButton] Состояние useFontManager сброшено.');
-        // Дополнительно можно перезагрузить страницу для чистоты, но пока не будем
-        // window.location.reload();
+        resetApplicationState();
       } catch (error) {
         console.error('[ResetButton] Ошибка при выполнении сброса:', error);
         toast.error('Ошибка при сбросе приложения.');
       }
-    } else {
-      console.log('[ResetButton] Сброс отменен пользователем.');
     }
   };
 
   return (
     <button
+      type="button"
       onClick={handleResetClick}
-      className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 w-full text-sm"
+      className="w-full min-h-0 rounded-md border border-gray-200 bg-gray-100 px-3 py-2 text-center text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400/40 focus:ring-offset-1"
       title="Сбросить все настройки приложения и удалить локальные шрифты"
     >
       Сбросить всё состояние

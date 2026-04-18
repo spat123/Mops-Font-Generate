@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useLayoutEffect, memo, useCallback } from 'react';
 // Импортируем useSettings
 import { useSettings } from '../contexts/SettingsContext';
-import { useFontContext } from '../contexts/FontContext';
 
 /**
  * Компонент для редактируемого текста с оптимизацией курсора
@@ -23,16 +22,12 @@ const EditableText = memo(({
   viewMode,
   syncId = 'global',
 }) => {
-  const { text, setText, settings, backgroundColor } = useSettings();
-  const { selectedFont, getFontFamily, getVariationSettings } = useFontContext();
+  const { text, setText } = useSettings();
 
   const contentRef = useRef(null);
   const localTextRef = useRef(text);
   const hasModificationsRef = useRef(false);
-  
-  // Отладочное сообщение для проверки, что текст обновляется
-  // console.log(`EditableText (${syncId}): Текущий текст:`, text);
-  
+
   // Функция для проверки и управления прокруткой
   const adjustScroll = useCallback(() => {
     if (contentRef.current) {
@@ -156,7 +151,7 @@ const EditableText = memo(({
   return (
     <div
       ref={contentRef}
-      className={`preview-content pl-8 outline-none editable-sync-${syncId} ${isWaterfall ? 'waterfall-editable' : ''} ${isStyles ? 'styles-editable' : ''}`}
+      className={`preview-content ${isStyles ? 'pl-0' : 'pl-8'} editable-sync-${syncId} ${isWaterfall ? 'waterfall-editable outline-none' : ''} ${isStyles ? 'styles-editable outline-none' : ''} ${!isWaterfall && !isStyles ? 'outline-none' : ''}`}
       style={{
         ...style,
         ...(extraStyles || {}),

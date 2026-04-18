@@ -1,92 +1,51 @@
 /**
- * Утилита для генерации статических шрифтов из вариативных
- * Использует различные подходы в зависимости от доступности инструментов
+ * Генерация статического файла из VF на клиенте:
+ * 1) POST /api/generate-static-font (Python или @web-alchemy/fonttools)
+ * 2) иначе псевдо-статика: тот же буфер + CSS с font-variation-settings
  */
 
-// Попытка загрузки HarfBuzz WASM (если доступен)
-let harfbuzzWasm = null;
-
-const loadHarfBuzz = async () => {
-  if (harfbuzzWasm) return harfbuzzWasm;
-  
-  try {
-    // Пытаемся загрузить HarfBuzz WASM (пакет не установлен, будет fallback)
-    return null;
-  } catch (error) {
-    return null;
-  }
-};
-
 /**
- * Генерирует статический шрифт с использованием HarfBuzz WASM
- */
-const generateWithHarfBuzz = async (fontBuffer, variableSettings) => {
-  const hb = await loadHarfBuzz();
-  if (!hb) throw new Error('HarfBuzz WASM недоступен');
-  
-  // Создаем blob из font data
-  const blob = hb.createBlob(fontBuffer);
-  const face = hb.createFace(blob, 0);
-  const font = hb.createFont(face);
-  
-  // Применяем вариативные настройки
-  const variations = Object.entries(variableSettings).map(([tag, value]) => ({
-    tag: hb.tagFromString(tag),
-    value: parseFloat(value)
-  }));
-  
-  font.setVariations(variations);
-  
-  // Получаем новые данные шрифта
-  const outputBlob = face.reference_table(hb.tagFromString('GDEF')); // Это упрощенный пример
-  const outputBuffer = outputBlob.getData();
-  
-  // Очищаем ресурсы
-  font.destroy();
-  face.destroy();
-  blob.destroy();
-  
-  return outputBuffer;
-};
-
-/**
- * Генерирует статический шрифт через серверный API
+ * @param {ArrayBuffer} fontBuffer
+ * @param {Record<string, number>} variableSettings
+ * @param {string} [format]
  */
 const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2') => {
   const response = await fetch('/api/generate-static-font', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fontData: Buffer.from(fontBuffer).toString('base64'),
       variableSettings,
-      format
-    })
+      format,
+    }),
   });
-  
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.details || 'Серверная генерация не удалась');
+    let detail = 'Серверная генерация не удалась';
+    try {
+      const err = await response.json();
+      detail = err.details || err.error || detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
   }
-  
+
   const result = await response.json();
   return Buffer.from(result.data, 'base64');
 };
 
-/**
- * Fallback: создает "псевдо-статический" шрифт с CSS переменными
- */
 const generatePseudoStatic = (fontBuffer, variableSettings, fontName) => {
-  // Возвращаем оригинальный шрифт + CSS с фиксированными настройками
   const cssVariations = Object.entries(variableSettings)
     .map(([axis, value]) => `"${axis}" ${value}`)
     .join(', ');
-  
+
+  const base64 = Buffer.from(fontBuffer).toString('base64');
+
   const css = `
 @font-face {
   font-family: "${fontName}-Static";
-  src: url(data:font/woff2;base64,${Buffer.from(fontBuffer).toString('base64')}) format("woff2");
+  src: url(data:font/woff2;base64,${base64}) format("woff2");
   font-variation-settings: ${cssVariations};
   font-display: swap;
 }
@@ -96,89 +55,63 @@ const generatePseudoStatic = (fontBuffer, variableSettings, fontName) => {
   font-variation-settings: ${cssVariations};
 }
 `;
-  
+
   return {
     fontBuffer,
     css,
-    isPseudoStatic: true
+    isPseudoStatic: true,
   };
 };
 
 /**
- * Основная функция генерации статического шрифта
- * Пробует разные методы в порядке приоритета
+ * @param {ArrayBuffer} fontBuffer
+ * @param {Record<string, number>} variableSettings
+ * @param {{ format?: string, fontName?: string, preferredMethod?: 'auto'|'server'|'pseudo-static' }} [options]
  */
 export const generateStaticFont = async (fontBuffer, variableSettings, options = {}) => {
   const { format = 'woff2', fontName = 'VariableFont', preferredMethod = 'auto' } = options;
-  
-  // Метод 1: HarfBuzz WASM (наиболее качественный)
-  if (preferredMethod === 'auto' || preferredMethod === 'harfbuzz') {
-    try {
-      const result = await generateWithHarfBuzz(fontBuffer, variableSettings);
-      return {
-        buffer: result,
-        method: 'harfbuzz',
-        isRealStatic: true
-      };
-    } catch (error) {
-      // Переходим к следующему методу
-    }
-  }
-  
-  // Метод 2: Серверный API (второй по качеству)
+
   if (preferredMethod === 'auto' || preferredMethod === 'server') {
     try {
       const result = await generateViaAPI(fontBuffer, variableSettings, format);
       return {
         buffer: result,
         method: 'server',
-        isRealStatic: true
+        isRealStatic: true,
       };
-    } catch (error) {
-      // Переходим к следующему методу
+    } catch {
+      /* fallback */
     }
   }
-  
-  // Метод 3: Псевдо-статический (fallback)
+
   const result = generatePseudoStatic(fontBuffer, variableSettings, fontName);
   return {
     buffer: result.fontBuffer,
     css: result.css,
     method: 'pseudo-static',
     isRealStatic: false,
-    warning: 'Создан псевдо-статический шрифт. Для настоящей статической генерации требуется серверная поддержка.'
+    warning:
+      'Создан псевдо-статический шрифт. Для настоящей статической генерации нужен рабочий /api/generate-static-font.',
   };
 };
 
-/**
- * Проверяет доступность различных методов генерации
- */
+/** Доступность серверного /api/generate-static-font и fallback. */
 export const checkGenerationCapabilities = async () => {
   const capabilities = {
-    harfbuzz: false,
     server: false,
-    pseudoStatic: true // Всегда доступен
+    pseudoStatic: true,
   };
-  
-  // Проверяем HarfBuzz
-  try {
-    await loadHarfBuzz();
-    capabilities.harfbuzz = true;
-  } catch (error) {
-    // HarfBuzz недоступен
-  }
-  
-  // Проверяем серверный API
+
   try {
     const response = await fetch('/api/generate-static-font', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ test: true })
+      body: JSON.stringify({ probe: true }),
     });
-    capabilities.server = response.status !== 404;
-  } catch (error) {
-    // Серверный API недоступен
+    capabilities.server = response.ok;
+  } catch {
+    capabilities.server = false;
   }
-  
+
   return capabilities;
-}; 
+};

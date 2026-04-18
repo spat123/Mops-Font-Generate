@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 function slugToLabel(slug) {
   return slug
@@ -13,8 +14,7 @@ function slugToLabel(slug) {
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonMethodNotAllowed(res, 'GET');
   }
 
   try {

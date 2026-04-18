@@ -23,16 +23,13 @@ function openDB() {
     };
 
     request.onsuccess = (event) => {
-      console.log("IndexedDB успешно открыта");
       resolve(event.target.result);
     };
 
     // Вызывается при создании БД или обновлении версии
     request.onupgradeneeded = (event) => {
-      console.log("Обновление схемы IndexedDB...");
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        console.log(`Создание хранилища объектов: ${STORE_NAME}`);
         // Создаем хранилище объектов для шрифтов
         // 'id' будет ключом
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
@@ -67,7 +64,6 @@ export async function saveFont(fontObj) {
 
     return new Promise((resolve, reject) => {
       request.onsuccess = () => {
-        // console.log(`Шрифт ${fontObj.name} (${fontObj.id}) сохранен в IndexedDB`);
         resolve();
       };
       request.onerror = (event) => {
@@ -121,7 +117,6 @@ export async function deleteFontDB(fontId) {
 
     return new Promise((resolve, reject) => {
       request.onsuccess = () => {
-        // console.log(`Шрифт ${fontId} удален из IndexedDB`);
         resolve();
       };
       request.onerror = (event) => {
@@ -148,7 +143,6 @@ export async function deleteAllFontsDB() {
 
     return new Promise((resolve, reject) => {
       request.onsuccess = () => {
-        console.log(`Все шрифты удалены из IndexedDB (хранилище ${STORE_NAME})`);
         resolve();
       };
       request.onerror = (event) => {
@@ -203,7 +197,6 @@ export async function updateFontSettings(fontId, updates) {
         const putRequest = store.put(updatedFont);
         
         putRequest.onsuccess = () => {
-          console.log(`Настройки шрифта ${fontId} обновлены в IndexedDB:`, updates);
           resolve();
         };
         

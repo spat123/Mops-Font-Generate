@@ -3,6 +3,7 @@
  * Источник: https://fonts.google.com/metadata/fonts
  */
 import { slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
+import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 const SOURCE = 'https://fonts.google.com/metadata/fonts';
 
@@ -43,8 +44,7 @@ function slimEntry(x) {
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonMethodNotAllowed(res, 'GET');
   }
 
   try {

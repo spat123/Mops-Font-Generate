@@ -175,11 +175,10 @@ export const getFormatFromExtension = (fileName) => {
   }
 };
 
-/**
- * Получает читаемое имя для тега оси вариативного шрифта
- * @param {string} tag - Тег оси (например, 'wght', 'wdth')
- * @returns {string} - Читаемое имя (например, 'Weight', 'Width')
- */
-export const getAxisName = (tag) => {
-  // ... (остальной код)
-}; 
+/** Стили строки превью для SessionFontCard (локальные и Fontsource в сессии). */
+export function sessionFontCardPreviewStyle(font) {
+  const quoted = font.fontFamily
+    ? `'${font.fontFamily}'`
+    : `'${font.displayName || font.name}'`;
+  return { fontFamily: quoted, fontSize: '20px' };
+}

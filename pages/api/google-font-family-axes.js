@@ -3,11 +3,11 @@
  */
 import { slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
 import { getGoogleFontsMetadataFamilyList } from '../../utils/googleFontsMetadataServer';
+import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method not allowed' });
+    return jsonMethodNotAllowed(res, 'GET');
   }
 
   const family = typeof req.query.family === 'string' ? req.query.family.trim() : '';

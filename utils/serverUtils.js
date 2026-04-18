@@ -13,8 +13,7 @@ const __dirname = path.dirname(__filename);
  */
 async function findProjectRoot(startDir) {
   let currentDir = startDir;
-  console.log(`[ServerUtils] Ищем корень проекта, начиная с: ${startDir}`);
-  
+
   // Специальная логика для Vercel - попробуем несколько стандартных путей
   const vercelPaths = [
     '/var/task',           // Стандартный путь для Vercel Functions
@@ -28,10 +27,9 @@ async function findProjectRoot(startDir) {
     try {
       const packageJsonPath = path.join(vercelPath, 'package.json');
       await fs.access(packageJsonPath, fs.constants.F_OK);
-      console.log(`[ServerUtils] ✅ Найден корень проекта (Vercel): ${vercelPath}`);
       return vercelPath;
     } catch (e) {
-      console.log(`[ServerUtils] ⚠️ Vercel путь не подошел: ${vercelPath}`);
+      // пробуем следующий путь
     }
   }
   
@@ -40,7 +38,6 @@ async function findProjectRoot(startDir) {
     const packageJsonPath = path.join(currentDir, 'package.json');
     try {
       await fs.access(packageJsonPath, fs.constants.F_OK);
-      console.log(`[ServerUtils] ✅ Найден корень проекта (обычный поиск): ${currentDir}`);
       return currentDir; // Нашли package.json, это корень
     } catch (e) {
       // Игнорируем ошибку и идем на уровень выше
@@ -60,8 +57,6 @@ async function findProjectRoot(startDir) {
  * @returns {Promise<string|null>} - Абсолютный путь или null, если пакет/metadata.json не найден.
  */
 export async function findFontsourcePackagePath(packageName) {
-  console.log(`[ServerUtils] Поиск пакета: ${packageName}`);
-  
   const projectRoot = await findProjectRoot(__dirname);
   if (!projectRoot) {
     console.error("[ServerUtils] Не удалось найти корневую директорию проекта (package.json).");
@@ -75,10 +70,7 @@ export async function findFontsourcePackagePath(packageName) {
   // Пути к обычному и вариативному пакетам
   const normalPackageName = `@fontsource/${baseName}`;
   const variablePackageName = `@fontsource-variable/${baseName}`;
-  
-  console.log(`[ServerUtils] Проверяем пакеты: ${normalPackageName}, ${variablePackageName}`);
-  console.log(`[ServerUtils] Корень проекта: ${projectRoot}`);
-  
+
   let packageDir;
   let metadataPath;
   
@@ -86,11 +78,9 @@ export async function findFontsourcePackagePath(packageName) {
   if (isVariableRequest) {
     packageDir = path.join(projectRoot, 'node_modules', variablePackageName);
     metadataPath = path.join(packageDir, 'metadata.json');
-    console.log(`[ServerUtils] Проверяем вариативный пакет: ${metadataPath}`);
-    
+
     try {
       await fs.access(metadataPath, fs.constants.F_OK);
-      console.log(`[ServerUtils] ✅ Найден вариативный пакет ${variablePackageName} в: ${packageDir}`);
       return packageDir;
     } catch (error) {
       console.warn(`[ServerUtils] ⚠️ Вариативный пакет ${variablePackageName} не найден: ${error.message}`);
@@ -101,13 +91,10 @@ export async function findFontsourcePackagePath(packageName) {
   // Ищем обычный пакет
   packageDir = path.join(projectRoot, 'node_modules', normalPackageName);
   metadataPath = path.join(packageDir, 'metadata.json');
-  
-  console.log(`[ServerUtils] Проверяем обычный пакет: ${metadataPath}`);
-  
+
   try {
     // Проверяем доступность metadata.json по построенному пути
     await fs.access(metadataPath, fs.constants.F_OK);
-    console.log(`[ServerUtils] ✅ Найден пакет ${normalPackageName} в: ${packageDir}`);
     return packageDir; // Возвращаем путь к директории пакета
   } catch (error) {
     console.warn(`[ServerUtils] ⚠️ Обычный пакет ${normalPackageName} не найден: ${error.message}`);
@@ -116,11 +103,9 @@ export async function findFontsourcePackagePath(packageName) {
     if (!isVariableRequest) {
       packageDir = path.join(projectRoot, 'node_modules', variablePackageName);
       metadataPath = path.join(packageDir, 'metadata.json');
-      console.log(`[ServerUtils] Проверяем вариативный пакет (fallback): ${metadataPath}`);
-      
+
       try {
         await fs.access(metadataPath, fs.constants.F_OK);
-        console.log(`[ServerUtils] ✅ Найден вариативный пакет ${variablePackageName} в: ${packageDir}`);
         return packageDir;
       } catch (variableError) {
         console.error(`[ServerUtils] ❌ Не найдены пакеты ${normalPackageName} и ${variablePackageName}`);

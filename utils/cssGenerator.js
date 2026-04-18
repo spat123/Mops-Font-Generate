@@ -195,8 +195,6 @@ export const loadFontFaceIfNeeded = async (
           ? { ...faceDescriptors }
           : {};
 
-      console.log(`[loadFontFaceIfNeeded] Создаем FontFace для ${fontFamily} БЕЗ фиксированных variationSettings`);
-      
       const fontFace = isUrl
         ? new FontFace(fontFamily, `url(${urlOrBuffer})`, options)
         : new FontFace(fontFamily, urlOrBuffer, options);
@@ -204,8 +202,7 @@ export const loadFontFaceIfNeeded = async (
       if (typeof document !== 'undefined' && document.fonts) {
           document.fonts.add(fontFace);
       }
-      
-      console.log(`[loadFontFaceIfNeeded] FontFace успешно загружен и добавлен: ${fontFamily}`);
+
       return fontFace;
     } catch (error) {
       console.error(`Ошибка при загрузке шрифта ${fontFamily} через FontFace API:`, error);
@@ -218,74 +215,6 @@ export const loadFontFaceIfNeeded = async (
   fontFaceCache.set(cacheKey, loadPromise);
 
   return loadPromise;
-};
-
-/**
- * @deprecated Эта функция больше не добавляет @font-face. Используйте loadFontFaceIfNeeded.
- *             Она может быть использована только для обновления настроек, но лучше использовать updateVariableFontSettings.
- */
-export const addFontFace = (fontObj, prevSettings = null) => {
-  // Проверяем, что у нас есть допустимый объект шрифта
-  if (!fontObj) {
-    console.error('fontObj не предоставлен');
-    return null;
-  }
-
-  // Проверяем, что у нас есть файл или URL (уже не нужно для этой функции)
-  /*
-  if (!fontObj.url && (!fontObj.file || !(fontObj.file instanceof Blob))) {
-    console.error('Нет URL или файла для шрифта');
-    return fontObj;
-  }
-  */
-
-  // Убедимся, что у шрифта есть ID
-  if (!fontObj.id) {
-    fontObj.id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  }
-
-  // Убедимся, что есть fontFamily (он должен быть установлен в processLocalFont или взят из источника)
-  const fontFamilyName = fontObj.fontFamily;
-  if (!fontFamilyName) {
-    console.error('fontObj не имеет fontFamily, не могу обновить CSS.', fontObj);
-    return fontObj; // Возвращаем без изменений
-  }
-
-  // --- УДАЛЕНА ГЕНЕРАЦИЯ @font-face --- 
-  // Вся логика, связанная с `src: url(...)` и `format()` удалена.
-
-  // --- ЛОГИКА ОБНОВЛЕНИЯ VARIATION SETTINGS (оставлена для обратной совместимости, но лучше использовать updateVariableFontSettings) ---
-  // ... (код извлечения currentSettings и генерации variationSettingsRule остается, как в предыдущем анализе)
-  const currentSettings = {};
-  if (fontObj.isVariableFont && fontObj.variableAxes) {
-    Object.entries(fontObj.variableAxes).forEach(([tag, axisData]) => {
-         const value = axisData?.currentValue ?? axisData?.default;
-         if (value !== undefined) {
-             currentSettings[tag] = value;
-      }
-    });
-  }
-  
-  // Подготавливаем строку font-variation-settings
-  let variationSettingsRule = '';
-  if (fontObj.isVariableFont) {
-      const settingsToApply = Object.entries(currentSettings);
-      if (settingsToApply.length > 0) {
-          const settingsArray = settingsToApply.map(([tag, value]) => `\"${tag}\" ${value}`);
-          // Используем data-атрибут как селектор (пример)
-          variationSettingsRule = `[data-font-family="${fontFamilyName}"] { font-variation-settings: ${settingsArray.join(', ')}; }`;
-      }
-  }
-
-  const cssRule = variationSettingsRule;
-
-  // Обновляем CSS с помощью буферизации, если есть что обновлять
-  if (cssRule) {
-      // Используем ID + '-settings', чтобы не конфликтовать с возможным старым @font-face стилем
-      updateBufferedFontCss(fontObj.id + '-settings', cssRule);
-  }
-
-    return fontObj;
 };
 
 /**
@@ -302,11 +231,6 @@ export const debounce = (func, wait = 50) => {
     timeout = setTimeout(() => func.apply(context, args), wait);
   };
 };
-
-/**
- * Дебаунсированная версия addFontFace для безопасного вызова при изменении осей
- */
-export const debouncedAddFontFace = debounce(addFontFace, 50);
 
 /**
  * Переименовываем updateFontFaceIfNeeded в updateVariableFontSettings
@@ -357,9 +281,3 @@ export const updateVariableFontSettings = (fontObj, currentSettings, prevSetting
 
 // Дебаунсированная версия updateVariableFontSettings (остается)
 export const debouncedUpdateVariableFontSettings = debounce(updateVariableFontSettings, 50);
-
-/**
- * Счетчик для отслеживания количества загрузок шрифтов для отладки
- */
-let fontLoadCounter = 0;
-

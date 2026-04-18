@@ -34,7 +34,7 @@ export default function MyApp({ Component, pageProps }) {
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Font Gauntlet - Инструмент для работы со шрифтами</title>
+        <title>Dynamic font — инструмент для работы со шрифтами</title>
       </Head>
       
       <SettingsProvider>

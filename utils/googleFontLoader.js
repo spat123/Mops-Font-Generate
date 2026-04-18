@@ -1,38 +1,3 @@
-/**
- * Загружает бинарник шрифта Google Fonts (woff2) через серверный API-прокси.
- * @param {string} family - Имя семейства, например "Roboto", "Open Sans"
- * @param {{ variable?: boolean, wghtMin?: number, wghtMax?: number, weight?: number, italic?: boolean }} [opts]
- *   variable=false — статический файл; для variable можно передать wghtMin/wghtMax из каталога (напр. Roboto Flex 100–1000).
- * @returns {Promise<Blob>}
- */
-export async function fetchGoogleFontBlob(family, opts = {}) {
-  const variable = opts.variable !== false;
-  const q = new URLSearchParams();
-  q.set('family', family);
-  if (!variable) {
-    q.set('variable', 'false');
-    if (opts.weight != null) q.set('weight', String(opts.weight));
-    if (opts.italic) q.set('italic', '1');
-  } else {
-    if (opts.wghtMin != null) q.set('wghtMin', String(opts.wghtMin));
-    if (opts.wghtMax != null) q.set('wghtMax', String(opts.wghtMax));
-  }
-
-  const url = `/api/google-font?${q.toString()}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    let detail = '';
-    try {
-      const j = await res.json();
-      detail = j.error || JSON.stringify(j);
-    } catch {
-      detail = await res.text();
-    }
-    throw new Error(detail || `HTTP ${res.status}`);
-  }
-  return res.blob();
-}
-
 function parseSliceWeight(w) {
   const s = String(w ?? '400').trim();
   const n = parseInt(s.split(/\s+/)[0], 10);

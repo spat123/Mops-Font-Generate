@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import EditableText from './EditableText';
 import { useSettings } from '../contexts/SettingsContext';
 
@@ -10,16 +10,13 @@ import { useSettings } from '../contexts/SettingsContext';
  */
 function PlainTextMode({ containerStyle, contentStyle }) {
   // Получаем text и setText из контекста
-  const { text, setText } = useSettings();
-  
-  // Используем useRef для ссылки на контейнер, если нужно будет управлять фокусом или другими DOM-манипуляциями
-  const containerRef = useRef(null);
+  const { text } = useSettings();
 
   // Обеспечиваем, что текст всегда имеет значение
   const displayText = text || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   
   return (
-    <div ref={containerRef} 
+    <div
       className="min-h-full pr-8 pb-8 pt-8 w-full relative"
       style={containerStyle}
     >

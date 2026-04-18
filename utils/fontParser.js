@@ -6,22 +6,6 @@ import { extractBasicGlyphData } from './glyphUtils';
 // --- ИМПОРТИРУЕМ ДЕКОМПРЕССОР ИЗ НОВОГО ПАКЕТА ---
 import decompress from 'woff2-encoder/decompress';
 
-// <<< ЛОГ ПРОВЕРКИ OPENTYPE.JS >>>
-try {
-  console.log('[Main] opentype.js status:', typeof opentype, 'Version:', opentype?.version || 'N/A'); 
-} catch (e) {
-  console.error('[Main] Failed to access opentype object after import:', e);
-}
-// <<< КОНЕЦ ЛОГА ПРОВЕРКИ >>>
-
-// <<< ЛОГ ПРОВЕРКИ ДЕКОМПРЕССОРА >>>
-try {
-  console.log('[Main] woff2-encoder/decompress status:', typeof decompress);
-} catch (e) {
-  console.error('[Main] Failed to access decompress function after import:', e);
-}
-// <<< КОНЕЦ ЛОГА ПРОВЕРКИ >>>
-
 /**
  * Проверяет первые 4 байта буфера на сигнатуру WOFF2 ('wOF2')
  */
@@ -145,18 +129,10 @@ export async function mergeFvarAxesFromFontInputs(inputs) {
  * @returns {Promise<opentype.Font|null>} Промис с объектом шрифта или null.
  */
 export async function parseFontBuffer(buffer, fontName = 'unknown') {
-  // Теперь эта функция просто вызывает _parseFontBufferDirect
-    return _parseFontBufferDirect(buffer, fontName);
+  return parseFontBufferFromArrayBuffer(buffer, fontName);
 }
 
-/**
- * [Только основной поток] Асинхронно парсит ArrayBuffer файла шрифта с помощью opentype.js
- * Декомпрессирует WOFF2 с помощью woff2-encoder.
- * @param {ArrayBuffer} buffer - Буфер с данными файла шрифта
- * @param {string} fontName - Имя шрифта (для сообщений об ошибках)
- * @returns {Promise<opentype.Font|null>} - Промис с объектом fontData от opentype.js или null в случае ошибки
- */
-export const _parseFontBufferDirect = async (buffer, fontName = 'font') => {
+async function parseFontBufferFromArrayBuffer(buffer, fontName = 'font') {
   if (!buffer || !(buffer instanceof ArrayBuffer) || buffer.byteLength === 0) {
     console.error(`[${fontName}] Invalid or empty buffer provided for direct parsing.`);
     return null;
@@ -166,7 +142,6 @@ export const _parseFontBufferDirect = async (buffer, fontName = 'font') => {
   
   try {
      if (isWoff2(buffer)) {
-         console.log(`[Main] Detected WOFF2 for ${fontName}, attempting decompression with woff2-encoder...`);
          try {
              if (typeof decompress !== 'function') {
                  throw new Error('woff2-encoder decompress function is not available. Check import.');
@@ -176,7 +151,6 @@ export const _parseFontBufferDirect = async (buffer, fontName = 'font') => {
                  throw new Error('woff2-encoder decompression returned null or undefined.');
              }
              processedBuffer = decompressedData.buffer;
-             console.log(`[Main] WOFF2 decompression successful for ${fontName}`);
          } catch (decompError) {
              toast.error(`Ошибка декомпрессии WOFF2 для ${fontName}: ${decompError.message}`);
              console.error(`[Main] WOFF2 decompression failed for ${fontName}:`, decompError);
@@ -189,7 +163,6 @@ export const _parseFontBufferDirect = async (buffer, fontName = 'font') => {
     }
      
     const parsedFont = opentype.parse(processedBuffer);
-    console.log(`[Main] Parsed ${fontName} successfully.`);
     return parsedFont;
     
   } catch (parseError) {
@@ -197,46 +170,7 @@ export const _parseFontBufferDirect = async (buffer, fontName = 'font') => {
     console.error(`[Main] Font parsing/processing error for ${fontName}:`, parseError);
     return null;
   }
-};
-
-/**
- * [Только основной поток] Читает файл шрифта (Blob) и парсит его.
- */
-export const _parseFontFileDirect = (file, fontName = 'font') => {
-  return new Promise((resolve) => { 
-    if (!(file instanceof Blob)) {
-      toast.error(`Недопустимый файл шрифта для ${fontName} (ожидается Blob)`);
-      resolve(null);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const buffer = e.target.result;
-        // Вызываем парсер основного потока
-        const parsedFont = await _parseFontBufferDirect(buffer, fontName);
-        resolve(parsedFont);
-      } catch (error) {
-         console.error('Unexpected error during font buffer processing (direct):', error);
-         resolve(null);
-      }
-    };
-    reader.onerror = (error) => {
-      toast.error(`Ошибка при чтении файла шрифта ${fontName}`);
-      console.error(`FileReader error for ${fontName}:`, error);
-      resolve(null);
-    };
-
-    try {
-      reader.readAsArrayBuffer(file);
-    } catch (readError) {
-        toast.error(`Не удалось начать чтение файла ${fontName}`);
-        console.error(`Error calling readAsArrayBuffer for ${fontName}:`, readError);
-        resolve(null);
-    }
-  });
-};
+}
 
 /**
  * [Только основной поток] Получает данные глифов для шрифта.
@@ -259,11 +193,9 @@ export const getGlyphDataForFont = async (fontObj) => {
       throw new Error("Font file buffer is empty.");
     }
 
-    // --- Используем только основной поток --- 
-    console.log(`[fontParser] Processing glyphs in main thread for ${fontObj.name}`);
-    
+    // --- Используем только основной поток ---
     // Парсим буфер в основном потоке
-    const font = await parseFontBuffer(buffer, fontObj.name); // parseFontBuffer теперь вызывает _parseFontBufferDirect
+    const font = await parseFontBuffer(buffer, fontObj.name);
         if (!font) {
             console.error(`[fontParser] Main thread: Failed to parse font buffer for ${fontObj.name}`);
             throw new Error('Ошибка при парсинге шрифта в основном потоке');

@@ -1,12 +1,10 @@
 import React, { useCallback, useMemo, useRef, useEffect, memo, useState, lazy, Suspense } from 'react';
 import FontUploader from './FontUploader';
-import { findStyleInfoByWeightAndStyle, getFormatFromExtension, getCharUnicode } from '../utils/fontUtilsCommon';
+import { SegmentedControl, VIEW_MODE_OPTIONS } from './ui/SegmentedControl';
+import { EDITOR_PREVIEW_BOTTOM_BAR_CLASS } from './ui/editorChromeClasses';
 import { toast } from 'react-toastify';
 import { useSettings } from '../contexts/SettingsContext';
 import { useFontContext } from '../contexts/FontContext';
-// Удаляем импорт getGlyphDataForFont, так как он больше не используется здесь
-// import { getGlyphDataForFont } from '../utils/fontParser'; 
-// Импортируем новые компоненты
 import EditableText from './EditableText';
 import dynamic from 'next/dynamic';
 import { fetchGoogleVariableFontSlicesAll } from '../utils/googleFontLoader';
@@ -19,12 +17,6 @@ const StylesMode = lazy(() => import('./StylesMode'));
 const GlyphsMode = lazy(() => import('./GlyphsMode'));
 const TextMode = lazy(() => import('./TextMode'));
 // --- Конец ленивой загрузки ---
-
-// Ленивая загрузка тяжелых утилит для работы с глифами (можно оставить, если GlyphsMode использует его)
-const GlyphUtils = lazy(() => import('../utils/glyphUtils'));
-
-// Удаляем glyphDataCache, так как он теперь внутри GlyphsMode
-// const glyphDataCache = new Map();
 
 // После импортов добавляем новую переменную для буферизации текста
 // Функция для буферизации обновлений отображения шрифта
@@ -211,12 +203,16 @@ export default function FontPreview({
     textColor, 
     backgroundColor, 
     viewMode, 
+    setViewMode,
     textDirection, 
     textAlignment, 
     textCase, 
     textCenter, 
     textFill 
   } = useSettings();
+
+  /** Общий скролл области превью — режим Glyphs подписывается на этот узел для своей виртуализации */
+  const previewBodyScrollRef = useRef(null);
 
   const styleValues = useMemo(() => {
     const letterSpacingValue = `${(letterSpacing / 100) * 0.5}em`; 
@@ -225,13 +221,7 @@ export default function FontPreview({
     // Используем fontCssProperties для получения правильных значений weight и style
     const fontStyleValue = fontCssProperties?.fontStyle || 'normal';
     const fontWeightValue = fontCssProperties?.fontWeight || 400;
-    
-    console.log('[FontPreview] styleValues обновлены из fontCssProperties:', {
-      fontStyleValue,
-      fontWeightValue,
-      fontCssProperties
-    });
-    
+
     return {
       letterSpacingValue,
       lineHeightValue,
@@ -439,9 +429,9 @@ export default function FontPreview({
 
   if (!selectedFont) {
     return (
-      <div className="flex items-center justify-center h-full w-full bg-gray-50">
+      <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center bg-gray-50">
         <div className="text-center p-8 max-w-md">
-          <h2 className="text-2xl font-semibold text-blue-700 mb-4">Загрузите шрифт для начала работы</h2>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Загрузите шрифт для начала работы</h2>
           <p className="text-gray-600 mb-6">Загрузите TTF, OTF, WOFF или WOFF2 файл шрифта</p>
           <div className="mb-8">
             <FontUploader onFontsUploaded={handleFontsUploaded} />
@@ -455,7 +445,7 @@ export default function FontPreview({
                 key={fontName}
                 onClick={() => loadPresetFont(fontName)}
                 type="button"
-                className="bg-white py-3 px-4 rounded-md border border-blue-200 text-blue-700 shadow-sm hover:shadow-md transition-all duration-200 hover:border-blue-400 font-sans font-medium"
+                className="bg-white py-3 px-4 rounded-md border border-gray-200 text-gray-800 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-400 font-sans font-medium"
               >
                 {fontName}
               </button>
@@ -467,8 +457,12 @@ export default function FontPreview({
   }
 
   return (
-    <div className="flex-1 bg-white relative flex flex-col h-screen w-full overflow-hidden">
-      <div className="flex-1 overflow-auto pb-10 w-full relative pt-10" style={{ backgroundColor }}>
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
+      <div
+        ref={previewBodyScrollRef}
+        className="relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto pt-0 pb-4"
+        style={{ backgroundColor }}
+      >
         {viewMode === 'plain' && (
           <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
             <PlainTextMode
@@ -501,14 +495,15 @@ export default function FontPreview({
         )}
 
         {viewMode === 'glyphs' && (
-          <Suspense fallback={<div className="p-8 text-center">Загрузка утилит для глифов...</div>}>
-             <GlyphsMode
-               key={`${selectedFont?.id}-${viewMode === 'glyphs'}`}
-               selectedFont={selectedFont}
-               fontFamily={fontFamilyValue}
-               glyphDisplayStyle={glyphDisplayStyle}
-               isActive={viewMode === 'glyphs'}
-             />
+          <Suspense fallback={<div className="p-8 text-center text-gray-600">Загрузка режима глифов…</div>}>
+            <GlyphsMode
+              key={`${selectedFont?.id}-${viewMode === 'glyphs'}`}
+              selectedFont={selectedFont}
+              fontFamily={fontFamilyValue}
+              glyphDisplayStyle={glyphDisplayStyle}
+              isActive={viewMode === 'glyphs'}
+              scrollParentRef={previewBodyScrollRef}
+            />
           </Suspense>
         )}
 
@@ -517,56 +512,81 @@ export default function FontPreview({
             <TextMode
               contentStyle={contentStyle}
               textDisplayBuffer={textDisplayBuffer}
-              fontFamilyValue={fontFamilyValue}
+              fontFamily={fontFamilyValue}
               variationSettingsValue={variationSettingsValue}
             />
           </Suspense>
         )}
       </div>
 
-      <div className="text-xs text-blue-600 p-4 bg-white border-t border-blue-100 flex justify-between items-center absolute bottom-0 left-0 right-0 z-10 shadow-lg">
-        <div>
+      <div className={EDITOR_PREVIEW_BOTTOM_BAR_CLASS}>
+        <div className="relative z-20 shrink-0 bg-white py-0.5 pr-2">
+          <SegmentedControl
+            label="View Mode:"
+            value={viewMode}
+            onChange={setViewMode}
+            options={VIEW_MODE_OPTIONS}
+            variant="compact"
+          />
+        </div>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-8">
           {selectedFont && (
-            <>
-              <span className="text-blue-800 font-medium">
-                {exportedFont 
-                  ? exportedFont.name.replace(/-static$/, '') 
-                  : selectedFont.name || selectedFont.family || (selectedFont.fontFamily && selectedFont.source !== 'google' 
-                       ? selectedFont.fontFamily : 'Шрифт')}
+            <div className="pointer-events-none max-w-[min(520px,calc(100%-20rem))] text-center text-xs leading-snug text-gray-700 sm:max-w-[min(560px,calc(100%-18rem))]">
+              <span className="font-medium text-gray-900">
+                {exportedFont
+                  ? exportedFont.name.replace(/-static$/, '')
+                  : selectedFont.name ||
+                    selectedFont.family ||
+                    (selectedFont.fontFamily && selectedFont.source !== 'google'
+                      ? selectedFont.fontFamily
+                      : 'Шрифт')}
               </span>
-              {' • '}
-              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">
+              <span className="text-gray-400"> • </span>
+              <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
                 {selectedFont.source === 'google' ? 'Google Font' : 'Пользовательский'}
               </span>
               {(selectedFont.variationSettings || selectedFont.isVariableFont) && (
-                <span className="ml-1 bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">
-                  Вариативный
-                </span>
+                <>
+                  <span className="text-gray-400"> </span>
+                  <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-green-700">
+                    Вариативный
+                  </span>
+                </>
               )}
-              <span className="ml-1 bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs">
+              <span className="text-gray-400"> </span>
+              <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
                 {selectedFont.currentWeight}
               </span>
               {selectedFont.currentStyle === 'italic' && (
-                <span className="ml-1 bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs">
-                  Italic
-                </span>
+                <>
+                  <span className="text-gray-400"> </span>
+                  <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                    Italic
+                  </span>
+                </>
               )}
-            </>
+            </div>
           )}
         </div>
-        <div className="flex gap-2">
-          <button 
+        <div className="relative z-20 ml-auto flex shrink-0 gap-2 bg-white py-0.5 pl-2">
+          <button
+            type="button"
             onClick={handleCSSClick}
-            className="px-2 py-1 text-xs bg-blue-600 text-white rounded-sm font-medium hover:bg-blue-700 transition-colors shadow-sm hover:shadow"
+            className="rounded-sm bg-accent px-2 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-accent-hover hover:shadow"
           >
             Получить CSS
           </button>
-          <button 
+          <button
+            type="button"
             onClick={handleScreenshotClick}
-            className="px-2 py-1 text-xs bg-blue-500 text-white rounded-sm font-medium hover:bg-blue-600 transition-colors shadow-sm hover:shadow flex items-center gap-1"
+            className="flex items-center gap-1 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-accent-hover hover:shadow"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
-              <path fillRule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clipRule="evenodd" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
+              <path
+                fillRule="evenodd"
+                d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
+                clipRule="evenodd"
+              />
             </svg>
             Скриншот
           </button>

@@ -1,9 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 
-// Создаем контекст
-const SettingsContext = createContext();
+const SettingsContext = createContext(null);
 
-// <<< Ключи для localStorage >>>
 const LOCAL_STORAGE_KEYS = {
   BACKGROUND_COLOR: 'backgroundColor',
   TEXT_COLOR: 'textColor',
@@ -15,11 +13,9 @@ const LOCAL_STORAGE_KEYS = {
   TEXT_ALIGNMENT: 'textAlignment',
   TEXT_CASE: 'textCase',
   TEXT_CENTER: 'textCenter',
-  TEXT_FILL: 'textFill'
-  // Добавьте другие ключи при необходимости
+  TEXT_FILL: 'textFill',
 };
 
-// <<< Дефолтные значения >>>
 const DEFAULT_SETTINGS = {
   TEXT: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
   FONT_SIZE: 150,
@@ -32,46 +28,49 @@ const DEFAULT_SETTINGS = {
   TEXT_ALIGNMENT: 'left',
   TEXT_CASE: 'uppercase',
   TEXT_CENTER: false,
-  TEXT_FILL: false
+  TEXT_FILL: false,
 };
 
 /** Текст превью по умолчанию (как при сбросе настроек). */
 export const DEFAULT_PREVIEW_TEXT = DEFAULT_SETTINGS.TEXT;
 
-// <<< Функция для безопасного чтения из localStorage >>>
 const getLocalStorageItem = (key, defaultValue) => {
-  if (typeof window !== 'undefined') { // Убедимся, что localStorage доступен (не на сервере)
-    try {
-      const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : defaultValue;
-    } catch (error) {
-      console.error(`Ошибка чтения localStorage для ключа ${key}:`, error);
-      return defaultValue;
-    }
-  } else {
-      return defaultValue;
+  if (typeof window === 'undefined') {
+    return defaultValue;
+  }
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Ошибка чтения localStorage для ключа ${key}:`, error);
+    return defaultValue;
   }
 };
 
-// <<< Функция для безопасной записи в localStorage >>>
 const setLocalStorageItem = (key, value) => {
-   if (typeof window !== 'undefined') {
-       try {
-           localStorage.setItem(key, JSON.stringify(value));
-       } catch (error) {
-           console.error(`Ошибка записи в localStorage для ключа ${key}:`, error);
-       }
-   }
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Ошибка записи в localStorage для ключа ${key}:`, error);
+  }
 };
 
-// Создаем провайдер контекста
+/** Пишет одно поле в localStorage после гидратации (отдельный эффект на поле). */
+function useSyncSettingToStorage(isClient, storageKey, value) {
+  useEffect(() => {
+    if (!isClient) return;
+    setLocalStorageItem(storageKey, value);
+  }, [isClient, storageKey, value]);
+}
+
 export const SettingsProvider = ({ children }) => {
-  // Состояние для отслеживания клиентской стороны (предотвращение гидратации)
   const [isClient, setIsClient] = useState(false);
-  
-  // Переносим состояния из pages/index.jsx
-  const [text, setText] = useState(DEFAULT_SETTINGS.TEXT); // Текст не храним в LS пока
-  const [fontSize, setFontSize] = useState(DEFAULT_SETTINGS.FONT_SIZE); // Инициализируем дефолтом
+
+  const [text, setText] = useState(DEFAULT_SETTINGS.TEXT);
+  const [fontSize, setFontSize] = useState(DEFAULT_SETTINGS.FONT_SIZE);
   const [lineHeight, setLineHeight] = useState(DEFAULT_SETTINGS.LINE_HEIGHT);
   const [letterSpacing, setLetterSpacing] = useState(DEFAULT_SETTINGS.LETTER_SPACING);
   const [textColor, setTextColor] = useState(DEFAULT_SETTINGS.TEXT_COLOR);
@@ -82,12 +81,9 @@ export const SettingsProvider = ({ children }) => {
   const [textCase, setTextCase] = useState(DEFAULT_SETTINGS.TEXT_CASE);
   const [textCenter, setTextCenter] = useState(DEFAULT_SETTINGS.TEXT_CENTER);
   const [textFill, setTextFill] = useState(DEFAULT_SETTINGS.TEXT_FILL);
-  
-  // Эффект для инициализации клиентской стороны и загрузки из localStorage
+
   useEffect(() => {
     setIsClient(true);
-    
-    // Загружаем значения из localStorage только на клиенте
     setFontSize(getLocalStorageItem(LOCAL_STORAGE_KEYS.FONT_SIZE, DEFAULT_SETTINGS.FONT_SIZE));
     setLineHeight(getLocalStorageItem(LOCAL_STORAGE_KEYS.LINE_HEIGHT, DEFAULT_SETTINGS.LINE_HEIGHT));
     setLetterSpacing(getLocalStorageItem(LOCAL_STORAGE_KEYS.LETTER_SPACING, DEFAULT_SETTINGS.LETTER_SPACING));
@@ -101,20 +97,18 @@ export const SettingsProvider = ({ children }) => {
     setTextFill(getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_FILL, DEFAULT_SETTINGS.TEXT_FILL));
   }, []);
 
-  // <<< useEffects для сохранения в localStorage (только после клиентской инициализации) >>>
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.BACKGROUND_COLOR, backgroundColor); }, [backgroundColor, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_COLOR, textColor); }, [textColor, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.FONT_SIZE, fontSize); }, [fontSize, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.LINE_HEIGHT, lineHeight); }, [lineHeight, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.LETTER_SPACING, letterSpacing); }, [letterSpacing, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.VIEW_MODE, viewMode); }, [viewMode, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_DIRECTION, textDirection); }, [textDirection, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_ALIGNMENT, textAlignment); }, [textAlignment, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_CASE, textCase); }, [textCase, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_CENTER, textCenter); }, [textCenter, isClient]);
-  useEffect(() => { if (isClient) setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_FILL, textFill); }, [textFill, isClient]);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.BACKGROUND_COLOR, backgroundColor);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_COLOR, textColor);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.FONT_SIZE, fontSize);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.LINE_HEIGHT, lineHeight);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.LETTER_SPACING, letterSpacing);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.VIEW_MODE, viewMode);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_DIRECTION, textDirection);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_ALIGNMENT, textAlignment);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_CASE, textCase);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_CENTER, textCenter);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_FILL, textFill);
 
-  // <<< Функция сброса настроек >>>
   const resetSettings = useCallback(() => {
     setText(DEFAULT_SETTINGS.TEXT);
     setFontSize(DEFAULT_SETTINGS.FONT_SIZE);
@@ -129,14 +123,13 @@ export const SettingsProvider = ({ children }) => {
     setTextCenter(DEFAULT_SETTINGS.TEXT_CENTER);
     setTextFill(DEFAULT_SETTINGS.TEXT_FILL);
 
-    // Очищаем localStorage
-    Object.values(LOCAL_STORAGE_KEYS).forEach(key => {
-      if (typeof window !== 'undefined') localStorage.removeItem(key);
+    Object.values(LOCAL_STORAGE_KEYS).forEach((key) => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(key);
+      }
     });
-    console.log('[SettingsContext] Настройки сброшены к дефолтным и localStorage очищен.');
-  }, []); // Нет зависимостей, т.к. используем только сеттеры и константы
+  }, []);
 
-  // Значение, которое будет передано через контекст
   const value = {
     text,
     setText,
@@ -172,11 +165,10 @@ export const SettingsProvider = ({ children }) => {
   );
 };
 
-// Хук для удобного использования контекста
 export const useSettings = () => {
   const context = useContext(SettingsContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useSettings must be used within a SettingsProvider');
   }
   return context;
-}; 
+};

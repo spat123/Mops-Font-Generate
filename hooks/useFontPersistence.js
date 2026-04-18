@@ -17,10 +17,7 @@ const FONT_SETTINGS_LS_KEYS = {
     SELECTED_FONT_ID: 'selectedFontId'
 };
 
-/**
- * Старые записи Google VF в IndexedDB: gstatic-сабсеты без полного fvar.
- * Подменяем файл на полный variable TTF с репозитория google/fonts (как при ручной загрузке).
- */
+/** Дополняет урезанный Google VF полным fvar (TTF с github/google/fonts). */
 async function enrichGoogleVfAxesFromGithubIfNeeded(font) {
     if (font.source !== 'google' || !font.isVariableFont) return;
     const keys =
@@ -64,23 +61,12 @@ async function enrichGoogleVfAxesFromGithubIfNeeded(font) {
         font.variationSettings = buildVariationSettingsCssString(variableAxes);
 
         await saveFont(font);
-        console.log('[DB] Google VF обновлён полным TTF (GitHub):', family, font.supportedAxes.length, 'осей');
     } catch (e) {
         console.warn('[DB] enrichGoogleVfAxesFromGithubIfNeeded:', family, e);
     }
 }
 
-/**
- * Хук для управления постоянством данных шрифтов (IndexedDB, localStorage).
- * @param {Function} setFonts - Функция установки состояния массива шрифтов.
- * @param {Function} setIsLoading - Функция установки состояния загрузки.
- * @param {Function} setIsInitialLoadComplete - Функция установки флага завершения начальной загрузки.
- * @param {Function} setSelectedFont - Функция установки выбранного шрифта.
- * @param {Function} handleVariableSettingsChange - Функция применения настроек вариативности.
- * @param {Function} applyPresetStyle - Функция применения пресета стиля.
- * @param {Array} fonts - Текущий массив шрифтов (для поиска при восстановлении).
- * @param {Object|null} selectedFont - Текущий выбранный шрифт (для предотвращения повторного восстановления).
- */
+/** IndexedDB + localStorage: загрузка, восстановление выбора, сброс. */
 export function useFontPersistence(
     setFonts,
     setIsLoading,
@@ -88,22 +74,20 @@ export function useFontPersistence(
     setSelectedFont,
     handleVariableSettingsChange,
     applyPresetStyle,
-    fonts, // Передаем текущие fonts
-    selectedFont // Передаем selectedFont
+    fonts,
+    selectedFont
 ) {
 
     // --- Начальная загрузка из IndexedDB --- 
     useEffect(() => {
         let isMounted = true;
         const loadInitialFonts = async () => {
-            console.log('[DB] Загрузка начальных шрифтов...');
             setIsLoading(true);
             try {
                 const storedFonts = await getAllFonts();
                 if (!isMounted) return;
 
                 if (storedFonts && storedFonts.length > 0) {
-                    console.log(`[DB] Найдено ${storedFonts.length} шрифтов.`);
                     const processedFonts = await Promise.all(storedFonts.map(async (font) => {
                         if (!font?.id || !font.file || !(font.file instanceof Blob)) {
                             console.warn('[DB] Пропущен некорректный объект:', font);
@@ -206,10 +190,7 @@ export function useFontPersistence(
                             }
                         }
                         setFonts(validFonts);
-                        console.log(`[DB] ${validFonts.length} шрифтов успешно загружено.`);
                     }
-                } else {
-                    console.log('[DB] В IndexedDB нет шрифтов.');
                 }
             } catch (error) {
                 console.error('[DB] Ошибка загрузки шрифтов:', error);
@@ -230,22 +211,17 @@ export function useFontPersistence(
     useEffect(() => {
         // Запускаем только после завершения загрузки из DB и если есть шрифты, но ни один не выбран
         if (fonts && fonts.length > 0 && !selectedFont) {
-            console.log('[Restore] Попытка восстановить выбор и настройки...');
             const storedId = localStorage.getItem(FONT_SETTINGS_LS_KEYS.SELECTED_FONT_ID);
             let fontToSelect = null;
 
             if (storedId) {
                 fontToSelect = fonts.find(f => f.id === storedId);
-                if (fontToSelect) {
-                    console.log(`[Restore] Найден шрифт по ID: ${fontToSelect.displayName || fontToSelect.name}`);
-                } else {
-                    console.log(`[Restore] Шрифт с ID ${storedId} не найден. Удаляем ID.`);
+                if (!fontToSelect) {
                     localStorage.removeItem(FONT_SETTINGS_LS_KEYS.SELECTED_FONT_ID);
                 }
             }
 
             if (!fontToSelect && fonts && fonts.length > 0) {
-                console.log('[Restore] Выбираем первый доступный шрифт.');
                 fontToSelect = fonts[0];
                 localStorage.setItem(FONT_SETTINGS_LS_KEYS.SELECTED_FONT_ID, fontToSelect.id); // Сохраняем ID первого
             }
@@ -255,7 +231,6 @@ export function useFontPersistence(
 
                 // Используем setTimeout для применения настроек после установки шрифта
                 setTimeout(() => {
-                    console.log(`[Restore] Применение настроек для ${fontToSelect.displayName || fontToSelect.name} через setTimeout`);
                     const restoredVarSettingsRaw = localStorage.getItem(FONT_SETTINGS_LS_KEYS.LAST_VARIABLE_SETTINGS);
                     const restoredPresetName = localStorage.getItem(FONT_SETTINGS_LS_KEYS.LAST_PRESET_NAME);
                     let settingsApplied = false;
@@ -267,13 +242,11 @@ export function useFontPersistence(
                         const dbAxes = fontToSelect.lastUsedVariableSettings;
                         const hasDbAxes = dbAxes && typeof dbAxes === 'object' && Object.keys(dbAxes).length > 0;
                         if (hasDbAxes) {
-                            console.log('[Restore] Восстанавливаем оси из IndexedDB (приоритет):', dbAxes);
                             handleVariableSettingsChange(dbAxes, true, fontToSelect);
                             settingsApplied = true;
                         } else if (restoredVarSettingsRaw) {
                             try {
                                 const restoredVarSettings = JSON.parse(restoredVarSettingsRaw);
-                                console.log('[Restore] Восстанавливаем оси из localStorage:', restoredVarSettings);
                                 handleVariableSettingsChange(restoredVarSettings, true, fontToSelect);
                                 settingsApplied = true;
                             } catch (e) {
@@ -281,29 +254,24 @@ export function useFontPersistence(
                                 localStorage.removeItem(FONT_SETTINGS_LS_KEYS.LAST_VARIABLE_SETTINGS);
                             }
                         } else if (fontToSelect.lastUsedPresetName && applyPresetStyle) {
-                            console.log(`[Restore] Вариативный, нет осей — пресет из IndexedDB: ${fontToSelect.lastUsedPresetName}`);
                             applyPresetStyle(fontToSelect.lastUsedPresetName, fontToSelect);
                             settingsApplied = true;
                         } else if (restoredPresetName && applyPresetStyle) {
-                            console.log(`[Restore] Вариативный, нет осей в БД — пресет из localStorage: ${restoredPresetName}`);
                             applyPresetStyle(restoredPresetName, fontToSelect);
                             settingsApplied = true;
                         }
                     } else if (!fontToSelect.isVariableFont) {
                         // Статический: глобальный пресет из LS, затем сохранённый в IndexedDB
                         if (restoredPresetName && applyPresetStyle) {
-                            console.log(`[Restore] Восстанавливаем пресет из localStorage: ${restoredPresetName}`);
                             applyPresetStyle(restoredPresetName, fontToSelect);
                             settingsApplied = true;
                         } else if (fontToSelect.lastUsedPresetName && applyPresetStyle) {
-                            console.log(`[Restore] Восстанавливаем пресет из IndexedDB: ${fontToSelect.lastUsedPresetName}`);
                             applyPresetStyle(fontToSelect.lastUsedPresetName, fontToSelect);
                             settingsApplied = true;
                         }
                     }
 
                     if (!settingsApplied) {
-                        console.log('[Restore] Настройки не восстановлены, применяем дефолтный Regular');
                         if (applyPresetStyle) {
                             applyPresetStyle('Regular', fontToSelect);
                         }
@@ -327,11 +295,9 @@ export function useFontPersistence(
     }, []);
 
     const saveLastVariableSettings = useCallback((settings) => {
-        console.log('[Persistence] saveLastVariableSettings вызвана с настройками:', settings);
         if (typeof window !== 'undefined') {
             localStorage.setItem(FONT_SETTINGS_LS_KEYS.LAST_VARIABLE_SETTINGS, JSON.stringify(settings));
             localStorage.removeItem(FONT_SETTINGS_LS_KEYS.LAST_PRESET_NAME); // Сбрасываем пресет
-            console.log('[Persistence] Настройки сохранены в localStorage');
         } else {
             console.warn('[Persistence] window недоступен, сохранение пропущено');
         }
@@ -349,7 +315,6 @@ export function useFontPersistence(
             Object.values(FONT_SETTINGS_LS_KEYS).forEach(key => {
                 localStorage.removeItem(key);
             });
-            console.log("[Persistence] localStorage (шрифты) очищен.");
         }
     }, []);
 
