@@ -25,7 +25,7 @@ function PlainTextMode({ containerStyle, contentStyle }) {
         isStyles={false}
         syncId="plain"
       />
-      <div className="absolute bottom-8 right-2 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded-md opacity-50 hover:opacity-100 transition-opacity">
+      <div className="absolute -bottom-1 left-3 text-xs text-gray-400 opacity-50 hover:opacity-100 transition-opacity">
         Нажмите для редактирования текста
       </div>
     </div>

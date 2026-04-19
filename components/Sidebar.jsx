@@ -9,6 +9,7 @@ import {
   rgbStringToHex 
 } from '../utils/colorUtils'; // Исправляем импорт утилит цвета
 import { useSettings, DEFAULT_PREVIEW_TEXT } from '../contexts/SettingsContext';
+import { useFontContext } from '../contexts/FontContext';
 import ResetButton from './ResetButton';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { SelectableChip } from './ui/SelectableChip';
@@ -147,8 +148,10 @@ export default function Sidebar({
     textCase, setTextCase, 
     textCenter, setTextCenter, 
     textFill, setTextFill 
-  } = useSettings();
-  
+} = useSettings();
+
+  const { resetSelectedFontState } = useFontContext();
+
   const [activeTab, setActiveTab] = useState('sample'); // 'sample' или 'glyphs'
   const [activeGlyphSet, setActiveGlyphSet] = useState('entire'); // текущий набор глифов
   /** Последний авто-подставленный googleFontRecommendedSample (чтобы сбросить при смене на шрифт без образца). */
@@ -442,12 +445,12 @@ export default function Sidebar({
   
   return (
     <div className="w-64 flex flex-col border-r border-gray-200 bg-white shadow-sm h-screen overflow-y-auto">
-      <div className="h-12 min-h-12 flex items-center justify-left pl-4">
+      <div className="h-12 min-h-12 flex items-center justify-left pl-4 border-b border-gray-200">
         <h1 className="text-xl font-bold text-gray-900">Dynamic font</h1>
       </div>
       
       {/* Базовые настройки шрифта */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4">
         <div>
           
           {selectedFont && availableStyles?.length > 0 && (
@@ -654,12 +657,10 @@ export default function Sidebar({
           </div>
         </div>
         
-        {/* Variable Axes — заголовок только у вариативного шрифта с осями */}
-        {selectedFont && (
+        {/* Variable Axes — только у вариативного шрифта с осями */}
+        {selectedFont && isVariableEnabled() && (
           <div className="border-t border-gray-200 pt-4 mb-4">
-            {isVariableEnabled() ? (
-              <h2 className="font-medium text-sm text-gray-900 mb-2">Variable Axes</h2>
-            ) : null}
+            <h2 className="font-medium text-sm text-gray-900 mb-2">Variable Axes</h2>
             <VariableFontControls 
               font={selectedFont} 
               onSettingsChange={handleVariableSettingsChange}
@@ -993,7 +994,7 @@ export default function Sidebar({
       </div>
 
       <div className={EDITOR_SIDEBAR_FOOTER_BAR_CLASS}>
-        <ResetButton />
+        <ResetButton onResetSelectedFont={resetSelectedFontState} />
       </div>
 
     </div>

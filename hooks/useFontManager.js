@@ -414,6 +414,49 @@ export function useFontManager() {
     }
   }, [setFonts, setSelectedFont, setVariableSettings, setExportedFont, setIsLoading, resetPersistence]);
 
+  const resetSelectedFontState = useCallback(() => {
+    if (!selectedFont) {
+      toast.info('Шрифт не выбран');
+      return;
+    }
+
+    const defaultSettings = getDefaultAxisValues();
+
+    setVariableSettings(defaultSettings);
+
+    setFonts((prev) =>
+      prev.map((font) =>
+        font.id === selectedFont.id
+          ? {
+              ...font,
+              lastUsedVariableSettings: null,
+              lastUsedPresetName: null,
+              currentWeight: null,
+              currentStyle: null,
+            }
+          : font
+      )
+    );
+
+    setSelectedFont((prev) =>
+      prev
+        ? {
+            ...prev,
+            lastUsedVariableSettings: null,
+            lastUsedPresetName: null,
+            currentWeight: null,
+            currentStyle: null,
+          }
+        : null
+    );
+
+    if (applyVariableSettings) {
+      applyVariableSettings(defaultSettings, true, selectedFont);
+    }
+
+    toast.success(`Настройки шрифта "${selectedFont.name}" сброшены`);
+  }, [selectedFont, getDefaultAxisValues, applyVariableSettings, setFonts, setSelectedFont, setVariableSettings]);
+
   return {
     fonts,
     selectedFont,
@@ -454,5 +497,6 @@ export function useFontManager() {
     createStaticFont,
     resetApplicationState,
     saveFontSettings,
+    resetSelectedFontState,
   };
 } 

@@ -453,9 +453,9 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         </button>
       </div>
 
-      <div className="mb-4 rounded-lg bg-gray-50 p-3">
-        <div className="mb-2">
-          <p className="text-xs font-semibold text-gray-900">Скорость анимации</p>
+      <div className="mb-3.5">
+        <div className="mb-0.5">
+          <p className="text-xs font-medium text-gray-900">Скорость анимации</p>
           <p className="mt-0.5 text-[0.65rem] leading-snug text-gray-500">
           </p>
         </div>
@@ -483,8 +483,8 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         const truncatedName = truncateText(axisName, AXIS_NAME_MAX_LENGTH);
         
         return (
-          <div key={axis.tag} className="mb-4">
-            <div className="flex justify-between mb-1">
+          <div key={axis.tag} className="mb-3.5">
+            <div className="flex justify-between mb-0.5">
               <div className="text-[0.75rem] font-medium text-gray-900 flex items-center h-5 max-w-[80%] hover:text-gray-950 transition-colors">
                 <span className="truncate mr-1" title={axisName}>{truncatedName}</span>
                 <span className="text-[0.7rem] font-normal text-gray-500 px-0.5 py-px rounded-sm whitespace-nowrap flex-shrink-0 leading-tight">({axis.tag})</span>
@@ -530,15 +530,12 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       
       <div className="pt-4 mt-4 border-t border-gray-200">
         <div className="mb-3">
-          <label className="block text-xs font-medium text-gray-800 mb-1">
-            Формат экспорта:
-          </label>
           <NativeSelect
             id="vf-export-format"
             className={nativeSelectFieldClass({ compact: true })}
             value={exportFormat || 'ttf'}
             onChange={(e) => setExportFormat(e.target.value)}
-            aria-label="Формат экспорта статического файла"
+            aria-label="Выберите формат экспорта"
           >
             <option value="ttf">TTF (TrueType Font)</option>
             <option value="otf">OTF (OpenType Font)</option>
