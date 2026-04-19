@@ -67,9 +67,6 @@ export function SegmentedControl({
 
   return (
     <div className={`flex items-center ${className}`.trim()}>
-      {label != null && label !== '' && (
-        <span className="mr-2 text-xs text-gray-600">{label}</span>
-      )}
       <div className="flex h-8 overflow-hidden rounded-md border border-gray-200 bg-white">
         {options.map((opt) => (
           <button

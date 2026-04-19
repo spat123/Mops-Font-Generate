@@ -633,12 +633,12 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                     <span className="truncate text-xs text-gray-500">{entry.category || 'Google'}</span>
                     {entry.isVariable ? (
-                      <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-medium uppercase text-gray-800">
-                        var
+                      <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-medium uppercase text-gray-800 mb-0.5">
+                        vf
                       </span>
                     ) : null}
                     {entry.hasItalic ? (
-                      <span className="shrink-0 rounded bg-gray-200 px-1 py-0 text-[10px] text-gray-700">
+                      <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-medium uppercase text-gray-400 mb-0.5">
                         italic
                       </span>
                     ) : null}

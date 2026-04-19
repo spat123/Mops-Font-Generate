@@ -522,7 +522,6 @@ export default function FontPreview({
       <div className={EDITOR_PREVIEW_BOTTOM_BAR_CLASS}>
         <div className="relative z-20 shrink-0 bg-white py-0.5 pr-2">
           <SegmentedControl
-            label="View Mode:"
             value={viewMode}
             onChange={setViewMode}
             options={VIEW_MODE_OPTIONS}
@@ -532,7 +531,7 @@ export default function FontPreview({
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-8">
           {selectedFont && (
             <div className="pointer-events-none max-w-[min(520px,calc(100%-20rem))] text-center text-xs leading-snug text-gray-700 sm:max-w-[min(560px,calc(100%-18rem))]">
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-gray-900 mr-2">
                 {exportedFont
                   ? exportedFont.name.replace(/-static$/, '')
                   : selectedFont.name ||
@@ -541,7 +540,6 @@ export default function FontPreview({
                       ? selectedFont.fontFamily
                       : 'Шрифт')}
               </span>
-              <span className="text-gray-400"> • </span>
               <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
                 {selectedFont.source === 'google' ? 'Google Font' : 'Пользовательский'}
               </span>
@@ -549,7 +547,7 @@ export default function FontPreview({
                 <>
                   <span className="text-gray-400"> </span>
                   <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-green-700">
-                    Вариативный
+                    Variable
                   </span>
                 </>
               )}
