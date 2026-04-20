@@ -33,7 +33,7 @@ function ResetButton({ onResetSelectedFont }) {
     <button
       type="button"
       onClick={handleResetClick}
-      className="w-full h-full text-center text-xs font-medium text-gray-600 transition-colors hover:bg-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-400/40 focus:ring-offset-1"
+      className="w-full h-full text-center text-xs font-medium text-gray-600 uppercase transition-colors hover:bg-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-400/40 focus:ring-offset-1"
       title={title}
     >
       {buttonText}

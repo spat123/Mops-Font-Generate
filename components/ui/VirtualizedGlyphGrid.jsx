@@ -1,17 +1,9 @@
-import React, { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-
-/** Сумма offsetTop по цепочке offsetParent до scroll-контейнера */
-function offsetTopToScrollAncestor(el, scrollAncestor) {
-  if (!el || !scrollAncestor) return 0;
-  let top = 0;
-  let n = el;
-  while (n && n !== scrollAncestor) {
-    top += n.offsetTop;
-    n = n.offsetParent;
-  }
-  if (n === scrollAncestor) return top;
-  return 0;
-}
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  offsetTopToScrollAncestor,
+  useScrollTop,
+  useClientWidth,
+} from './virtualScrollUtils';
 
 function columnsFromWidth(w) {
   if (w >= 1280) return 10;
@@ -21,49 +13,27 @@ function columnsFromWidth(w) {
   return 2;
 }
 
-function subscribeScroll(el, onChange) {
-  if (!el) return () => {};
-  el.addEventListener('scroll', onChange, { passive: true });
-  return () => el.removeEventListener('scroll', onChange);
-}
-
-function useScrollTop(scrollEl) {
-  return useSyncExternalStore(
-    (onStoreChange) => subscribeScroll(scrollEl, onStoreChange),
-    () => scrollEl?.scrollTop ?? 0,
-    () => 0,
-  );
-}
-
-/** Совпадает с `gap-3` у сетки — иначе общая высота контента занижена и нельзя доскроллить до конца */
-const GRID_ROW_GAP_PX = 12;
-
-function subscribeResize(el, onChange) {
-  if (!el || typeof ResizeObserver === 'undefined') return () => {};
-  const ro = new ResizeObserver(() => onChange());
-  ro.observe(el);
-  return () => ro.disconnect();
-}
-
-function useClientWidth(el) {
-  return useSyncExternalStore(
-    (onStoreChange) => subscribeResize(el, onStoreChange),
-    () => el?.clientWidth ?? 0,
-    () => 0,
-  );
-}
+const DEFAULT_ROW_GAP_PX = 12;
 
 /**
- * Виртуализированная сетка глифов: общий скролл у родителя, фиксированная оценка высоты строки.
- * Высота строки фиксированная (оценка) — для скроллбара и диапазона индексов.
+ * Виртуализированная сетка: общий скролл у родителя, фиксированная оценка высоты строки.
+ * @param {number=} props.columnCount — если задано, не вычислять число колонок по ширине (каталог Google).
+ * @param {number=} props.rowGapPx — шаг между ячейками по обеим осям (px), по умолчанию 12.
+ * @param {boolean=} props.seamlessGrid — без зазоров, общая сетка границ (border-l/t у контейнера, у ячеек — border-r/b).
+ * @param {(w: number) => void=} props.onInnerWidth — ширина контейнера сетки (для внешней вёрстки).
+ * @param {(range: { startIndex: number, endIndex: number }) => void=} props.onVisibleIndexRangeChange
  */
 export function VirtualizedGlyphGrid({
   scrollParentEl,
   totalCount,
   estimatedRowHeightPx,
   renderItem,
-  /** Доп. строк сетки сверху/снизу вне экрана */
   overscanRows = 2,
+  columnCount: columnCountProp,
+  rowGapPx = DEFAULT_ROW_GAP_PX,
+  seamlessGrid = false,
+  onInnerWidth,
+  onVisibleIndexRangeChange,
 }) {
   const anchorRef = useRef(null);
   const [widthHostEl, setWidthHostEl] = useState(null);
@@ -93,10 +63,22 @@ export function VirtualizedGlyphGrid({
     };
   }, [scrollParentEl, width, totalCount]);
 
-  const cols = useMemo(() => Math.max(1, columnsFromWidth(width)), [width]);
-  const rowH = Math.max(80, estimatedRowHeightPx);
-  /** Одна «логическая» строка сетки: карточка + вертикальный gap */
-  const rowStride = rowH + GRID_ROW_GAP_PX;
+  useEffect(() => {
+    if (typeof onInnerWidth !== 'function' || !widthHostEl) return;
+    const w = widthHostEl.clientWidth;
+    if (w > 0) onInnerWidth(w);
+  }, [onInnerWidth, widthHostEl, width]);
+
+  const cols = useMemo(() => {
+    if (columnCountProp != null && columnCountProp > 0) {
+      return Math.max(1, Math.floor(columnCountProp));
+    }
+    return Math.max(1, columnsFromWidth(width));
+  }, [width, columnCountProp]);
+
+  const rowH = Math.max(24, estimatedRowHeightPx);
+  const gapPx = seamlessGrid ? 0 : rowGapPx;
+  const rowStride = rowH + gapPx;
   const totalRows = Math.max(1, Math.ceil(Math.max(0, totalCount) / cols));
 
   const range = useMemo(() => {
@@ -127,6 +109,15 @@ export function VirtualizedGlyphGrid({
     overscanRows,
   ]);
 
+  useEffect(() => {
+    if (typeof onVisibleIndexRangeChange !== 'function') return;
+    if (range.end <= range.start) return;
+    onVisibleIndexRangeChange({
+      startIndex: range.start,
+      endIndex: range.end - 1,
+    });
+  }, [onVisibleIndexRangeChange, range.start, range.end]);
+
   const cells = useMemo(() => {
     const out = [];
     for (let i = range.start; i < range.end; i++) {
@@ -146,9 +137,14 @@ export function VirtualizedGlyphGrid({
         }}
       >
         <div
-          className="grid w-full gap-3"
+          className={
+            seamlessGrid ? 'grid w-full border-l border-t border-gray-200' : 'grid w-full'
+          }
           style={{
             gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+            /** Совпадает с rowStride в виртуализации; иначе строки с «лёгким» контентом схлопываются */
+            gridAutoRows: `${rowH}px`,
+            gap: gapPx,
           }}
         >
           {cells}

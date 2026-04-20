@@ -8,6 +8,17 @@ import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
 // Инициализируем глобальный кэш для глифов, чтобы не загружать их повторно
 const glyphDataCache = new Map();
 
+/** Квадратные ячейки: число колонок и высота строки = ширина контейнера / cols. targetSide растёт с fontSize → меньше колонок. */
+function computeGlyphSquareGrid(innerWidthPx, fontSizePx) {
+  const W = Math.max(64, innerWidthPx);
+  const fs = fontSizePx || 40;
+  const targetSide = Math.round(Math.max(48, Math.min(320, fs * 2.2 + 14)));
+  let cols = Math.round(W / targetSide);
+  cols = Math.max(2, Math.min(40, cols));
+  const rowH = Math.max(28, Math.round(W / cols));
+  return { columnCount: cols, rowHeightPx: rowH };
+}
+
 /**
  * Компонент для режима отображения глифов шрифта
  * 
@@ -24,6 +35,8 @@ function GlyphsMode({
   glyphDisplayStyle,
   isActive = true,
   scrollParentRef,
+  /** Сообщить родителю количество глифов для строки статистики в нижней панели */
+  onDisplayableGlyphCountChange,
 }) {
   const { fontSize } = useSettings();
 
@@ -196,6 +209,26 @@ function GlyphsMode({
       return glyphsData?.allGlyphs || [];
     }, [glyphsData]);
 
+    useEffect(() => {
+      if (!onDisplayableGlyphCountChange || !isActive) return;
+      if (selectedFont?.source === 'google') {
+        onDisplayableGlyphCountChange(null);
+        return;
+      }
+      if (!glyphsLoaded || !glyphsData) {
+        onDisplayableGlyphCountChange(null);
+        return;
+      }
+      onDisplayableGlyphCountChange(displayableGlyphs.length);
+    }, [
+      isActive,
+      selectedFont?.source,
+      glyphsLoaded,
+      glyphsData,
+      displayableGlyphs.length,
+      onDisplayableGlyphCountChange,
+    ]);
+
     // Хелперы для получения имени и Unicode
     // Обновляем для использования glyphsData.names и glyphsData.unicodes
     const getGlyphName = useCallback((glyph) => {
@@ -215,6 +248,26 @@ function GlyphsMode({
     }, [glyphsData]);
 
     const [selectedGlyph, setSelectedGlyph] = useState(null);
+    const [glyphGridInnerWidth, setGlyphGridInnerWidth] = useState(null);
+
+    const onGlyphGridInnerWidth = useCallback((w) => {
+      if (typeof w === 'number' && w > 32) setGlyphGridInnerWidth(w);
+    }, []);
+
+    const glyphSquareGrid = useMemo(() => {
+      const fallbackW =
+        glyphGridInnerWidth != null
+          ? glyphGridInnerWidth
+          : typeof window !== 'undefined'
+            ? Math.max(200, Math.min(1200, window.innerWidth - 140))
+            : 560;
+      return computeGlyphSquareGrid(fallbackW, fontSize);
+    }, [glyphGridInnerWidth, fontSize]);
+
+    const glyphCellFontPx = useMemo(() => {
+      const side = glyphSquareGrid.rowHeightPx;
+      return Math.min(fontSize || 40, Math.max(8, Math.round(side * 0.48)));
+    }, [fontSize, glyphSquareGrid.rowHeightPx]);
 
     const renderGlyphGridItem = useCallback(
       (index) => {
@@ -256,26 +309,38 @@ function GlyphsMode({
 
         return (
           <div
-            className="flex h-full cursor-pointer flex-col overflow-hidden rounded-md border border-gray-200 bg-white transition-all hover:border-gray-400 hover:shadow-md"
+            className="group relative box-border flex h-full min-h-0 cursor-pointer flex-col items-stretch border-r border-b border-gray-200 bg-white transition-shadow duration-100 hover:z-[2] hover:ring-1 hover:ring-inset hover:ring-gray-900"
             onClick={() => setSelectedGlyph(glyph)}
-            title={`Нажмите, чтобы увидеть детали глифа ${glyphName}`}
+            title={glyphName}
           >
             <div
-              className="flex flex-grow items-center justify-center p-4 text-center"
+              className="flex min-h-0 flex-1 flex-col items-center justify-center p-1 text-center transition-opacity duration-100 group-hover:pointer-events-none group-hover:opacity-0"
               style={{
-                fontSize: `${fontSize}px`,
+                fontSize: `${glyphCellFontPx}px`,
                 fontFamily: fontFamily || 'inherit',
                 ...glyphDisplayStyle,
               }}
             >
-              {isPrintable ? char : <span className="text-sm text-gray-400">(no char)</span>}
+              {isPrintable ? (
+                char
+              ) : (
+                <span className="text-[10px] text-gray-400" aria-hidden>
+                  —
+                </span>
+              )}
             </div>
-            <div className="bg-gray-50 p-2 text-[10px]">
-              <div className="w-full truncate text-center font-medium text-gray-700" title={glyphName}>
+
+            <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col items-center justify-center gap-1 px-1 py-1 opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100">
+              <span
+                className="w-full max-w-full truncate text-center font-mono text-sm font-medium leading-tight text-gray-900"
+                title={glyphName}
+              >
                 {glyphName}
-              </div>
-              <div className="text-center text-gray-500">{glyphUnicodeStr || '-'}</div>
-              <div className="mt-1 flex justify-center gap-1">
+              </span>
+              <span className="max-w-full truncate text-center font-mono text-xs leading-tight text-gray-600">
+                {glyphUnicodeStr || '—'}
+              </span>
+              <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1">
                 {isPrintable && (
                   <button
                     type="button"
@@ -283,10 +348,10 @@ function GlyphsMode({
                       e.stopPropagation();
                       copyToClipboard(char, 'Символ');
                     }}
-                    className="rounded bg-gray-100 px-1 py-0.5 text-[8px] text-gray-800 hover:bg-gray-200"
+                    className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-800 hover:bg-gray-200"
                     title="Копировать символ"
                   >
-                    Char
+                    Ch
                   </button>
                 )}
                 <button
@@ -295,24 +360,24 @@ function GlyphsMode({
                     e.stopPropagation();
                     copyToClipboard(glyphName, 'Имя');
                   }}
-                  className="rounded bg-gray-100 px-1 py-0.5 text-[8px] text-gray-700 hover:bg-gray-200"
-                  title="Копировать имя"
+                  className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-700 hover:bg-gray-200"
+                    title="Копировать имя (PostScript)"
                 >
-                  Name
+                  Nm
                 </button>
-                {glyphUnicodeStr && (
+                {glyphUnicodeStr ? (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       copyToClipboard(glyphUnicodeStr, 'Unicode');
                     }}
-                    className="rounded bg-gray-100 px-1 py-0.5 text-[8px] text-gray-700 hover:bg-gray-200"
+                    className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-700 hover:bg-gray-200"
                     title="Копировать Unicode"
                   >
-                    Unicode
+                    U+
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -320,7 +385,7 @@ function GlyphsMode({
       },
       [
         displayableGlyphs,
-        fontSize,
+        glyphCellFontPx,
         fontFamily,
         glyphDisplayStyle,
         getGlyphName,
@@ -351,12 +416,8 @@ function GlyphsMode({
       );
     }
 
-    const glyphRowHeightPx = Math.round(Math.max(168, (fontSize || 40) * 1.35 + 96));
-
     return (
-      <div className="w-full px-8 pb-6 pt-4">
-        <p className="mb-2 text-sm text-gray-600">Найдено {displayableGlyphs.length} глифов.</p>
-
+      <div className="w-full p-6">
         {glyphErrors.length > 0 && (
           <div className="mb-4 rounded border border-yellow-300 bg-yellow-100 p-3 text-xs text-yellow-800">
             При обработке шрифта возникло {glyphErrors.length} ошибок.
@@ -368,9 +429,13 @@ function GlyphsMode({
           <VirtualizedGlyphGrid
             scrollParentEl={scrollParentEl}
             totalCount={displayableGlyphs.length}
-            estimatedRowHeightPx={glyphRowHeightPx}
+            columnCount={glyphSquareGrid.columnCount}
+            estimatedRowHeightPx={glyphSquareGrid.rowHeightPx}
             renderItem={renderGlyphGridItem}
             overscanRows={2}
+            rowGapPx={0}
+            seamlessGrid
+            onInnerWidth={onGlyphGridInnerWidth}
           />
         ) : null}
 
@@ -448,11 +513,11 @@ function GlyphsMode({
                           </div>
                           <div className="mt-6 flex flex-wrap justify-end gap-2">
                               {isPrintable && (
-                                  <button onClick={() => copyToClipboard(char, 'Символ')} className="px-3 py-1.5 bg-accent text-white rounded hover:bg-accent-hover text-sm shadow-sm">Копировать символ</button>
+                                  <button onClick={() => copyToClipboard(char, 'Символ')} className="px-3 py-1.5 bg-accent text-white rounded hover:bg-accent-hover text-sm">Копировать символ</button>
                               )}
-                              <button onClick={() => copyToClipboard(name, 'Имя')} className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm shadow-sm">Копировать имя</button>
+                              <button onClick={() => copyToClipboard(name, 'Имя')} className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">Копировать имя</button>
                               {unicodeStr && (
-                                  <button onClick={() => copyToClipboard(unicodeStr, 'Unicode')} className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm shadow-sm">Копировать Unicode</button>
+                                  <button onClick={() => copyToClipboard(unicodeStr, 'Unicode')} className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">Копировать Unicode</button>
                               )}
                           </div>
                       </>

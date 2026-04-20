@@ -250,22 +250,13 @@ export default function DraggableValueRangeSlider({
       onMouseLeave={() => setHover(false)}
     >
       {/* Фон дорожки — как раньше (серый), не меняется при hover */}
-      <div className="absolute left-0 right-0 h-1 rounded-full bg-gray-200">
+      <div className="absolute left-0 right-0 z-0 h-1 rounded-full bg-gray-200">
         <div
           className={`absolute top-0 left-0 h-full rounded-full transition-colors duration-200 ease-out ${
             disabled ? 'bg-gray-400' : hot ? 'bg-accent' : 'bg-black'
           }`}
           style={{ width: `${percent}%` }}
         />
-        {defaultPercent !== null && !Number.isNaN(defaultPercent) && (
-          <div
-            className="absolute top-1/2 h-4 w-1 -translate-x-1/2 -translate-y-1/2 transform rounded-full bg-yellow-400"
-            style={{
-              left: `calc(20px + (${defaultPercent} * (100% - 40px) / 100))`,
-            }}
-            title="Значение по умолчанию"
-          />
-        )}
       </div>
 
       <input
@@ -279,6 +270,35 @@ export default function DraggableValueRangeSlider({
         className="absolute left-0 right-0 z-20 h-5 cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
         style={{ WebkitAppearance: 'none', appearance: 'none' }}
       />
+
+      {defaultPercent !== null &&
+        !Number.isNaN(defaultPercent) &&
+        defaultMarkerValue !== undefined &&
+        defaultMarkerValue !== null && (
+          <button
+            type="button"
+            disabled={disabled}
+            tabIndex={disabled ? -1 : 0}
+            aria-label="Установить значение по умолчанию для оси"
+            title="По умолчанию — нажмите, чтобы применить"
+            className="absolute top-1/2 z-[22] flex h-8 min-w-[18px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent px-1 hover:bg-yellow-400/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/70 disabled:cursor-not-allowed disabled:opacity-40"
+            style={{
+              left: `calc(20px + (${defaultPercent} * (100% - 40px) / 100))`,
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (disabled) return;
+              const v = snapValueToStep(Number(defaultMarkerValue), min, max, step);
+              onChange(v);
+            }}
+          >
+            <span
+              className="pointer-events-none h-3.5 w-1 shrink-0 rounded-full bg-yellow-400"
+              aria-hidden
+            />
+          </button>
+        )}
 
       <div
         className={`absolute z-30 flex h-6 w-10 -translate-x-1/2 transform cursor-pointer items-center justify-center rounded-full border-2 border-white text-[0.65rem] font-medium text-white transition-[transform,background-color] duration-200 ease-out hover:scale-110 ${

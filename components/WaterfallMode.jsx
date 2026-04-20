@@ -1,26 +1,44 @@
-import React, { useCallback, useMemo } from 'react';
-import { Virtuoso } from 'react-virtuoso';
+import React, { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useFontContext } from '../contexts/FontContext';
 import EditableText from './EditableText';
+import { VirtualizedVariableList } from './ui/VirtualizedVariableList';
 
-// Стандартные размеры для режима Waterfall - НАЧИНАЕМ СО 180px
-const waterfallSizes = [180, 120, 96, 72, 60, 48, 36, 30, 24, 18, 14, 12, 10, 8];
+// Fallback, если родитель не передал массив (должен совпадать с FontPreview.waterfallSizes)
+const DEFAULT_WATERFALL_SIZES = [180, 120, 96, 72, 60, 48, 36, 30, 24, 18, 14, 12, 10, 8];
 
-const WaterfallMode = () => {
-  // Получаем все нужные настройки, включая textColor
-  const { 
-    text, 
-    backgroundColor, 
-    textAlignment, 
-    lineHeight, 
-    textCase, 
-    textColor 
-  } = useSettings();
-  
+function estimateWaterfallRowHeight(sizePx, lineHeight) {
+  const pad = 32;
+  const lh = sizePx > 48 ? 1.0 : lineHeight;
+  return pad + Math.ceil(sizePx * lh) + 1;
+}
+
+/**
+ * @param {object} props
+ * @param {number[]=} props.waterfallSizes
+ * @param {React.RefObject<HTMLElement|null>=} props.scrollParentRef — общий скролл области превью
+ */
+const WaterfallMode = ({
+  waterfallSizes: sizesProp,
+  scrollParentRef,
+  /** Не дергать offsetHeight в каждой строке на каждом кадре анимации VF */
+  isVariableFontAnimating = false,
+} = {}) => {
+  const waterfallSizes =
+    Array.isArray(sizesProp) && sizesProp.length > 0 ? sizesProp : DEFAULT_WATERFALL_SIZES;
+
+  const { backgroundColor, previewBackgroundImage, textAlignment, lineHeight, textCase, textColor } =
+    useSettings();
+
   const { selectedFont, getFontFamily, fontCssProperties } = useFontContext();
 
-  // Как в FontPreview: полный font-family (с sans fallback) + вес/стиль для статики + FVS для VF.
+  const [scrollParentEl, setScrollParentEl] = useState(null);
+
+  useLayoutEffect(() => {
+    const el = scrollParentRef?.current;
+    setScrollParentEl(el instanceof HTMLElement ? el : null);
+  }, [scrollParentRef]);
+
   const baseTextStyle = useMemo(() => {
     const fromHook =
       fontCssProperties && typeof fontCssProperties === 'object' && fontCssProperties.fontFamily
@@ -32,75 +50,75 @@ const WaterfallMode = () => {
       textTransform: textCase === 'none' ? 'none' : textCase,
       color: textColor,
     };
-  }, [
-    fontCssProperties,
-    getFontFamily,
-    textAlignment,
-    textCase,
-    textColor,
-  ]);
+  }, [fontCssProperties, getFontFamily, textAlignment, textCase, textColor]);
 
-  // Оборачиваем renderItem в useCallback
-  const renderItem = useCallback((index, size) => {
-    const uniqueKey = `${selectedFont?.id || 'no-font'}-${size}-${index}`; // Уникальный ключ
+  const itemHeights = useMemo(
+    () => waterfallSizes.map((size) => estimateWaterfallRowHeight(size, lineHeight)),
+    [waterfallSizes, lineHeight],
+  );
 
-    // Собираем itemStyle точно как в оригинале
-    const itemStyle = {
-      ...baseTextStyle, 
-      fontSize: `${size}px`, 
-      lineHeight: size > 48 ? 1.0 : lineHeight, // Оригинальная логика lineHeight
-      whiteSpace: 'nowrap', 
-      overflow: 'hidden', 
-      width: '100%', 
-      textAlign: textAlignment, // Используем textAlignment из context
-    };
+  const renderItem = useCallback(
+    (index) => {
+      const size = waterfallSizes[index];
+      const itemStyle = {
+        ...baseTextStyle,
+        fontSize: `${size}px`,
+        lineHeight: size > 48 ? 1.0 : lineHeight,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        width: '100%',
+        textAlign: textAlignment,
+      };
 
-    return (
-      <div key={uniqueKey} className={`${index > 0 ? 'border-t border-gray-200' : ''} pt-4 pb-4`}>
-        <div className="flex items-center">
-          <div className="text-xs text-gray-500 pl-8 font-medium shrink-0 text-right">{size}px</div>
-          <div className="flex-1 overflow-hidden"> {/* Обертка для EditableText */} 
-            <EditableText
-              style={itemStyle}
-              isStyles={false} 
-              syncId={`waterfall-${size}`} 
-              viewMode="waterfall"
-              isWaterfall={true}
-            />
+      return (
+        <div
+          className={`${index > 0 ? 'border-t border-gray-200' : ''} pb-4 pt-4`}
+          style={{ contain: 'layout style' }}
+        >
+          <div className="flex items-center">
+            <div className="shrink-0 pl-5 text-right text-xs font-medium text-gray-500">{size}px</div>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <EditableText
+                style={itemStyle}
+                isStyles={false}
+                syncId={`waterfall-${size}`}
+                viewMode="waterfall"
+                isWaterfall={true}
+                skipMetricReflowWhileVfAnimating={isVariableFontAnimating}
+              />
+            </div>
           </div>
         </div>
+      );
+    },
+    [baseTextStyle, lineHeight, textAlignment, waterfallSizes, isVariableFontAnimating],
+  );
+
+  if (!selectedFont) {
+    return (
+      <div className="flex h-full min-h-[200px] w-full items-center justify-center text-gray-500">
+        Выберите или загрузите шрифт для просмотра в режиме Waterfall.
       </div>
     );
-  }, [
-    // Добавляем все зависимости, используемые внутри renderItem
-    selectedFont, 
-    baseTextStyle,
-    lineHeight, 
-    textAlignment, 
-    // text (из useSettings) используется в EditableText, но передается через initialText, 
-    // поэтому явно renderItem от него не зависит напрямую для структуры/стилей
-    // getFontFamily, getVariationSettings включены через baseTextStyle
-  ]);
+  }
+
+  if (!scrollParentEl) {
+    return <div className="h-0 w-full shrink-0" aria-hidden />;
+  }
 
   return (
     <div
-      className="font-preview-area overflow-y-auto w-full h-full"
-      style={{ backgroundColor: backgroundColor }} // Применяем фон здесь
+      className="w-full min-w-0"
+      style={{
+        backgroundColor: previewBackgroundImage ? 'transparent' : (backgroundColor ?? undefined),
+      }}
     >
-      {selectedFont ? (
-        <div className="pb-2">
-          <Virtuoso
-            style={{ height: 'calc(100vh - 100px)' }} // Подбираем высоту, чтобы поместился pb-8 и не было двойного скролла
-            data={waterfallSizes} // Передаем отсортированные размеры
-            itemContent={renderItem} // Используем восстановленную функцию рендеринга
-            overscan={200} // Добавляем overscan
-          />
-        </div>
-      ) : (
-        <div className="flex items-center justify-center h-full text-gray-500">
-          Выберите или загрузите шрифт для просмотра в режиме Waterfall.
-        </div>
-      )}
+      <VirtualizedVariableList
+        scrollParentEl={scrollParentEl}
+        itemHeights={itemHeights}
+        renderItem={renderItem}
+        overscanPx={96}
+      />
     </div>
   );
 };

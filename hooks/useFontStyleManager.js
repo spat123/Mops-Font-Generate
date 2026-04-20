@@ -125,14 +125,16 @@ export function useFontStyleManager(
       }
       return currentFonts.map(f => {
         if (f.id === fontToApply.id) {
+          // Вес/стиль должны жить и в массиве fonts: иначе эффект в pages/index.jsx
+          // подменяет selectedFont объектом из fonts без currentWeight — внизу всегда 400.
+          const meta = { currentWeight: weight, currentStyle: style };
           // Для вариативных шрифтов НЕ сбрасываем lastUsedVariableSettings,
           // так как пресет может изменить оси, и мы хотим сохранить эти изменения
           if (fontToApply.isVariableFont) {
-            return { ...f, lastUsedPresetName: presetName };
-          } else {
-            // Для статических шрифтов сбрасываем variableSettings и сохраняем пресет
-            return { ...f, lastUsedPresetName: presetName, lastUsedVariableSettings: null };
+            return { ...f, lastUsedPresetName: presetName, ...meta };
           }
+          // Для статических шрифтов сбрасываем variableSettings и сохраняем пресет
+          return { ...f, lastUsedPresetName: presetName, lastUsedVariableSettings: null, ...meta };
         }
         return f;
       });

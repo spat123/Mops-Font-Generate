@@ -62,7 +62,8 @@ function StylesMode({
     fontSize, 
     letterSpacing,
     textColor, 
-    backgroundColor, 
+    backgroundColor,
+    previewBackgroundImage,
     textDirection, 
     textAlignment, 
     textCase 
@@ -77,6 +78,8 @@ function StylesMode({
   const showStaticStyles = hasStaticStyles && (!selectedFont.isVariableFont || !hasVariableAxes);
   
   const safeFontFamily = fontFamilyValue || selectedFont.name || 'sans-serif';
+
+  const bgForStyleCells = previewBackgroundImage ? 'transparent' : (backgroundColor || 'transparent');
 
   /** Подписи и рамки под фон превью; rgba учитывается при смешивании с белой подложкой */
   const chrome = useMemo(() => getPreviewChromeFromBackground(backgroundColor), [backgroundColor]);
@@ -110,7 +113,7 @@ function StylesMode({
                           fontStyle: 'normal',
                           letterSpacing: letterSpacingValue,
                           color: textColor,
-                          backgroundColor: backgroundColor || 'transparent',
+                          backgroundColor: bgForStyleCells,
                           fontVariationSettings: 'normal',
                           direction: textDirection,
                           textAlign: textAlignment,
@@ -149,7 +152,7 @@ function StylesMode({
                           fontStyle: 'italic',
                           letterSpacing: letterSpacingValue,
                           color: textColor,
-                          backgroundColor: backgroundColor || 'transparent',
+                          backgroundColor: bgForStyleCells,
                           fontVariationSettings: 'normal',
                           direction: textDirection,
                           textAlign: textAlignment,
@@ -171,7 +174,6 @@ function StylesMode({
       {/* Вариативные возможности шрифта */}
       {hasVariableAxes && (
         <div className="overflow-x-hidden">
-          <h3 className={`${chrome.sectionTitle} mb-3`}>Вариативные возможности</h3>
 
           {/* Группа Weight стилей */}
           {selectedFont.variableAxes['wght'] !== undefined && (
@@ -189,7 +191,7 @@ function StylesMode({
                         fontFamily: safeFontFamily,
                         fontSize: `${fontSize}px`,
                         color: textColor,
-                        backgroundColor: backgroundColor || 'transparent',
+                        backgroundColor: bgForStyleCells,
                         letterSpacing: letterSpacingValue,
                         fontVariationSettings: generateVariationSettings(style, selectedFont.variableAxes),
                         direction: textDirection,
@@ -228,7 +230,7 @@ function StylesMode({
                         fontFamily: safeFontFamily,
                         fontSize: `${fontSize}px`,
                         color: textColor,
-                        backgroundColor: backgroundColor || 'transparent',
+                        backgroundColor: bgForStyleCells,
                         letterSpacing: letterSpacingValue,
                         fontVariationSettings: generateVariationSettings(style, selectedFont.variableAxes),
                         direction: textDirection,
@@ -270,7 +272,7 @@ function StylesMode({
                             fontFamily: safeFontFamily,
                             fontSize: `${fontSize}px`,
                             color: textColor,
-                            backgroundColor: backgroundColor || 'transparent',
+                            backgroundColor: bgForStyleCells,
                             letterSpacing: letterSpacingValue,
                             fontVariationSettings: generateVariationSettings(style, selectedFont.variableAxes),
                             direction: textDirection,

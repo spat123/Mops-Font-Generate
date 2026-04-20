@@ -1,6 +1,30 @@
 import React, { useCallback, useMemo, useRef, useEffect, memo, useState, lazy, Suspense } from 'react';
+
+/** Совпадает с логикой подсчёта блоков в StylesMode */
+function getStylesPreviewRowCount(selectedFont, weightVariations, italicVariations, axisRatios) {
+  if (!selectedFont) return { n: 0, kind: 'none' };
+  const hasStaticStyles = selectedFont.availableStyles && selectedFont.availableStyles.length > 1;
+  const hasVariableAxes =
+    selectedFont.isVariableFont &&
+    selectedFont.variableAxes &&
+    Object.keys(selectedFont.variableAxes).length > 0;
+  const showStaticStyles = hasStaticStyles && (!selectedFont.isVariableFont || !hasVariableAxes);
+
+  if (showStaticStyles) {
+    return { n: selectedFont.availableStyles.length, kind: 'static' };
+  }
+  if (hasVariableAxes) {
+    const axes = selectedFont.variableAxes;
+    let n = 0;
+    if (axes.wght !== undefined) n += weightVariations.length;
+    if (axes.ital !== undefined || axes.slnt !== undefined) n += italicVariations.length;
+    const otherKeys = Object.keys(axes).filter((a) => !['wght', 'ital', 'slnt'].includes(a));
+    n += otherKeys.length * axisRatios.length;
+    return { n, kind: 'variable' };
+  }
+  return { n: 0, kind: 'none' };
+}
 import FontUploader from './FontUploader';
-import { SegmentedControl, VIEW_MODE_OPTIONS } from './ui/SegmentedControl';
 import { EDITOR_PREVIEW_BOTTOM_BAR_CLASS } from './ui/editorChromeClasses';
 import { toast } from 'react-toastify';
 import { useSettings } from '../contexts/SettingsContext';
@@ -9,6 +33,7 @@ import EditableText from './EditableText';
 import dynamic from 'next/dynamic';
 import { fetchGoogleVariableFontSlicesAll } from '../utils/googleFontLoader';
 import { GOOGLE_PRESET_FONT_NAMES } from '../utils/googlePresetFonts';
+import { getPreviewAreaBackgroundStyle } from '../utils/previewAreaBackgroundStyle';
 
 // --- Ленивая загрузка компонентов режимов --- 
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -189,11 +214,15 @@ export default function FontPreview({
   handleFontsUploaded,
   /** Fallback: Fontsource, если Google недоступен */
   selectOrAddFontsourceFont,
-  handleScreenshotClick, 
-  handleCSSClick,
+  handleScreenshotClick,
   getFontFamily,
   getVariationSettings,
-  fontCssProperties
+  fontCssProperties,
+  /** Во время анимации осей VF в Waterfall не делаем N× forced reflow на каждый кадр */
+  isVariableFontAnimating = false,
+  /** Полноэкранный plain-превью (тулбар «Превью») */
+  plainPreviewOpen = false,
+  onClosePlainPreview,
 }) {
   const { 
     text, setText, 
@@ -206,13 +235,20 @@ export default function FontPreview({
     setViewMode,
     textDirection, 
     textAlignment, 
-    textCase, 
-    textCenter, 
-    textFill 
+    textCase,
+    verticalAlignment,
+    textFill,
+    previewBackgroundImage,
   } = useSettings();
 
   /** Общий скролл области превью — режим Glyphs подписывается на этот узел для своей виртуализации */
   const previewBodyScrollRef = useRef(null);
+
+  const [glyphFooterCount, setGlyphFooterCount] = useState(null);
+
+  useEffect(() => {
+    if (viewMode !== 'glyphs') setGlyphFooterCount(null);
+  }, [viewMode]);
 
   const styleValues = useMemo(() => {
     const letterSpacingValue = `${(letterSpacing / 100) * 0.5}em`; 
@@ -328,38 +364,57 @@ export default function FontPreview({
     textDirection, textAlignment, textCase
   ]);
   
+  const previewAreaBgStyle = useMemo(
+    () => getPreviewAreaBackgroundStyle(backgroundColor, previewBackgroundImage),
+    [backgroundColor, previewBackgroundImage],
+  );
+
   const containerStyle = useMemo(() => {
-    return {
-      backgroundColor, 
-      ...(textCenter ? { 
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '100%'
-      } : {}),
-      ...(textFill ? { 
-        width: '100%',
-        height: '100%'
-      } : {})
+    const base = {
+      backgroundColor: previewBackgroundImage ? 'transparent' : backgroundColor,
     };
-  }, [backgroundColor, textCenter, textFill]);
+    if (textFill) {
+      return {
+        ...base,
+        width: '100%',
+        height: '100%',
+      };
+    }
+    const v = verticalAlignment;
+    const justifyContent = v === 'middle' ? 'center' : v === 'bottom' ? 'flex-end' : 'flex-start';
+    return {
+      ...base,
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100%',
+      justifyContent,
+      alignItems: 'stretch',
+    };
+  }, [backgroundColor, verticalAlignment, textFill, previewBackgroundImage]);
   
   const contentStyle = useMemo(() => {
+    const alignItemsForFill =
+      textAlignment === 'center' ? 'center' : textAlignment === 'right' ? 'flex-end' : 'stretch';
+    const justifyContentForFill =
+      verticalAlignment === 'middle' ? 'center' : verticalAlignment === 'bottom' ? 'flex-end' : 'flex-start';
     return {
       ...baseTextStyle,
       wordWrap: 'break-word',
       whiteSpace: 'pre-wrap',
-      ...(textFill ? { 
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        ...(textCenter ? { justifyContent: 'center' } : {}) 
-      } : {
-        maxWidth: '100%',
-      })
+      ...(textFill
+        ? {
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: justifyContentForFill,
+            alignItems: alignItemsForFill,
+          }
+        : {
+            maxWidth: '100%',
+          }),
     };
-  }, [baseTextStyle, textFill, textCenter]);
+  }, [baseTextStyle, textFill, verticalAlignment, textAlignment]);
 
   const glyphDisplayStyle = useMemo(() => {
     if (selectedFont?.isVariableFont) {
@@ -427,6 +482,66 @@ export default function FontPreview({
   }, []);
   const axisRatios = useMemo(() => [0, 0.25, 0.5, 0.75, 1], []);
 
+  const plainCharCount = useMemo(() => [...String(text ?? '')].length, [text]);
+
+  const stylesPreviewStats = useMemo(
+    () => getStylesPreviewRowCount(selectedFont, weightVariations, italicVariations, axisRatios),
+    [selectedFont, weightVariations, italicVariations, axisRatios],
+  );
+
+  const bottomBarModeHint = useMemo(() => {
+    switch (viewMode) {
+      case 'plain':
+      case 'text':
+        return `символов: ${plainCharCount}`;
+      case 'waterfall':
+        return `Рядов: ${waterfallSizes.length}`;
+      case 'glyphs':
+        if (selectedFont?.source === 'google') return 'Глифы недоступны (Google)';
+        if (glyphFooterCount === null) return 'Глифы: загрузка…';
+        return `Глифов: ${glyphFooterCount}`;
+      case 'styles':
+        if (stylesPreviewStats.kind === 'static' && stylesPreviewStats.n > 0) {
+          return `Статических стилей: ${stylesPreviewStats.n}`;
+        }
+        if (stylesPreviewStats.kind === 'variable' && stylesPreviewStats.n > 0) {
+          return `Вариативных превью: ${stylesPreviewStats.n}`;
+        }
+        return 'Стили: не определены';
+      default:
+        return null;
+    }
+  }, [
+    viewMode,
+    plainCharCount,
+    waterfallSizes.length,
+    selectedFont?.source,
+    glyphFooterCount,
+    stylesPreviewStats,
+  ]);
+
+  const handleGlyphCountForFooter = useCallback((n) => {
+    setGlyphFooterCount(n);
+  }, []);
+
+  useEffect(() => {
+    if (!plainPreviewOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [plainPreviewOpen]);
+
+  useEffect(() => {
+    if (!plainPreviewOpen || typeof onClosePlainPreview !== 'function') return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClosePlainPreview();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [plainPreviewOpen, onClosePlainPreview]);
+
   if (!selectedFont) {
     return (
       <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center bg-gray-50">
@@ -445,7 +560,7 @@ export default function FontPreview({
                 key={fontName}
                 onClick={() => loadPresetFont(fontName)}
                 type="button"
-                className="bg-white py-3 px-4 rounded-md border border-gray-200 text-gray-800 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-400 font-sans font-medium"
+                className="bg-white py-3 px-4 rounded-md border border-gray-200 text-gray-800 shadow-sm transition-all duration-200 hover:border-gray-400 font-sans font-medium"
               >
                 {fontName}
               </button>
@@ -457,17 +572,19 @@ export default function FontPreview({
   }
 
   return (
+    <>
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
       <div
         ref={previewBodyScrollRef}
         className="relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto pt-0 pb-4"
-        style={{ backgroundColor }}
+        style={previewAreaBgStyle}
       >
         {viewMode === 'plain' && (
           <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
             <PlainTextMode
               containerStyle={containerStyle}
               contentStyle={contentStyle}
+              variant="default"
             />
           </Suspense>
         )}
@@ -475,8 +592,9 @@ export default function FontPreview({
         {viewMode === 'waterfall' && (
           <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
             <WaterfallMode
-              baseTextStyle={baseTextStyle}
               waterfallSizes={waterfallSizes}
+              scrollParentRef={previewBodyScrollRef}
+              isVariableFontAnimating={isVariableFontAnimating}
             />
           </Suspense>
         )}
@@ -503,6 +621,7 @@ export default function FontPreview({
               glyphDisplayStyle={glyphDisplayStyle}
               isActive={viewMode === 'glyphs'}
               scrollParentRef={previewBodyScrollRef}
+              onDisplayableGlyphCountChange={handleGlyphCountForFooter}
             />
           </Suspense>
         )}
@@ -520,18 +639,19 @@ export default function FontPreview({
       </div>
 
       <div className={EDITOR_PREVIEW_BOTTOM_BAR_CLASS}>
-        <div className="relative z-20 shrink-0 bg-white py-0.5 pr-2">
-          <SegmentedControl
-            value={viewMode}
-            onChange={setViewMode}
-            options={VIEW_MODE_OPTIONS}
-            variant="compact"
-          />
+        <div className="relative z-20 flex min-w-0 max-w-[42%] shrink-0 items-center bg-white py-0.5 pl-2 pr-2 sm:max-w-[38%]">
+          {bottomBarModeHint ? (
+            <span className="truncate text-left text-xs uppercase font-semibold tabular-nums text-gray-800" title={bottomBarModeHint}>
+              {bottomBarModeHint}
+            </span>
+          ) : (
+            <span className="text-xs text-gray-400"> </span>
+          )}
         </div>
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-8">
           {selectedFont && (
-            <div className="pointer-events-none max-w-[min(520px,calc(100%-20rem))] text-center text-xs leading-snug text-gray-700 sm:max-w-[min(560px,calc(100%-18rem))]">
-              <span className="font-medium text-gray-900 mr-2">
+            <div className="pointer-events-none max-w-[min(520px,calc(100%-20rem))] text-center text-xs uppercase leading-snug font-semibold text-gray-700 sm:max-w-[min(560px,calc(100%-18rem))]">
+              <span className="text-gray-800 mr-2">
                 {exportedFont
                   ? exportedFont.name.replace(/-static$/, '')
                   : selectedFont.name ||
@@ -540,25 +660,25 @@ export default function FontPreview({
                       ? selectedFont.fontFamily
                       : 'Шрифт')}
               </span>
-              <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-800">
+              <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-gray-800">
                 {selectedFont.source === 'google' ? 'Google Font' : 'Пользовательский'}
               </span>
               {(selectedFont.variationSettings || selectedFont.isVariableFont) && (
                 <>
                   <span className="text-gray-400"> </span>
-                  <span className="inline-block rounded-full bg-green-100 px-2 py-0.5 text-green-700">
-                    Variable
+                  <span className="inline-block rounded-full bg-green-100 px-2.5 py-1 text-green-700">
+                    VF
                   </span>
                 </>
               )}
               <span className="text-gray-400"> </span>
-              <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+              <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-gray-800">
                 {selectedFont.currentWeight}
               </span>
               {selectedFont.currentStyle === 'italic' && (
                 <>
                   <span className="text-gray-400"> </span>
-                  <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">
+                  <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-gray-800">
                     Italic
                   </span>
                 </>
@@ -566,18 +686,11 @@ export default function FontPreview({
             </div>
           )}
         </div>
-        <div className="relative z-20 ml-auto flex shrink-0 gap-2 bg-white py-0.5 pl-2">
+        <div className="relative z-20 ml-auto flex shrink-0 flex-wrap justify-end gap-1.5 bg-white py-0.5 pl-2 sm:gap-2">
           <button
             type="button"
-            onClick={handleCSSClick}
-            className="rounded-sm bg-accent px-2 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-accent-hover hover:shadow"
-          >
-            Получить CSS
-          </button>
-          <button
-            type="button"
-            onClick={handleScreenshotClick}
-            className="flex items-center gap-1 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-accent-hover hover:shadow"
+            onClick={() => handleScreenshotClick?.()}
+            className="flex items-center gap-1 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-accent-hover"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
               <path
@@ -591,5 +704,35 @@ export default function FontPreview({
         </div>
       </div>
     </div>
+
+    {plainPreviewOpen && typeof onClosePlainPreview === 'function' && (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Полноэкранное превью plain-текста"
+        className="fixed inset-0 z-[220] flex flex-col"
+        style={previewAreaBgStyle}
+      >
+        <div className="flex shrink-0 items-center justify-end bg-white/95 px-3 py-2 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={onClosePlainPreview}
+            className="rounded-sm border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-100"
+          >
+            Закрыть
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto" style={previewAreaBgStyle}>
+          <Suspense fallback={<div className="p-8 text-gray-500">Загрузка…</div>}>
+            <PlainTextMode
+              containerStyle={containerStyle}
+              contentStyle={contentStyle}
+              variant="fullscreen"
+            />
+          </Suspense>
+        </div>
+      </div>
+    )}
+    </>
   );
 } 

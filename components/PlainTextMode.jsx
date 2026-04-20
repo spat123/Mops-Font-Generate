@@ -8,16 +8,21 @@ import { useSettings } from '../contexts/SettingsContext';
  * @param {Object} props.containerStyle - Стили контейнера
  * @param {Object} props.contentStyle - Стили содержимого
  */
-function PlainTextMode({ containerStyle, contentStyle }) {
+function PlainTextMode({ containerStyle, contentStyle, variant = 'default' }) {
   // Получаем text и setText из контекста
   const { text } = useSettings();
 
   // Обеспечиваем, что текст всегда имеет значение
   const displayText = text || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  
+  const isFullscreen = variant === 'fullscreen';
+
   return (
     <div
-      className="min-h-full pr-8 pb-8 pt-8 w-full relative"
+      className={
+        isFullscreen
+          ? 'relative box-border min-h-full w-full px-8 pb-8 pt-8'
+          : 'relative min-h-full w-full pr-8 pb-8 pt-8'
+      }
       style={containerStyle}
     >
       <EditableText 
@@ -25,9 +30,11 @@ function PlainTextMode({ containerStyle, contentStyle }) {
         isStyles={false}
         syncId="plain"
       />
-      <div className="absolute -bottom-1 left-3 text-xs text-gray-400 opacity-50 hover:opacity-100 transition-opacity">
-        Нажмите для редактирования текста
-      </div>
+      {!isFullscreen && (
+        <div className="absolute -bottom-1 left-5 text-xs text-gray-400 opacity-50 hover:opacity-100 transition-opacity">
+          Нажмите для редактирования текста
+        </div>
+      )}
     </div>
   );
 }

@@ -129,7 +129,7 @@ const CSSModal = ({ isOpen, onClose, cssCode, fontName }) => {
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-4">
           <button
             onClick={copyToClipboard}
-            className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 shadow-sm"
+            className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
           >
             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
@@ -138,7 +138,7 @@ const CSSModal = ({ isOpen, onClose, cssCode, fontName }) => {
           </button>
           <button
             onClick={downloadCSS}
-            className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50 shadow-sm"
+            className="px-4 py-2 bg-accent text-white rounded hover:bg-accent-hover transition-colors flex items-center focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-50"
           >
             <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

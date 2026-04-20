@@ -138,6 +138,29 @@ export const hexToRgbString = (hex) => {
   return `rgb(${r}, ${g}, ${b})`;
 };
 
+/** Компоненты RGB 0–255 из HEX (для отдельных полей ввода) */
+export const hexToRgbComponents = (hex) => {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) {
+    return { r: 0, g: 0, b: 0 };
+  }
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hex.length === 4) {
+    r = parseInt(hex[1] + hex[1], 16);
+    g = parseInt(hex[2] + hex[2], 16);
+    b = parseInt(hex[3] + hex[3], 16);
+  } else if (hex.length === 7) {
+    r = parseInt(hex.substring(1, 3), 16);
+    g = parseInt(hex.substring(3, 5), 16);
+    b = parseInt(hex.substring(5, 7), 16);
+  }
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) {
+    return { r: 0, g: 0, b: 0 };
+  }
+  return { r, g, b };
+};
+
 // Функция для преобразования RGB строки "rgb(r, g, b)" в HEX
 export const rgbStringToHex = (rgb) => {
   // Получаем значения из rgb(r, g, b)

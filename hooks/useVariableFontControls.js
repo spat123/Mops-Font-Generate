@@ -15,7 +15,8 @@ export function useVariableFontControls(
 
   const applyVariableSettingsRef = useRef(null);
 
-  const applyVariableSettings = useCallback((newSettings, isFinalUpdate = false, font = null) => {
+  const applyVariableSettings = useCallback((newSettings, isFinalUpdate = false, font = null, opts = {}) => {
+    const skipSideEffects = opts.skipSideEffects === true;
     const fontToApply = font || selectedFont;
     if (!fontToApply || !fontToApply.isVariableFont) return;
 
@@ -31,27 +32,37 @@ export function useVariableFontControls(
 
     const updatedSettings = { ...variableSettings, ...newSettings };
 
-    // Обновляем объект selectedFont асинхронно
-    setSelectedFont(prevFont => {
-      if (!prevFont || prevFont.id !== fontToApply.id) return prevFont;
+    if (!skipSideEffects) {
+      // Обновляем объект selectedFont асинхронно
+      setSelectedFont(prevFont => {
+        if (!prevFont || prevFont.id !== fontToApply.id) return prevFont;
 
-      const variationSettingsStr = Object.entries(updatedSettings)
-        .map(([tag, value]) => `\"${tag}\" ${value}`)
-        .join(', ');
+        const variationSettingsStr = Object.entries(updatedSettings)
+          .map(([tag, value]) => `\"${tag}\" ${value}`)
+          .join(', ');
 
-      const updatedAxes = { ...fontToApply.variableAxes };
-      Object.entries(updatedSettings).forEach(([tag, value]) => {
-        if (updatedAxes[tag]) {
-          if (typeof updatedAxes[tag] === 'object') {
-            updatedAxes[tag] = { ...updatedAxes[tag], currentValue: value };
-          } else {
-            updatedAxes[tag] = { min: value * 0.5, max: value * 1.5, default: value, currentValue: value, name: tag.charAt(0).toUpperCase() + tag.slice(1) };
+        const updatedAxes = { ...fontToApply.variableAxes };
+        Object.entries(updatedSettings).forEach(([tag, value]) => {
+          if (updatedAxes[tag]) {
+            if (typeof updatedAxes[tag] === 'object') {
+              updatedAxes[tag] = { ...updatedAxes[tag], currentValue: value };
+            } else {
+              updatedAxes[tag] = { min: value * 0.5, max: value * 1.5, default: value, currentValue: value, name: tag.charAt(0).toUpperCase() + tag.slice(1) };
+            }
           }
-        }
+        });
+
+        return { ...prevFont, variableAxes: updatedAxes, variationSettings: variationSettingsStr };
       });
 
-      return { ...prevFont, variableAxes: updatedAxes, variationSettings: variationSettingsStr };
-    });
+      // Обновляем lastUsedVariableSettings в общем массиве шрифтов
+      setFonts(currentFonts => currentFonts.map(f => {
+        if (f.id === fontToApply.id) {
+          return { ...f, lastUsedVariableSettings: updatedSettings, lastUsedPresetName: null };
+        }
+        return f;
+      }));
+    }
 
     // Обновляем CSS (если финальное изменение)
     if (isFinalUpdate && typeof debouncedUpdateCssSettings === 'function') {
@@ -63,14 +74,6 @@ export function useVariableFontControls(
     if (isFinalUpdate && typeof saveLastVariableSettings === 'function') {
       saveLastVariableSettings(updatedSettings);
     }
-
-    // Обновляем lastUsedVariableSettings в общем массиве шрифтов
-    setFonts(currentFonts => currentFonts.map(f => {
-      if (f.id === fontToApply.id) {
-        return { ...f, lastUsedVariableSettings: updatedSettings, lastUsedPresetName: null };
-      }
-      return f;
-    }));
 
   }, [selectedFont, variableSettings, setVariableSettings, setSelectedFont, setFonts, debouncedUpdateCssSettings, saveLastVariableSettings]);
 

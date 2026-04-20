@@ -72,7 +72,8 @@ export function useFontExport(exportToCSSFromHook) {
     return cssCode;
   }, [exportToCSSFromHook, downloadFile]);
 
-  const generateStaticFontFile = useCallback(async (selectedFont, variableSettings, format = 'woff2') => {
+  const generateStaticFontFile = useCallback(async (selectedFont, variableSettings, format = 'woff2', opts = {}) => {
+    const { outputFontName, skipPseudoCssPrompt } = opts;
     if (!selectedFont || !selectedFont.isVariableFont) {
       toast.error('Выберите вариативный шрифт для создания статической версии');
       return null;
@@ -110,19 +111,21 @@ export function useFontExport(exportToCSSFromHook) {
         throw new Error(`Неправильный тип данных шрифта. Ожидается ArrayBuffer, получен: ${typeof fontData}`);
       }
 
+      const displayName = outputFontName || selectedFont.name || 'VariableFont';
+
       const result = await generateStaticFont(fontData, variableSettings, {
         format,
-        fontName: selectedFont.name || 'VariableFont'
+        fontName: displayName,
       });
 
       if (result.warning) {
         toast.warning(result.warning);
       }
 
-      if (result.css) {
+      if (result.css && !skipPseudoCssPrompt) {
         const downloadCSS = window.confirm('Создан псевдо-статический шрифт с CSS. Скачать CSS файл?');
         if (downloadCSS) {
-          downloadFile(result.css, `${selectedFont.name}-static.css`, 'text/css');
+          downloadFile(result.css, `${displayName}-static.css`, 'text/css');
         }
       }
 

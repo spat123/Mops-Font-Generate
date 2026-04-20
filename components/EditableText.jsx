@@ -12,6 +12,7 @@ import { useSettings } from '../contexts/SettingsContext';
  * @param {boolean} props.isStyles - Флаг режима стилей
  * @param {string} props.viewMode - Текущий режим отображения
  * @param {string} props.syncId - Идентификатор для синхронизации (напр. 'waterfall', 'styles')
+ * @param {boolean=} props.skipMetricReflowWhileVfAnimating — при анимации VF в Waterfall не вызывать forced reflow каждый кадр
  */
 const EditableText = memo(({ 
   style, 
@@ -21,6 +22,7 @@ const EditableText = memo(({
   isStyles = false,
   viewMode,
   syncId = 'global',
+  skipMetricReflowWhileVfAnimating = false,
 }) => {
   const { text, setText } = useSettings();
 
@@ -40,11 +42,14 @@ const EditableText = memo(({
   
   // После смены семейства / FVS / веса иногда нужен reflow, иначе contenteditable + FontFace API
   // оставляют часть глифов на fallback до следующей перерисовки.
+  // В Waterfall при анимации осей N строк × offsetHeight на кадр даёт сильный лаг — пропускаем до паузы.
   useLayoutEffect(() => {
+    if (skipMetricReflowWhileVfAnimating) return;
     const el = contentRef.current;
     if (!el || !style) return;
     void el.offsetHeight;
   }, [
+    skipMetricReflowWhileVfAnimating,
     style?.fontFamily,
     style?.fontVariationSettings,
     style?.fontWeight,

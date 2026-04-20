@@ -3,6 +3,11 @@
  * Не включает variable axes / пресет — они уже на объекте шрифта.
  */
 
+import {
+  ENTIRE_PRINTABLE_ASCII_SAMPLE,
+  LEGACY_BASIC_ALNUM_PREVIEW_TEXT,
+} from './previewSampleStrings';
+
 export function collectPerFontPreviewSnapshot(s) {
   return {
     text: s.text,
@@ -15,7 +20,9 @@ export function collectPerFontPreviewSnapshot(s) {
     textDirection: s.textDirection,
     textAlignment: s.textAlignment,
     textCase: s.textCase,
-    textCenter: s.textCenter,
+    /** Совместимость: true ≈ вертикаль «по центру» */
+    textCenter: s.verticalAlignment === 'middle',
+    verticalAlignment: s.verticalAlignment,
     textFill: s.textFill,
   };
 }
@@ -26,9 +33,29 @@ export function collectPerFontPreviewSnapshot(s) {
  */
 export function applyPerFontPreviewSnapshot(snapshot, setters) {
   if (!snapshot || typeof snapshot !== 'object') return;
-  const { setText, setFontSize, setLineHeight, setLetterSpacing, setTextColor, setBackgroundColor, setViewMode, setTextDirection, setTextAlignment, setTextCase, setTextCenter, setTextFill } = setters;
+  const {
+    setText,
+    setFontSize,
+    setLineHeight,
+    setLetterSpacing,
+    setTextColor,
+    setBackgroundColor,
+    setViewMode,
+    setTextDirection,
+    setTextAlignment,
+    setTextCase,
+    setTextCenter,
+    setVerticalAlignment,
+    setTextFill,
+  } = setters;
 
-  if (snapshot.text !== undefined) setText(snapshot.text);
+  if (snapshot.text !== undefined) {
+    const t =
+      snapshot.text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT
+        ? ENTIRE_PRINTABLE_ASCII_SAMPLE
+        : snapshot.text;
+    setText(t);
+  }
   if (snapshot.fontSize !== undefined) setFontSize(snapshot.fontSize);
   if (snapshot.lineHeight !== undefined) setLineHeight(snapshot.lineHeight);
   if (snapshot.letterSpacing !== undefined) setLetterSpacing(snapshot.letterSpacing);
@@ -38,6 +65,18 @@ export function applyPerFontPreviewSnapshot(snapshot, setters) {
   if (snapshot.textDirection !== undefined) setTextDirection(snapshot.textDirection);
   if (snapshot.textAlignment !== undefined) setTextAlignment(snapshot.textAlignment);
   if (snapshot.textCase !== undefined) setTextCase(snapshot.textCase);
-  if (snapshot.textCenter !== undefined) setTextCenter(snapshot.textCenter);
+  if (typeof setTextCenter === 'function' && snapshot.textCenter !== undefined) {
+    setTextCenter(snapshot.textCenter);
+  }
+  if (typeof setVerticalAlignment === 'function') {
+    if (snapshot.verticalAlignment !== undefined) {
+      const v = snapshot.verticalAlignment;
+      if (v === 'top' || v === 'middle' || v === 'bottom') setVerticalAlignment(v);
+    } else if (snapshot.textCenter === true) {
+      setVerticalAlignment('middle');
+    } else if (snapshot.textCenter === false) {
+      setVerticalAlignment('top');
+    }
+  }
   if (snapshot.textFill !== undefined) setTextFill(snapshot.textFill);
 }

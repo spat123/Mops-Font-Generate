@@ -9,7 +9,7 @@ export const SAMPLE_TEXT_PRESET_ITEMS = [
 ];
 
 const btnClass =
-  'rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-800 transition-all duration-150 hover:bg-gray-50 hover:shadow-sm';
+  'rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-800 transition-all duration-150 hover:bg-gray-200';
 
 /**
  * Сетка кнопок быстрой подстановки образца текста (сайдбар).

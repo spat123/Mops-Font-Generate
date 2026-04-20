@@ -177,3 +177,20 @@ input[type='number'].no-arrows {
   background-color: var(--color-accent-soft);
   color: var(--color-ink);
 }
+
+/* Левая панель: нативная полоса скрыта (не сужает колонку); индикатор — отдельный слой в Sidebar. */
+.editor-sidebar-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.editor-sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+@supports (overflow: overlay) {
+  .editor-sidebar-scroll {
+    overflow-y: overlay;
+  }
+}

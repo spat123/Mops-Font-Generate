@@ -9,15 +9,15 @@ export const NativeSelect = forwardRef(function NativeSelect(
   ref,
 ) {
   return (
-    <div className="relative min-w-0 w-full">
+    <div className="group relative min-w-0 w-full">
       <select
         ref={ref}
         disabled={disabled}
         {...rest}
         className={[
           /* фон задаётся только через className — иначе bg-transparent/bg-white бьётся с bg-gray-50 в порядке утилит Tailwind */
-          'appearance-none [&::-ms-expand]:hidden',
-          disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+          'peer native-select-field appearance-none [&::-ms-expand]:hidden',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
           className,
         ]
           .filter(Boolean)
@@ -26,7 +26,7 @@ export const NativeSelect = forwardRef(function NativeSelect(
         {children}
       </select>
       <span
-        className="pointer-events-none absolute inset-y-0 right-0 flex w-8 items-center justify-center text-gray-900"
+        className="pointer-events-none absolute inset-y-0 right-0 flex w-8 items-center justify-center text-gray-900 transition-colors group-hover:text-white peer-disabled:text-gray-600 peer-disabled:group-hover:text-gray-600"
         aria-hidden
       >
         <svg

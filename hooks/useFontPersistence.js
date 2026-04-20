@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { getAllFonts, deleteAllFontsDB, updateFontSettings, saveFont } from '../utils/db';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from '../utils/cssGenerator'; // Нужен для восстановления
@@ -66,6 +66,87 @@ async function enrichGoogleVfAxesFromGithubIfNeeded(font) {
     }
 }
 
+/** Быстрый проход: только валидация и нормализация имени — без arrayBuffer / FontFace / сети. */
+function stageFontFromRecord(font) {
+    if (!font?.id || !font.file || !(font.file instanceof Blob)) return null;
+    if (typeof font.file.size === 'number' && font.file.size === 0) return null;
+    const rawFamily = font.fontFamily || `font-${font.id}`;
+    const fontFamilyToLoad = String(rawFamily).replace(/^['"]+|['"]+$/g, '').trim() || `font-${font.id}`;
+    return {
+        ...font,
+        url: undefined,
+        fontFamily: fontFamilyToLoad,
+        lastUsedPresetName: font.lastUsedPresetName || null,
+        lastUsedVariableSettings: font.lastUsedVariableSettings || null,
+    };
+}
+
+/**
+ * Полная регистрация @font-face в браузере (после stage — можно вызывать в фоне).
+ * Раньше всё это ждало завершения по всем шрифтам + document.fonts.ready — вкладки появлялись через десятки секунд.
+ */
+async function loadFontFacesForRestoredFont(font) {
+    const working = { ...font };
+    try {
+        await enrichGoogleVfAxesFromGithubIfNeeded(working);
+
+        working.url = undefined;
+        const fontFamilyToLoad = working.fontFamily;
+
+        let initialVarSettings = {};
+        if (working.isVariableFont && working.variableAxes) {
+            initialVarSettings = Object.entries(working.variableAxes).reduce((acc, [tag, axis]) => {
+                if (axis && typeof axis === 'object' && axis.default !== undefined) acc[tag] = axis.default;
+                return acc;
+            }, {});
+        }
+        const fontBinary = await working.file.arrayBuffer();
+        let mainFaceDescriptors = {};
+        if (working.isVariableFont) {
+            mainFaceDescriptors = working.googleFontFirstSliceMeta
+                ? buildGoogleVariableSliceFaceDescriptors(working.googleFontFirstSliceMeta, working.variableAxes)
+                : buildVariableFontFaceDescriptors(working.variableAxes);
+        } else if (working.googleFontFirstSliceMeta) {
+            mainFaceDescriptors = buildGoogleStaticSliceFaceDescriptors(working.googleFontFirstSliceMeta);
+        }
+        await loadFontFaceIfNeeded(
+            fontFamilyToLoad,
+            fontBinary,
+            initialVarSettings,
+            working.id,
+            mainFaceDescriptors,
+        );
+
+        const extraMeta = working.googleFontExtraSliceMeta;
+        const extraBlobs = working.googleFontExtraSliceBlobs;
+        if (
+            Array.isArray(extraMeta) &&
+            Array.isArray(extraBlobs) &&
+            extraMeta.length > 0 &&
+            extraMeta.length === extraBlobs.length
+        ) {
+            for (let i = 0; i < extraMeta.length; i++) {
+                const buf = await extraBlobs[i].arrayBuffer();
+                const exDesc = working.isVariableFont
+                    ? buildGoogleVariableSliceFaceDescriptors(extraMeta[i], working.variableAxes)
+                    : buildGoogleStaticSliceFaceDescriptors(extraMeta[i]);
+                await loadFontFaceIfNeeded(fontFamilyToLoad, buf, {}, `${working.id}-ex-${i}`, exDesc);
+            }
+        }
+
+        working.url = URL.createObjectURL(working.file);
+        return {
+            ...working,
+            lastUsedPresetName: working.lastUsedPresetName || null,
+            lastUsedVariableSettings: working.lastUsedVariableSettings || null,
+        };
+    } catch (loadError) {
+        console.error(`[DB] Ошибка пересоздания FontFace для ${font.name}:`, loadError);
+        if (working.url) revokeObjectURL(working.url);
+        return null;
+    }
+}
+
 /** IndexedDB + localStorage: загрузка, восстановление выбора, сброс. */
 export function useFontPersistence(
     setFonts,
@@ -78,6 +159,10 @@ export function useFontPersistence(
     selectedFont
 ) {
 
+    // Восстановление выбранного шрифта должно происходить только один раз после гидратации из DB,
+    // иначе при переходе на «Новый»/«Все шрифты» (selectedFont=null) эффект снова выберет первый шрифт.
+    const hasRestoredSelectedFontRef = useRef(false);
+
     // --- Начальная загрузка из IndexedDB --- 
     useEffect(() => {
         let isMounted = true;
@@ -88,108 +173,23 @@ export function useFontPersistence(
                 if (!isMounted) return;
 
                 if (storedFonts && storedFonts.length > 0) {
-                    const processedFonts = await Promise.all(storedFonts.map(async (font) => {
-                        if (!font?.id || !font.file || !(font.file instanceof Blob)) {
-                            console.warn('[DB] Пропущен некорректный объект:', font);
-                            return null;
-                        }
-                        if (typeof font.file.size === 'number' && font.file.size === 0) {
-                            console.warn('[DB] Пустой Blob шрифта, пропуск:', font.name || font.id);
-                            return null;
-                        }
-                        try {
-                            await enrichGoogleVfAxesFromGithubIfNeeded(font);
+                    const stagedFonts = storedFonts.map(stageFontFromRecord).filter((f) => f !== null);
 
-                            // blob: из прошлой сессии в IndexedDB невалиден; пересоздаём только после успешной загрузки
-                            font.url = undefined;
-                            // FontFace принимает имя без CSS-кавычек; в БД могло сохраниться "'Roboto'" из Fontsource
-                            const rawFamily = font.fontFamily || `font-${font.id}`;
-                            const fontFamilyToLoad = String(rawFamily).replace(/^['"]+|['"]+$/g, '').trim() || `font-${font.id}`;
-                            font.fontFamily = fontFamilyToLoad;
+                    if (isMounted && stagedFonts.length > 0) {
+                        setFonts(stagedFonts);
+                        setIsLoading(false);
+                        setIsInitialLoadComplete(true);
+                    }
 
-                            let initialVarSettings = {};
-                            if (font.isVariableFont && font.variableAxes) {
-                                initialVarSettings = Object.entries(font.variableAxes).reduce((acc, [tag, axis]) => {
-                                    if (axis && typeof axis === 'object' && axis.default !== undefined) acc[tag] = axis.default;
-                                    return acc;
-                                }, {});
-                            }
-                            // Загрузка из буфера надёжнее, чем из blob: URL после перезагрузки страницы
-                            const fontBinary = await font.file.arrayBuffer();
-                            let mainFaceDescriptors = {};
-                            if (font.isVariableFont) {
-                                mainFaceDescriptors = font.googleFontFirstSliceMeta
-                                    ? buildGoogleVariableSliceFaceDescriptors(
-                                          font.googleFontFirstSliceMeta,
-                                          font.variableAxes,
-                                      )
-                                    : buildVariableFontFaceDescriptors(font.variableAxes);
-                            } else if (font.googleFontFirstSliceMeta) {
-                                mainFaceDescriptors = buildGoogleStaticSliceFaceDescriptors(font.googleFontFirstSliceMeta);
-                            }
-                            await loadFontFaceIfNeeded(
-                                fontFamilyToLoad,
-                                fontBinary,
-                                initialVarSettings,
-                                font.id,
-                                mainFaceDescriptors
-                            );
+                    const processedFonts = await Promise.all(
+                        stagedFonts.map((font) => loadFontFacesForRestoredFont(font)),
+                    );
+                    const validFonts = processedFonts.filter((f) => f !== null);
 
-                            const extraMeta = font.googleFontExtraSliceMeta;
-                            const extraBlobs = font.googleFontExtraSliceBlobs;
-                            if (
-                                Array.isArray(extraMeta) &&
-                                Array.isArray(extraBlobs) &&
-                                extraMeta.length > 0 &&
-                                extraMeta.length === extraBlobs.length
-                            ) {
-                                for (let i = 0; i < extraMeta.length; i++) {
-                                    const buf = await extraBlobs[i].arrayBuffer();
-                                    const exDesc = font.isVariableFont
-                                        ? buildGoogleVariableSliceFaceDescriptors(
-                                              extraMeta[i],
-                                              font.variableAxes,
-                                          )
-                                        : buildGoogleStaticSliceFaceDescriptors(extraMeta[i]);
-                                    await loadFontFaceIfNeeded(
-                                        fontFamilyToLoad,
-                                        buf,
-                                        {},
-                                        `${font.id}-ex-${i}`,
-                                        exDesc
-                                    );
-                                }
-                            }
-
-                            font.url = URL.createObjectURL(font.file);
-                            // Добавляем недостающие поля сессии, если их нет
-                            return {
-                                ...font,
-                                lastUsedPresetName: font.lastUsedPresetName || null,
-                                lastUsedVariableSettings: font.lastUsedVariableSettings || null
-                            };
-                        } catch (loadError) {
-                            console.error(`[DB] Ошибка пересоздания FontFace для ${font.name}:`, loadError);
-                            if (font.url) revokeObjectURL(font.url);
-                            return null;
-                        }
-                    }));
-
-                    const validFonts = processedFonts.filter(f => f !== null);
-                    if (isMounted) {
-                        if (
-                            validFonts.length > 0 &&
-                            typeof document !== 'undefined' &&
-                            document.fonts &&
-                            typeof document.fonts.ready?.then === 'function'
-                        ) {
-                            try {
-                                await document.fonts.ready;
-                            } catch (e) {
-                                console.warn('[DB] document.fonts.ready:', e);
-                            }
-                        }
+                    if (isMounted && validFonts.length > 0) {
                         setFonts(validFonts);
+                    } else if (isMounted && stagedFonts.length > 0 && validFonts.length === 0) {
+                        console.warn('[DB] Ни один шрифт не удалось восстановить в FontFace');
                     }
                 }
             } catch (error) {
@@ -210,6 +210,7 @@ export function useFontPersistence(
     // --- Восстановление выбранного шрифта и его настроек --- 
     useEffect(() => {
         // Запускаем только после завершения загрузки из DB и если есть шрифты, но ни один не выбран
+        if (hasRestoredSelectedFontRef.current) return;
         if (fonts && fonts.length > 0 && !selectedFont) {
             const storedId = localStorage.getItem(FONT_SETTINGS_LS_KEYS.SELECTED_FONT_ID);
             let fontToSelect = null;
@@ -228,6 +229,7 @@ export function useFontPersistence(
 
             if (fontToSelect) {
                 setSelectedFont(fontToSelect); // Устанавливаем шрифт
+                hasRestoredSelectedFontRef.current = true;
 
                 // Используем setTimeout для применения настроек после установки шрифта
                 setTimeout(() => {
