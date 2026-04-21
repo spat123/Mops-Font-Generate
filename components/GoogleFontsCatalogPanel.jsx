@@ -22,6 +22,9 @@ import {
   customSelectTriggerClass,
 } from './ui/nativeSelectFieldClasses';
 import CatalogSessionAddSpinner from './ui/CatalogSessionAddSpinner';
+import { CatalogAddTargetMenu } from './ui/CatalogAddTargetMenu';
+import { Tooltip } from './ui/Tooltip';
+import { matchesSearch } from '../utils/searchMatching';
 /** Подписи к кодам наборов Google Fonts (subsets) */
 const SUBSET_LABEL_RU = {
   latin: 'Латиница',
@@ -63,6 +66,15 @@ function subsetOptionLabel(code) {
   return ru ? `${ru} (${code})` : code;
 }
 
+function pluralRu(n, one, few, many) {
+  const abs = Math.abs(Number(n));
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return few;
+  return many;
+}
+
 function findLoadedGoogleFont(fonts, family) {
   return fonts.find(
     (f) =>
@@ -91,12 +103,21 @@ function googleFontCatalogGridCols(viewportWidth) {
 
 const GRID_GAP_PX = 16;
 
-export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, trailingToolbar = null }) {
+export default function GoogleFontsCatalogPanel({
+  fonts,
+  handleFontsUploaded,
+  fontLibraries = [],
+  onAddFontToLibrary,
+  onRequestCreateLibrary,
+  trailingToolbar = null,
+}) {
   const [gridInnerWidth, setGridInnerWidth] = useState(null);
   const [catalogScrollEl, setCatalogScrollEl] = useState(null);
   const [viewportW, setViewportW] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 0,
   );
+  const [trailingToolbarEl, setTrailingToolbarEl] = useState(null);
+  const [trailingToolbarW, setTrailingToolbarW] = useState(0);
   const [items, setItems] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
   const [addingFamily, setAddingFamily] = useState(null);
@@ -119,6 +140,29 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
   const setCatalogScrollContainer = useCallback((node) => {
     setCatalogScrollEl(node instanceof HTMLElement ? node : null);
   }, []);
+
+  const setTrailingToolbarContainer = useCallback((node) => {
+    setTrailingToolbarEl(node instanceof HTMLElement ? node : null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!trailingToolbarEl) {
+      setTrailingToolbarW(0);
+      return;
+    }
+
+    const measure = () => {
+      const w = trailingToolbarEl.getBoundingClientRect().width;
+      setTrailingToolbarW(Number.isFinite(w) ? w : 0);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== 'function') return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(trailingToolbarEl);
+    return () => ro.disconnect();
+  }, [trailingToolbarEl]);
 
   const gridCols = googleFontCatalogGridCols(viewportW);
   const oneCardWidthPx =
@@ -144,14 +188,18 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
 
   const filteredSortedItems = useMemo(() => {
     let list = items;
-    const q = searchQuery.trim().toLowerCase();
-    if (q) {
+    if (searchQuery.trim()) {
       list = list.filter(
         (x) =>
-          (x.family && x.family.toLowerCase().includes(q)) ||
-          (x.category && String(x.category).toLowerCase().includes(q)) ||
-          (x.stroke && String(x.stroke).toLowerCase().includes(q)) ||
-          (x.subsets || []).some((s) => String(s).toLowerCase().includes(q)),
+          matchesSearch(
+            [
+              x.family,
+              x.category,
+              x.stroke,
+              ...(x.subsets || []),
+            ],
+            searchQuery,
+          ),
       );
     }
     if (filterCategory) list = list.filter((x) => x.category === filterCategory);
@@ -341,7 +389,7 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
       const family = entry.family;
       if (findLoadedGoogleFont(fonts, family)) {
         toast.info(`${family} уже в сессии`);
-        return;
+        return true;
       }
       setAddingFamily(family);
       try {
@@ -366,6 +414,9 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
               googleFontSlices: slices,
               googleFontAxesFromCatalog:
                 Array.isArray(entry.axes) && entry.axes.length > 0 ? entry.axes : null,
+              googleFontItalicMode:
+                typeof entry.italicMode === 'string' && entry.italicMode ? entry.italicMode : 'none',
+              googleFontHasItalicStyles: entry.hasItalicStyles === true,
               googleFontRecommendedSample,
             },
           ]);
@@ -382,20 +433,31 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
               name: `${family}.woff2`,
               source: 'google',
               googleFontSlices: slices,
+              googleFontItalicMode:
+                typeof entry.italicMode === 'string' && entry.italicMode ? entry.italicMode : 'none',
+              googleFontHasItalicStyles: entry.hasItalicStyles === true,
               googleFontRecommendedSample,
             },
           ]);
         }
         toast.success(`${family} добавлен`);
+        return true;
       } catch (e) {
         console.warn('[GoogleFontsCatalogPanel]', family, e);
         toast.error(e?.message ? `${family}: ${e.message}` : `Не удалось загрузить ${family}`);
+        return false;
       } finally {
         setAddingFamily(null);
       }
     },
     [fonts, handleFontsUploaded],
   );
+
+  const googleLibraryEntry = useCallback((entry) => ({
+    id: `google:${entry.family}`,
+    label: entry.family,
+    source: 'google',
+  }), []);
 
   if (catalogError) {
     return <p className="text-sm text-red-600 mt-2">Каталог Google: {catalogError}</p>;
@@ -414,22 +476,33 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
 
   const selectClass = (placeholderMuted) => customSelectTriggerClass({ placeholderMuted });
 
+  const toolbarAlignToGrid = oneCardWidthPx != null && viewportW >= 640;
+  const twoCardWidthPx = toolbarAlignToGrid ? oneCardWidthPx * 2 + GRID_GAP_PX : null;
+  const searchWidthPx =
+    toolbarAlignToGrid && twoCardWidthPx != null
+      ? Math.max(
+          0,
+          twoCardWidthPx - (trailingToolbar ? trailingToolbarW + GRID_GAP_PX : 0),
+        )
+      : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden gap-4">
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
         {trailingToolbar ? (
-          <div className="flex shrink-0 items-center">{trailingToolbar}</div>
+          <div ref={setTrailingToolbarContainer} className="flex shrink-0 items-center">
+            {trailingToolbar}
+          </div>
         ) : null}
-        <div
+        <Tooltip
+          as="div"
+          content={`${catalogItemsNotInSession.length}${countSuffix}`}
           className={
-            'relative min-w-0 flex-1 ' +
-            /* sm+: ширина одной карточки по измерению сетки списка */
-            (oneCardWidthPx != null && viewportW >= 640 ? 'sm:w-auto' : 'w-full')
+            'relative min-w-0 w-full ' +
+            (toolbarAlignToGrid ? 'sm:w-auto sm:flex-none' : 'sm:flex-1')
           }
           style={
-            oneCardWidthPx != null && viewportW >= 640
-              ? { width: oneCardWidthPx, maxWidth: '100%' }
-              : undefined
+            toolbarAlignToGrid && searchWidthPx != null ? { width: searchWidthPx, maxWidth: '100%' } : undefined
           }
         >
           <input
@@ -438,80 +511,89 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Имя, категория, группа, код набора…"
-            className={`box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-24 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${fieldInteractive} focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30 sm:pl-3 sm:pr-28`}
+            className={`box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-24 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${fieldInteractive} focus:border-black/[0.14] focus:outline-none sm:pl-3 sm:pr-28`}
             autoComplete="off"
             spellCheck={false}
           />
           <span
             className="pointer-events-none absolute top-1/2 right-3 max-w-[45%] -translate-y-1/2 truncate text-right text-sm tabular-nums uppercase font-semibold text-gray-500"
-            title={`${catalogItemsNotInSession.length}${countSuffix}`}
           >
             {catalogItemsNotInSession.length}
             <span className="text-gray-400">{countSuffix}</span>
           </span>
-        </div>
-        <div className="min-w-0 flex-1 sm:max-w-[12rem]">
-          <CustomSelect
-            id="gf-filter-category"
-            value={filterCategory}
-            onChange={setFilterCategory}
-            className={selectClass(!filterCategory)}
-            aria-label="Категория"
-            placeholder="Категория"
-            emptyValue=""
-            options={facetOptions.categories.map((c) => ({ value: c, label: c }))}
-          />
-        </div>
-        {facetOptions.strokes.length > 0 ? (
-          <div className="min-w-0 flex-1 sm:max-w-[12rem]">
+        </Tooltip>
+        <div
+          className="min-w-0 w-full sm:w-auto"
+          style={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
+        >
+          <div
+            className={
+              'grid grid-cols-1 gap-3 ' + (facetOptions.strokes.length > 0 ? 'sm:grid-cols-2' : '')
+            }
+          >
             <CustomSelect
-              id="gf-filter-stroke"
-              value={filterStroke}
-              onChange={setFilterStroke}
-              className={selectClass(!filterStroke)}
-              aria-label="Группа"
-              placeholder="Группа"
+              id="gf-filter-category"
+              value={filterCategory}
+              onChange={setFilterCategory}
+              className={selectClass(!filterCategory)}
+              aria-label="Категория"
+              placeholder="Категория"
               emptyValue=""
-              options={facetOptions.strokes.map((s) => ({ value: s, label: s }))}
+              options={facetOptions.categories.map((c) => ({ value: c, label: c }))}
+            />
+            {facetOptions.strokes.length > 0 ? (
+              <CustomSelect
+                id="gf-filter-stroke"
+                value={filterStroke}
+                onChange={setFilterStroke}
+                className={selectClass(!filterStroke)}
+                aria-label="Группа"
+                placeholder="Группа"
+                emptyValue=""
+                options={facetOptions.strokes.map((s) => ({ value: s, label: s }))}
+              />
+            ) : null}
+          </div>
+        </div>
+        <div
+          className="min-w-0 w-full sm:w-auto"
+          style={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <CustomSelect
+              id="gf-filter-subset"
+              value={filterSubset}
+              onChange={setFilterSubset}
+              className={selectClass(!filterSubset)}
+              aria-label="Язык / набор (subset)"
+              placeholder="Язык"
+              emptyValue=""
+              options={facetOptions.subsets.map((s) => ({
+                value: s,
+                label: subsetOptionLabel(s),
+              }))}
+            />
+            <CustomSelect
+              id="gf-filter-var"
+              value={filterVariable}
+              onChange={setFilterVariable}
+              className={selectClass(filterVariable === 'all')}
+              aria-label="Вариативность"
+              placeholder="Вариативность"
+              emptyValue="all"
+              options={[
+                { value: 'variable', label: 'Вариативные' },
+                { value: 'static', label: 'Статические' },
+              ]}
             />
           </div>
-        ) : null}
-        <div className="min-w-0 flex-1 sm:max-w-[12rem]">
-          <CustomSelect
-            id="gf-filter-subset"
-            value={filterSubset}
-            onChange={setFilterSubset}
-            className={selectClass(!filterSubset)}
-            aria-label="Язык / набор (subset)"
-            placeholder="Язык"
-            emptyValue=""
-            options={facetOptions.subsets.map((s) => ({
-              value: s,
-              label: subsetOptionLabel(s),
-            }))}
-          />
-        </div>
-        <div className="min-w-0 flex-1 sm:max-w-[10rem]">
-          <CustomSelect
-            id="gf-filter-var"
-            value={filterVariable}
-            onChange={setFilterVariable}
-            className={selectClass(filterVariable === 'all')}
-            aria-label="Вариативность"
-            placeholder="Вариативность"
-            emptyValue="all"
-            options={[
-              { value: 'variable', label: 'Вариативные' },
-              { value: 'static', label: 'Статические' },
-            ]}
-          />
         </div>
         <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-gray-50 uppercase font-semibold px-2 text-sm text-gray-900 sm:px-3">
           <input
             type="checkbox"
             checked={filterItalicOnly}
             onChange={(e) => setFilterItalicOnly(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-400 bg-gray-50 text-accent focus:ring-accent/40"
+            className="h-4 w-4 rounded border-gray-400 bg-gray-50 text-accent"
           />
           <span className="whitespace-nowrap">Курсив</span>
         </label>
@@ -539,7 +621,7 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
             type="button"
             disabled={!hasActiveFilters}
             onClick={clearFilters}
-            className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-xs uppercase font-semibold text-gray-900 disabled:cursor-not-allowed disabled:opacity-40"
+            className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm uppercase font-semibold text-gray-900 disabled:cursor-default disabled:opacity-40"
           >
             Сбросить все
           </button>
@@ -590,31 +672,19 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
                           : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100')
                       }
                     >
-                      <button
-                        type="button"
-                        disabled={busy}
-                        aria-busy={busy}
-                        aria-label="Добавить в сессию"
-                        onClick={() => addGoogleToSession(entry)}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-md border-0 bg-transparent pb-2 py-1 text-[11px] uppercase font-semibold leading-none text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-100"
-                      >
-                        <span className="select-none truncate">В сессию</span>
-                        {busy ? (
-                          <CatalogSessionAddSpinner />
-                        ) : (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth={1.6}
-                            className="h-4 w-4 shrink-0"
-                            aria-hidden
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                          </svg>
-                        )}
-                      </button>
+                      <CatalogAddTargetMenu
+                        libraries={fontLibraries}
+                        busy={busy}
+                        busyIndicator={<CatalogSessionAddSpinner />}
+                        onAddToSession={() => addGoogleToSession(entry)}
+                        onAddToLibrary={async (libraryId) => {
+                          const ok = await addGoogleToSession(entry);
+                          if (ok) {
+                            onAddFontToLibrary?.(libraryId, googleLibraryEntry(entry));
+                          }
+                        }}
+                        onCreateLibrary={() => onRequestCreateLibrary?.([googleLibraryEntry(entry)])}
+                      />
                     </div>
                     <div className="truncate text-sm font-medium text-gray-800">{family}</div>
                     <div
@@ -632,23 +702,29 @@ export default function GoogleFontsCatalogPanel({ fonts, handleFontsUploaded, tr
                           </span>
                         ) : null}
                         {entry.hasItalic ? (
-                          <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] uppercase font-semibold text-gray-400">
+                          <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] uppercase font-semibold text-gray-800">
                             italic
                           </span>
                         ) : null}
                       </div>
-                      <div
+                      <Tooltip
+                        as="div"
+                        content="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
                         className="shrink-0 flex items-center justify-end gap-1.5 text-right text-[11px] uppercase font-semibold tabular-nums leading-snug text-gray-500"
-                        title="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
                       >
                         <span className="whitespace-nowrap">
-                          {entry.styleCount != null ? entry.styleCount : '—'} начертаний
+                          {entry.styleCount != null
+                            ? `${entry.styleCount} ${pluralRu(entry.styleCount, 'начертание', 'начертания', 'начертаний')}`
+                            : '—'}
                         </span>
                   
                         <span className="whitespace-nowrap">
-                          {(entry.subsets && entry.subsets.length) || 0} наборов
+                          {(() => {
+                            const n = (entry.subsets && entry.subsets.length) || 0;
+                            return `${n} ${pluralRu(n, 'набор', 'набора', 'наборов')}`;
+                          })()}
                         </span>
-                      </div>
+                      </Tooltip>
                     </div>
                   </div>
                 );

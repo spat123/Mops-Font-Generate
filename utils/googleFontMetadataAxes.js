@@ -22,3 +22,13 @@ export function slimGoogleMetadataAxes(rawAxes) {
         typeof a.defaultValue === 'number' && Number.isFinite(a.defaultValue) ? a.defaultValue : a.min,
     }));
 }
+
+export function resolveGoogleMetadataItalicMode(rawAxes, rawFonts) {
+  const axes = slimGoogleMetadataAxes(rawAxes);
+  if (axes.some((axis) => axis?.tag === 'ital')) return 'axis-ital';
+  if (axes.some((axis) => axis?.tag === 'slnt')) return 'axis-slnt';
+  const fontsObj = rawFonts && typeof rawFonts === 'object' && !Array.isArray(rawFonts) ? rawFonts : {};
+  const hasItalicStyles = Object.keys(fontsObj).some((k) => /^\d+i$/.test(k));
+  if (hasItalicStyles) return 'separate-style';
+  return 'none';
+}

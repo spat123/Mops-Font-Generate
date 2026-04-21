@@ -161,7 +161,7 @@ export default function GenerateFontModal({
               value={outputName}
               onChange={(e) => setOutputName(e.target.value)}
               disabled={!vf || busy}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black/[0.14] focus:outline-none"
               placeholder="MyFont"
               autoComplete="off"
             />

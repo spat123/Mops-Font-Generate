@@ -3,6 +3,8 @@
  * Статика и VF: у Google часто несколько файлов woff2 с разными unicode-range — нужны все.
  */
 import { CHROME_UA, buildGoogleFontsCss2Url, parseGoogleFontFacesFromCss } from '../../utils/googleFontsCssShared';
+import { getGoogleFontsMetadataFamilyList } from '../../utils/googleFontsMetadataServer';
+import { resolveGoogleMetadataItalicMode, slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 export default async function handler(req, res) {
@@ -22,11 +24,27 @@ export default async function handler(req, res) {
   const wghtMax = req.query.wghtMax;
   const subset = typeof req.query.subset === 'string' ? req.query.subset.trim() : '';
 
-  const cssUrl = variable
-    ? buildGoogleFontsCss2Url(family, { variable: true, wghtMin, wghtMax, subset: subset || undefined })
-    : buildGoogleFontsCss2Url(family, { variable: false, weight, italic, subset: subset || undefined });
-
   try {
+    let axes;
+    let italicMode;
+    if (variable) {
+      const list = await getGoogleFontsMetadataFamilyList();
+      const entry = list.find((x) => x && x.family === family);
+      axes = entry ? slimGoogleMetadataAxes(entry.axes) : [];
+      italicMode = entry ? resolveGoogleMetadataItalicMode(entry.axes, entry.fonts) : 'none';
+    }
+
+    const cssUrl = variable
+      ? buildGoogleFontsCss2Url(family, {
+          variable: true,
+          wghtMin,
+          wghtMax,
+          subset: subset || undefined,
+          axes,
+          italicMode,
+        })
+      : buildGoogleFontsCss2Url(family, { variable: false, weight, italic, subset: subset || undefined });
+
     const cssRes = await fetch(cssUrl, { headers: { 'User-Agent': CHROME_UA } });
     if (!cssRes.ok) {
       return res.status(cssRes.status >= 400 && cssRes.status < 600 ? cssRes.status : 502).json({

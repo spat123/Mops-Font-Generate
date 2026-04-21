@@ -85,6 +85,9 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
       if (variationSettings && variationSettings !== 'normal') {
         properties.fontVariationSettings = variationSettings;
       }
+      if (selectedFont?.italicMode === 'separate-style' && selectedFont?.currentStyle === 'italic') {
+        properties.fontStyle = 'italic';
+      }
     } else {
       // Для статических шрифтов добавляем weight и style
       if (selectedFont.currentWeight) {

@@ -18,14 +18,16 @@ export function familyNameToCamelCase(family) {
 /**
  * @param {string} family — как в metadata (напр. "Roboto Flex")
  * @param {string[]} axisTags — порядок тегов как в metadata / slimAxes
+ * @param {{ italic?: boolean }} [options]
  * @returns {string[]} URL кандидаты (ofl / apache / ufl)
  */
-export function buildGithubVariableTtfCandidateUrls(family, axisTags) {
+export function buildGithubVariableTtfCandidateUrls(family, axisTags, options = {}) {
   const camel = familyNameToCamelCase(family);
   if (!camel || !axisTags?.length) return [];
   const slug = camel.toLowerCase();
   const inner = axisTags.join(',');
-  const filename = `${camel}[${inner}].ttf`;
+  const suffix = options?.italic ? '-Italic' : '';
+  const filename = `${camel}${suffix}[${inner}].ttf`;
   const enc = encodeURIComponent(filename);
   const prefixes = ['ofl', 'apache', 'ufl'];
   return prefixes.map((p) => `${RAW_BASE}/${p}/${slug}/${enc}`);

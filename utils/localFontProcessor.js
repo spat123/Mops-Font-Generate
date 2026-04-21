@@ -1,7 +1,7 @@
 // Функции для обработки локально загруженных шрифтов (кэширование, FontFace)
 import { toast } from 'react-toastify';
 import { parseFontBuffer, isVariableFont, mergeFvarAxesFromFontInputs, normalizeFvarAxisTag } from './fontParser';
-import { findStyleInfoByWeightAndStyle, getFormatFromExtension } from './fontUtilsCommon';
+import { filterPresetStylesForVariableAxes, findStyleInfoByWeightAndStyle, getFormatFromExtension } from './fontUtilsCommon';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGenerator';
 
 /**
@@ -69,6 +69,21 @@ async function registerGoogleFontSlices(fontFamilyName, slices, fontObj, initial
   );
 }
 
+async function registerItalicVariableFace(fontFamilyName, italicFile, fontObj, cacheId = '') {
+  if (!(italicFile instanceof Blob) || !fontObj?.isVariableFont) return;
+  const italicBuffer = await italicFile.arrayBuffer();
+  const faceDescriptors = buildVariableFontFaceDescriptors(fontObj.variableAxes, { style: 'italic' });
+  await loadFontFaceIfNeeded(fontFamilyName, italicBuffer, {}, cacheId, faceDescriptors);
+}
+
+function resolveFontItalicMode(variableAxes, hasItalicStyles = false) {
+  const axes = variableAxes && typeof variableAxes === 'object' ? variableAxes : {};
+  if (axes.ital && typeof axes.ital === 'object') return 'axis-ital';
+  if (axes.slnt && typeof axes.slnt === 'object') return 'axis-slnt';
+  if (hasItalicStyles) return 'separate-style';
+  return 'none';
+}
+
 /**
  * Асинхронно вычисляет SHA-256 хеш для Blob файла.
  * @param {Blob} file - Файл (Blob).
@@ -124,10 +139,33 @@ export const processLocalFont = async (incomingFontInput) => {
         if (ct.includes('font') || ct.includes('ttf') || ct.includes('octet')) {
           const blob = await res.blob();
           if (blob instanceof Blob && blob.size > 10_000) {
+            let italicBlob = fontInput.googleFontItalicFile instanceof Blob ? fontInput.googleFontItalicFile : null;
+            const shouldLoadItalicVf =
+              fontInput.googleFontItalicMode === 'separate-style' &&
+              fontInput.googleFontHasItalicStyles === true;
+            if (!italicBlob && shouldLoadItalicVf) {
+              try {
+                const italicRes = await fetch(
+                  `/api/google-font-github-vf?family=${encodeURIComponent(cleanedName)}&italic=1`,
+                );
+                if (italicRes.ok) {
+                  const italicCt = italicRes.headers.get('content-type') || '';
+                  if (italicCt.includes('font') || italicCt.includes('ttf') || italicCt.includes('octet')) {
+                    const loadedItalicBlob = await italicRes.blob();
+                    if (loadedItalicBlob instanceof Blob && loadedItalicBlob.size > 10_000) {
+                      italicBlob = loadedItalicBlob;
+                    }
+                  }
+                }
+              } catch (italicError) {
+                console.warn('[localFontProcessor] Italic VF с GitHub:', cleanedName, italicError);
+              }
+            }
             fontInput = {
               ...fontInput,
               file: blob,
               name: `${cleanedName}.ttf`,
+              googleFontItalicFile: italicBlob,
               googleFontSlices: undefined,
               googleFontAxesFromCatalog: null,
             };
@@ -281,6 +319,12 @@ export const processLocalFont = async (incomingFontInput) => {
       variationSettings: '',
       availableStyles: [],
       file: file,
+      hasItalicStyles: fontInput.googleFontHasItalicStyles === true,
+      googleFontItalicFile: fontInput.googleFontItalicFile instanceof Blob ? fontInput.googleFontItalicFile : null,
+      italicMode:
+        typeof fontInput.googleFontItalicMode === 'string' && fontInput.googleFontItalicMode
+          ? fontInput.googleFontItalicMode
+          : 'none',
       // url: objectUrl, // Устанавливаем ниже, после создания fontFamilyName
       fontFamily: null, // Установим ниже
     };
@@ -317,7 +361,10 @@ export const processLocalFont = async (incomingFontInput) => {
          fontObj.variationSettings = Object.entries(fontObj.variableAxes)
             .map(([tag, value]) => `\"${tag}\" ${value.default || 400}`) // Запасное значение для веса
             .join(', ');
-         fontObj.availableStyles = [{ name: 'Default', weight: 400, style: 'normal' }]; // Заглушка
+         fontObj.italicMode = resolveFontItalicMode(fontObj.variableAxes, fontObj.hasItalicStyles);
+         fontObj.availableStyles = filterPresetStylesForVariableAxes(fontObj.variableAxes, undefined, {
+           italicMode: fontObj.italicMode,
+         });
 
         const gfSlices = fontInput.googleFontSlices;
         if (Array.isArray(gfSlices) && gfSlices.length > 1) {
@@ -327,6 +374,7 @@ export const processLocalFont = async (incomingFontInput) => {
             if (mergedAxes && Object.keys(mergedAxes).length > 0) {
               fontObj.variableAxes = mergedAxes;
               fontObj.supportedAxes = Object.keys(mergedAxes);
+              fontObj.italicMode = resolveFontItalicMode(mergedAxes, fontObj.hasItalicStyles);
               fontObj.variationSettings = Object.entries(mergedAxes)
                 .map(([tag, v]) => {
                   const d = v?.default;
@@ -334,6 +382,9 @@ export const processLocalFont = async (incomingFontInput) => {
                   return `\"${tag}\" ${num}`;
                 })
                 .join(', ');
+              fontObj.availableStyles = filterPresetStylesForVariableAxes(mergedAxes, undefined, {
+                italicMode: fontObj.italicMode,
+              });
             }
           } catch (e) {
             console.warn('[localFontProcessor] Объединение fvar по слайсам Google:', e);
@@ -365,6 +416,8 @@ export const processLocalFont = async (incomingFontInput) => {
         }
          fontObj.currentWeight = weight;
          fontObj.currentStyle = style;
+        fontObj.hasItalicStyles = fontObj.hasItalicStyles || style === 'italic';
+        fontObj.italicMode = resolveFontItalicMode(fontObj.variableAxes, fontObj.hasItalicStyles);
         const styleInfo = findStyleInfoByWeightAndStyle(weight, style);
         fontObj.availableStyles = [{ name: styleInfo.name, weight, style }];
       }
@@ -429,6 +482,14 @@ export const processLocalFont = async (incomingFontInput) => {
           ? buildVariableFontFaceDescriptors(fontObj.variableAxes)
           : {};
         await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings, '', faceDescriptors);
+      }
+      if (fontObj.isVariableFont && fontObj.italicMode === 'separate-style' && fontObj.googleFontItalicFile) {
+        await registerItalicVariableFace(
+          fontFamilyName,
+          fontObj.googleFontItalicFile,
+          fontObj,
+          `${fontObj.id}-italic`,
+        );
       }
       revokeObjectURL(objectUrl);
       fontObj.url = URL.createObjectURL(file);

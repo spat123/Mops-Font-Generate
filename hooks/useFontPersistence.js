@@ -9,6 +9,7 @@ import {
 } from '../utils/localFontProcessor'; // Для очистки URL и дескрипторов сабсетов Google
 import { buildVariationSettingsCssString } from '../utils/googleFontCatalogAxes';
 import { parseFontBuffer, normalizeFvarAxisTag } from '../utils/fontParser';
+import { filterPresetStylesForVariableAxes } from '../utils/fontUtilsCommon';
 
 // Ключи localStorage для настроек шрифта
 const FONT_SETTINGS_LS_KEYS = {
@@ -22,45 +23,72 @@ async function enrichGoogleVfAxesFromGithubIfNeeded(font) {
     if (font.source !== 'google' || !font.isVariableFont) return;
     const keys =
         font.variableAxes && typeof font.variableAxes === 'object' ? Object.keys(font.variableAxes) : [];
-    if (keys.length > 1) return;
-
     const family = String(font.name || '').trim();
     if (!family) return;
 
     try {
-        const res = await fetch(`/api/google-font-github-vf?family=${encodeURIComponent(family)}`);
-        if (!res.ok) return;
-        const blob = await res.blob();
-        if (!(blob instanceof Blob) || blob.size < 10_000) return;
+        let changed = false;
 
-        const buf = await blob.arrayBuffer();
-        const parsed = await parseFontBuffer(buf, family);
-        const axes = parsed?.tables?.fvar?.axes;
-        if (!axes?.length) return;
+        if (keys.length <= 1) {
+            const res = await fetch(`/api/google-font-github-vf?family=${encodeURIComponent(family)}`);
+            if (res.ok) {
+                const blob = await res.blob();
+                if (blob instanceof Blob && blob.size >= 10_000) {
+                    const buf = await blob.arrayBuffer();
+                    const parsed = await parseFontBuffer(buf, family);
+                    const axes = parsed?.tables?.fvar?.axes;
+                    if (axes?.length) {
+                        const variableAxes = axes.reduce((acc, axis) => {
+                            const tag = normalizeFvarAxisTag(axis.tag);
+                            if (!tag) return acc;
+                            const axisName = axis.name?.en || tag.toUpperCase();
+                            acc[tag] = {
+                                name: axisName,
+                                min: axis.minValue,
+                                max: axis.maxValue,
+                                default: axis.defaultValue,
+                            };
+                            return acc;
+                        }, {});
 
-        const variableAxes = axes.reduce((acc, axis) => {
-            const tag = normalizeFvarAxisTag(axis.tag);
-            if (!tag) return acc;
-            const axisName = axis.name?.en || tag.toUpperCase();
-            acc[tag] = {
-                name: axisName,
-                min: axis.minValue,
-                max: axis.maxValue,
-                default: axis.defaultValue,
-            };
-            return acc;
-        }, {});
+                        font.file = blob;
+                        font.originalName = `${family}.ttf`;
+                        font.googleFontExtraSliceBlobs = undefined;
+                        font.googleFontExtraSliceMeta = undefined;
+                        font.googleFontFirstSliceMeta = undefined;
+                        font.variableAxes = variableAxes;
+                        font.supportedAxes = Object.keys(variableAxes);
+                        font.variationSettings = buildVariationSettingsCssString(variableAxes);
+                        changed = true;
+                    }
+                }
+            }
+        }
 
-        font.file = blob;
-        font.originalName = `${family}.ttf`;
-        font.googleFontExtraSliceBlobs = undefined;
-        font.googleFontExtraSliceMeta = undefined;
-        font.googleFontFirstSliceMeta = undefined;
-        font.variableAxes = variableAxes;
-        font.supportedAxes = Object.keys(variableAxes);
-        font.variationSettings = buildVariationSettingsCssString(variableAxes);
+        const variableAxes = font.variableAxes && typeof font.variableAxes === 'object' ? font.variableAxes : {};
+        font.italicMode = variableAxes.ital ? 'axis-ital' : variableAxes.slnt ? 'axis-slnt' : (font.hasItalicStyles ? 'separate-style' : 'none');
+        font.availableStyles = filterPresetStylesForVariableAxes(variableAxes, undefined, {
+            italicMode: font.italicMode,
+        });
 
-        await saveFont(font);
+        if (font.italicMode === 'separate-style' && font.hasItalicStyles && !(font.googleFontItalicFile instanceof Blob)) {
+            try {
+                const italicRes = await fetch(`/api/google-font-github-vf?family=${encodeURIComponent(family)}&italic=1`);
+                if (italicRes.ok) {
+                    const italicBlob = await italicRes.blob();
+                    if (italicBlob instanceof Blob && italicBlob.size > 10_000) {
+                        font.googleFontItalicFile = italicBlob;
+                        changed = true;
+                    }
+                }
+            } catch (italicError) {
+                console.warn('[DB] enrichGoogleVfAxesFromGithubIfNeeded italic:', family, italicError);
+            }
+        }
+
+        if (changed) {
+            await saveFont(font);
+        }
     } catch (e) {
         console.warn('[DB] enrichGoogleVfAxesFromGithubIfNeeded:', family, e);
     }
@@ -116,6 +144,18 @@ async function loadFontFacesForRestoredFont(font) {
             working.id,
             mainFaceDescriptors,
         );
+
+        if (working.isVariableFont && working.italicMode === 'separate-style' && working.googleFontItalicFile instanceof Blob) {
+            const italicBinary = await working.googleFontItalicFile.arrayBuffer();
+            const italicDescriptors = buildVariableFontFaceDescriptors(working.variableAxes, { style: 'italic' });
+            await loadFontFaceIfNeeded(
+                fontFamilyToLoad,
+                italicBinary,
+                {},
+                `${working.id}-italic`,
+                italicDescriptors,
+            );
+        }
 
         const extraMeta = working.googleFontExtraSliceMeta;
         const extraBlobs = working.googleFontExtraSliceBlobs;

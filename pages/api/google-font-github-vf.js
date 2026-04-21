@@ -15,6 +15,7 @@ export default async function handler(req, res) {
   }
 
   const family = typeof req.query.family === 'string' ? req.query.family.trim() : '';
+  const italic = req.query.italic === '1' || req.query.italic === 'true';
   if (!family) {
     return res.status(400).json({ error: 'Query "family" is required' });
   }
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: 'No axes in metadata' });
     }
     const tags = slim.map((a) => a.tag);
-    const urls = buildGithubVariableTtfCandidateUrls(entry.family, tags);
+    const urls = buildGithubVariableTtfCandidateUrls(entry.family, tags, { italic });
 
     let buf = null;
     for (const url of urls) {
@@ -45,7 +46,11 @@ export default async function handler(req, res) {
     }
 
     if (!buf?.length) {
-      return res.status(404).json({ error: 'Full variable TTF not found on GitHub (google/fonts)' });
+      return res.status(404).json({
+        error: italic
+          ? 'Italic variable TTF not found on GitHub (google/fonts)'
+          : 'Full variable TTF not found on GitHub (google/fonts)',
+      });
     }
 
     res.setHeader('Content-Type', 'font/ttf');

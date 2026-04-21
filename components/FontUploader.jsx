@@ -115,7 +115,7 @@ export default function FontUploader({ onFontsUploaded }) {
   return (
     <div
       {...getRootProps()}
-      className={`p-4 border-2 border-dashed rounded-md transition-all ${
+      className={`p-4 border-2 border-dashed rounded-lg transition-all ${
         isDragActive 
           ? 'border-gray-500 bg-gray-100'
           : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'

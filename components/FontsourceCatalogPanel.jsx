@@ -1,12 +1,19 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'react-toastify';
 import CatalogSessionAddSpinner from './ui/CatalogSessionAddSpinner';
+import { CatalogAddTargetMenu } from './ui/CatalogAddTargetMenu';
 
 function findFontsourceSessionFont(fonts, slug) {
   return fonts.find((f) => f.source === 'fontsource' && f.name === slug);
 }
 
-export default function FontsourceCatalogPanel({ fonts, selectOrAddFontsourceFont }) {
+export default function FontsourceCatalogPanel({
+  fonts,
+  selectOrAddFontsourceFont,
+  fontLibraries = [],
+  onAddFontToLibrary,
+  onRequestCreateLibrary,
+}) {
   const [items, setItems] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [addingSlug, setAddingSlug] = useState(null);
@@ -33,17 +40,22 @@ export default function FontsourceCatalogPanel({ fonts, selectOrAddFontsourceFon
 
   const addFont = useCallback(
     async (slug, label) => {
+      if (findFontsourceSessionFont(fonts, slug)) {
+        return true;
+      }
       setAddingSlug(slug);
       try {
         await selectOrAddFontsourceFont(slug, false);
+        return true;
       } catch (e) {
         console.error('[FontsourceCatalogPanel] add', slug, e);
         toast.error(`Не удалось добавить ${label}`);
+        return false;
       } finally {
         setAddingSlug(null);
       }
     },
-    [selectOrAddFontsourceFont],
+    [fonts, selectOrAddFontsourceFont],
   );
 
   /** До любых return — иначе «Rendered more hooks than during the previous render» */
@@ -89,31 +101,31 @@ export default function FontsourceCatalogPanel({ fonts, selectOrAddFontsourceFon
                 : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100')
             }
           >
-            <button
-              type="button"
-              disabled={busy}
-              aria-busy={busy}
-              aria-label="Добавить в сессию"
-              onClick={() => addFont(slug, label)}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-md border-0 bg-transparent px-2 py-1 text-sm font-normal leading-none text-gray-400 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-100"
-            >
-              <span className="select-none truncate">В сессию</span>
-              {busy ? (
-                <CatalogSessionAddSpinner />
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.6}
-                  className="h-4 w-4 shrink-0"
-                  aria-hidden
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              )}
-            </button>
+            <CatalogAddTargetMenu
+              libraries={fontLibraries}
+              busy={busy}
+              busyIndicator={<CatalogSessionAddSpinner />}
+              onAddToSession={() => addFont(slug, label)}
+              onAddToLibrary={async (libraryId) => {
+                const ok = await addFont(slug, label);
+                if (ok) {
+                  onAddFontToLibrary?.(libraryId, {
+                    id: `fontsource:${slug}`,
+                    label,
+                    source: 'fontsource',
+                  });
+                }
+              }}
+              onCreateLibrary={() =>
+                onRequestCreateLibrary?.([
+                  {
+                    id: `fontsource:${slug}`,
+                    label,
+                    source: 'fontsource',
+                  },
+                ])
+              }
+            />
           </div>
           <div className="font-medium text-sm truncate text-gray-800">{label}</div>
           <div className="mt-2 text-sm text-gray-400 truncate" style={{ fontFamily: 'system-ui, sans-serif' }}>

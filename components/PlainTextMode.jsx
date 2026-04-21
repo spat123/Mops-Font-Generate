@@ -31,7 +31,7 @@ function PlainTextMode({ containerStyle, contentStyle, variant = 'default' }) {
         syncId="plain"
       />
       {!isFullscreen && (
-        <div className="absolute -bottom-1 left-5 text-xs text-gray-400 opacity-50 hover:opacity-100 transition-opacity">
+        <div className="absolute -bottom-1 left-5 text-xs uppercase text-gray-400 opacity-50 hover:opacity-100 transition-opacity">
           Нажмите для редактирования текста
         </div>
       )}

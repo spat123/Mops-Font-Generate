@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Tooltip } from './Tooltip';
 
 /** Привязка к шагу и границам [min, max] */
 export function snapValueToStep(value, min, max, step) {
@@ -243,17 +244,19 @@ export default function DraggableValueRangeSlider({
 
   return (
     <div
-      className="relative flex h-8 w-full items-center variable-font-slider-container"
+      className={`relative flex h-8 w-full items-center variable-font-slider-container ${
+        disabled ? 'pointer-events-none opacity-40' : ''
+      }`.trim()}
+      aria-disabled={disabled || undefined}
       onMouseEnter={() => {
         if (!disabled) setHover(true);
       }}
       onMouseLeave={() => setHover(false)}
     >
-      {/* Фон дорожки — как раньше (серый), не меняется при hover */}
-      <div className="absolute left-0 right-0 z-0 h-1 rounded-full bg-gray-200">
+      <div className="absolute left-0 right-0 top-1/2 z-0 h-1 -translate-y-1/2 transform rounded-full bg-gray-200">
         <div
           className={`absolute top-0 left-0 h-full rounded-full transition-colors duration-200 ease-out ${
-            disabled ? 'bg-gray-400' : hot ? 'bg-accent' : 'bg-black'
+            hot ? 'bg-accent' : 'bg-black'
           }`}
           style={{ width: `${percent}%` }}
         />
@@ -267,7 +270,9 @@ export default function DraggableValueRangeSlider({
         value={value}
         disabled={disabled}
         onChange={handleRangeChange}
-        className="absolute left-0 right-0 z-20 h-5 cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-50"
+        className={`absolute left-0 right-0 z-20 h-5 appearance-none bg-transparent ${
+          disabled ? '' : 'cursor-pointer'
+        }`.trim()}
         style={{ WebkitAppearance: 'none', appearance: 'none' }}
       />
 
@@ -275,13 +280,14 @@ export default function DraggableValueRangeSlider({
         !Number.isNaN(defaultPercent) &&
         defaultMarkerValue !== undefined &&
         defaultMarkerValue !== null && (
-          <button
+          <Tooltip
+            as="button"
             type="button"
             disabled={disabled}
             tabIndex={disabled ? -1 : 0}
             aria-label="Установить значение по умолчанию для оси"
-            title="По умолчанию — нажмите, чтобы применить"
-            className="absolute top-1/2 z-[22] flex h-8 min-w-[18px] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent px-1 hover:bg-yellow-400/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500/70 disabled:cursor-not-allowed disabled:opacity-40"
+            content="По умолчанию — нажмите, чтобы применить"
+            className="absolute top-1/2 z-[22] flex h-6 min-w-[12px] -translate-x-1/2 -translate-y-1/2 transform items-center justify-center rounded-md border-0 bg-transparent px-1 hover:bg-accent/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/10 disabled:opacity-40"
             style={{
               left: `calc(20px + (${defaultPercent} * (100% - 40px) / 100))`,
             }}
@@ -294,22 +300,20 @@ export default function DraggableValueRangeSlider({
             }}
           >
             <span
-              className="pointer-events-none h-3.5 w-1 shrink-0 rounded-full bg-yellow-400"
+              className="pointer-events-none h-3.5 w-1 shrink-0 rounded-full bg-accent"
               aria-hidden
             />
-          </button>
+          </Tooltip>
         )}
 
       <div
-        className={`absolute z-30 flex h-6 w-10 -translate-x-1/2 transform cursor-pointer items-center justify-center rounded-full border-2 border-white text-[0.65rem] font-medium text-white transition-[transform,background-color] duration-200 ease-out hover:scale-110 ${
-          disabled
-            ? 'bg-gray-400'
-            : hot
-              ? active
-                ? 'bg-accent-hover'
-                : 'bg-accent'
-              : 'bg-black'
-        } ${disabled ? 'pointer-events-none opacity-50' : ''}`}
+        className={`absolute top-1/2 z-30 flex h-6 w-10 -translate-x-1/2 -translate-y-1/2 transform cursor-pointer items-center justify-center rounded-full border-2 border-white text-[0.65rem] font-medium text-white transition-[transform,background-color] duration-200 ease-out hover:scale-110 ${
+          hot
+            ? active
+              ? 'bg-accent-hover'
+              : 'bg-accent'
+            : 'bg-black'
+        } ${disabled ? 'pointer-events-none' : ''}`}
         style={{
           left: `calc(20px + (${percent} * (100% - 40px) / 100))`,
         }}
@@ -331,7 +335,7 @@ export default function DraggableValueRangeSlider({
             min={min}
             max={max}
             step={step}
-            className="no-arrows h-6 w-10 appearance-none rounded-full border-0 bg-white px-1 text-center text-[0.65rem] text-accent focus:ring-1 focus:ring-accent/40 focus:outline-none"
+            className="no-arrows h-6 w-10 appearance-none rounded-full border-2 border-accent bg-white px-1 text-center text-[0.65rem] text-accent focus:outline-none"
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={(e) => {

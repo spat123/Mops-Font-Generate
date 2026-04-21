@@ -3,6 +3,8 @@
  * Запрос CSS выполняется на сервере с «браузерным» User-Agent, чтобы в ответе были woff2, а не TTF.
  */
 import { CHROME_UA, buildGoogleFontsCss2Url, parseGoogleFontFacesFromCss } from '../../utils/googleFontsCssShared';
+import { getGoogleFontsMetadataFamilyList } from '../../utils/googleFontsMetadataServer';
+import { resolveGoogleMetadataItalicMode, slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 /**
@@ -47,9 +49,26 @@ export default async function handler(req, res) {
   const wghtMin = req.query.wghtMin;
   const wghtMax = req.query.wghtMax;
 
-  const primaryUrl = buildGoogleFontsCss2Url(family, { variable, weight, italic, wghtMin, wghtMax });
-
   try {
+    let axes;
+    let italicMode;
+    if (variable) {
+      const list = await getGoogleFontsMetadataFamilyList();
+      const entry = list.find((x) => x && x.family === family);
+      axes = entry ? slimGoogleMetadataAxes(entry.axes) : [];
+      italicMode = entry ? resolveGoogleMetadataItalicMode(entry.axes, entry.fonts) : 'none';
+    }
+
+    const primaryUrl = buildGoogleFontsCss2Url(family, {
+      variable,
+      weight,
+      italic,
+      wghtMin,
+      wghtMax,
+      axes,
+      italicMode,
+    });
+
     let result = await fetchWoff2BufferFromGoogleCss(primaryUrl);
 
     /* Многие семейства не вариативные в CSS2 — при ошибке или без woff2 пробуем статический 400. */

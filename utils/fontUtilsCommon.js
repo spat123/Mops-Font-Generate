@@ -27,8 +27,10 @@ export const PRESET_STYLES = [
 /**
  * Есть ли у VF смысл показывать курсивные пресеты (ось ital или реальный slnt).
  * @param {Record<string, { min?: number, max?: number }>|null|undefined} variableAxes
+ * @param {'none'|'axis-ital'|'axis-slnt'|'separate-style'|string|null|undefined} italicMode
  */
-export function variableFontAllowsItalicPresets(variableAxes) {
+export function variableFontAllowsItalicPresets(variableAxes, italicMode) {
+  if (italicMode === 'separate-style') return true;
   if (!variableAxes || typeof variableAxes !== 'object') return false;
   const ital = variableAxes.ital;
   if (ital && typeof ital === 'object') {
@@ -48,8 +50,9 @@ export function variableFontAllowsItalicPresets(variableAxes) {
  * Оставляет только пресеты, совместимые с осями вариативного шрифта (в первую очередь wght).
  * @param {Record<string, { min?: number, max?: number, default?: number }>|null|undefined} variableAxes
  * @param {typeof PRESET_STYLES} [presets]
+ * @param {{ italicMode?: 'none'|'axis-ital'|'axis-slnt'|'separate-style'|string|null }} [options]
  */
-export function filterPresetStylesForVariableAxes(variableAxes, presets = PRESET_STYLES) {
+export function filterPresetStylesForVariableAxes(variableAxes, presets = PRESET_STYLES, options = {}) {
   const list = Array.isArray(presets) ? presets : PRESET_STYLES;
   if (!variableAxes || typeof variableAxes !== 'object') {
     return [...list];
@@ -62,7 +65,7 @@ export function filterPresetStylesForVariableAxes(variableAxes, presets = PRESET
   const lo = hasWght ? Math.min(wMin, wMax) : null;
   const hi = hasWght ? Math.max(wMin, wMax) : null;
 
-  const allowItalic = variableFontAllowsItalicPresets(variableAxes);
+  const allowItalic = variableFontAllowsItalicPresets(variableAxes, options?.italicMode);
 
   const filtered = list.filter((p) => {
     if (!p || typeof p.weight !== 'number') return false;
@@ -82,8 +85,9 @@ export function clampPresetNameForVariableAxes(
   variableAxes,
   hintWeight = 400,
   hintStyle = 'normal',
+  options = {},
 ) {
-  const allowed = filterPresetStylesForVariableAxes(variableAxes);
+  const allowed = filterPresetStylesForVariableAxes(variableAxes, PRESET_STYLES, options);
   if (allowed.some((p) => p.name === presetName)) return presetName;
 
   const w = Number.isFinite(Number(hintWeight)) ? Number(hintWeight) : 400;

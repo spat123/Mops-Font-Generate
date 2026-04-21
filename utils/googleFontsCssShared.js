@@ -7,10 +7,22 @@ export const CHROME_UA =
 
 /**
  * @param {string} family
- * @param {{ variable?: boolean, weight?: string|number, italic?: boolean, wghtMin?: number|string, wghtMax?: number|string, subset?: string }} opts
+ * @param {{
+ *   variable?: boolean,
+ *   weight?: string|number,
+ *   italic?: boolean,
+ *   wghtMin?: number|string,
+ *   wghtMax?: number|string,
+ *   subset?: string,
+ *   axes?: { tag: string, min?: number, max?: number, defaultValue?: number }[],
+ *   italicMode?: 'none'|'axis-ital'|'axis-slnt'|'separate-style'|string,
+ * }} opts
  *   subset — через запятую коды subset (latin,limbu,…), как в Google Fonts CSS2.
  */
-export function buildGoogleFontsCss2Url(family, { variable, weight, italic, wghtMin, wghtMax, subset }) {
+export function buildGoogleFontsCss2Url(
+  family,
+  { variable, weight, italic, wghtMin, wghtMax, subset, axes, italicMode },
+) {
   const name = String(family).trim().replace(/\s+/g, '+');
   const subsetQs =
     typeof subset === 'string' && subset.trim()
@@ -20,15 +32,77 @@ export function buildGoogleFontsCss2Url(family, { variable, weight, italic, wght
           .filter(Boolean)
           .join(',')}`
       : '';
+  const axisList = Array.isArray(axes) ? axes.filter((axis) => axis && typeof axis.tag === 'string') : [];
+  const axisMap = axisList.reduce((acc, axis) => {
+    acc[axis.tag] = axis;
+    return acc;
+  }, {});
+
+  const clampAxisRange = (tag, rawMin, rawMax, fallbackMin, fallbackMax) => {
+    const axis = axisMap[tag];
+    let min = Number.isFinite(Number(rawMin)) ? Number(rawMin) : Number(fallbackMin);
+    let max = Number.isFinite(Number(rawMax)) ? Number(rawMax) : Number(fallbackMax);
+    if (!Number.isFinite(min) && Number.isFinite(max)) min = max;
+    if (!Number.isFinite(max) && Number.isFinite(min)) max = min;
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return [undefined, undefined];
+    if (axis && Number.isFinite(Number(axis.min)) && Number.isFinite(Number(axis.max))) {
+      const axisMin = Math.min(Number(axis.min), Number(axis.max));
+      const axisMax = Math.max(Number(axis.min), Number(axis.max));
+      min = Math.min(axisMax, Math.max(axisMin, min));
+      max = Math.min(axisMax, Math.max(axisMin, max));
+    }
+    if (max < min) max = min;
+    return [min, max];
+  };
+
   if (variable) {
-    const wMin = Number.isFinite(Number(wghtMin))
-      ? Math.max(1, Math.min(1000, Math.round(Number(wghtMin))))
-      : 100;
-    let wMax = Number.isFinite(Number(wghtMax))
-      ? Math.max(1, Math.min(1000, Math.round(Number(wghtMax))))
-      : 1000;
-    if (wMax < wMin) wMax = wMin;
-    return `https://fonts.googleapis.com/css2?family=${name}:ital,wght@0,${wMin}..${wMax};1,${wMin}..${wMax}&display=swap${subsetQs}`;
+    const variableAxes = axisList.filter((axis) => {
+      const min = Number(axis?.min);
+      const max = Number(axis?.max);
+      return Number.isFinite(min) && Number.isFinite(max) && max > min;
+    });
+
+    if (!variableAxes.length) {
+      const w = String(weight || '400');
+      if (italic) {
+        return `https://fonts.googleapis.com/css2?family=${name}:ital,wght@1,${w}&display=swap${subsetQs}`;
+      }
+      return `https://fonts.googleapis.com/css2?family=${name}:wght@${w}&display=swap${subsetQs}`;
+    }
+
+    const axisTags = variableAxes.map((axis) => axis.tag);
+    const includeItalAxis = italicMode === 'axis-ital' && axisTags.includes('ital');
+    const rangeTags = variableAxes
+      .map((axis) => axis.tag)
+      .filter((tag) => tag !== 'ital')
+      .sort((a, b) => a.localeCompare(b));
+    const orderedTags = includeItalAxis ? ['ital', ...rangeTags] : rangeTags;
+
+    const buildRangeToken = (tag) => {
+      if (tag === 'wght') {
+        const [min, max] = clampAxisRange(tag, wghtMin, wghtMax, axisMap.wght?.min ?? 100, axisMap.wght?.max ?? 900);
+        if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+        return `${Math.round(min)}..${Math.round(max)}`;
+      }
+      const axis = axisMap[tag];
+      const [min, max] = clampAxisRange(tag, axis?.min, axis?.max, axis?.min, axis?.max);
+      if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
+      if (Math.round(min) === Math.round(max)) return `${Math.round(min)}`;
+      return `${Math.round(min)}..${Math.round(max)}`;
+    };
+
+    const rangeValues = orderedTags.map((tag) => buildRangeToken(tag));
+    if (rangeValues.some((value) => !value)) {
+      return `https://fonts.googleapis.com/css2?family=${name}&display=swap${subsetQs}`;
+    }
+
+    if (includeItalAxis) {
+      const romanTuple = ['0', ...rangeValues];
+      const italicTuple = ['1', ...rangeValues];
+      return `https://fonts.googleapis.com/css2?family=${name}:${orderedTags.join(',')}@${romanTuple.join(',')};${italicTuple.join(',')}&display=swap${subsetQs}`;
+    }
+
+    return `https://fonts.googleapis.com/css2?family=${name}:${orderedTags.join(',')}@${rangeValues.join(',')}&display=swap${subsetQs}`;
   }
   const w = String(weight || '400');
   if (italic) {

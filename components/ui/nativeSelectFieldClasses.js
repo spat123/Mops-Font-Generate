@@ -13,7 +13,7 @@ export function customSelectTriggerClass({ compact = false, placeholderMuted = f
   return [
     `box-border w-full rounded-md border border-transparent !bg-gray-50 py-0 pl-2 pr-8 text-left uppercase font-semibold text-gray-900 ${sizing}`,
     NATIVE_SELECT_FIELD_INTERACTIVE,
-    'focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30 sm:pl-3',
+    'focus:border-black/[0.14] focus:outline-none sm:pl-3',
     placeholderMuted ? '!text-gray-900/45' : '',
   ]
     .filter(Boolean)

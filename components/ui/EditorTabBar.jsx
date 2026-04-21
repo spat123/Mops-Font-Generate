@@ -1,4 +1,5 @@
 import React from 'react';
+import { Tooltip } from './Tooltip';
 
 const EMPTY_PREFIX = 'empty:';
 
@@ -42,7 +43,7 @@ function labelTextClass(active) {
 
 const LIBRARY_LABEL_BTN = (active) =>
   `flex h-full min-h-0 w-32 min-w-24 flex-1 items-center justify-center bg-transparent text-center text-xs transition-colors ${
-    active ? 'font-semibold text-white' : 'font-medium text-gray-900 hover:text-accent'
+    active ? 'font-semibold text-white' : 'font-semibold text-gray-900 hover:text-accent'
   }`;
 
 /** Неинтерактивная вкладка до прихода данных из IndexedDB (тот же силуэт, что у ClosableEditorTab). */
@@ -51,7 +52,6 @@ function PlaceholderFontTab({ label, maxWClass }) {
     <div
       className={`${tabShellWithClose(false)} ${maxWClass} pointer-events-none select-none opacity-75`.trim()}
       aria-hidden="true"
-      title="Загрузка сессии…"
     >
       <div className={LABEL_CLUSTER_WRAP}>
         <div className={LABEL_CLUSTER}>
@@ -69,7 +69,6 @@ function NewTabSsrFallback() {
     <div
       className={`${tabShellWithClose(false)} max-w-[11rem] editor-new-ssr-fallback`.trim()}
       aria-hidden="true"
-      title="Новый предпросмотр"
     >
       <div className={LABEL_CLUSTER_WRAP}>
         <div className={LABEL_CLUSTER}>
@@ -96,7 +95,7 @@ function ClosableEditorTab({
 }) {
   return (
     <div className={`${tabShellWithClose(active)} ${maxWClass} ${shellExtraClass}`.trim()}>
-      <button type="button" className={HIT_AREA_BTN} onClick={onSelect} title={title} aria-label={ariaTabLabel} />
+      <button type="button" className={HIT_AREA_BTN} onClick={onSelect} aria-label={ariaTabLabel} />
       <div className={LABEL_CLUSTER_WRAP}>
         <div className={LABEL_CLUSTER}>
           <span className={labelTextClass(active)}>{label}</span>
@@ -157,7 +156,6 @@ export function EditorTabBar({
           type="button"
           className={LIBRARY_LABEL_BTN(libActive)}
           onClick={onLibraryClick}
-          title="Каталог и список в сессии"
         >
           <span className="min-w-0 truncate uppercase font-semibold">Все шрифты</span>
         </button>
@@ -208,25 +206,26 @@ export function EditorTabBar({
       <div
         className={`box-border flex ${TAB_ROW} w-12 shrink-0 items-center justify-center ${INACTIVE_TAB_BOTTOM} border-r-0 bg-white`}
       >
-        <button
-          type="button"
-          className="inline-flex shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-1 text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          onClick={onAddEmptySlot}
-          title="Новая пустая вкладка"
-          aria-label="Добавить вкладку «Новый»"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            className="h-4 w-4 shrink-0"
-            aria-hidden
+        <Tooltip content="Новая пустая вкладка">
+          <button
+            type="button"
+            className="inline-flex shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-1 text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            onClick={onAddEmptySlot}
+            aria-label="Добавить вкладку «Новый»"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              className="h-4 w-4 shrink-0"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+        </Tooltip>
       </div>
 
       <div

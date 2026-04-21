@@ -115,9 +115,10 @@ const fontFaceCache = new Map();
  * Дескрипторы FontFace для variable fonts (диапазон веса/ширины), иначе движок может
  * сопоставлять глифы только с «одним» начертанием.
  * @param {Record<string, { min?: number, max?: number }>|null|undefined} variableAxes
+ * @param {FontFaceDescriptors} [extraDescriptors]
  * @returns {FontFaceDescriptors}
  */
-export const buildVariableFontFaceDescriptors = (variableAxes) => {
+export const buildVariableFontFaceDescriptors = (variableAxes, extraDescriptors = {}) => {
   const descriptors = {};
   if (!variableAxes || typeof variableAxes !== 'object') return descriptors;
 
@@ -140,7 +141,10 @@ export const buildVariableFontFaceDescriptors = (variableAxes) => {
     }
   }
 
-  return descriptors;
+  return {
+    ...descriptors,
+    ...(extraDescriptors && typeof extraDescriptors === 'object' ? extraDescriptors : {}),
+  };
 };
 
 /**

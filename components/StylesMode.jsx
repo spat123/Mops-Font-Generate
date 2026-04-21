@@ -59,19 +59,20 @@ function StylesMode({
 }) {
   const { 
     text, setText, 
-    fontSize, 
-    letterSpacing,
+    stylesFontSize,
+    stylesLetterSpacing,
     textColor, 
     backgroundColor,
     previewBackgroundImage,
     textDirection, 
     textAlignment, 
-    textCase 
+    textCase,
+    textDecoration,
   } = useSettings();
 
   if (!selectedFont) return null;
 
-  const letterSpacingValue = `${(letterSpacing / 100) * 0.5}em`;
+  const letterSpacingValue = `${(stylesLetterSpacing / 100) * 0.5}em`;
 
   const hasStaticStyles = selectedFont.availableStyles && selectedFont.availableStyles.length > 1;
   const hasVariableAxes = selectedFont.isVariableFont && selectedFont.variableAxes && Object.keys(selectedFont.variableAxes).length > 0;
@@ -108,7 +109,7 @@ function StylesMode({
                       <EditableText 
                         style={{
                           fontFamily: safeFontFamily,
-                          fontSize: `${fontSize}px`,
+                          fontSize: `${stylesFontSize}px`,
                           fontWeight: style.weight,
                           fontStyle: 'normal',
                           letterSpacing: letterSpacingValue,
@@ -118,6 +119,7 @@ function StylesMode({
                           direction: textDirection,
                           textAlign: textAlignment,
                           textTransform: textCase,
+                          textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
                           whiteSpace: 'nowrap',
                           scrollBehavior: 'auto',
                         }}
@@ -147,7 +149,7 @@ function StylesMode({
                       <EditableText 
                         style={{
                           fontFamily: safeFontFamily,
-                          fontSize: `${fontSize}px`,
+                          fontSize: `${stylesFontSize}px`,
                           fontWeight: style.weight,
                           fontStyle: 'italic',
                           letterSpacing: letterSpacingValue,
@@ -157,6 +159,7 @@ function StylesMode({
                           direction: textDirection,
                           textAlign: textAlignment,
                           textTransform: textCase,
+                          textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
                           whiteSpace: 'nowrap',
                           scrollBehavior: 'auto',
                         }}
@@ -173,7 +176,7 @@ function StylesMode({
       
       {/* Вариативные возможности шрифта */}
       {hasVariableAxes && (
-        <div className="overflow-x-hidden">
+        <div>
 
           {/* Группа Weight стилей */}
           {selectedFont.variableAxes['wght'] !== undefined && (
@@ -189,7 +192,7 @@ function StylesMode({
                     <EditableText 
                       style={{
                         fontFamily: safeFontFamily,
-                        fontSize: `${fontSize}px`,
+                        fontSize: `${stylesFontSize}px`,
                         color: textColor,
                         backgroundColor: bgForStyleCells,
                         letterSpacing: letterSpacingValue,
@@ -228,7 +231,7 @@ function StylesMode({
                     <EditableText 
                       style={{
                         fontFamily: safeFontFamily,
-                        fontSize: `${fontSize}px`,
+                        fontSize: `${stylesFontSize}px`,
                         color: textColor,
                         backgroundColor: bgForStyleCells,
                         letterSpacing: letterSpacingValue,
@@ -270,7 +273,7 @@ function StylesMode({
                         <EditableText 
                           style={{
                             fontFamily: safeFontFamily,
-                            fontSize: `${fontSize}px`,
+                            fontSize: `${stylesFontSize}px`,
                             color: textColor,
                             backgroundColor: bgForStyleCells,
                             letterSpacing: letterSpacingValue,

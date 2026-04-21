@@ -156,7 +156,7 @@ const EditableText = memo(({
   return (
     <div
       ref={contentRef}
-      className={`preview-content ${isStyles ? 'pl-0' : 'pl-8'} editable-sync-${syncId} ${isWaterfall ? 'waterfall-editable outline-none' : ''} ${isStyles ? 'styles-editable outline-none' : ''} ${!isWaterfall && !isStyles ? 'outline-none' : ''}`}
+      className={`preview-content ${isStyles ? 'pl-0' : isWaterfall ? 'pl-6' : 'pl-8'} editable-sync-${syncId} ${isWaterfall ? 'waterfall-editable outline-none' : ''} ${isStyles ? 'styles-editable outline-none' : ''} ${!isWaterfall && !isStyles ? 'outline-none' : ''}`}
       style={{
         ...style,
         ...(extraStyles || {}),

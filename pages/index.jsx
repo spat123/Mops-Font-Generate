@@ -11,12 +11,16 @@ import GoogleFontsCatalogPanel from '../components/GoogleFontsCatalogPanel';
 import FontsourceCatalogPanel from '../components/FontsourceCatalogPanel';
 import { getFormatFromExtension, sessionFontCardPreviewStyle } from '../utils/fontUtilsCommon';
 import { UnderlineTab } from '../components/ui/UnderlineTab';
-import { SessionFontCard } from '../components/ui/SessionFontCard';
+import { SortableFontCardGrid } from '../components/ui/SortableFontCardGrid';
+import { Tooltip } from '../components/ui/Tooltip';
 import { EditorTabBar, EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
-import { CustomSelect } from '../components/ui/CustomSelect';
-import { customSelectTriggerClass } from '../components/ui/nativeSelectFieldClasses';
+import { ScopeFilterToolbar } from '../components/ui/ScopeFilterToolbar';
+import { UploadFromDiskCard } from '../components/ui/UploadFromDiskCard';
 import { updateFontSettings } from '../utils/db';
+import { useFontLibraries } from '../hooks/useFontLibraries';
+import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
+import { getLibrarySourceLabel, sanitizeLibraryFont } from '../utils/fontLibraryUtils';
 import {
   collectPerFontPreviewSnapshot,
   applyPerFontPreviewSnapshot,
@@ -37,6 +41,8 @@ const EDITOR_CLOSED_FONT_TAB_IDS_KEY = 'editorClosedFontTabIds';
 
 /** Внутри экрана «Все шрифты»: «В сессии» | «Все» (каталог). */
 const FONTS_LIBRARY_INNER_TAB_LS_KEY = 'fontsLibraryInnerTab';
+const SAVED_LIBRARY_TAB_PREFIX = 'saved-library:';
+const SESSION_FONT_ORDER_LS_KEY = 'mopsSessionFontOrder';
 
 /** Лёгкий снимок вкладок шрифтов для первого кадра после F5 (пока IndexedDB не отдал blobs). */
 const SESSION_FONT_TABS_PREVIEW_KEY = 'mopsSessionFontTabsPreview';
@@ -95,6 +101,16 @@ const LIBRARY_MAIN_TABS = [
   { id: 'catalog', label: 'Все' },
 ];
 
+function makeSavedLibraryTabId(libraryId) {
+  return `${SAVED_LIBRARY_TAB_PREFIX}${libraryId}`;
+}
+
+function readSavedLibraryId(tabId) {
+  return typeof tabId === 'string' && tabId.startsWith(SAVED_LIBRARY_TAB_PREFIX)
+    ? tabId.slice(SAVED_LIBRARY_TAB_PREFIX.length)
+    : null;
+}
+
 const CATALOG_SOURCE_OPTIONS = [
   { value: 'google', label: 'Google', title: 'Каталог Google Fonts' },
   { value: 'fontsource', label: 'Fontsource', title: 'Каталог Fontsource' },
@@ -108,6 +124,39 @@ const SESSION_FONTS_SCOPE_TABS = [
   { id: 'fontsource', label: 'Fontsource' },
 ];
 
+function countFontsByScope(fonts) {
+  const list = Array.isArray(fonts) ? fonts : [];
+  return {
+    all: list.length,
+    local: list.filter((font) => (font?.source || 'local') === 'local').length,
+    google: list.filter((font) => font?.source === 'google').length,
+    fontsource: list.filter((font) => font?.source === 'fontsource').length,
+  };
+}
+
+function buildScopeSelectOptions(counts) {
+  return SESSION_FONTS_SCOPE_TABS.map((tab) => ({
+    value: tab.id,
+    label: (
+      <span className="flex w-full items-center justify-between gap-3">
+        <span className="truncate">{tab.label}</span>
+        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-50 text-[10px] tabular-nums leading-none text-gray-800 transition-colors group-hover:bg-white group-hover:text-accent">
+          {counts?.[tab.id] ?? 0}
+        </span>
+      </span>
+    ),
+    triggerLabel: tab.label,
+  }));
+}
+
+function ReorderHint({ children }) {
+  return (
+    <div className="pointer-events-auto absolute bottom-0 left-0 text-xs uppercase text-gray-400 opacity-50 transition-opacity hover:opacity-100">
+      {children}
+    </div>
+  );
+}
+
 function fontSourceLabel(font) {
   if (font.source === 'google') return 'Google Font';
   if (font.source === 'fontsource') return 'Fontsource';
@@ -117,15 +166,16 @@ function fontSourceLabel(font) {
 /** Скелетон карточки в «В сессии», пока IndexedDB не вернул шрифты (есть кэш подписей). */
 function SessionFontCardSkeleton({ title }) {
   return (
-    <div
+    <Tooltip
+      as="div"
+      content={title}
       className="relative animate-pulse rounded-lg border border-gray-100 bg-gray-50/90 p-4"
       aria-hidden="true"
-      title={title}
     >
       <div className="h-4 w-2/3 max-w-[12rem] rounded bg-gray-200" />
       <div className="mt-3 h-7 w-full max-w-full rounded bg-gray-200/75" />
       <div className="mt-2 h-3 w-1/2 rounded bg-gray-200/65" />
-    </div>
+    </Tooltip>
   );
 }
 
@@ -140,14 +190,49 @@ export default function Home() {
   const { 
     text, setText, 
     fontSize, setFontSize, 
+    glyphsFontSize, setGlyphsFontSize,
+    stylesFontSize, setStylesFontSize,
     lineHeight, setLineHeight, 
     letterSpacing, setLetterSpacing, 
+    stylesLetterSpacing, setStylesLetterSpacing,
     textColor, setTextColor, 
     backgroundColor, setBackgroundColor, 
     viewMode, setViewMode,
     textDirection, setTextDirection, 
     textAlignment, setTextAlignment, 
     textCase, setTextCase,
+    textDecoration,
+    setTextDecoration,
+    listStyle,
+    setListStyle,
+    textColumns,
+    setTextColumns,
+    textColumnGap,
+    setTextColumnGap,
+    waterfallRows,
+    setWaterfallRows,
+    waterfallBaseSize,
+    setWaterfallBaseSize,
+    waterfallEditTarget,
+    setWaterfallEditTarget,
+    waterfallHeadingPresetName,
+    setWaterfallHeadingPresetName,
+    waterfallBodyPresetName,
+    setWaterfallBodyPresetName,
+    waterfallHeadingLineHeight,
+    setWaterfallHeadingLineHeight,
+    waterfallBodyLineHeight,
+    setWaterfallBodyLineHeight,
+    waterfallHeadingLetterSpacing,
+    setWaterfallHeadingLetterSpacing,
+    waterfallBodyLetterSpacing,
+    setWaterfallBodyLetterSpacing,
+    waterfallScaleRatio,
+    setWaterfallScaleRatio,
+    waterfallUnit,
+    setWaterfallUnit,
+    waterfallRoundPx,
+    setWaterfallRoundPx,
     setTextCenter,
     verticalAlignment,
     setVerticalAlignment,
@@ -178,9 +263,20 @@ export default function Home() {
   const [sessionFontsPanelPreviewFromCache, setSessionFontsPanelPreviewFromCache] = useState([]);
   /** Фильтр карточек в блоке «В сессии» */
   const [sessionFontsScope, setSessionFontsScope] = useState('all'); // 'all' | 'local' | 'google' | 'fontsource'
+  const [savedLibraryFontsScope, setSavedLibraryFontsScope] = useState('all');
+  const [fileUploadTarget, setFileUploadTarget] = useState('session');
+  const [createLibrarySeedRequest, setCreateLibrarySeedRequest] = useState(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [plainPreviewOpen, setPlainPreviewOpen] = useState(false);
+  const {
+    libraries: fontLibraries,
+    createLibrary: createFontLibrary,
+    updateLibrary: updateFontLibrary,
+    deleteLibrary: deleteFontLibrary,
+    reorderLibraries: reorderFontLibraries,
+    reorderLibraryFonts,
+  } = useFontLibraries();
 
   // Используем хук useFontContext вместо useFontManager
   const {
@@ -217,14 +313,33 @@ export default function Home() {
   previewSettingsValuesRef.current = {
     text,
     fontSize,
+    glyphsFontSize,
+    stylesFontSize,
     lineHeight,
     letterSpacing,
+    stylesLetterSpacing,
     textColor,
     backgroundColor,
     viewMode,
     textDirection,
     textAlignment,
     textCase,
+    textDecoration,
+    listStyle,
+    textColumns,
+    textColumnGap,
+    waterfallRows,
+    waterfallBaseSize,
+    waterfallEditTarget,
+    waterfallHeadingPresetName,
+    waterfallBodyPresetName,
+    waterfallHeadingLineHeight,
+    waterfallBodyLineHeight,
+    waterfallHeadingLetterSpacing,
+    waterfallBodyLetterSpacing,
+    waterfallScaleRatio,
+    waterfallUnit,
+    waterfallRoundPx,
     verticalAlignment,
     textFill,
   };
@@ -233,20 +348,41 @@ export default function Home() {
   previewSettersRef.current = {
     setText,
     setFontSize,
+    setGlyphsFontSize,
+    setStylesFontSize,
     setLineHeight,
     setLetterSpacing,
+    setStylesLetterSpacing,
     setTextColor,
     setBackgroundColor,
     setViewMode,
     setTextDirection,
     setTextAlignment,
     setTextCase,
+    setTextDecoration,
+    setListStyle,
+    setTextColumns,
+    setTextColumnGap,
+    setWaterfallRows,
+    setWaterfallBaseSize,
+    setWaterfallEditTarget,
+    setWaterfallHeadingPresetName,
+    setWaterfallBodyPresetName,
+    setWaterfallHeadingLineHeight,
+    setWaterfallBodyLineHeight,
+    setWaterfallHeadingLetterSpacing,
+    setWaterfallBodyLetterSpacing,
+    setWaterfallScaleRatio,
+    setWaterfallUnit,
+    setWaterfallRoundPx,
     setTextCenter,
     setVerticalAlignment,
     setTextFill,
   };
 
   const lastMainTabForPreviewRef = useRef(null);
+  const initialSessionFontOrderIdsRef = useRef([]);
+  const hasAppliedInitialSessionFontOrderRef = useRef(false);
 
   /** После чтения shell из LS — можно безопасно писать mainTab и emptySlotIds обратно. */
   const [hasRestoredEditorMainTab, setHasRestoredEditorMainTab] = useState(false);
@@ -312,8 +448,17 @@ export default function Home() {
 
     try {
       const inner = localStorage.getItem(FONTS_LIBRARY_INNER_TAB_LS_KEY);
-      if (inner === 'session' || inner === 'catalog') {
+      if (inner === 'session' || inner === 'catalog' || inner?.startsWith(SAVED_LIBRARY_TAB_PREFIX)) {
         setFontsLibraryTab(inner);
+      }
+    } catch {
+      /* ignore */
+    }
+    try {
+      const rawOrder = localStorage.getItem(SESSION_FONT_ORDER_LS_KEY);
+      const parsed = rawOrder ? JSON.parse(rawOrder) : [];
+      if (Array.isArray(parsed)) {
+        initialSessionFontOrderIdsRef.current = parsed.filter((id) => typeof id === 'string');
       }
     } catch {
       /* ignore */
@@ -362,6 +507,39 @@ export default function Home() {
       /* ignore quota */
     }
   }, [fontsLibraryTab, hasRestoredEditorMainTab]);
+
+  useEffect(() => {
+    if (fontsLibraryTab === 'session' || fontsLibraryTab === 'catalog') return;
+    const libraryId = readSavedLibraryId(fontsLibraryTab);
+    if (!libraryId || !fontLibraries.some((library) => library.id === libraryId)) {
+      setFontsLibraryTab('session');
+    }
+  }, [fontLibraries, fontsLibraryTab]);
+
+  useEffect(() => {
+    if (!isInitialLoadComplete || hasAppliedInitialSessionFontOrderRef.current) return;
+    if (fonts.length === 0) {
+      hasAppliedInitialSessionFontOrderRef.current = true;
+      return;
+    }
+    const savedOrder = initialSessionFontOrderIdsRef.current;
+    if (savedOrder.length > 0) {
+      const orderedFonts = orderItemsByIdList(fonts, savedOrder);
+      if (!areIdOrdersEqual(fonts, orderedFonts.map((font) => font.id))) {
+        setFonts(orderedFonts);
+      }
+    }
+    hasAppliedInitialSessionFontOrderRef.current = true;
+  }, [fonts, isInitialLoadComplete, setFonts]);
+
+  useEffect(() => {
+    if (!isInitialLoadComplete || typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(SESSION_FONT_ORDER_LS_KEY, JSON.stringify(fonts.map((font) => font.id)));
+    } catch {
+      /* ignore */
+    }
+  }, [fonts, isInitialLoadComplete]);
 
   /** Настройки левой панели / превью — отдельно на каждую вкладку шрифта */
   useEffect(() => {
@@ -414,6 +592,52 @@ export default function Home() {
     if (sessionFontsScope === 'all') return fonts;
     return fonts.filter((f) => f.source === sessionFontsScope);
   }, [fonts, sessionFontsScope]);
+
+  const sessionScopeCounts = useMemo(() => countFontsByScope(fonts), [fonts]);
+  const sessionScopeOptions = useMemo(() => buildScopeSelectOptions(sessionScopeCounts), [sessionScopeCounts]);
+
+  const libraryTabs = useMemo(
+    () => [
+      ...LIBRARY_MAIN_TABS,
+      ...fontLibraries.map((library) => ({
+        id: makeSavedLibraryTabId(library.id),
+        label: library.name,
+      })),
+    ],
+    [fontLibraries],
+  );
+
+  const activeSavedLibrary = useMemo(() => {
+    const libraryId = readSavedLibraryId(fontsLibraryTab);
+    if (!libraryId) return null;
+    return fontLibraries.find((library) => library.id === libraryId) || null;
+  }, [fontLibraries, fontsLibraryTab]);
+
+  const filteredActiveSavedLibraryFonts = useMemo(() => {
+    if (!activeSavedLibrary) return [];
+    if (savedLibraryFontsScope === 'all') return activeSavedLibrary.fonts;
+    return activeSavedLibrary.fonts.filter((font) => (font?.source || 'session') === savedLibraryFontsScope);
+  }, [activeSavedLibrary, savedLibraryFontsScope]);
+
+  const activeSavedLibraryScopeCounts = useMemo(
+    () => countFontsByScope(activeSavedLibrary?.fonts || []),
+    [activeSavedLibrary],
+  );
+  const activeSavedLibraryScopeOptions = useMemo(
+    () => buildScopeSelectOptions(activeSavedLibraryScopeCounts),
+    [activeSavedLibraryScopeCounts],
+  );
+
+  const sessionFontLookup = useMemo(() => {
+    const byLabel = new Map();
+    fonts.forEach((font) => {
+      const keys = [font.displayName, font.name].filter(Boolean);
+      keys.forEach((key) => {
+        byLabel.set(String(key).toLowerCase(), font);
+      });
+    });
+    return byLabel;
+  }, [fonts]);
 
   const fontsVisibleInTabBar = useMemo(
     () => fonts.filter((f) => !closedFontTabIds.includes(f.id)),
@@ -511,6 +735,7 @@ export default function Home() {
       if (added?.id) {
         setClosedFontTabIds((prev) => prev.filter((id) => id !== added.id));
       }
+      return added || null;
     },
     [handleFontsUploaded, mainTab],
   );
@@ -531,6 +756,7 @@ export default function Home() {
       if (added?.id) {
         setClosedFontTabIds((prev) => prev.filter((id) => id !== added.id));
       }
+      return added || null;
     },
     [selectOrAddFontsourceFont, mainTab],
   );
@@ -583,6 +809,24 @@ export default function Home() {
       removeFont(fontId);
     },
     [mainTab, removeFont],
+  );
+
+  const sessionGridItems = useMemo(
+    () =>
+      filteredSessionFonts.map((font) => ({
+        id: font.id,
+        selected: mainTab === font.id,
+        title: font.displayName || font.name,
+        subtitle: fontSourceLabel(font),
+        previewStyle: sessionCardPreviewStyleFor(font),
+        onCardClick: () => {
+          safeSelectFont(font);
+          setClosedFontTabIds((prev) => prev.filter((id) => id !== font.id));
+          setMainTab(font.id);
+        },
+        onRemove: () => removeFontFromSession(font.id),
+      })),
+    [filteredSessionFonts, mainTab, removeFontFromSession, safeSelectFont, sessionCardPreviewStyleFor],
   );
 
   /** Убрать из closed только id удалённых из сессии шрифтов — не при fonts=[] до загрузки IndexedDB (иначе сбрасывается весь список). */
@@ -676,15 +920,42 @@ export default function Home() {
   const handleFileUpload = async (e) => {
     const files = e.target.files;
     if (files.length > 0) {
-      const newFonts = Array.from(files).map((file) => ({
-        file: file,
+      const fileItems = Array.from(files).map((file) => ({
+        file,
         name: file.name,
       }));
-      await handleFontsUploadedWithNav(newFonts);
+
+      if (fileUploadTarget === 'library' && activeSavedLibrary) {
+        const addedLibraryFonts = [];
+
+        for (const item of fileItems) {
+          const added = await handleFontsUploadedWithNav([item]);
+          if (added) {
+            addedLibraryFonts.push({
+              id: `session:${added.id || added.name || added.displayName}`,
+              label: added.displayName || added.name || item.name.replace(/\.[^/.]+$/, ''),
+              source: added.source || 'local',
+            });
+          }
+        }
+
+        if (addedLibraryFonts.length > 0) {
+          const existingIds = new Set((activeSavedLibrary.fonts || []).map((item) => item.id));
+          handleUpdateSavedLibrary(activeSavedLibrary.id, {
+            fonts: [
+              ...activeSavedLibrary.fonts,
+              ...addedLibraryFonts.filter((item) => !existingIds.has(item.id)),
+            ],
+          });
+        }
+      } else {
+        await handleFontsUploadedWithNav(fileItems);
+      }
 
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      setFileUploadTarget('session');
     }
   };
 
@@ -787,6 +1058,99 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
   const closePlainPreview = useCallback(() => setPlainPreviewOpen(false), []);
 
+  const openSavedLibrary = useCallback((libraryId) => {
+    setMainTab('library');
+    setFontsLibraryTab(makeSavedLibraryTabId(libraryId));
+  }, []);
+
+  const handleCreateSavedLibrary = useCallback(
+    (draft) => createFontLibrary(draft),
+    [createFontLibrary],
+  );
+
+  const handleUpdateSavedLibrary = useCallback(
+    (libraryId, draft) => updateFontLibrary(libraryId, draft),
+    [updateFontLibrary],
+  );
+
+  const handleDeleteSavedLibrary = useCallback(
+    (libraryId) => {
+      deleteFontLibrary(libraryId);
+      setFontsLibraryTab((prev) => (prev === makeSavedLibraryTabId(libraryId) ? 'session' : prev));
+    },
+    [deleteFontLibrary],
+  );
+
+  const handleMoveSessionFont = useCallback((draggedId, targetId) => {
+    setFonts((prev) => moveItemById(prev, draggedId, targetId));
+  }, [setFonts]);
+
+  const handleMoveLibraryFont = useCallback(
+    (libraryId, draggedFontId, targetFontId) => {
+      reorderLibraryFonts(libraryId, draggedFontId, targetFontId);
+    },
+    [reorderLibraryFonts],
+  );
+
+  const addFontEntryToLibrary = useCallback(
+    (libraryId, fontEntry) => {
+      const entry = sanitizeLibraryFont(fontEntry);
+      if (!entry) return;
+      const targetLibrary = fontLibraries.find((library) => library.id === libraryId);
+      if (!targetLibrary) return;
+      if (targetLibrary.fonts.some((item) => item.id === entry.id)) return;
+      handleUpdateSavedLibrary(libraryId, {
+        fonts: [...targetLibrary.fonts, entry],
+      });
+    },
+    [fontLibraries, handleUpdateSavedLibrary],
+  );
+
+  const requestCreateLibraryWithFonts = useCallback((selectedFonts) => {
+    setCreateLibrarySeedRequest({
+      requestId:
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `library-seed:${Date.now()}`,
+      selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
+    });
+  }, []);
+
+  const activeSavedLibraryItems = useMemo(() => {
+    if (!activeSavedLibrary) return [];
+    return filteredActiveSavedLibraryFonts.map((font) => {
+      const sessionFont = sessionFontLookup.get(String(font.label || '').toLowerCase()) || null;
+      return {
+        id: font.id,
+        selected: sessionFont ? mainTab === sessionFont.id : false,
+        title: font.label,
+        subtitle: sessionFont
+          ? `${getLibrarySourceLabel(font.source)} · В сессии`
+          : getLibrarySourceLabel(font.source),
+        previewStyle: sessionFont ? sessionCardPreviewStyleFor(sessionFont) : undefined,
+        onCardClick: sessionFont
+          ? () => {
+              safeSelectFont(sessionFont);
+              setClosedFontTabIds((prev) => prev.filter((id) => id !== sessionFont.id));
+              setMainTab(sessionFont.id);
+            }
+          : undefined,
+        onRemove: () =>
+          handleUpdateSavedLibrary(activeSavedLibrary.id, {
+            fonts: activeSavedLibrary.fonts.filter((item) => item.id !== font.id),
+          }),
+      };
+    });
+  }, [
+    activeSavedLibrary,
+    filteredActiveSavedLibraryFonts,
+    handleUpdateSavedLibrary,
+    mainTab,
+    safeSelectFont,
+    sessionCardPreviewStyleFor,
+    sessionFontLookup,
+  ]);
+
   useEffect(() => {
     if (
       mainTab === EDITOR_MAIN_TAB_PENDING ||
@@ -808,55 +1172,56 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     const canGenerate = Boolean(selectedFont.isVariableFont);
     return (
       <>
-        <span
-          className="inline-flex"
-          title={
+        <Tooltip
+          as="span"
+          content={
             canGenerate
-              ? 'Сгенерировать статический файл по текущим осям (VF)'
+              ? 'Статический файл по текущим осям (VF)'
               : 'Доступно только для вариативных шрифтов'
           }
+          className="inline-flex"
         >
           <button
             type="button"
             disabled={!canGenerate}
             onClick={handleGenerateClick}
-            className="inline-flex h-8 w-40.5 shrink-0 items-center justify-center rounded-sm border border-gray-200 bg-white px-3 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9] disabled:cursor-not-allowed disabled:border-gray-50 disabled:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-gray-50 disabled:hover:text-gray-400"
+            className="inline-flex h-8 w-40.5 shrink-0 items-center justify-center rounded-sm border border-gray-200 bg-white px-3 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9] disabled:cursor-default disabled:border-gray-50 disabled:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-gray-50 disabled:hover:text-gray-400"
           >
             Генерация
           </button>
-        </span>
-        <button
-          type="button"
-          onClick={handleExportClick}
-          title="Экспорт CSS: предпросмотр, копирование, скачивание файла"
-          className="inline-flex h-8 w-40.5 shrink-0 items-center justify-center rounded-sm bg-accent px-3 text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover"
-        >
-          Экспорт
-        </button>
-        <div className="flex self-stretch border-l border-gray-200">
+        </Tooltip>
+        <Tooltip content="Копирование, скачивание файла">
           <button
             type="button"
-            onClick={() => setPlainPreviewOpen(true)}
-            title="Полноэкранное превью текста (plain)"
-            aria-label="Полноэкранное превью текста (plain)"
-            className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-0 px-2 text-gray-800 transition-colors hover:text-accent"
+            onClick={handleExportClick}
+            className="inline-flex h-8 w-40.5 shrink-0 items-center justify-center rounded-sm bg-accent px-3 text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover"
+            aria-label="Экспорт CSS: предпросмотр, копирование, скачивание файла"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth={1.5}
-              stroke="currentColor"
-              className="h-4 w-4 shrink-0"
-              aria-hidden
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"
-              />
-            </svg>
+            Экспорт
           </button>
+        </Tooltip>
+        <div className="flex self-stretch border-l border-gray-200">
+          <Tooltip content="Полноэкранное превью" className="h-full">
+            <button
+              type="button"
+              onClick={() => setPlainPreviewOpen(true)}
+              aria-label="Полноэкранное превью текста (plain)"
+              className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-0 px-2 text-gray-800 transition-colors hover:text-accent"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                className="h-4 w-4 shrink-0"
+                aria-hidden
+              >
+                <path
+                  d="M22.75 -0.00195312C23.4404 -0.00195313 24 0.55769 24 1.24805V9.99805C24 10.5503 23.5523 10.998 23 10.998C22.4477 10.998 22 10.5503 22 9.99805V3.41211L3.41406 21.998H10C10.5523 21.998 11 22.4458 11 22.998C11 23.5503 10.5523 23.998 10 23.998H1.25C0.559645 23.998 2.41189e-06 23.4384 0 22.748V14.998C0 14.4458 0.447715 13.998 1 13.998C1.55228 13.998 2 14.4458 2 14.998V20.584L20.5859 1.99805H14C13.4477 1.99805 13 1.55033 13 0.998047C13 0.445762 13.4477 -0.00195312 14 -0.00195312H22.75Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+          </Tooltip>
         </div>
       </>
     );
@@ -901,6 +1266,20 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       <div className="h-screen sticky top-0 left-0">
         <Sidebar
           selectedFont={sidebarSelectedFont}
+          isLibraryTab={mainTab === 'library'}
+          activeLibraryId={activeSavedLibrary?.id || null}
+          fontLibraries={fontLibraries}
+          onOpenFontLibrary={openSavedLibrary}
+          onCreateFontLibrary={handleCreateSavedLibrary}
+          onUpdateFontLibrary={handleUpdateSavedLibrary}
+          onDeleteFontLibrary={handleDeleteSavedLibrary}
+          onReorderFontLibraries={reorderFontLibraries}
+          createLibrarySeedRequest={createLibrarySeedRequest}
+          onCreateLibrarySeedHandled={(requestId) =>
+            setCreateLibrarySeedRequest((prev) =>
+              prev?.requestId === requestId ? null : prev,
+            )
+          }
           setSelectedFont={pickFont}
           handleVariableSettingsChange={handleVariableSettingsChange}
           availableStyles={availableStyles}
@@ -966,8 +1345,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
           {mainTab === 'library' && (
             <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white p-6">
-              <div className="mb-4 flex shrink-0">
-                {LIBRARY_MAIN_TABS.map((tab) => (
+              <div className="mb-4 flex shrink-0 overflow-x-auto border-b border-gray-200">
+                {libraryTabs.map((tab) => (
                   <UnderlineTab
                     key={tab.id}
                     isActive={fontsLibraryTab === tab.id}
@@ -979,65 +1358,39 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               </div>
 
               {fontsLibraryTab === 'session' && (
-                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                  <div className="flex shrink-0 pb-3">
-                    <div className="w-full min-w-0 sm:max-w-[min(100%,18rem)] sm:min-w-[14rem]">
-                      <CustomSelect
-                        id="session-fonts-scope"
-                        value={sessionFontsScope}
-                        onChange={setSessionFontsScope}
-                        className={customSelectTriggerClass()}
-                        aria-label="Показать шрифты в сессии"
-                        options={SESSION_FONTS_SCOPE_TABS.map((t) => ({
-                          value: t.id,
-                          label: t.label,
-                        }))}
-                      />
+                <div className="relative flex min-h-0 flex-1 flex-col">
+                  <ScopeFilterToolbar
+                    id="session-fonts-scope"
+                    value={sessionFontsScope}
+                    onChange={setSessionFontsScope}
+                    options={sessionScopeOptions}
+                    count={sessionScopeCounts[sessionFontsScope] ?? 0}
+                    ariaLabel="Показать шрифты в сессии"
+                  />
+                  <div className="min-h-0 flex-1 pb-10">
+                  {showSessionFontCardSkeletons ? (
+                    <div className="grid max-w-full shrink-0 grid-cols-2 gap-4 pb-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                      {sessionFontsPanelPreviewFromCache.map((row) => (
+                        <SessionFontCardSkeleton key={row.id} title={row.label} />
+                      ))}
                     </div>
-                  </div>
-                  <div className="grid max-w-full shrink-0 grid-cols-2 gap-4 pb-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                    {showSessionFontCardSkeletons
-                      ? sessionFontsPanelPreviewFromCache.map((row) => (
-                          <SessionFontCardSkeleton key={row.id} title={row.label} />
-                        ))
-                      : filteredSessionFonts.map((font) => (
-                          <SessionFontCard
-                            key={font.id}
-                        selected={mainTab === font.id}
-                            title={font.displayName || font.name}
-                            subtitle={fontSourceLabel(font)}
-                            previewStyle={sessionCardPreviewStyleFor(font)}
-                            onCardClick={() => {
-                              safeSelectFont(font);
-                              setClosedFontTabIds((prev) => prev.filter((id) => id !== font.id));
-                              setMainTab(font.id);
+                  ) : (
+                    <SortableFontCardGrid
+                      items={sessionGridItems}
+                      draggable={sessionFontsScope === 'all'}
+                      onMoveItem={handleMoveSessionFont}
+                      renderAfter={
+                        (sessionFontsScope === 'all' || sessionFontsScope === 'local') && (
+                          <UploadFromDiskCard
+                            onClick={() => {
+                              setFileUploadTarget('session');
+                              fileInputRef.current?.click();
                             }}
-                            onRemove={() => removeFontFromSession(font.id)}
                           />
-                        ))}
-
-                    {(sessionFontsScope === 'all' || sessionFontsScope === 'local') && (
-                      <div
-                        className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 p-4 text-center transition-colors duration-200 hover:bg-gray-50"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className="h-5 w-5 text-gray-600"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                          </svg>
-                        </div>
-                        <div className="text-sm font-medium">Загрузить с диска</div>
-                        <div className="mt-1 text-xs text-gray-500">TTF, OTF, WOFF или WOFF2</div>
-                      </div>
-                    )}
-                  </div>
+                        )
+                      }
+                    />
+                  )}
                   {filteredSessionFonts.length === 0 &&
                     !showSessionFontCardSkeletons &&
                     sessionFontsScope !== 'all' &&
@@ -1047,6 +1400,12 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                         добавить шрифт.
                       </p>
                     )}
+                  </div>
+                  {sessionFontsScope === 'all' && filteredSessionFonts.length > 1 && !showSessionFontCardSkeletons ? (
+                    <ReorderHint>
+                      Перетаскивайте карточки, чтобы менять порядок в сессии
+                    </ReorderHint>
+                  ) : null}
                 </div>
               )}
 
@@ -1056,6 +1415,9 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                     <GoogleFontsCatalogPanel
                       fonts={fonts}
                       handleFontsUploaded={handleFontsUploadedWithNav}
+                      fontLibraries={fontLibraries}
+                      onAddFontToLibrary={addFontEntryToLibrary}
+                      onRequestCreateLibrary={requestCreateLibraryWithFonts}
                       trailingToolbar={
                         <SegmentedControl
                           value={catalogSource}
@@ -1084,9 +1446,55 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                       <FontsourceCatalogPanel
                         fonts={fonts}
                         selectOrAddFontsourceFont={selectOrAddFontsourceFontWithNav}
+                        fontLibraries={fontLibraries}
+                        onAddFontToLibrary={addFontEntryToLibrary}
+                        onRequestCreateLibrary={requestCreateLibraryWithFonts}
                       />
                     </div>
                   )}
+                </div>
+              )}
+
+              {activeSavedLibrary && (
+                <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                  <ScopeFilterToolbar
+                    id="saved-library-fonts-scope"
+                    value={savedLibraryFontsScope}
+                    onChange={setSavedLibraryFontsScope}
+                    options={activeSavedLibraryScopeOptions}
+                    count={activeSavedLibraryScopeCounts[savedLibraryFontsScope] ?? 0}
+                    ariaLabel={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
+                  />
+                  <div className="min-h-0 flex-1 pb-10">
+                  {filteredActiveSavedLibraryFonts.length > 0 || savedLibraryFontsScope === 'all' || savedLibraryFontsScope === 'local' ? (
+                    <div>
+                      <SortableFontCardGrid
+                        items={activeSavedLibraryItems}
+                        draggable={savedLibraryFontsScope === 'all'}
+                        onMoveItem={(draggedId, targetId) =>
+                          handleMoveLibraryFont(activeSavedLibrary.id, draggedId, targetId)
+                        }
+                        renderAfter={
+                          (savedLibraryFontsScope === 'all' || savedLibraryFontsScope === 'local') && (
+                            <UploadFromDiskCard
+                              onClick={() => {
+                                setFileUploadTarget('library');
+                                fileInputRef.current?.click();
+                              }}
+                            />
+                          )
+                        }
+                      />
+                    </div>
+                  ) : (
+                    <p className="py-4 text-sm text-gray-500">В этой выборке пока пусто.</p>
+                  )}
+                  </div>
+                  {savedLibraryFontsScope === 'all' && filteredActiveSavedLibraryFonts.length > 1 ? (
+                    <ReorderHint>
+                      Перетаскивайте карточки, чтобы менять порядок в библиотеке.
+                    </ReorderHint>
+                  ) : null}
                 </div>
               )}
             </div>

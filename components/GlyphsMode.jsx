@@ -38,7 +38,7 @@ function GlyphsMode({
   /** Сообщить родителю количество глифов для строки статистики в нижней панели */
   onDisplayableGlyphCountChange,
 }) {
-  const { fontSize } = useSettings();
+  const { glyphsFontSize } = useSettings();
 
   const [scrollParentEl, setScrollParentEl] = useState(null);
   useLayoutEffect(() => {
@@ -177,7 +177,7 @@ function GlyphsMode({
     // Стили для отображения увеличенного глифа в модальном окне
     const largeGlyphStyle = useMemo(() => {
       // Используем fontSize из useSettings вместо selectedFontSize
-      const baseSize = fontSize || 40; // Используем fontSize, fallback 40
+      const baseSize = glyphsFontSize || 40; // Используем glyphsFontSize, fallback 40
       const modalFontSize = Math.max(80, Math.min(200, baseSize * 2.5));
       
       return {
@@ -186,7 +186,7 @@ function GlyphsMode({
         lineHeight: 1,
         ...(glyphDisplayStyle || {}),
       };
-    }, [fontFamily, glyphDisplayStyle, fontSize]);
+    }, [fontFamily, glyphDisplayStyle, glyphsFontSize]);
 
     const copyToClipboard = useCallback((text, type = 'Символ') => {
       if (!text) {
@@ -261,13 +261,13 @@ function GlyphsMode({
           : typeof window !== 'undefined'
             ? Math.max(200, Math.min(1200, window.innerWidth - 140))
             : 560;
-      return computeGlyphSquareGrid(fallbackW, fontSize);
-    }, [glyphGridInnerWidth, fontSize]);
+      return computeGlyphSquareGrid(fallbackW, glyphsFontSize);
+    }, [glyphGridInnerWidth, glyphsFontSize]);
 
     const glyphCellFontPx = useMemo(() => {
       const side = glyphSquareGrid.rowHeightPx;
-      return Math.min(fontSize || 40, Math.max(8, Math.round(side * 0.48)));
-    }, [fontSize, glyphSquareGrid.rowHeightPx]);
+      return Math.min(glyphsFontSize || 40, Math.max(8, Math.round(side * 0.48)));
+    }, [glyphsFontSize, glyphSquareGrid.rowHeightPx]);
 
     const renderGlyphGridItem = useCallback(
       (index) => {
@@ -311,7 +311,6 @@ function GlyphsMode({
           <div
             className="group relative box-border flex h-full min-h-0 cursor-pointer flex-col items-stretch border-r border-b border-gray-200 bg-white transition-shadow duration-100 hover:z-[2] hover:ring-1 hover:ring-inset hover:ring-gray-900"
             onClick={() => setSelectedGlyph(glyph)}
-            title={glyphName}
           >
             <div
               className="flex min-h-0 flex-1 flex-col items-center justify-center p-1 text-center transition-opacity duration-100 group-hover:pointer-events-none group-hover:opacity-0"
@@ -331,10 +330,7 @@ function GlyphsMode({
             </div>
 
             <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col items-center justify-center gap-1 px-1 py-1 opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100">
-              <span
-                className="w-full max-w-full truncate text-center font-mono text-sm font-medium leading-tight text-gray-900"
-                title={glyphName}
-              >
+              <span className="w-full max-w-full truncate text-center font-mono text-sm font-medium leading-tight text-gray-900">
                 {glyphName}
               </span>
               <span className="max-w-full truncate text-center font-mono text-xs leading-tight text-gray-600">
@@ -349,7 +345,7 @@ function GlyphsMode({
                       copyToClipboard(char, 'Символ');
                     }}
                     className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-800 hover:bg-gray-200"
-                    title="Копировать символ"
+                    aria-label="Копировать символ"
                   >
                     Ch
                   </button>
@@ -361,7 +357,7 @@ function GlyphsMode({
                     copyToClipboard(glyphName, 'Имя');
                   }}
                   className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-700 hover:bg-gray-200"
-                    title="Копировать имя (PostScript)"
+                  aria-label="Копировать имя (PostScript)"
                 >
                   Nm
                 </button>
@@ -373,7 +369,7 @@ function GlyphsMode({
                       copyToClipboard(glyphUnicodeStr, 'Unicode');
                     }}
                     className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-700 hover:bg-gray-200"
-                    title="Копировать Unicode"
+                    aria-label="Копировать Unicode"
                   >
                     U+
                   </button>
@@ -494,7 +490,7 @@ function GlyphsMode({
 
                   return (
                       <>
-                          <h3 className="text-xl font-semibold mb-4 text-gray-800 truncate" title={name}>
+                          <h3 className="text-xl font-semibold mb-4 text-gray-800 truncate">
                               Детали глифа: {name}
                           </h3>
                           <div className="text-center mb-6 p-4 bg-gray-50 rounded" style={largeGlyphStyle}>

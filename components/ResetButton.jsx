@@ -2,6 +2,7 @@ import React from 'react';
 import { useFontContext } from '../contexts/FontContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { toast } from 'react-toastify';
+import { Tooltip } from './ui/Tooltip';
 
 function ResetButton({ onResetSelectedFont }) {
   const { resetApplicationState } = useFontContext();
@@ -30,14 +31,16 @@ function ResetButton({ onResetSelectedFont }) {
     : 'Сбросить все настройки приложения и удалить локальные шрифты';
 
   return (
-    <button
+    <Tooltip
+      as="button"
       type="button"
       onClick={handleResetClick}
-      className="w-full h-full text-center text-xs font-medium text-gray-600 uppercase transition-colors hover:bg-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-400/40 focus:ring-offset-1"
-      title={title}
+      className="w-full h-full items-center justify-center text-center text-xs font-medium text-gray-400 uppercase transition-colors hover:bg-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-400/40 focus:ring-offset-1"
+      content={title}
+      aria-label={title}
     >
       {buttonText}
-    </button>
+    </Tooltip>
   );
 }
 

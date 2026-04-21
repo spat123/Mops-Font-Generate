@@ -214,6 +214,9 @@ export function useFontManager() {
         if (axisSource) {
           hintW = axisSource.wght != null ? Number(axisSource.wght) : 400;
           hintStyle = (axisSource.ital === 1 || (axisSource.slnt != null && Number(axisSource.slnt) < 0)) ? 'italic' : 'normal';
+          if (selectedFont.italicMode === 'separate-style') {
+            hintStyle = selectedFont.currentStyle === 'italic' ? 'italic' : 'normal';
+          }
           const matchedPreset = findStyleInfoByWeightAndStyle(hintW, hintStyle);
           if (matchedPreset) candidate = matchedPreset.name;
         } else if (selectedFont.lastUsedPresetName) {
@@ -229,6 +232,7 @@ export function useFontManager() {
           selectedFont.variableAxes,
           hintW,
           hintStyle,
+          { italicMode: selectedFont.italicMode },
         );
         return clamped;
       }
@@ -313,7 +317,9 @@ export function useFontManager() {
 
       // Вариативный: только пресеты, попадающие в диапазон wght (и курсив — если есть ital/slnt)
       if (selectedFont.isVariableFont) {
-          return filterPresetStylesForVariableAxes(selectedFont.variableAxes);
+          return filterPresetStylesForVariableAxes(selectedFont.variableAxes, undefined, {
+            italicMode: selectedFont.italicMode,
+          });
       // Если у шрифта есть поле availableStyles (из Fontsource или локального парсинга)
       } else if (selectedFont.availableStyles && Array.isArray(selectedFont.availableStyles) && selectedFont.availableStyles.length > 0) {
           const isValid = selectedFont.availableStyles.every(

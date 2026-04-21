@@ -17,7 +17,7 @@ export const NativeSelect = forwardRef(function NativeSelect(
         className={[
           /* фон задаётся только через className — иначе bg-transparent/bg-white бьётся с bg-gray-50 в порядке утилит Tailwind */
           'peer native-select-field appearance-none [&::-ms-expand]:hidden',
-          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+          disabled ? 'cursor-default' : 'cursor-pointer',
           className,
         ]
           .filter(Boolean)

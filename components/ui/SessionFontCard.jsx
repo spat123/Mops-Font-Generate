@@ -27,9 +27,17 @@ export function SessionFontCard({
   onRemove,
   variant = 'default',
   previewClassName,
+  shellClassName = '',
+  draggable = false,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }) {
   const base =
-    'relative cursor-pointer rounded-lg bg-surface-card transition-all duration-200 ' +
+    `relative rounded-lg bg-surface-card transition-all duration-200 ${
+      onCardClick ? 'cursor-pointer ' : ''
+    }` +
     (selected
       ? 'bg-accent-soft'
       : 'hover:bg-gray-50');
@@ -37,7 +45,7 @@ export function SessionFontCard({
   const shell =
     variant === 'tall'
       ? `${base} flex min-h-[132px] flex-col p-4`
-      : `${base} p-4`;
+      : `${base} flex h-full flex-col p-4`;
 
   const previewCls =
     previewClassName ||
@@ -45,11 +53,18 @@ export function SessionFontCard({
       ? 'mt-2 min-h-[1.75rem] truncate text-xl leading-tight'
       : 'mt-2 truncate');
 
-  const subCls =
-    variant === 'tall' ? 'mt-auto pt-1 text-xs text-gray-500' : 'mt-1 text-xs text-gray-500';
+  const subCls = 'mt-auto pt-1 text-xs text-gray-500';
 
   return (
-    <div className={shell} onClick={onCardClick}>
+    <div
+      className={`${shell} ${shellClassName}`.trim()}
+      onClick={onCardClick}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+    >
       <div className="truncate text-sm font-medium">{title}</div>
       <div className={previewCls} style={previewStyle}>
         {PREVIEW_SAMPLE}

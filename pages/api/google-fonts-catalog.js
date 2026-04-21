@@ -2,7 +2,7 @@
  * Прокси каталога Google Fonts (metadata) — один раз с сервера, кэш.
  * Источник: https://fonts.google.com/metadata/fonts
  */
-import { slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
+import { resolveGoogleMetadataItalicMode, slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 const SOURCE = 'https://fonts.google.com/metadata/fonts';
@@ -22,10 +22,11 @@ function slimEntry(x) {
   );
   const fontsObj = x.fonts && typeof x.fonts === 'object' && !Array.isArray(x.fonts) ? x.fonts : {};
   const styleKeys = Object.keys(fontsObj);
-  const hasItalic = styleKeys.some((k) => /^\d+i$/.test(k));
+  const hasItalicStyles = styleKeys.some((k) => /^\d+i$/.test(k));
   const subsets = Array.isArray(x.subsets) ? x.subsets.filter((s) => s && s !== 'menu') : [];
   /** Полные оси из metadata — в поднаборах woff2 с gstatic часто в fvar только wght; UI берёт оси отсюда. */
   const axesFull = slimGoogleMetadataAxes(axes);
+  const italicMode = resolveGoogleMetadataItalicMode(axes, fontsObj);
   return {
     family: x.family,
     category: x.category || '',
@@ -37,7 +38,9 @@ function slimEntry(x) {
     axes: axesFull,
     subsets,
     styleCount: styleKeys.length,
-    hasItalic,
+    hasItalic: hasItalicStyles,
+    hasItalicStyles,
+    italicMode,
     primaryScript: typeof x.primaryScript === 'string' ? x.primaryScript : '',
   };
 }

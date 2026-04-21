@@ -236,6 +236,13 @@ export default function FontPreview({
     textDirection, 
     textAlignment, 
     textCase,
+    textDecoration,
+    textColumns,
+    textColumnGap,
+    waterfallRows,
+    waterfallBaseSize,
+    waterfallScaleRatio,
+    waterfallRoundPx,
     verticalAlignment,
     textFill,
     previewBackgroundImage,
@@ -342,6 +349,7 @@ export default function FontPreview({
       direction: textDirection, 
       textAlign: textAlignment, 
       textTransform: textCase, 
+      textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
     };
     
     if (selectedFont?.isVariableFont) {
@@ -349,6 +357,9 @@ export default function FontPreview({
       // иначе при смене осей useMemo fontCssProperties мог отставать и превью «залипало».
       if (variationSettingsValue && variationSettingsValue !== 'normal') {
         styles.fontVariationSettings = variationSettingsValue;
+      }
+      if (fontStyleValue && fontStyleValue !== 'normal') {
+        styles.fontStyle = fontStyleValue;
       }
     } else {
       // Для НЕвариативных шрифтов используем font-weight и font-style
@@ -361,7 +372,7 @@ export default function FontPreview({
     fontFamilyValue, fontSize, letterSpacingValue, fontStyleValue, fontWeightValue, 
     lineHeightValue, textColor, featureSettingsValue, selectedFont,
     variationSettingsValue,
-    textDirection, textAlignment, textCase
+    textDirection, textAlignment, textCase, textDecoration
   ]);
   
   const previewAreaBgStyle = useMemo(
@@ -412,23 +423,34 @@ export default function FontPreview({
           }
         : {
             maxWidth: '100%',
+            ...(Number(textColumns) > 1
+              ? {
+                  columnCount: Number(textColumns),
+                  columnGap: `${Number(textColumnGap) || 24}px`,
+                }
+              : {}),
           }),
     };
-  }, [baseTextStyle, textFill, verticalAlignment, textAlignment]);
+  }, [baseTextStyle, textFill, verticalAlignment, textAlignment, textColumns, textColumnGap]);
 
   const glyphDisplayStyle = useMemo(() => {
     if (selectedFont?.isVariableFont) {
       const fvs =
         variationSettingsValue && variationSettingsValue !== 'normal' ? variationSettingsValue : null;
-      return fvs ? { fontVariationSettings: fvs } : {};
+      return {
+        ...(fvs ? { fontVariationSettings: fvs } : {}),
+        ...(fontStyleValue && fontStyleValue !== 'normal' ? { fontStyle: fontStyleValue } : {}),
+        color: textColor,
+      };
     } else {
       // Для НЕвариативных шрифтов используем font-weight и font-style
       return {
         fontStyle: fontStyleValue,
-        fontWeight: fontWeightValue
+        fontWeight: fontWeightValue,
+        color: textColor,
       };
     }
-  }, [fontStyleValue, fontWeightValue, selectedFont, variationSettingsValue]);
+  }, [fontStyleValue, fontWeightValue, selectedFont, variationSettingsValue, textColor]);
 
   const loadPresetFont = useCallback(async (fontName) => {
     try {
@@ -462,9 +484,34 @@ export default function FontPreview({
   
   const presetFonts = useMemo(() => [...GOOGLE_PRESET_FONT_NAMES], []);
   
-  const waterfallSizes = useMemo(() => {
-    return [160, 144, 128, 112, 96, 80, 72, 64, 56, 48, 40, 36, 32, 28, 24, 20, 18, 16, 14, 12];
-  }, []);
+  const effectiveWaterfallSizes = useMemo(() => {
+    const n = Math.max(1, Math.min(40, Math.round(Number(waterfallRows) || 20)));
+    const ratioRaw = Number(waterfallScaleRatio);
+    const ratio = Number.isFinite(ratioRaw) ? ratioRaw : 1.25;
+    const baseRaw = Number(waterfallBaseSize);
+    const startPx = Number.isFinite(baseRaw) ? Math.max(1, Math.round(baseRaw)) : 160;
+    const roundPx = waterfallRoundPx !== false;
+    const roundTo3 = (x) => Math.round(x * 1000) / 1000;
+    if (ratio <= 1.0001) {
+      const fallback = [
+        160, 144, 128, 112, 96, 80, 72, 64, 56, 48, 40, 36, 32, 28, 24, 20, 18, 16, 14, 12,
+      ];
+      return fallback.slice(0, n);
+    }
+    const out = [];
+    let prev = Infinity;
+    for (let i = 0; i < n; i++) {
+      const pxFloat = startPx / Math.pow(ratio, i);
+      let px = roundPx ? Math.round(pxFloat) : roundTo3(pxFloat);
+      if (!Number.isFinite(px) || px < 0.001) px = roundPx ? 1 : 0.001;
+      if (px >= prev) px = roundPx ? Math.max(1, prev - 1) : Math.max(0.001, prev - 0.001);
+      out.push(px);
+      prev = px;
+      if (prev <= (roundPx ? 1 : 0.001)) break;
+    }
+    while (out.length < n) out.push(roundPx ? 1 : 0.001);
+    return out;
+  }, [waterfallRows, waterfallScaleRatio, waterfallBaseSize, waterfallRoundPx]);
   
   const weightVariations = useMemo(() => {
     return [
@@ -495,7 +542,7 @@ export default function FontPreview({
       case 'text':
         return `символов: ${plainCharCount}`;
       case 'waterfall':
-        return `Рядов: ${waterfallSizes.length}`;
+        return `Рядов: ${effectiveWaterfallSizes.length}`;
       case 'glyphs':
         if (selectedFont?.source === 'google') return 'Глифы недоступны (Google)';
         if (glyphFooterCount === null) return 'Глифы: загрузка…';
@@ -514,7 +561,7 @@ export default function FontPreview({
   }, [
     viewMode,
     plainCharCount,
-    waterfallSizes.length,
+    effectiveWaterfallSizes.length,
     selectedFont?.source,
     glyphFooterCount,
     stylesPreviewStats,
@@ -546,7 +593,7 @@ export default function FontPreview({
     return (
       <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center bg-gray-50">
         <div className="text-center p-8 max-w-md">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Загрузите шрифт для начала работы</h2>
+          <h2 className="text-2xl font-bold uppercase text-gray-900 mb-4">Загрузите шрифт для начала работы</h2>
           <p className="text-gray-600 mb-6">Загрузите TTF, OTF, WOFF или WOFF2 файл шрифта</p>
           <div className="mb-8">
             <FontUploader onFontsUploaded={handleFontsUploaded} />
@@ -560,7 +607,7 @@ export default function FontPreview({
                 key={fontName}
                 onClick={() => loadPresetFont(fontName)}
                 type="button"
-                className="bg-white py-3 px-4 rounded-md border border-gray-200 text-gray-800 shadow-sm transition-all duration-200 hover:border-gray-400 font-sans font-medium"
+                className="bg-white py-3 px-4 rounded-md border border-white text-gray-800 transition-all duration-200 hover:border-gray-400 font-sans font-medium"
               >
                 {fontName}
               </button>
@@ -573,10 +620,10 @@ export default function FontPreview({
 
   return (
     <>
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-white">
+    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-white">
       <div
         ref={previewBodyScrollRef}
-        className="relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto pt-0 pb-4"
+        className="relative min-h-0 w-full flex-1 overflow-y-auto pt-0 pb-4"
         style={previewAreaBgStyle}
       >
         {viewMode === 'plain' && (
@@ -592,7 +639,7 @@ export default function FontPreview({
         {viewMode === 'waterfall' && (
           <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
             <WaterfallMode
-              waterfallSizes={waterfallSizes}
+              waterfallSizes={effectiveWaterfallSizes}
               scrollParentRef={previewBodyScrollRef}
               isVariableFontAnimating={isVariableFontAnimating}
             />
@@ -641,7 +688,7 @@ export default function FontPreview({
       <div className={EDITOR_PREVIEW_BOTTOM_BAR_CLASS}>
         <div className="relative z-20 flex min-w-0 max-w-[42%] shrink-0 items-center bg-white py-0.5 pl-2 pr-2 sm:max-w-[38%]">
           {bottomBarModeHint ? (
-            <span className="truncate text-left text-xs uppercase font-semibold tabular-nums text-gray-800" title={bottomBarModeHint}>
+            <span className="truncate text-left text-xs uppercase font-semibold tabular-nums text-gray-800">
               {bottomBarModeHint}
             </span>
           ) : (
@@ -666,7 +713,7 @@ export default function FontPreview({
               {(selectedFont.variationSettings || selectedFont.isVariableFont) && (
                 <>
                   <span className="text-gray-400"> </span>
-                  <span className="inline-block rounded-full bg-green-100 px-2.5 py-1 text-green-700">
+                  <span className="inline-block rounded-full bg-gray-900 px-2.5 py-1 text-white">
                     VF
                   </span>
                 </>

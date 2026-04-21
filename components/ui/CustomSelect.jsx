@@ -28,6 +28,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
     disabled = false,
     'aria-label': ariaLabel,
     listZIndexClass = 'z-[300]',
+    listMinWidthPx = 120,
   },
   ref,
 ) {
@@ -48,7 +49,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
   );
 
   const displayLabel = useMemo(() => {
-    if (selected) return selected.label;
+    if (selected) return selected.triggerLabel ?? selected.label;
     if (
       placeholder != null &&
       placeholder !== '' &&
@@ -117,7 +118,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
           style={{
             top: pos.top,
             left: pos.left,
-            width: Math.max(pos.width, 120),
+            width: Math.max(pos.width, Number(listMinWidthPx) || 120),
           }}
         >
           {options.map((opt, i) => {
@@ -129,7 +130,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
                 aria-selected={isSelected}
                 style={opt.style}
                 className={[
-                  'break-words cursor-pointer border-b border-gray-200 p-3 text-left text-sm font-semibold uppercase text-gray-900 transition-colors last:border-b-0',
+                  'group break-words cursor-pointer border-b border-gray-200 p-3 text-left text-sm font-semibold uppercase text-gray-900 transition-colors last:border-b-0',
                   'hover:bg-accent hover:text-white',
                   isSelected ? 'bg-accent text-white' : '',
                 ]
@@ -172,7 +173,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
         }}
         className={[
           'peer flex w-full items-center text-left rounded-md',
-          disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+          disabled ? 'cursor-default opacity-60' : 'cursor-pointer',
           className,
         ]
           .filter(Boolean)
@@ -183,7 +184,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
         </span>
       </button>
       <span
-        className="pointer-events-none absolute inset-y-0 right-0 flex w-8 items-center justify-center text-gray-900 transition-colors group-hover:text-white peer-disabled:text-gray-600 peer-disabled:group-hover:text-gray-600"
+        className="pointer-events-none absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-400 transition-colors group-hover:text-gray-800 peer-disabled:text-gray-600 peer-disabled:group-hover:text-gray-600"
         aria-hidden
       >
         <svg
@@ -192,11 +193,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
           fill="currentColor"
           className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
         >
-          <path
-            fillRule="evenodd"
-            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-            clipRule="evenodd"
-          />
+          <path d="M5 7h10l-5 6-5-6z" />
         </svg>
       </span>
       {listNode}

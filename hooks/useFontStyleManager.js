@@ -64,6 +64,7 @@ export function useFontStyleManager(
     // Логика для вариативных шрифтов
     else if (fontToApply.isVariableFont) {
       const currentAxes = fontToApply.variableAxes || {};
+      const italicMode = typeof fontToApply.italicMode === 'string' ? fontToApply.italicMode : 'none';
       // Используем актуальные настройки из variableSettings (переданные в хук)
       const currentFontSettings = variableSettings; 
       const newSettings = { ...currentFontSettings }; // Копируем текущие настройки
@@ -90,14 +91,14 @@ export function useFontStyleManager(
       // Определяем целевое значение 'slnt'. Если стиль 'italic', используем min оси (или -15), иначе default (или 0)
       const targetSlnt = style === 'italic' ? (slantAxis?.min ?? -15) : (slantAxis?.default ?? 0);
 
-      if ('ital' in currentAxes) { // Если есть ось 'ital'
+      if (italicMode === 'axis-ital' && 'ital' in currentAxes) { // Если есть ось 'ital'
         if (newSettings.ital !== targetItal) {
           newSettings.ital = targetItal;
           settingsChanged = true;
           // Если есть 'slnt', удаляем его, т.к. 'ital' имеет приоритет
           if ('slnt' in newSettings) delete newSettings.slnt; 
         }
-      } else if ('slnt' in currentAxes) { // Иначе, если есть ось 'slnt'
+      } else if (italicMode === 'axis-slnt' && 'slnt' in currentAxes) { // Иначе, если есть ось 'slnt'
         if (newSettings.slnt !== targetSlnt) {
           newSettings.slnt = targetSlnt;
           settingsChanged = true;

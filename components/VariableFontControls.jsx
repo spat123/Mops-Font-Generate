@@ -3,6 +3,8 @@ import { useFontContext } from '../contexts/FontContext';
 import { toast } from 'react-toastify';
 import { hasSignificantChanges } from '../utils/cssGenerator';
 import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
+import { SegmentedControl } from './ui/SegmentedControl';
+import { Tooltip } from './ui/Tooltip';
 
 // Функция для обрезания длинного текста и добавления многоточия
 const truncateText = (text, maxLength = 15) => {
@@ -16,9 +18,9 @@ const AXIS_NAME_MAX_LENGTH = 22;
 /** Как кнопки «картинка фона» и «сброс цветов» в сайдбаре (rounded-full, bg-gray-50) */
 const VF_TOOLBAR_BTN_BASE =
   'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors';
-const VF_TOOLBAR_BTN_IDLE = `${VF_TOOLBAR_BTN_BASE} bg-gray-50 text-gray-600 hover:text-accent`;
+const VF_TOOLBAR_BTN_IDLE = `${VF_TOOLBAR_BTN_BASE} bg-gray-50 text-gray-800 hover:text-accent`;
 /** Активное состояние — как выбранное фоновое изображение (bg-accent/15) */
-const VF_TOOLBAR_BTN_ACTIVE = `${VF_TOOLBAR_BTN_BASE} bg-accent/15 text-accent`;
+const VF_TOOLBAR_BTN_ACTIVE = `${VF_TOOLBAR_BTN_BASE} bg-accent text-white hover:text-white`;
 
 export default function VariableFontControls({ font, onSettingsChange, isAnimating = false, toggleAnimation, animationSpeed = 1, setAnimationSpeed }) {
   const [axes, setAxes] = useState([]);
@@ -58,6 +60,9 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     handleVariableSettingsChange,
     variableSettings,
     resetVariableSettings,
+    setSelectedFont,
+    setFonts,
+    saveFontSettings,
   } = useFontContext();
 
   handleVariableSettingsChangeRef.current = handleVariableSettingsChange;
@@ -90,6 +95,47 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       setLocalAnimationSpeed(value);
     }
   }, [setAnimationSpeed]);
+
+  const updateFontStyleState = useCallback((targetStyle) => {
+    const normalizedStyle = targetStyle === 'italic' ? 'italic' : 'normal';
+    const liveWeight =
+      Number.isFinite(Number(settings?.wght))
+        ? Math.round(Number(settings.wght))
+        : Number.isFinite(Number(font?.currentWeight))
+          ? Math.round(Number(font.currentWeight))
+          : Number.isFinite(Number(font?.variableAxes?.wght?.default))
+            ? Math.round(Number(font.variableAxes.wght.default))
+            : 400;
+
+    setSelectedFont((prev) => {
+      if (!prev || prev.id !== font?.id) return prev;
+      return {
+        ...prev,
+        currentStyle: normalizedStyle,
+        currentWeight: liveWeight,
+      };
+    });
+
+    setFonts((currentFonts) => {
+      if (!Array.isArray(currentFonts)) return currentFonts;
+      return currentFonts.map((f) => (
+        f.id === font?.id
+          ? {
+              ...f,
+              currentStyle: normalizedStyle,
+              currentWeight: liveWeight,
+              lastUsedPresetName: null,
+            }
+          : f
+      ));
+    });
+
+    saveFontSettings?.(font?.id, {
+      currentStyle: normalizedStyle,
+      currentWeight: liveWeight,
+      lastUsedPresetName: null,
+    });
+  }, [font, saveFontSettings, setFonts, setSelectedFont, settings]);
   
   // Оптимизированный эффект для загрузки осей шрифта
   useEffect(() => {
@@ -407,6 +453,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     
     // Используем resetVariableSettings из хука для централизованной обработки
     resetVariableSettings();
+    updateFontStyleState('normal');
     
     // Также уведомляем родительский компонент о сбросе настроек
     if (typeof onSettingsChange === 'function') {
@@ -414,12 +461,57 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     }
     
     toast.info('Все настройки сброшены до значений по умолчанию');
-  }, [axes, isAnimating, toggleAnimation, resetVariableSettings, onSettingsChange]);
+  }, [axes, isAnimating, toggleAnimation, resetVariableSettings, onSettingsChange, updateFontStyleState]);
 
   // Мемоизированное значение для проверки наличия осей
   const hasAxes = useMemo(() => axes.length > 0, [axes]);
+  const canShowItalicControl = useMemo(() => {
+    if (!font || !font.isVariableFont) return false;
+    if (font.italicMode === 'axis-ital' || font.italicMode === 'separate-style') {
+      return true;
+    }
+    return font.hasItalicStyles === true && font.italicMode !== 'axis-slnt';
+  }, [font]);
+  const italicControlValue = useMemo(() => {
+    if (!canShowItalicControl) return '0';
+    if (font?.italicMode === 'axis-ital') {
+      return Number(settings?.ital ?? font?.variableAxes?.ital?.default ?? 0) >= 1 ? '1' : '0';
+    }
+    return font?.currentStyle === 'italic' ? '1' : '0';
+  }, [canShowItalicControl, font, settings]);
+  const handleItalicToggle = useCallback((nextValue) => {
+    if (!font || isAnimating) return;
+    const wantsItalic = nextValue === '1';
+    const targetStyle = wantsItalic ? 'italic' : 'normal';
 
-  if (!hasAxes) {
+    if (font.italicMode === 'axis-ital') {
+      const nextSettings = { ...settings, ital: wantsItalic ? 1 : 0 };
+      setSettings(nextSettings);
+      prevSettingsRef.current = { ...nextSettings };
+      isUpdatingFromExternal.current = true;
+      handleVariableSettingsChange(nextSettings, true);
+      onSettingsChangeRef.current?.(nextSettings);
+      updateFontStyleState(targetStyle);
+      return;
+    }
+
+    if (font.italicMode === 'axis-slnt') {
+      const slantAxis = typeof font.variableAxes?.slnt === 'object' ? font.variableAxes.slnt : null;
+      const targetSlnt = wantsItalic ? (slantAxis?.min ?? -10) : (slantAxis?.default ?? 0);
+      const nextSettings = { ...settings, slnt: Math.round(Number(targetSlnt)) };
+      setSettings(nextSettings);
+      prevSettingsRef.current = { ...nextSettings };
+      isUpdatingFromExternal.current = true;
+      handleVariableSettingsChange(nextSettings, true);
+      onSettingsChangeRef.current?.(nextSettings);
+      updateFontStyleState(targetStyle);
+      return;
+    }
+
+    updateFontStyleState(targetStyle);
+  }, [font, handleVariableSettingsChange, isAnimating, settings, updateFontStyleState]);
+
+  if (!hasAxes && !canShowItalicControl) {
     return (
       <div className="text-sm text-gray-500 p-4 border border-gray-200 rounded-md bg-white text-center">
         Шрифт не имеет вариативных осей
@@ -432,56 +524,85 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
         <h2 className="min-w-0 shrink uppercase font-semibold text-sm text-gray-900">Variable Axes</h2>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            className={isAnimating ? VF_TOOLBAR_BTN_ACTIVE : VF_TOOLBAR_BTN_IDLE}
-            onClick={toggleAnimation}
-            title={isAnimating ? 'Остановить анимацию' : 'Воспроизвести анимацию'}
-          >
-            {isAnimating ? (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-              </svg>
-            )}
-          </button>
+          <Tooltip content={isAnimating ? 'Остановить анимацию' : 'Воспроизвести анимацию'}>
+            <button
+              type="button"
+              className={isAnimating ? VF_TOOLBAR_BTN_ACTIVE : VF_TOOLBAR_BTN_IDLE}
+              onClick={toggleAnimation}
+              aria-label={isAnimating ? 'Остановить анимацию' : 'Воспроизвести анимацию'}
+            >
+              {isAnimating ? (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                </svg>
+              )}
+            </button>
+          </Tooltip>
 
-          <button
-            type="button"
-            className={`${VF_TOOLBAR_BTN_IDLE} relative group`}
-            onClick={handleResetAll}
-            title="Сбросить все настройки"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-4 w-4">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-            </svg>
-            <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-              Сбросить все оси
-            </span>
-          </button>
+          <Tooltip content="Сбросить все оси">
+            <button
+              type="button"
+              className={VF_TOOLBAR_BTN_IDLE}
+              onClick={handleResetAll}
+              aria-label="Сбросить все оси"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden
+              >
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+              </svg>
+            </button>
+          </Tooltip>
         </div>
       </div>
 
-      <div className="mb-3.5">
-        <div className="mb-0.5">
-          <p className="text-xs font-medium text-gray-600">Скорость анимации</p>
-          <p className="mt-0.5 text-[0.65rem] leading-snug text-gray-500">
-          </p>
-        </div>
-        <div className="variable-font-slider-container">
-          <DraggableValueRangeSlider
-            min={0.1}
-            max={5}
-            step={0.1}
-            value={Math.min(5, Math.max(0.1, Number(effectiveAnimationSpeed) || 1))}
-            onChange={handleAnimationSpeedChange}
-            formatDisplay={(v) => Number(v).toFixed(1)}
+      {canShowItalicControl ? (
+        <div className="mb-3.5">
+          <SegmentedControl
+            variant="surface"
+            value={italicControlValue}
+            onChange={handleItalicToggle}
+            disabled={isAnimating}
+            options={[
+              { value: '0', label: 'Roman', title: 'Roman (0)' },
+              { value: '1', label: 'Italic', title: 'Italic (1)' },
+            ]}
           />
         </div>
-      </div>
+      ) : null}
+
+      {hasAxes ? (
+        <div className="mb-3.5">
+          <div className="mb-0.5">
+            <p className="text-xs font-medium text-gray-600">Скорость анимации</p>
+            <p className="mt-0.5 text-[0.65rem] leading-snug text-gray-500">
+            </p>
+          </div>
+          <div className="variable-font-slider-container">
+            <DraggableValueRangeSlider
+              min={0.1}
+              max={5}
+              step={0.1}
+              value={Math.min(5, Math.max(0.1, Number(effectiveAnimationSpeed) || 1))}
+              onChange={handleAnimationSpeedChange}
+              formatDisplay={(v) => Number(v).toFixed(1)}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {axes.map(axis => {
         const value = settings[axis.tag] !== undefined ? settings[axis.tag] : axis.default;
@@ -498,24 +619,27 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
           <div key={axis.tag} className="mb-3.5">
             <div className="flex justify-between mb-0.5">
               <div className="text-[0.75rem] font-medium text-gray-600 flex items-center h-5 max-w-[80%] hover:text-gray-950 transition-colors">
-                <span className="truncate mr-1" title={axisName}>{truncatedName}</span>
+                <Tooltip content={axisName} className="min-w-0">
+                  <span className="truncate mr-1">{truncatedName}</span>
+                </Tooltip>
                 <span className="text-[0.7rem] font-normal text-gray-500 px-0.5 py-px rounded-sm whitespace-nowrap flex-shrink-0 leading-tight">({axis.tag})</span>
               </div>
-              <button 
-                className={`text-gray-400 hover:text-accent w-4 h-4 flex items-center justify-center ${isAnimating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={() => {
-                  if (!isAnimating) {
-                    // Сбрасываем только эту ось к дефолтному значению
-                    handleSliderChange(axis.tag, axis.default);
-                  }
-                }}
-                title="Сбросить к значению по умолчанию"
-                disabled={isAnimating}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-2.5 h-2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                </svg>
-              </button>
+              <Tooltip content="Сбросить к значению по умолчанию">
+                <button 
+                  className={`text-gray-800 hover:text-accent w-4 h-4 flex items-center justify-center ${isAnimating ? 'opacity-50 cursor-default' : ''}`}
+                  onClick={() => {
+                    if (!isAnimating) {
+                      handleSliderChange(axis.tag, axis.default);
+                    }
+                  }}
+                  disabled={isAnimating}
+                  aria-label="Сбросить к значению по умолчанию"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                  </svg>
+                </button>
+              </Tooltip>
             </div>
             
             <DraggableValueRangeSlider

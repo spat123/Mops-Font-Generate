@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { Tooltip } from './ui/Tooltip';
 
 const CSSModal = ({ isOpen, onClose, cssCode, fontName }) => {
   const textareaRef = useRef(null);
@@ -89,12 +90,11 @@ const CSSModal = ({ isOpen, onClose, cssCode, fontName }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900 truncate max-w-[calc(100%-2rem)] group relative" title={fontName ? `CSS код для шрифта: ${fontName}` : 'CSS код для шрифта'}>
-            <span className="truncate inline-block">CSS код для шрифта{fontName ? `: ${fontName}` : ''}</span>
-            <span className="invisible group-hover:visible absolute left-0 -bottom-1 text-xs text-gray-500 whitespace-normal">
-              {fontName && fontName.length > 20 ? fontName : ''}
-            </span>
-          </h3>
+          <Tooltip content={fontName ? `CSS код для шрифта: ${fontName}` : 'CSS код для шрифта'} maxWidthClass="max-w-[28rem]">
+            <h3 className="text-lg font-medium text-gray-900 truncate max-w-[calc(100%-2rem)]">
+              <span className="truncate inline-block">CSS код для шрифта{fontName ? `: ${fontName}` : ''}</span>
+            </h3>
+          </Tooltip>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 focus:outline-none hover:bg-gray-100 p-1 rounded-full transition-colors"
