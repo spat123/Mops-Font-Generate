@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 
 export function CatalogFontCard({
   busy = false,
@@ -17,7 +17,12 @@ export function CatalogFontCard({
   onPointerUp,
   onPointerLeave,
   onPointerCancel,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
 }) {
+  const [showHoverUi, setShowHoverUi] = useState(false);
+  const rootRef = useRef(null);
   const rootClassName = [
     'group relative flex flex-col rounded-lg bg-surface-card p-4 select-none transition-colors duration-100 hover:bg-gray-50',
     minHeightClass,
@@ -26,25 +31,81 @@ export function CatalogFontCard({
     .filter(Boolean)
     .join(' ');
 
+  const showInteractiveUi = busy || showHoverUi;
   const actionsClassName =
-    'absolute right-2 top-2 z-30 max-w-[min(100%,12rem)] transition-opacity duration-100 ' +
-    (busy
-      ? 'pointer-events-auto opacity-100'
-      : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100');
+    'absolute right-2 top-2 z-30 max-w-[min(100%,12rem)] transition-opacity duration-75 ' +
+    (showInteractiveUi ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0');
+
+  const handlePointerEnter = useCallback(() => {
+    setShowHoverUi(true);
+  }, []);
+
+  const handlePointerLeave = useCallback(
+    (event) => {
+      setShowHoverUi(false);
+      onPointerLeave?.(event);
+    },
+    [onPointerLeave],
+  );
+
+  const handlePointerCancel = useCallback(
+    (event) => {
+      setShowHoverUi(false);
+      onPointerCancel?.(event);
+    },
+    [onPointerCancel],
+  );
+
+  const handleFocusCapture = useCallback(() => {
+    setShowHoverUi(true);
+  }, []);
+
+  const handleBlurCapture = useCallback((event) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    setShowHoverUi(false);
+  }, []);
+
+  const handleRequestCloseHoverUi = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.requestAnimationFrame(() => {
+      const rootNode = rootRef.current;
+      if (!rootNode) return;
+      const focusInside =
+        typeof document !== 'undefined' ? rootNode.contains(document.activeElement) : false;
+      if (rootNode.matches(':hover') || focusInside) return;
+      setShowHoverUi(false);
+    });
+  }, []);
+
+  const resolvedHoverOverlay =
+    hoverOverlay && React.isValidElement(hoverOverlay)
+      ? React.cloneElement(hoverOverlay, {
+          onRequestCloseHoverUi: handleRequestCloseHoverUi,
+        })
+      : hoverOverlay;
 
   return (
     <div
+      ref={rootRef}
       className={rootClassName}
       onClick={onClick}
+      onPointerEnter={handlePointerEnter}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
-      onPointerLeave={onPointerLeave}
-      onPointerCancel={onPointerCancel}
+      onPointerLeave={handlePointerLeave}
+      onPointerCancel={handlePointerCancel}
+      onFocusCapture={handleFocusCapture}
+      onBlurCapture={handleBlurCapture}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
     >
-      <div className={actionsClassName}>{actions}</div>
-      {hoverOverlay && !selected ? (
-        <div className="pointer-events-none absolute -inset-1 z-20 opacity-0 transition-opacity duration-100 group-hover:opacity-100 focus-within:opacity-100">
-          {hoverOverlay}
+      {actions && (showInteractiveUi || selected) ? (
+        <div className={actionsClassName}>{actions}</div>
+      ) : null}
+      {resolvedHoverOverlay && !selected && showHoverUi ? (
+        <div className="pointer-events-none absolute -inset-1 z-20 opacity-100 transition-opacity duration-75">
+          {resolvedHoverOverlay}
         </div>
       ) : null}
       {selected ? (

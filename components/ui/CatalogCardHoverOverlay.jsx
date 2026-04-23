@@ -24,12 +24,31 @@ function OpenInEditorIcon() {
 export function CatalogCardHoverOverlay({
   centered = false,
   onOpen,
+  onRequestCloseHoverUi,
   openAriaLabel,
   openLabel = 'Открыть',
   downloadButtonProps,
 }) {
   const resolvedDownloadButtonProps =
     downloadButtonProps && typeof downloadButtonProps === 'object' ? downloadButtonProps : {};
+  const rowDownloadItems = (
+    Array.isArray(resolvedDownloadButtonProps.menuItems) ? resolvedDownloadButtonProps.menuItems : []
+  )
+    .filter((item) => !item?.hidden)
+    .map((item) => ({
+      key: item.key,
+      label:
+        item.key === 'zip'
+          ? 'ZIP'
+          : item.key === 'variable'
+            ? 'VF'
+            : String(item.label || '')
+                .replace(/\s*\(.*?\)\s*/g, '')
+                .trim()
+                .toUpperCase(),
+      onSelect: item.onSelect,
+      disabled: item.disabled,
+    }));
 
   const openButton = (
     <button
@@ -39,7 +58,7 @@ export function CatalogCardHoverOverlay({
         event.stopPropagation();
         onOpen?.();
       }}
-      className="inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white/95 px-2 text-[11px] uppercase font-semibold text-gray-800 transition-colors hover:bg-white"
+      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white"
       aria-label={openAriaLabel}
     >
       <OpenInEditorIcon />
@@ -47,13 +66,46 @@ export function CatalogCardHoverOverlay({
     </button>
   );
 
-  const downloadButton = <CatalogDownloadSplitButton className="w-auto" {...resolvedDownloadButtonProps} />;
+  const downloadButton = (
+    <CatalogDownloadSplitButton
+      className="w-auto"
+      onActionComplete={onRequestCloseHoverUi}
+      {...resolvedDownloadButtonProps}
+    />
+  );
 
   return centered ? (
-    <div className="flex h-full w-full items-center justify-center">
-      <div className="pointer-events-auto flex items-center gap-3">
-        {openButton}
-        {downloadButton}
+    <div className="relative h-full w-full">
+      <div className="pointer-events-auto absolute bottom-4 right-4 flex max-w-[calc(100%-1rem)] flex-wrap justify-end gap-1.5">
+        <button
+          type="button"
+          data-no-card-select="true"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen?.();
+          }}
+          className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white"
+          aria-label={openAriaLabel}
+        >
+          <OpenInEditorIcon />
+          {openLabel}
+        </button>
+        {rowDownloadItems.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            data-no-card-select="true"
+            disabled={item.disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              item.onSelect?.();
+              onRequestCloseHoverUi?.();
+            }}
+            className="inline-flex h-8 items-center rounded-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-50"
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
     </div>
   ) : (

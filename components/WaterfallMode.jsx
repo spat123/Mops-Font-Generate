@@ -4,6 +4,7 @@ import { useFontContext } from '../contexts/FontContext';
 import EditableText from './EditableText';
 import { VirtualizedVariableList } from './ui/VirtualizedVariableList';
 import { FloatingTooltip } from './ui/Tooltip';
+import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 import { PRESET_STYLES, clampPresetNameForVariableAxes } from '../utils/fontUtilsCommon';
 
 // Fallback, если родитель не передал массив (должен совпадать с FontPreview.waterfallSizes)
@@ -379,7 +380,7 @@ const WaterfallMode = ({
         <FloatingTooltip content="Скопировано" anchorRect={copyToast.anchorRect} side="top" />
       ) : null}
       <div
-        className="w-full min-w-0"
+        className="relative min-h-full w-full min-w-0 pb-8 pr-8 pt-0"
         style={{
           backgroundColor: previewBackgroundImage ? 'transparent' : (backgroundColor ?? undefined),
         }}
@@ -390,6 +391,7 @@ const WaterfallMode = ({
           renderItem={renderItem}
           overscanPx={96}
         />
+        <PreviewEditTextHint />
       </div>
     </>
   );

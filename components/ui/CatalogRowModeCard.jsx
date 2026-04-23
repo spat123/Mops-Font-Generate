@@ -18,6 +18,9 @@ export function CatalogRowModeCard({
   onPointerUp,
   onPointerLeave,
   onPointerCancel,
+  draggable = false,
+  onDragStart,
+  onDragEnd,
 }) {
   const resolvedPreviewProps = previewProps && typeof previewProps === 'object' ? previewProps : {};
   const { className: previewClassName = '', ...restPreviewProps } = resolvedPreviewProps;
@@ -36,6 +39,9 @@ export function CatalogRowModeCard({
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
       onPointerCancel={onPointerCancel}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       title={<CatalogRowHeader family={family} metaItems={metaItems} />}
       titleClassName="w-full"
       preview={

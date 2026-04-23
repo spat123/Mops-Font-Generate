@@ -5,6 +5,7 @@ export function useCatalogToolbarLayout({
   gridGapPx = 16,
   gridColsResolver,
   autoMeasureGridWidth = false,
+  enabled = true,
 }) {
   const [gridInnerWidth, setGridInnerWidth] = useState(null);
   const [catalogScrollEl, setCatalogScrollEl] = useState(null);
@@ -15,10 +16,12 @@ export function useCatalogToolbarLayout({
   const [trailingToolbarW, setTrailingToolbarW] = useState(0);
 
   useLayoutEffect(() => {
+    if (!enabled) return undefined;
+    setViewportW(window.innerWidth);
     const onResize = () => setViewportW(window.innerWidth);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [enabled]);
 
   const setCatalogScrollContainer = useCallback((node) => {
     setCatalogScrollEl(node instanceof HTMLElement ? node : null);
@@ -29,7 +32,7 @@ export function useCatalogToolbarLayout({
   }, []);
 
   useLayoutEffect(() => {
-    if (!autoMeasureGridWidth) {
+    if (!enabled || !autoMeasureGridWidth) {
       setGridInnerWidth(null);
       return undefined;
     }
@@ -47,10 +50,10 @@ export function useCatalogToolbarLayout({
     const ro = new ResizeObserver(() => measure());
     ro.observe(catalogScrollEl);
     return () => ro.disconnect();
-  }, [autoMeasureGridWidth, catalogScrollEl]);
+  }, [autoMeasureGridWidth, catalogScrollEl, enabled]);
 
   useLayoutEffect(() => {
-    if (!trailingToolbarEl) {
+    if (!enabled || !trailingToolbarEl) {
       setTrailingToolbarW(0);
       return undefined;
     }
@@ -63,7 +66,7 @@ export function useCatalogToolbarLayout({
     const ro = new ResizeObserver(() => measure());
     ro.observe(trailingToolbarEl);
     return () => ro.disconnect();
-  }, [trailingToolbarEl]);
+  }, [enabled, trailingToolbarEl]);
 
   const gridCols = useMemo(() => {
     if (typeof gridColsResolver === 'function') return gridColsResolver(viewportW);

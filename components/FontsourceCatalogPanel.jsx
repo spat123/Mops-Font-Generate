@@ -1,29 +1,21 @@
 ﻿import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from '../utils/appNotify';
-import CatalogSessionAddSpinner from './ui/CatalogSessionAddSpinner';
-import { CatalogLibraryActions } from './ui/CatalogLibraryActions';
-import { CatalogFontCard } from './ui/CatalogFontCard';
 import { CustomSelect } from './ui/CustomSelect';
 import {
   NATIVE_SELECT_FIELD_INTERACTIVE,
   customSelectTriggerClass,
 } from './ui/nativeSelectFieldClasses';
-import { Tooltip } from './ui/Tooltip';
 import { CatalogTopToolbar } from './ui/CatalogTopToolbar';
-import { CatalogDownloadSplitButton } from './ui/CatalogDownloadSplitButton';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { CatalogSearchField } from './ui/CatalogSearchField';
 import { CatalogSearchButton } from './ui/CatalogSearchButton';
 import { CatalogTextSortControls } from './ui/CatalogTextSortControls';
 import { CatalogGridModeToggle } from './ui/CatalogGridModeToggle';
-import { CatalogRowModeCard } from './ui/CatalogRowModeCard';
-import { CatalogCardHoverOverlay } from './ui/CatalogCardHoverOverlay';
+import { CatalogCheckboxControl } from './ui/CatalogCheckbox';
+import { FontsourceCatalogCard } from './ui/FontsourceCatalogCard';
 import { useCatalogToolbarLayout } from './ui/useCatalogToolbarLayout';
 import { matchesSearch } from '../utils/searchMatching';
-import {
-  createCatalogLibraryEntry,
-  isFontsourceFontInSession,
-} from '../utils/fontLibraryUtils';
+import { isFontsourceFontInSession } from '../utils/fontLibraryUtils';
 import {
   readFontsourceCatalogCache,
   writeFontsourceCatalogCache,
@@ -34,9 +26,17 @@ import {
   hasFontsourcePreviewFamily,
   loadFontsourcePreviewFamily,
 } from '../utils/fontsourcePreviewRuntimeCache';
+import {
+  compareFontCategoryLabelsRu,
+  getFontCategoryLabelRu,
+} from '../utils/fontCategoryLabels';
+import {
+  buildGroupedFontSubsetOptions,
+  getFontSubsetLabelRu,
+} from '../utils/fontSubsetLabels';
 import { base64ToArrayBuffer } from '../utils/fontManagerUtils';
-import { processLocalFont } from '../utils/localFontProcessor';
 import { createZipBlob } from '../utils/zipUtils';
+import { writeLibraryFontDragData } from '../utils/libraryDragData';
 
 const { startTransition } = React;
 
@@ -44,6 +44,7 @@ const PREVIEW_TEXT = 'AaBbCcDdEe';
 const PREVIEW_CONCURRENCY_LIMIT = 3;
 const CARD_LONG_PRESS_MS = 220;
 const MIN_LOADER_VISIBLE_MS = 900;
+const FONTSOURCE_ADD_CATALOG_STICKY_MS = MIN_LOADER_VISIBLE_MS + 1300;
 const GRID_GAP_PX = 16;
 const CHUNKED_RENDER_THRESHOLD = 80;
 const CHUNKED_INITIAL_ROWS = 2;
@@ -98,15 +99,6 @@ function isInteractiveTarget(target) {
   );
 }
 
-function pluralRu(n, one, few, many) {
-  const abs = Math.abs(Number(n));
-  const mod10 = abs % 10;
-  const mod100 = abs % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return few;
-  return many;
-}
-
 function normalizeDirectFontsourceRow(row) {
   if (!row || typeof row !== 'object') return null;
   const id = String(row.id || '').trim();
@@ -151,11 +143,10 @@ function FontsourceCatalogEmptyLoader() {
 
 export default function FontsourceCatalogPanel({
   fonts,
-  selectOrAddFontsourceFont,
   fontLibraries = [],
   onAddFontToLibrary,
   onRequestCreateLibrary,
-  onOpenInEditor,
+  onOpenFontsourceInEditorTab,
   trailingToolbar = null,
   isActive = true,
   onSelectionActionsChange,
@@ -172,14 +163,16 @@ export default function FontsourceCatalogPanel({
     gridGapPx: GRID_GAP_PX,
     gridColsResolver: fontsourceCatalogGridCols,
     autoMeasureGridWidth: true,
+    enabled: isActive,
   });
   const [items, setItems] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [addingSlug, setAddingSlug] = useState(null);
+  const [recentlyAddedSlugs, setRecentlyAddedSlugs] = useState(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterSubset, setFilterSubset] = useState('');
+  const [filterSubset, setFilterSubset] = useState([]);
   const [filterVariable, setFilterVariable] = useState('all');
   const [filterItalicOnly, setFilterItalicOnly] = useState(false);
   const [gridViewMode, setGridViewMode] = useState('grid');
@@ -190,25 +183,84 @@ export default function FontsourceCatalogPanel({
   const [areCardsVisible, setAreCardsVisible] = useState(false);
   const [visibleCardsCount, setVisibleCardsCount] = useState(0);
 
+  const handleDragStart = useCallback((event, item) => {
+    if (isInteractiveTarget(event.target)) {
+      event.preventDefault();
+      return;
+    }
+    const libraryEntry = {
+      id: `fontsource:${item?.id || item?.slug || ''}`,
+      label: item?.family || item?.label || item?.id || item?.slug || '',
+      source: 'fontsource',
+    };
+    const wrote = writeLibraryFontDragData(event.dataTransfer, libraryEntry);
+    if (!wrote) {
+      event.preventDefault();
+    }
+  }, []);
+
   useEffect(() => {
     onTotalItemsChange?.(items.length);
   }, [items, onTotalItemsChange]);
 
+  useEffect(() => {
+    return () => {
+      recentAddedSlugTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+      recentAddedSlugTimersRef.current.clear();
+    };
+  }, []);
+
+  const markSlugRecentlyAdded = useCallback((slug, stickyMs = MIN_LOADER_VISIBLE_MS) => {
+    if (!slug) return;
+    setRecentlyAddedSlugs((prev) => {
+      const next = new Set(prev);
+      next.add(slug);
+      return next;
+    });
+    const existingTimer = recentAddedSlugTimersRef.current.get(slug);
+    if (existingTimer) clearTimeout(existingTimer);
+    const timerId = setTimeout(() => {
+      setRecentlyAddedSlugs((prev) => {
+        if (!prev.has(slug)) return prev;
+        const next = new Set(prev);
+        next.delete(slug);
+        return next;
+      });
+      recentAddedSlugTimersRef.current.delete(slug);
+    }, stickyMs);
+    recentAddedSlugTimersRef.current.set(slug, timerId);
+  }, []);
+
   const [visiblePreviewMap, setVisiblePreviewMap] = useState({});
   const [previewFontFamilyBySlug, setPreviewFontFamilyBySlug] = useState({});
 
+  const libraryFontEntryIds = useMemo(() => {
+    const ids = new Set();
+    fontLibraries.forEach((library) => {
+      (Array.isArray(library?.fonts) ? library.fonts : []).forEach((font) => {
+        const id = String(font?.id || '').trim();
+        if (id) ids.add(id);
+      });
+    });
+    return ids;
+  }, [fontLibraries]);
+
   const previewObserverRef = React.useRef(null);
   const previewNodeBySlugRef = React.useRef(new Map());
+  const recentAddedSlugTimersRef = React.useRef(new Map());
   const previewLoadingRef = React.useRef(new Set());
   const previewQueuedRef = React.useRef(new Set());
   const previewQueueRef = React.useRef([]);
   const previewActiveLoadsRef = React.useRef(0);
   const longPressTimerRef = React.useRef(null);
   const longPressTriggeredRef = React.useRef(false);
+  const catalogLoadedRef = React.useRef(false);
 
   const searchQueryTrimmed = searchQuery.trim();
 
   useEffect(() => {
+    if (!isActive || catalogLoadedRef.current) return undefined;
+    catalogLoadedRef.current = true;
     const cached = readFontsourceCatalogCache();
     const hasCachedItems = cached.length > 0;
     const loadingStartedAt = Date.now();
@@ -284,9 +336,10 @@ export default function FontsourceCatalogPanel({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isActive]);
 
   useEffect(() => {
+    if (!isActive) return undefined;
     if (typeof window === 'undefined') return undefined;
 
     if (typeof IntersectionObserver === 'undefined') {
@@ -332,7 +385,7 @@ export default function FontsourceCatalogPanel({
       observer.disconnect();
       previewObserverRef.current = null;
     };
-  }, [items]);
+  }, [isActive, items]);
 
   const registerPreviewNode = useCallback((slug, node) => {
     const map = previewNodeBySlugRef.current;
@@ -401,24 +454,27 @@ export default function FontsourceCatalogPanel({
     drainPreviewQueue();
   }, [drainPreviewQueue]);
 
-  const addFont = useCallback(
-    async (slug, label, preferVariable = false) => {
-      if (isFontsourceFontInSession(fonts, slug)) {
-        return true;
-      }
+  const addFontToLibrary = useCallback(
+    async (libraryId, libraryEntry) => {
+      const slug = String(libraryEntry?.id || '').replace(/^fontsource:/, '').trim();
+      if (!slug) return false;
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
       setAddingSlug(slug);
       try {
-        await selectOrAddFontsourceFont(slug, Boolean(preferVariable));
-        return true;
-      } catch (e) {
-        console.error('[FontsourceCatalogPanel] add', slug, e);
-        toast.error(`Не удалось добавить ${label}`);
-        return false;
+        const ok = (await onAddFontToLibrary?.(libraryId, libraryEntry)) !== false;
+        if (ok) {
+          const elapsed = typeof performance !== 'undefined' ? performance.now() - t0 : MIN_LOADER_VISIBLE_MS;
+          if (elapsed < MIN_LOADER_VISIBLE_MS) {
+            await new Promise((resolve) => setTimeout(resolve, MIN_LOADER_VISIBLE_MS - elapsed));
+          }
+          markSlugRecentlyAdded(slug, FONTSOURCE_ADD_CATALOG_STICKY_MS);
+        }
+        return ok;
       } finally {
         setAddingSlug(null);
       }
     },
-    [fonts, selectOrAddFontsourceFont],
+    [markSlugRecentlyAdded, onAddFontToLibrary],
   );
 
   const clearLongPressTimer = useCallback(() => {
@@ -432,30 +488,25 @@ export default function FontsourceCatalogPanel({
     return () => clearLongPressTimer();
   }, [clearLongPressTimer]);
 
-  const fontsourceLibraryEntry = useCallback(
-    ({ id, slug, family, label }) =>
-      createCatalogLibraryEntry({
-        source: 'fontsource',
-        key: id || slug,
-        label: family || label || slug || id,
-      }),
-    [],
-  );
-
   /** До любых return — иначе «Rendered more hooks than during the previous render» */
   const catalogItemsNotInSession = useMemo(() => {
     return items.filter((item) => {
       const slug = item?.id || item?.slug;
-      return slug ? !isFontsourceFontInSession(fonts, slug) : false;
+      const libraryEntryId = slug ? `fontsource:${slug}` : '';
+      return slug
+        ? (!isFontsourceFontInSession(fonts, slug) && !libraryFontEntryIds.has(libraryEntryId)) ||
+            addingSlug === slug ||
+            recentlyAddedSlugs.has(slug)
+        : false;
     });
-  }, [items, fonts]);
+  }, [items, fonts, libraryFontEntryIds, addingSlug, recentlyAddedSlugs]);
 
   const filteredItems = useMemo(() => {
     return catalogItemsNotInSession.filter((item) => {
       if (filterCategory && (item.category || '') !== filterCategory) return false;
-      if (filterSubset) {
+      if (filterSubset.length > 0) {
         const subsets = Array.isArray(item.subsets) ? item.subsets : [];
-        if (!subsets.includes(filterSubset)) return false;
+        if (!filterSubset.some((subset) => subsets.includes(subset))) return false;
       }
       if (filterVariable === 'variable' && !item.isVariable) return false;
       if (filterVariable === 'static' && item.isVariable) return false;
@@ -466,8 +517,10 @@ export default function FontsourceCatalogPanel({
           item.family,
           item.label,
           item.category,
+          getFontCategoryLabelRu(item.category),
           item.primaryScript,
           ...(Array.isArray(item.subsets) ? item.subsets : []),
+          ...(Array.isArray(item.subsets) ? item.subsets : []).map((subset) => getFontSubsetLabelRu(subset)),
         ],
         searchQueryTrimmed,
       );
@@ -519,9 +572,7 @@ export default function FontsourceCatalogPanel({
         return String(b.family || '').localeCompare(String(a.family || ''), 'ru', { sensitivity: 'base' });
       }
       if (sortMode === 'category') {
-        const byCategory = String(a.category || '').localeCompare(String(b.category || ''), 'ru', {
-          sensitivity: 'base',
-        });
+        const byCategory = compareFontCategoryLabelsRu(a.category, b.category);
         if (byCategory !== 0) return byCategory;
         return String(a.family || '').localeCompare(String(b.family || ''), 'ru', { sensitivity: 'base' });
       }
@@ -540,6 +591,7 @@ export default function FontsourceCatalogPanel({
   }, [filteredItems, sortMode]);
 
   useEffect(() => {
+    if (!isActive) return undefined;
     const total = filteredSortedItems.length;
     if (total === 0) {
       setVisibleCardsCount(0);
@@ -575,7 +627,7 @@ export default function FontsourceCatalogPanel({
       cancelled = true;
       if (timerId) window.clearTimeout(timerId);
     };
-  }, [activeGridCols, filteredSortedItems]);
+  }, [activeGridCols, filteredSortedItems, isActive]);
 
   const renderedItems = useMemo(
     () => filteredSortedItems.slice(0, visibleCardsCount),
@@ -635,39 +687,18 @@ export default function FontsourceCatalogPanel({
 
   const openFontsourceInEditor = useCallback(
     async (slug, isVariable) => {
-      if (typeof onOpenInEditor !== 'function') return;
+      if (typeof onOpenFontsourceInEditorTab !== 'function') return;
       if (!slug) return;
       setAddingSlug(slug);
       try {
-        const apiUrl = isVariable
-          ? `/api/fontsource/${encodeURIComponent(slug)}/variable?subset=latin&style=normal&forceVariable=true`
-          : `/api/fontsource/${encodeURIComponent(slug)}?weight=400&style=normal&subset=latin`;
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const payload = await response.json();
-        const fontBufferBase64 = payload?.fontBufferBase64 ?? payload?.fontData;
-        if (!fontBufferBase64) throw new Error('Пустой буфер');
-        const fileNameRaw = String(payload?.fileName || payload?.actualFileName || `${slug}.woff2`);
-        const fontBuffer = base64ToArrayBuffer(fontBufferBase64);
-        const ext = fileNameRaw.split('.').pop()?.toLowerCase() || 'woff2';
-        const mimeType = `font/${
-          ext === 'ttf' ? 'ttf' : ext === 'otf' ? 'otf' : ext === 'woff' ? 'woff' : 'woff2'
-        }`;
-        const blob = new Blob([fontBuffer], { type: mimeType });
-        const previewFont = await processLocalFont({
-          file: blob,
-          name: fileNameRaw || `${slug}.woff2`,
-        });
-        if (!previewFont) throw new Error('Не удалось подготовить превью');
-        previewFont.source = 'fontsource';
-        await onOpenInEditor(previewFont);
-      } catch (error) {
+        await onOpenFontsourceInEditorTab(slug, isVariable);
+      } catch {
         toast.error(`Не удалось открыть ${slug} в редакторе`);
       } finally {
         setAddingSlug(null);
       }
     },
-    [onOpenInEditor],
+    [onOpenFontsourceInEditorTab],
   );
 
   const convertBlobToFormat = useCallback(async (blob, format) => {
@@ -1035,20 +1066,21 @@ export default function FontsourceCatalogPanel({
   }, [items]);
 
   useEffect(() => {
+    if (!isActive) return;
     filteredSortedItems.forEach((item) => {
       const slug = item?.id || item?.slug;
       if (!slug) return;
       if (!visiblePreviewMap[slug]) return;
       enqueuePreviewLoad(slug);
     });
-  }, [filteredSortedItems, visiblePreviewMap, enqueuePreviewLoad]);
+  }, [enqueuePreviewLoad, filteredSortedItems, isActive, visiblePreviewMap]);
 
   const facetCategories = useMemo(() => {
     const set = new Set();
     catalogItemsNotInSession.forEach((item) => {
       if (item?.category) set.add(item.category);
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' }));
+    return Array.from(set).sort(compareFontCategoryLabelsRu);
   }, [catalogItemsNotInSession]);
 
   const facetSubsets = useMemo(() => {
@@ -1061,21 +1093,24 @@ export default function FontsourceCatalogPanel({
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [catalogItemsNotInSession]);
 
+  const subsetFilterOptions = useMemo(
+    () => buildGroupedFontSubsetOptions(facetSubsets, filterSubset),
+    [facetSubsets, filterSubset],
+  );
+
   const hasActiveFilters =
     Boolean(searchQueryTrimmed) ||
     Boolean(filterCategory) ||
-    Boolean(filterSubset) ||
+    filterSubset.length > 0 ||
     filterVariable !== 'all' ||
-    filterItalicOnly ||
-    sortMode !== 'popular';
+    filterItalicOnly;
 
   const clearFilters = useCallback(() => {
     setSearchQuery('');
     setFilterCategory('');
-    setFilterSubset('');
+    setFilterSubset([]);
     setFilterVariable('all');
     setFilterItalicOnly(false);
-    setSortMode('popular');
   }, []);
 
   const countSuffix =
@@ -1120,18 +1155,25 @@ export default function FontsourceCatalogPanel({
               id="fontsource-filter-category"
               value={filterCategory}
               onChange={setFilterCategory}
+              clearable
               className={selectClass(!filterCategory)}
               aria-label="Категория"
+              clearAriaLabel="Очистить фильтр категории"
               placeholder="Категория"
               emptyValue=""
-              options={facetCategories.map((c) => ({ value: c, label: c }))}
+              options={facetCategories.map((c) => ({
+                value: c,
+                label: getFontCategoryLabelRu(c),
+              }))}
             />
             <CustomSelect
               id="fontsource-filter-var"
               value={filterVariable}
               onChange={setFilterVariable}
+              clearable
               className={selectClass(filterVariable === 'all')}
               aria-label="Вариативность"
+              clearAriaLabel="Очистить фильтр вариативности"
               placeholder="Вариативность"
               emptyValue="all"
               options={[
@@ -1146,23 +1188,23 @@ export default function FontsourceCatalogPanel({
             id="fontsource-filter-subset"
             value={filterSubset}
             onChange={setFilterSubset}
-            className={selectClass(!filterSubset)}
-            aria-label="Язык / набор (subset)"
-            placeholder="Язык"
-            emptyValue=""
-            options={facetSubsets.map((s) => ({ value: s, label: s }))}
+            multiple
+            clearable
+            className={selectClass(filterSubset.length === 0)}
+            aria-label="Языки / наборы"
+            clearAriaLabel="Очистить фильтр языков"
+            placeholder="Языки"
+            searchable
+            searchPlaceholder="Поиск языка"
+            options={subsetFilterOptions}
           />
         }
         italicControl={
-          <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-gray-50 px-2 text-sm uppercase font-semibold text-gray-900 sm:px-3">
-            <input
-              type="checkbox"
-              checked={filterItalicOnly}
-              onChange={(event) => setFilterItalicOnly(event.target.checked)}
-              className="h-4 w-4 rounded border-gray-400 bg-gray-50 text-accent"
-            />
-            <span className="whitespace-nowrap">Курсив</span>
-          </label>
+          <CatalogCheckboxControl
+            checked={filterItalicOnly}
+            onChange={setFilterItalicOnly}
+            label="Курсив"
+          />
         }
         actionsControl={
           <CatalogTextSortControls
@@ -1186,7 +1228,7 @@ export default function FontsourceCatalogPanel({
               type="button"
               disabled={!hasActiveFilters}
               onClick={clearFilters}
-              className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-gray-900 hover:text-accent disabled:cursor-default disabled:opacity-40 disabled:hover:text-gray-900"
+              className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent hover:text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
             >
               Сбросить все
             </button>
@@ -1224,188 +1266,33 @@ export default function FontsourceCatalogPanel({
             }`}
           >
             {renderedItems.map((item) => {
-            const slug = item.id || item.slug;
-            const family = item.family || item.label || slug;
-            const styleCount = Number(item.styleCount) || 1;
-            const subsetCount = (Array.isArray(item.subsets) ? item.subsets.length : 0) || 0;
-            const isVariable = Boolean(item.isVariable);
-            const hasItalic = Boolean(item.hasItalic);
-            const previewFamily = previewFontFamilyBySlug[slug] || 'system-ui, sans-serif';
-            const busy = addingSlug === slug;
-            const libraryEntry = fontsourceLibraryEntry(item);
-            const isRowMode = gridViewMode === 'row';
-            const selectionOverlay = (
-              <div className="flex h-full w-full items-center justify-center">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white shadow-sm">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    className="h-5 w-5"
-                    aria-hidden
-                  >
-                    <path
-                      d="M4.5 10.5L8.25 14.25L15.5 7"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-            );
-
-            const hoverOverlay = (
-              <CatalogCardHoverOverlay
-                centered={isRowMode}
-                onOpen={() => void openFontsourceInEditor(slug, isVariable)}
-                openAriaLabel={`Открыть ${family} в редакторе`}
-                downloadButtonProps={{
-                  primaryLabel: 'Скачать',
-                  primaryAriaLabel: `Скачать пакет ${family}`,
-                  onPrimaryClick: () => void downloadFontsourcePackageZip(item),
-                  menuItems: [
-                    {
-                      key: 'zip',
-                      label: 'ZIP (по умолчанию)',
-                      onSelect: () => void downloadFontsourcePackageZip(item),
-                    },
-                    {
-                      key: 'ttf',
-                      label: 'TTF',
-                      onSelect: () => void downloadFontsourceAsFormat(item, 'ttf'),
-                    },
-                    {
-                      key: 'otf',
-                      label: 'OTF',
-                      onSelect: () => void downloadFontsourceAsFormat(item, 'otf'),
-                    },
-                    {
-                      key: 'woff',
-                      label: 'WOFF',
-                      onSelect: () => void downloadFontsourceAsFormat(item, 'woff'),
-                    },
-                    {
-                      key: 'current-file',
-                      label: 'WOFF2',
-                      onSelect: () => void downloadFontsourceAsFormat(item, 'woff2'),
-                    },
-                    {
-                      key: 'variable',
-                      label: 'Variable вариант',
-                      hidden: !isVariable,
-                      onSelect: () => void downloadFontsourceVariableVariant(item),
-                    },
-                  ],
-                }}
-              />
-            );
-
-            const actions = (
-              <CatalogLibraryActions
-                libraries={fontLibraries}
-                busy={busy}
-                busyIndicator={<CatalogSessionAddSpinner />}
-                onAddToSession={() => addFont(slug, family, isVariable)}
-                onAddFontToLibrary={onAddFontToLibrary}
-                onRequestCreateLibrary={onRequestCreateLibrary}
-                libraryEntry={libraryEntry}
-              />
-            );
-
-            return (
-              isRowMode ? (
-                <CatalogRowModeCard
-                  family={family}
-                  metaItems={[
-                    item.category || 'Fontsource',
-                    isVariable ? 'vf' : null,
-                    hasItalic ? 'italic' : null,
-                    `${subsetCount} ${pluralRu(subsetCount, 'язык', 'языка', 'языков')}`,
-                    subsetCount > 0
-                      ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}`
-                      : null,
-                    `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`,
-                  ]}
-                  previewFamily={previewFamily}
-                  previewText={family}
-                  previewProps={{
-                    ref: (node) => registerPreviewNode(slug, node),
-                    'data-fontsource-slug': slug,
-                  }}
+              const slug = item.id || item.slug;
+              return (
+                <FontsourceCatalogCard
+                  key={slug}
+                  item={item}
+                  previewFamily={previewFontFamilyBySlug[slug] || 'system-ui, sans-serif'}
+                  busy={addingSlug === slug}
                   selected={selectedSlugs.has(slug)}
-                  busy={busy}
-                  actions={actions}
-                  selectionOverlay={selectionOverlay}
-                  hoverOverlay={hoverOverlay}
-                  onClick={(event) => onCardClick(event, slug)}
-                  onPointerDown={(event) => startCardLongPress(event, slug)}
+                  isRowMode={gridViewMode === 'row'}
+                  fontLibraries={fontLibraries}
+                  onAddFontToLibrary={addFontToLibrary}
+                  onRequestCreateLibrary={onRequestCreateLibrary}
+                  onOpenInEditor={openFontsourceInEditor}
+                  onDownloadPackageZip={downloadFontsourcePackageZip}
+                  onDownloadAsFormat={downloadFontsourceAsFormat}
+                  onDownloadVariableVariant={downloadFontsourceVariableVariant}
+                  onCardClick={onCardClick}
+                  onStartCardLongPress={startCardLongPress}
                   onPointerUp={clearLongPressTimer}
                   onPointerLeave={clearLongPressTimer}
                   onPointerCancel={clearLongPressTimer}
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, item)}
+                  registerPreviewNode={registerPreviewNode}
+                  previewText={PREVIEW_TEXT}
                 />
-              ) : (
-                <CatalogFontCard
-                key={slug}
-                selected={selectedSlugs.has(slug)}
-                onClick={(event) => onCardClick(event, slug)}
-                onPointerDown={(event) => startCardLongPress(event, slug)}
-                onPointerUp={clearLongPressTimer}
-                onPointerLeave={clearLongPressTimer}
-                onPointerCancel={clearLongPressTimer}
-                busy={busy}
-                minHeightClass="min-h-[148px] min-w-0"
-                selectionOverlay={selectionOverlay}
-                hoverOverlay={hoverOverlay}
-                actions={actions}
-                title={family}
-                preview={
-                  <div
-                    ref={(node) => registerPreviewNode(slug, node)}
-                    data-fontsource-slug={slug}
-                    className="mt-2 min-h-[1.75rem] flex-1 truncate text-[1.75rem] leading-tight text-gray-800"
-                    style={{ fontFamily: previewFamily }}
-                  >
-                    {PREVIEW_TEXT}
-                  </div>
-                }
-                footer={
-                  <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1">
-                      <span className="truncate text-[11px] uppercase font-semibold text-gray-500">
-                        {item.category || 'Fontsource'}
-                      </span>
-                      {isVariable ? (
-                        <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] uppercase font-semibold text-gray-800">
-                          vf
-                        </span>
-                      ) : null}
-                      {hasItalic ? (
-                        <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] uppercase font-semibold text-gray-800">
-                          italic
-                        </span>
-                      ) : null}
-                    </div>
-                    <Tooltip
-                      as="div"
-                      content="По метаданным Fontsource: начертания и поднаборы символов (subsets)"
-                      className="shrink-0 flex items-center justify-end gap-1.5 text-right text-[11px] uppercase font-semibold tabular-nums leading-snug text-gray-500"
-                    >
-                      <span className="whitespace-nowrap">
-                        {`${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`}
-                      </span>
-                      {subsetCount > 0 ? (
-                        <span className="whitespace-nowrap">
-                          {`${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}`}
-                        </span>
-                      ) : null}
-                    </Tooltip>
-                  </div>
-                }
-              />
-              )
-            );
+              );
             })}
           </div>
           {isChunkRendering ? (

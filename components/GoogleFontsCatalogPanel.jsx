@@ -1,4 +1,4 @@
-﻿﻿ import React, {
+ import React, {
   useEffect,
   useState,
   useCallback,
@@ -12,10 +12,6 @@ import {
   fetchGoogleVariableFontSlicesAll,
 } from '../utils/googleFontLoader';
 import { ensureGoogleFontPreviewCss, removeAllGoogleFontPreviewCss } from '../utils/googleFontPreviewCss';
-import {
-  buildGoogleFontGlyphSampleText,
-  hasGoogleScriptGlyphSample,
-} from '../utils/googleFontCatalogSampleText';
 import { CustomSelect } from './ui/CustomSelect';
 import {
   NATIVE_SELECT_FIELD_INTERACTIVE,
@@ -34,6 +30,7 @@ import { CatalogTextSortControls } from './ui/CatalogTextSortControls';
 import { CatalogGridModeToggle } from './ui/CatalogGridModeToggle';
 import { CatalogRowModeCard } from './ui/CatalogRowModeCard';
 import { CatalogCardHoverOverlay } from './ui/CatalogCardHoverOverlay';
+import { CatalogCheckboxControl } from './ui/CatalogCheckbox';
 import { useCatalogToolbarLayout } from './ui/useCatalogToolbarLayout';
 import { matchesSearch } from '../utils/searchMatching';
 import {
@@ -45,49 +42,17 @@ import {
   createCatalogLibraryEntry,
   isGoogleFontInSession,
 } from '../utils/fontLibraryUtils';
-import { processLocalFont } from '../utils/localFontProcessor';
+import { writeLibraryFontDragData } from '../utils/libraryDragData';
+import {
+  compareFontCategoryLabelsRu,
+  getFontCategoryLabelRu,
+} from '../utils/fontCategoryLabels';
+import {
+  buildGroupedFontSubsetOptions,
+  getFontSubsetLabelRu,
+} from '../utils/fontSubsetLabels';
 import { compareFontFamilyName } from '../utils/fontSort';
 import { createZipBlob } from '../utils/zipUtils';
-/** Подписи к кодам наборов Google Fonts (subsets) */
-const SUBSET_LABEL_RU = {
-  latin: 'Латиница',
-  'latin-ext': 'Латиница расш.',
-  cyrillic: 'Кириллица',
-  'cyrillic-ext': 'Кириллица расш.',
-  greek: 'Греческий',
-  hebrew: 'Иврит',
-  arabic: 'Арабский',
-  vietnamese: 'Вьетнамский',
-  devanagari: 'Деванагари',
-  thai: 'Тайский',
-  tamil: 'Тамильский',
-  bengali: 'Бенгальский',
-  gujarati: 'Гуджарати',
-  gurmukhi: 'Гурмукхи',
-  kannada: 'Каннада',
-  malayalam: 'Малайялам',
-  oriya: 'Ория',
-  telugu: 'Телугу',
-  sinhala: 'Сингальский',
-  khmer: 'Кхмерский',
-  lao: 'Лаосский',
-  myanmar: 'Мьянма',
-  tibetan: 'Тибетский',
-  ethiopic: 'Эфиопский',
-  cherokee: 'Чероки',
-  math: 'Математика',
-  symbols: 'Символы',
-  chakma: 'Чакма',
-  javanese: 'Яванский',
-  'ol-chiki': 'Ол-чики',
-  'tai-tham': 'Тай Тхам',
-};
-
-function subsetOptionLabel(code) {
-  if (!code) return '';
-  const ru = SUBSET_LABEL_RU[code];
-  return ru ? `${ru} (${code})` : code;
-}
 
 function GoogleCatalogEmptyLoader() {
   return (
@@ -126,6 +91,9 @@ function googleFontCatalogGridCols(viewportWidth) {
 
 const GRID_GAP_PX = 16;
 const CARD_LONG_PRESS_MS = 220;
+const RECENT_ADD_VISIBLE_MS = 900;
+/** Карточка остаётся в сетке дольше, чем горит галочка в меню «+», иначе виртуализатор снимает строку. */
+const RECENT_ADD_CATALOG_STICKY_MS = RECENT_ADD_VISIBLE_MS + 1300;
 
 function saveBlobAsFile(blob, fileName) {
   const objectUrl = URL.createObjectURL(blob);
@@ -176,11 +144,10 @@ function isInteractiveTarget(target) {
 
 export default function GoogleFontsCatalogPanel({
   fonts,
-  handleFontsUploaded,
   fontLibraries = [],
   onAddFontToLibrary,
   onRequestCreateLibrary,
-  onOpenInEditor,
+  onOpenGoogleEntryInEditorTab,
   trailingToolbar = null,
   isActive = true,
   onSelectionActionsChange,
@@ -200,16 +167,18 @@ export default function GoogleFontsCatalogPanel({
     gridGapPx: GRID_GAP_PX,
     gridColsResolver: googleFontCatalogGridCols,
     autoMeasureGridWidth: true,
+    enabled: isActive,
   });
   const [items, setItems] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
   const [addingFamily, setAddingFamily] = useState(null);
+  const [recentlyAddedFamilies, setRecentlyAddedFamilies] = useState(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   /** catalog — как в каталоге Google (defaultSort) */
   const [sortMode, setSortMode] = useState('catalog');
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterSubset, setFilterSubset] = useState('');
+  const [filterSubset, setFilterSubset] = useState([]);
   /** all | variable | static */
   const [filterVariable, setFilterVariable] = useState('all');
   const [filterItalicOnly, setFilterItalicOnly] = useState(false);
@@ -217,10 +186,40 @@ export default function GoogleFontsCatalogPanel({
   const [selectedFamilies, setSelectedFamilies] = useState(() => new Set());
   const longPressTimerRef = useRef(null);
   const longPressTriggeredRef = useRef(false);
+  const catalogLoadedRef = useRef(false);
+  const recentAddedFamilyTimersRef = useRef(new Map());
 
   useEffect(() => {
     onTotalItemsChange?.(items.length);
   }, [items, onTotalItemsChange]);
+
+  useEffect(() => {
+    return () => {
+      recentAddedFamilyTimersRef.current.forEach((timerId) => clearTimeout(timerId));
+      recentAddedFamilyTimersRef.current.clear();
+    };
+  }, []);
+
+  const markFamilyRecentlyAdded = useCallback((family, stickyMs = RECENT_ADD_VISIBLE_MS) => {
+    if (!family) return;
+    setRecentlyAddedFamilies((prev) => {
+      const next = new Set(prev);
+      next.add(family);
+      return next;
+    });
+    const existingTimer = recentAddedFamilyTimersRef.current.get(family);
+    if (existingTimer) clearTimeout(existingTimer);
+    const timerId = setTimeout(() => {
+      setRecentlyAddedFamilies((prev) => {
+        if (!prev.has(family)) return prev;
+        const next = new Set(prev);
+        next.delete(family);
+        return next;
+      });
+      recentAddedFamilyTimersRef.current.delete(family);
+    }, stickyMs);
+    recentAddedFamilyTimersRef.current.set(family, timerId);
+  }, []);
 
   const facetOptions = useMemo(() => {
     const categories = new Set();
@@ -230,10 +229,15 @@ export default function GoogleFontsCatalogPanel({
       (x.subsets || []).forEach((s) => subsets.add(s));
     });
     return {
-      categories: [...categories].sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })),
+      categories: [...categories].sort(compareFontCategoryLabelsRu),
       subsets: [...subsets].sort((a, b) => a.localeCompare(b)),
     };
   }, [items]);
+
+  const subsetFilterOptions = useMemo(
+    () => buildGroupedFontSubsetOptions(facetOptions.subsets, filterSubset),
+    [facetOptions.subsets, filterSubset],
+  );
 
   const filteredSortedItems = useMemo(() => {
     let list = items;
@@ -244,15 +248,19 @@ export default function GoogleFontsCatalogPanel({
             [
               x.family,
               x.category,
+              getFontCategoryLabelRu(x.category),
               x.stroke,
               ...(x.subsets || []),
+              ...(x.subsets || []).map((subset) => getFontSubsetLabelRu(subset)),
             ],
             searchQuery,
           ),
       );
     }
     if (filterCategory) list = list.filter((x) => x.category === filterCategory);
-    if (filterSubset) list = list.filter((x) => (x.subsets || []).includes(filterSubset));
+    if (filterSubset.length > 0) {
+      list = list.filter((x) => filterSubset.some((subset) => (x.subsets || []).includes(subset)));
+    }
     if (filterVariable === 'variable') list = list.filter((x) => x.isVariable);
     if (filterVariable === 'static') list = list.filter((x) => !x.isVariable);
     if (filterItalicOnly) list = list.filter((x) => x.hasItalic);
@@ -267,7 +275,7 @@ export default function GoogleFontsCatalogPanel({
         break;
       case 'category':
         out.sort((a, b) => {
-          const c = (a.category || '').localeCompare(b.category || '', 'ru', { sensitivity: 'base' });
+          const c = compareFontCategoryLabelsRu(a.category, b.category);
           if (c !== 0) return c;
           return compareFontFamilyName(a, b);
         });
@@ -318,21 +326,42 @@ export default function GoogleFontsCatalogPanel({
 
   const hasActiveFilters =
     !!filterCategory ||
-    !!filterSubset ||
+    filterSubset.length > 0 ||
     filterVariable !== 'all' ||
     filterItalicOnly;
 
-  /** В каталоге показываем только шрифты, которых ещё нет в сессии */
+  const libraryFontEntryIds = useMemo(() => {
+    const ids = new Set();
+    fontLibraries.forEach((library) => {
+      (Array.isArray(library?.fonts) ? library.fonts : []).forEach((font) => {
+        const id = String(font?.id || '').trim();
+        if (id) ids.add(id);
+      });
+    });
+    return ids;
+  }, [fontLibraries]);
+
+  /** В каталоге показываем только шрифты, которых ещё нет ни в сессии, ни в библиотеках. */
   const catalogItemsNotInSession = useMemo(
-    () => filteredSortedItems.filter((entry) => !isGoogleFontInSession(fonts, entry.family)),
-    [filteredSortedItems, fonts],
+    () =>
+      filteredSortedItems.filter((entry) => {
+        const family = entry?.family;
+        const libraryEntryId = family ? `google:${family}` : '';
+        if (!family) return false;
+        return (
+          (!isGoogleFontInSession(fonts, family) && !libraryFontEntryIds.has(libraryEntryId)) ||
+          addingFamily === family ||
+          recentlyAddedFamilies.has(family)
+        );
+      }),
+    [filteredSortedItems, fonts, libraryFontEntryIds, addingFamily, recentlyAddedFamilies],
   );
 
   const showFontGrid = filteredSortedItems.length > 0 && catalogItemsNotInSession.length > 0;
 
   const clearFilters = useCallback(() => {
     setFilterCategory('');
-    setFilterSubset('');
+    setFilterSubset([]);
     setFilterVariable('all');
     setFilterItalicOnly(false);
   }, []);
@@ -349,6 +378,8 @@ export default function GoogleFontsCatalogPanel({
   }, [clearLongPressTimer]);
 
   useEffect(() => {
+    if (!isActive || catalogLoadedRef.current) return undefined;
+    catalogLoadedRef.current = true;
     let cancelled = false;
     (async () => {
       try {
@@ -377,7 +408,7 @@ export default function GoogleFontsCatalogPanel({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isActive]);
 
   useEffect(() => {
     return () => {
@@ -387,6 +418,7 @@ export default function GoogleFontsCatalogPanel({
 
   /** Фон: постепенно подключаем CSS-превью для текущего отфильтрованного списка. */
   useEffect(() => {
+    if (!isActive) return undefined;
     if (!filteredSortedItems.length) return;
     let cursor = 0;
     let cancelled = false;
@@ -411,76 +443,7 @@ export default function GoogleFontsCatalogPanel({
       cancelled = true;
       if (cancelIdle) cancelIdle();
     };
-  }, [filteredSortedItems]);
-
-  const addGoogleToSession = useCallback(
-    async (entry) => {
-      const family = entry.family;
-      if (isGoogleFontInSession(fonts, family)) {
-        toast.info(`${family} уже в сессии`);
-        return true;
-      }
-      setAddingFamily(family);
-      try {
-        const subsetList = Array.isArray(entry.subsets) ? entry.subsets : [];
-        const googleFontRecommendedSample = hasGoogleScriptGlyphSample(entry)
-          ? buildGoogleFontGlyphSampleText(entry)
-          : undefined;
-        const useVariable = entry.isVariable === true;
-        if (useVariable) {
-          const slices = await fetchGoogleVariableFontSlicesAll(family, {
-            subsets: subsetList,
-            ...(entry.wghtMin != null && entry.wghtMax != null
-              ? { wghtMin: entry.wghtMin, wghtMax: entry.wghtMax }
-              : {}),
-          });
-          if (!slices?.[0]?.blob?.size) throw new Error('Пустой файл');
-          await handleFontsUploaded([
-            {
-              file: slices[0].blob,
-              name: `${family}.woff2`,
-              source: 'google',
-              googleFontSlices: slices,
-              googleFontAxesFromCatalog:
-                Array.isArray(entry.axes) && entry.axes.length > 0 ? entry.axes : null,
-              googleFontItalicMode:
-                typeof entry.italicMode === 'string' && entry.italicMode ? entry.italicMode : 'none',
-              googleFontHasItalicStyles: entry.hasItalicStyles === true,
-              googleFontRecommendedSample,
-            },
-          ]);
-        } else {
-          const slices = await fetchGoogleStaticFontSlicesAll(family, {
-            weight: 400,
-            italic: false,
-            subsets: subsetList,
-          });
-          if (!slices?.[0]?.blob?.size) throw new Error('Пустой файл');
-          await handleFontsUploaded([
-            {
-              file: slices[0].blob,
-              name: `${family}.woff2`,
-              source: 'google',
-              googleFontSlices: slices,
-              googleFontItalicMode:
-                typeof entry.italicMode === 'string' && entry.italicMode ? entry.italicMode : 'none',
-              googleFontHasItalicStyles: entry.hasItalicStyles === true,
-              googleFontRecommendedSample,
-            },
-          ]);
-        }
-        toast.success(`${family} добавлен`);
-        return true;
-      } catch (e) {
-        console.warn('[GoogleFontsCatalogPanel]', family, e);
-        toast.error(e?.message ? `${family}: ${e.message}` : `Не удалось загрузить ${family}`);
-        return false;
-      } finally {
-        setAddingFamily(null);
-      }
-    },
-    [fonts, handleFontsUploaded],
-  );
+  }, [filteredSortedItems, isActive]);
 
   useEffect(() => {
     const visibleFamilies = new Set(catalogItemsNotInSession.map((entry) => entry.family));
@@ -534,47 +497,17 @@ export default function GoogleFontsCatalogPanel({
 
   const openGoogleInEditor = useCallback(
     async (entry) => {
-      if (typeof onOpenInEditor !== 'function') return;
+      if (typeof onOpenGoogleEntryInEditorTab !== 'function') return;
       const family = entry?.family;
       if (!family) return;
       setAddingFamily(family);
       try {
-        const subsetList = Array.isArray(entry.subsets) ? entry.subsets : [];
-        const useVariable = entry.isVariable === true;
-        const slices = useVariable
-          ? await fetchGoogleVariableFontSlicesAll(family, {
-              subsets: subsetList,
-              ...(entry.wghtMin != null && entry.wghtMax != null
-                ? { wghtMin: entry.wghtMin, wghtMax: entry.wghtMax }
-                : {}),
-            })
-          : await fetchGoogleStaticFontSlicesAll(family, {
-              weight: 400,
-              italic: false,
-              subsets: subsetList,
-            });
-        const firstSlice = Array.isArray(slices) ? slices.find((slice) => slice?.blob?.size > 0) : null;
-        if (!firstSlice?.blob) throw new Error('Пустой файл');
-        const previewFont = await processLocalFont({
-          file: firstSlice.blob,
-          name: `${family}.woff2`,
-          source: 'google',
-          googleFontSlices: slices,
-          googleFontAxesFromCatalog:
-            Array.isArray(entry.axes) && entry.axes.length > 0 ? entry.axes : null,
-          googleFontItalicMode:
-            typeof entry.italicMode === 'string' && entry.italicMode ? entry.italicMode : 'none',
-          googleFontHasItalicStyles: entry.hasItalicStyles === true,
-        });
-        if (!previewFont) throw new Error('Не удалось подготовить превью');
-        await onOpenInEditor(previewFont);
-      } catch (error) {
-        toast.error(`Не удалось открыть ${family} в редакторе`);
+        await onOpenGoogleEntryInEditorTab(entry);
       } finally {
         setAddingFamily(null);
       }
     },
-    [onOpenInEditor],
+    [onOpenGoogleEntryInEditorTab],
   );
 
   const getGoogleSlicesForDownload = useCallback(async (entry) => {
@@ -868,6 +801,41 @@ export default function GoogleFontsCatalogPanel({
     [],
   );
 
+  const addGoogleToLibrary = useCallback(
+    async (libraryId, libraryEntry) => {
+      const family = libraryEntry?.label || '';
+      if (!family) return false;
+      const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+      setAddingFamily(family);
+      try {
+        const ok = (await onAddFontToLibrary?.(libraryId, libraryEntry)) !== false;
+        if (ok) {
+          const elapsed = typeof performance !== 'undefined' ? performance.now() - t0 : RECENT_ADD_VISIBLE_MS;
+          if (elapsed < RECENT_ADD_VISIBLE_MS) {
+            await new Promise((resolve) => setTimeout(resolve, RECENT_ADD_VISIBLE_MS - elapsed));
+          }
+          // После спиннера: иначе таймер «недавно добавлен» снимает карточку с сетки в тот же кадр, что и галочка.
+          markFamilyRecentlyAdded(family, RECENT_ADD_CATALOG_STICKY_MS);
+        }
+        return ok;
+      } finally {
+        setAddingFamily(null);
+      }
+    },
+    [markFamilyRecentlyAdded, onAddFontToLibrary],
+  );
+
+  const handleDragStart = useCallback((event, libraryEntry) => {
+    if (isInteractiveTarget(event.target)) {
+      event.preventDefault();
+      return;
+    }
+    const wrote = writeLibraryFontDragData(event.dataTransfer, libraryEntry);
+    if (!wrote) {
+      event.preventDefault();
+    }
+  }, []);
+
   const countSuffix =
     filteredSortedItems.length !== catalogItemsNotInSession.length
       ? ` из ${filteredSortedItems.length}`
@@ -911,18 +879,25 @@ export default function GoogleFontsCatalogPanel({
               id="gf-filter-category"
               value={filterCategory}
               onChange={setFilterCategory}
+              clearable
               className={selectClass(!filterCategory)}
               aria-label="Категория"
+              clearAriaLabel="Очистить фильтр категории"
               placeholder="Категория"
               emptyValue=""
-              options={facetOptions.categories.map((c) => ({ value: c, label: c }))}
+              options={facetOptions.categories.map((c) => ({
+                value: c,
+                label: getFontCategoryLabelRu(c),
+              }))}
             />
             <CustomSelect
               id="gf-filter-var"
               value={filterVariable}
               onChange={setFilterVariable}
+              clearable
               className={selectClass(filterVariable === 'all')}
               aria-label="Вариативность"
+              clearAriaLabel="Очистить фильтр вариативности"
               placeholder="Вариативность"
               emptyValue="all"
               options={[
@@ -937,26 +912,23 @@ export default function GoogleFontsCatalogPanel({
             id="gf-filter-subset"
             value={filterSubset}
             onChange={setFilterSubset}
-            className={selectClass(!filterSubset)}
-            aria-label="Язык / набор (subset)"
-            placeholder="Язык"
-            emptyValue=""
-            options={facetOptions.subsets.map((s) => ({
-              value: s,
-              label: subsetOptionLabel(s),
-            }))}
+            multiple
+            clearable
+            className={selectClass(filterSubset.length === 0)}
+            aria-label="Языки / наборы"
+            clearAriaLabel="Очистить фильтр языков"
+            placeholder="Языки"
+            searchable
+            searchPlaceholder="Поиск языка"
+            options={subsetFilterOptions}
           />
         }
         italicControl={
-          <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-gray-50 px-2 text-sm uppercase font-semibold text-gray-900 sm:px-3">
-            <input
-              type="checkbox"
-              checked={filterItalicOnly}
-              onChange={(event) => setFilterItalicOnly(event.target.checked)}
-              className="h-4 w-4 rounded border-gray-400 bg-gray-50 text-accent"
-            />
-            <span className="whitespace-nowrap">Курсив</span>
-          </label>
+          <CatalogCheckboxControl
+            checked={filterItalicOnly}
+            onChange={setFilterItalicOnly}
+            label="Курсив"
+          />
         }
         actionsControl={
           <CatalogTextSortControls
@@ -1105,8 +1077,9 @@ export default function GoogleFontsCatalogPanel({
                     libraries={fontLibraries}
                     busy={busy}
                     busyIndicator={<CatalogSessionAddSpinner />}
-                    onAddToSession={() => addGoogleToSession(entry)}
-                    onAddFontToLibrary={onAddFontToLibrary}
+                    appearance={isRowMode ? 'row' : 'default'}
+                    stateKey={libraryEntry?.id || family}
+                    onAddFontToLibrary={addGoogleToLibrary}
                     onRequestCreateLibrary={onRequestCreateLibrary}
                     libraryEntry={libraryEntry}
                   />
@@ -1117,10 +1090,12 @@ export default function GoogleFontsCatalogPanel({
                     <CatalogRowModeCard
                       family={family}
                       metaItems={[
-                        entry.category || 'Google',
+                        getFontCategoryLabelRu(entry.category) || 'Google',
                         entry.isVariable ? 'vf' : null,
                         entry.hasItalic ? 'italic' : null,
-                        `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}`,
+                        languageCount > 0
+                          ? `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}`
+                          : null,
                         subsetCount > 0
                           ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}`
                           : null,
@@ -1138,6 +1113,8 @@ export default function GoogleFontsCatalogPanel({
                       onPointerUp={clearLongPressTimer}
                       onPointerLeave={clearLongPressTimer}
                       onPointerCancel={clearLongPressTimer}
+                      draggable
+                      onDragStart={(event) => handleDragStart(event, libraryEntry)}
                     />
                   ) : (
                     <CatalogFontCard
@@ -1147,6 +1124,8 @@ export default function GoogleFontsCatalogPanel({
                     onPointerUp={clearLongPressTimer}
                     onPointerLeave={clearLongPressTimer}
                     onPointerCancel={clearLongPressTimer}
+                    draggable
+                    onDragStart={(event) => handleDragStart(event, libraryEntry)}
                     busy={busy}
                     minHeightClass="min-h-[148px] min-w-0"
                     selectionOverlay={selectionOverlay}
@@ -1163,15 +1142,17 @@ export default function GoogleFontsCatalogPanel({
                     }
                     footer={
                       <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-1">
-                          <span className="truncate text-[11px] uppercase font-semibold text-gray-500">{entry.category || 'Google'}</span>
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                          <span className="truncate text-xs uppercase font-semibold text-gray-800">
+                            {getFontCategoryLabelRu(entry.category) || 'Google'}
+                          </span>
                           {entry.isVariable ? (
-                            <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] uppercase font-semibold text-gray-800">
+                            <span className="text-xs uppercase font-semibold text-gray-800">
                               vf
                             </span>
                           ) : null}
                           {entry.hasItalic ? (
-                            <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] uppercase font-semibold text-gray-800">
+                            <span className="text-xs uppercase font-semibold text-gray-800">
                               italic
                             </span>
                           ) : null}
@@ -1179,7 +1160,7 @@ export default function GoogleFontsCatalogPanel({
                         <Tooltip
                           as="div"
                           content="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
-                          className="shrink-0 flex items-center justify-end gap-1.5 text-right text-[11px] uppercase font-semibold tabular-nums leading-snug text-gray-500"
+                          className="shrink-0 flex items-center justify-end gap-1.5 text-right text-xs uppercase font-semibold tabular-nums leading-snug text-gray-800"
                         >
                           <span className="whitespace-nowrap">
                             {entry.styleCount != null

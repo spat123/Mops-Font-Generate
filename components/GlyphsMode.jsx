@@ -4,6 +4,7 @@ import { debounce } from '../utils/debounce';
 import { getGlyphDataForFont } from '../utils/fontParser';
 import { useSettings } from '../contexts/SettingsContext';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
+import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 
 // Глобальный кэш глифов, чтобы не загружать их повторно.
 const glyphDataCache = new Map();
@@ -428,7 +429,7 @@ function GlyphsMode({
     }
 
     return (
-      <div className="w-full p-6">
+      <div className="relative min-h-full w-full p-6 pb-8 pr-8">
         {glyphErrors.length > 0 && (
           <div className="mb-4 rounded border border-yellow-300 bg-yellow-100 p-3 text-xs text-yellow-800">
             При обработке шрифта возникло {glyphErrors.length} ошибок.
@@ -449,6 +450,8 @@ function GlyphsMode({
             onInnerWidth={onGlyphGridInnerWidth}
           />
         ) : null}
+
+        <PreviewEditTextHint />
 
         {/* Детали глифа */}
         {selectedGlyph && (

@@ -2,7 +2,7 @@
  * Общие стили «хром»-полосы: нижний тулбар превью и подвал сайдбара (одинаковая высота и отступы).
  */
 export const EDITOR_CHROME_BAR_SURFACE =
-  'items-center border-t border-gray-200 bg-white pl-3';
+  'items-center border-t border-gray-200 bg-white pl-6';
 
   export const EDITOR_CHROME_BAR_SURFACE_RESET_BUTTON =
   'items-center bg-white px-4 pb-2';

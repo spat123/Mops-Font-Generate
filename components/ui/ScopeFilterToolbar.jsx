@@ -1,7 +1,6 @@
 import React from 'react';
 import { CustomSelect } from './CustomSelect';
 import { customSelectTriggerClass } from './nativeSelectFieldClasses';
-import { CountBadge } from './CountBadge';
 
 export function ScopeFilterToolbar({ id, value, onChange, options, count, ariaLabel }) {
   return (
@@ -17,9 +16,7 @@ export function ScopeFilterToolbar({ id, value, onChange, options, count, ariaLa
             options={options}
           />
         </div>
-        <div className="col-start-2 flex items-center justify-end md:col-start-3 lg:col-start-4 xl:col-start-5">
-          <CountBadge count={count} />
-        </div>
+        <div className="col-start-2 md:col-start-3 lg:col-start-4 xl:col-start-5" aria-hidden />
       </div>
     </div>
   );

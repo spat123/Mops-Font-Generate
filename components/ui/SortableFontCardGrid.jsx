@@ -25,6 +25,8 @@ export function SortableFontCardGrid({
             previewStyle={item.previewStyle}
             onCardClick={item.onCardClick}
             onRemove={item.onRemove}
+            menuItems={item.menuItems}
+            downloadSplitButtonProps={item.downloadSplitButtonProps}
             variant={item.variant}
             previewClassName={item.previewClassName}
             draggable={draggable}

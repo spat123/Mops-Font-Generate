@@ -15,26 +15,99 @@ function ChevronDownIcon({ className = 'h-3 w-3' }) {
   );
 }
 
+function CheckIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 20 20"
+      stroke="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path d="M4.5 10.5L8 14L15.5 6.5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function CatalogAddTargetMenu({
   libraries = [],
   busy = false,
   onAddToSession,
   onAddToLibrary,
+  shouldAddToSession,
   onCreateLibrary,
-  primaryLabel = 'В сессию',
+  primaryLabel = 'В библиотеку',
   className = '',
   busyIndicator = null,
+  appearance = 'default',
+  stateKey = '',
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedTarget, setSelectedTarget] = useState({ type: 'session', libraryId: null });
+  const [selectedLibraryId, setSelectedLibraryId] = useState(null);
+  const [completed, setCompleted] = useState(false);
   const rootRef = useRef(null);
+  const completedTimerRef = useRef(null);
   const hasLibraries = libraries.length > 0;
+  const isRowAppearance = appearance === 'row';
+  const singleButtonClassName = isRowAppearance
+    ? `inline-flex max-w-full items-center gap-2 rounded-md border-0 bg-transparent py-1 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
+    : `inline-flex max-w-full items-center gap-1.5 rounded-md border-0 bg-transparent py-1 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim();
+  const selectorButtonClassName = isRowAppearance
+    ? `inline-flex h-6 min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-0 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+        open ? 'text-black' : ''
+      }`
+    : `inline-flex h-5 min-w-0 items-center gap-1 rounded-md border-0 bg-transparent py-0 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+        open ? 'text-accent' : ''
+      }`;
+  const addButtonClassName = isRowAppearance
+    ? 'ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100'
+    : 'ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100';
+  const standaloneAddButtonClassName = isRowAppearance
+    ? `inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
+    : `inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim();
+  const plusIconClassName = isRowAppearance ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0';
+  const chevronClassName = isRowAppearance ? 'h-4.5 w-4.5 shrink-0' : 'h-4 w-4 shrink-0';
+
+  const showCompleted = () => {
+    if (completedTimerRef.current) {
+      clearTimeout(completedTimerRef.current);
+    }
+    setCompleted(true);
+    completedTimerRef.current = setTimeout(() => {
+      setCompleted(false);
+      completedTimerRef.current = null;
+    }, 1200);
+  };
+
+  const runAction = async (action) => {
+    if (busy || typeof action !== 'function') return false;
+    const result = await action();
+    if (result !== false) {
+      showCompleted();
+      return true;
+    }
+    return false;
+  };
+
+  const runAddToLibrary = async (libraryId) => {
+    if (!libraryId) return false;
+    if (typeof onAddToSession === 'function' && shouldAddToSession?.(libraryId) !== false) {
+      const addedToSession = await onAddToSession();
+      if (addedToSession === false) return false;
+    }
+    if (typeof onAddToLibrary !== 'function') return false;
+    return onAddToLibrary(libraryId);
+  };
 
   useEffect(() => {
-    if (selectedTarget.type !== 'library') return;
-    if (libraries.some((library) => library.id === selectedTarget.libraryId)) return;
-    setSelectedTarget({ type: 'session', libraryId: null });
-  }, [libraries, selectedTarget]);
+    if (libraries.length === 0) {
+      setSelectedLibraryId(null);
+      return;
+    }
+    if (selectedLibraryId && libraries.some((library) => library.id === selectedLibraryId)) return;
+    setSelectedLibraryId(libraries[0]?.id || null);
+  }, [libraries, selectedLibraryId]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -58,26 +131,41 @@ export function CatalogAddTargetMenu({
     };
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (completedTimerRef.current) {
+        clearTimeout(completedTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (completedTimerRef.current) {
+      clearTimeout(completedTimerRef.current);
+      completedTimerRef.current = null;
+    }
+    setCompleted(false);
+    setOpen(false);
+  }, [stateKey]);
+
   if (!hasLibraries) {
     return (
       <button
         type="button"
         disabled={busy}
         aria-busy={busy}
-        aria-label="Добавить в сессию"
-        onClick={onAddToSession}
-        className={`inline-flex max-w-full items-center gap-1.5 rounded-md border-0 bg-transparent py-1 text-[11px] uppercase font-semibold leading-none text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()}
+        aria-label="Создать библиотеку"
+        onClick={() => {
+          void runAction(onCreateLibrary);
+        }}
+        className={standaloneAddButtonClassName}
       >
-        <span className="select-none truncate">{primaryLabel}</span>
-        {busy ? busyIndicator : <PlusIcon className="h-4 w-4 shrink-0" />}
+        {busy ? busyIndicator : completed ? <CheckIcon className={plusIconClassName} /> : <PlusIcon className={plusIconClassName} />}
       </button>
     );
   }
 
-  const selectedLibrary =
-    selectedTarget.type === 'library'
-      ? libraries.find((library) => library.id === selectedTarget.libraryId) || null
-      : null;
+  const selectedLibrary = libraries.find((library) => library.id === selectedLibraryId) || null;
   const currentLabel = selectedLibrary?.name || primaryLabel;
 
   return (
@@ -88,29 +176,27 @@ export function CatalogAddTargetMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className={`inline-flex h-5 min-w-0 items-center gap-1 rounded-md border-0 bg-transparent py-0 text-[11px] uppercase font-semibold leading-none text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-          open ? 'text-accent' : ''
-        }`}
+        className={selectorButtonClassName}
       >
         <span className="select-none truncate">{currentLabel}</span>
-        <ChevronDownIcon className="h-4 w-4 shrink-0" />
+        <ChevronDownIcon className={chevronClassName} />
       </button>
 
       <button
         type="button"
         disabled={busy}
         aria-busy={busy}
-        aria-label={selectedLibrary ? `Добавить в библиотеку ${selectedLibrary.name}` : 'Добавить в сессию'}
+        aria-label={selectedLibrary ? `Добавить в библиотеку ${selectedLibrary.name}` : 'Добавить в библиотеку'}
         onClick={() => {
-          if (selectedLibrary) {
-            onAddToLibrary?.(selectedLibrary.id);
+          if (!selectedLibrary) {
+            setOpen(true);
             return;
           }
-          onAddToSession?.();
+          void runAction(() => runAddToLibrary(selectedLibrary.id));
         }}
-        className="ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100"
+        className={addButtonClassName}
       >
-        {busy ? busyIndicator : <PlusIcon className="h-4 w-4 shrink-0" />}
+        {busy ? busyIndicator : completed ? <CheckIcon className={plusIconClassName} /> : <PlusIcon className={plusIconClassName} />}
       </button>
 
       {open ? (
@@ -119,34 +205,21 @@ export function CatalogAddTargetMenu({
           role="menu"
         >
           <div className="max-h-64 overflow-y-auto">
-            <button
-              type="button"
-              role="menuitemradio"
-              aria-checked={selectedTarget.type === 'session'}
-              onClick={() => {
-                setSelectedTarget({ type: 'session', libraryId: null });
-                setOpen(false);
-              }}
-              className={`flex w-full items-center px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
-                selectedTarget.type === 'session'
-                  ? 'bg-accent text-white'
-                  : 'text-gray-900 hover:bg-accent hover:text-white'
-              }`}
-            >
-              <span className="truncate">{primaryLabel}</span>
-            </button>
             {libraries.map((library) => (
               <button
                 key={library.id}
                 type="button"
                 role="menuitemradio"
-                aria-checked={selectedTarget.type === 'library' && selectedTarget.libraryId === library.id}
+                aria-checked={selectedLibraryId === library.id}
                 onClick={() => {
                   setOpen(false);
-                  setSelectedTarget({ type: 'library', libraryId: library.id });
+                  setSelectedLibraryId(library.id);
+                  if (!busy) {
+                    void runAction(() => runAddToLibrary(library.id));
+                  }
                 }}
-                className={`flex w-full items-center border-t border-gray-200 px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
-                  selectedTarget.type === 'library' && selectedTarget.libraryId === library.id
+                className={`flex w-full items-center px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
+                  selectedLibraryId === library.id
                     ? 'bg-accent text-white'
                     : 'text-gray-900 hover:bg-accent hover:text-white'
                 }`}

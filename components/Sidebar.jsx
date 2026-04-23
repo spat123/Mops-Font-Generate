@@ -507,6 +507,7 @@ export default function Sidebar({
   onUpdateFontLibrary,
   onDeleteFontLibrary,
   onReorderFontLibraries,
+  onAddFontToLibrary,
   createLibrarySeedRequest = null,
   onCreateLibrarySeedHandled,
   setSelectedFont,
@@ -1101,6 +1102,7 @@ export default function Sidebar({
           onUpdateLibrary={onUpdateFontLibrary}
           onDeleteLibrary={onDeleteFontLibrary}
           onReorderLibraries={onReorderFontLibraries}
+          onAddFontToLibrary={onAddFontToLibrary}
           createLibrarySeedRequest={createLibrarySeedRequest}
           onCreateLibrarySeedHandled={onCreateLibrarySeedHandled}
         />

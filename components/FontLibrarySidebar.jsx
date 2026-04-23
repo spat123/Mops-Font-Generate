@@ -17,6 +17,7 @@ import {
   mergeLibraryEntries,
   normalizeLibraryText,
 } from '../utils/fontLibraryUtils';
+import { readLibraryFontDragData } from '../utils/libraryDragData';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
@@ -70,6 +71,7 @@ export default function FontLibrarySidebar({
   onReorderLibraries,
   createLibrarySeedRequest = null,
   onCreateLibrarySeedHandled,
+  onAddFontToLibrary,
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [draft, setDraft] = useState(() => readStoredDraft());
@@ -78,6 +80,7 @@ export default function FontLibrarySidebar({
   const [catalogError, setCatalogError] = useState('');
   const [draggedLibraryId, setDraggedLibraryId] = useState(null);
   const [dragOverLibraryId, setDragOverLibraryId] = useState(null);
+  const [dropTargetLibraryId, setDropTargetLibraryId] = useState(null);
   const nameInputRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -291,6 +294,28 @@ export default function FontLibrarySidebar({
   const dialogTitle = isEditMode ? 'Редактировать библиотеку' : 'Добавить библиотеку шрифтов';
   const submitLabel = isEditMode ? 'Сохранить' : 'Создать';
 
+  const handleLibraryDrop = useCallback(
+    (event, libraryId) => {
+      event.preventDefault();
+      const draggedFontEntry = readLibraryFontDragData(event.dataTransfer);
+      if (draggedFontEntry) {
+        onAddFontToLibrary?.(libraryId, draggedFontEntry);
+        setDropTargetLibraryId(null);
+        setDraggedLibraryId(null);
+        setDragOverLibraryId(null);
+        return;
+      }
+      const sourceId = event.dataTransfer.getData('text/plain') || draggedLibraryId;
+      if (sourceId && sourceId !== libraryId) {
+        onReorderLibraries?.(sourceId, libraryId);
+      }
+      setDropTargetLibraryId(null);
+      setDraggedLibraryId(null);
+      setDragOverLibraryId(null);
+    },
+    [draggedLibraryId, onAddFontToLibrary, onReorderLibraries],
+  );
+
   const createDialog =
     isDialogOpen && typeof document !== 'undefined'
       ? createPortal(
@@ -453,16 +478,30 @@ export default function FontLibrarySidebar({
               <div className="space-y-3">
                 {libraries.map((library) => {
                   const isActive = activeLibraryId === library.id;
+                  const fontCount = Array.isArray(library.fonts) ? library.fonts.length : 0;
+                  const previewFonts = fontCount > 4 ? library.fonts.slice(0, 1) : library.fonts;
+                  const remainingFontCount = fontCount > 4 ? fontCount - 1 : 0;
                   return (
                     <div
                       key={library.id}
-                      className={`group rounded-xl border p-2 transition-colors ${
+                      className={`group relative rounded-xl border p-2 transition-colors ${
                         isActive ? 'border-accent bg-accent' : 'border-gray-200 bg-white'
                       } ${draggedLibraryId === library.id ? 'opacity-55' : ''} ${
                         dragOverLibraryId === library.id && draggedLibraryId !== library.id
                           ? 'ring-2 ring-accent ring-offset-2'
                           : ''
-                      }`}
+                      } ${
+                        dropTargetLibraryId === library.id ? 'ring-2 ring-black ring-offset-2' : ''
+                      } cursor-pointer`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpenLibrary?.(library.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onOpenLibrary?.(library.id);
+                        }
+                      }}
                       draggable
                       onDragStart={(event) => {
                         event.dataTransfer.effectAllowed = 'move';
@@ -470,36 +509,62 @@ export default function FontLibrarySidebar({
                         setDraggedLibraryId(library.id);
                       }}
                       onDragOver={(event) => {
+                        const draggedFontEntry = readLibraryFontDragData(event.dataTransfer);
+                        if (draggedFontEntry) {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = 'copy';
+                          if (dropTargetLibraryId !== library.id) {
+                            setDropTargetLibraryId(library.id);
+                          }
+                          if (dragOverLibraryId !== null) {
+                            setDragOverLibraryId(null);
+                          }
+                          return;
+                        }
                         event.preventDefault();
                         if (dragOverLibraryId !== library.id) {
                           setDragOverLibraryId(library.id);
                         }
-                      }}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        const sourceId = event.dataTransfer.getData('text/plain') || draggedLibraryId;
-                        if (sourceId && sourceId !== library.id) {
-                          onReorderLibraries?.(sourceId, library.id);
+                        if (dropTargetLibraryId !== null) {
+                          setDropTargetLibraryId(null);
                         }
-                        setDraggedLibraryId(null);
-                        setDragOverLibraryId(null);
                       }}
+                      onDrop={(event) => handleLibraryDrop(event, library.id)}
                       onDragEnd={() => {
                         setDraggedLibraryId(null);
                         setDragOverLibraryId(null);
+                        setDropTargetLibraryId(null);
+                      }}
+                      onDragLeave={(event) => {
+                        if (!event.currentTarget.contains(event.relatedTarget)) {
+                          setDropTargetLibraryId((prev) => (prev === library.id ? null : prev));
+                          setDragOverLibraryId((prev) => (prev === library.id ? null : prev));
+                        }
                       }}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <button
-                          type="button"
-                          onClick={() => onOpenLibrary?.(library.id)}
-                          className="min-w-0 text-left"
-                        >
-                          <h3 className="truncate text-sm font-semibold uppercase text-gray-900">{library.name}</h3>
-                          <p className="mt-1 text-xs text-gray-500">
-                            {library.fonts.length > 0 ? `${library.fonts.length} шрифтов` : 'Пока без шрифтов'}
-                          </p>
-                        </button>
+                      <div className="min-w-0 text-left">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3
+                            className={`truncate text-sm font-semibold uppercase ${
+                              isActive ? 'text-white' : 'text-gray-900'
+                            }`}
+                          >
+                            {library.name}
+                          </h3>
+                          <span
+                            className={`shrink-0 text-xs font-semibold uppercase ${
+                              isActive ? 'text-white/90' : 'text-gray-500'
+                            }`}
+                          >
+                            {fontCount} ШТ.
+                          </span>
+                        </div>
+                      </div>
+                      <div
+                        className="absolute right-2 top-2"
+                        onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
+                      >
                         <CardActionsMenu
                           triggerLabel={`Действия для библиотеки ${library.name}`}
                           items={[
@@ -520,17 +585,29 @@ export default function FontLibrarySidebar({
                         />
                       </div>
 
-                      {library.fonts.length > 0 ? (
+                      {fontCount > 0 ? (
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {library.fonts.map((font) => (
+                          {previewFonts.map((font) => (
                             <span
                               key={font.id}
-                              className="inline-flex max-w-full items-center rounded-sm bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700"
+                              className={`inline-flex max-w-full items-center rounded-sm px-2.5 py-1 text-xs font-medium ${
+                                isActive ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-700'
+                              }`}
                               title={`${font.label} · ${getLibrarySourceLabel(font.source)}`}
                             >
                               <span className="truncate">{font.label}</span>
                             </span>
                           ))}
+                          {remainingFontCount > 0 ? (
+                            <span
+                              className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold ${
+                                isActive ? 'bg-white text-gray-900' : 'bg-gray-100 text-gray-700'
+                              }`}
+                              title={`Еще ${remainingFontCount} ${remainingFontCount === 1 ? 'шрифт' : 'шрифтов'}`}
+                            >
+                              +{remainingFontCount}
+                            </span>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -553,16 +630,21 @@ export default function FontLibrarySidebar({
           </>
         ) : (
           <div className="flex min-h-0 flex-1 items-center justify-center">
-            <button
-              type="button"
-              onClick={openCreateDialog}
-              className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
-            >
-              <IconCircleButton as="span" variant="accent" size="lg">
-                <PlusIcon className="h-5 w-5" />
-              </IconCircleButton>
-              <span className="max-w-[12rem] leading-5">Добавить библиотеку</span>
-            </button>
+            <div className="flex max-w-[16rem] flex-col items-center gap-4 text-center">
+              <button
+                type="button"
+                onClick={openCreateDialog}
+                className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
+              >
+                <IconCircleButton as="span" variant="accent" size="lg">
+                  <PlusIcon className="h-5 w-5" />
+                </IconCircleButton>
+                <span className="leading-5">Добавить библиотеку</span>
+              </button>
+              <p className="text-xs font-normal leading-5 text-gray-300 transition-colors hover:text-gray-600">
+                На данный момент у вас нет библиотек. Создайте библиотеку, чтобы собирать шрифты отдельно от каталога.
+              </p>
+            </div>
           </div>
         )}
       </div>

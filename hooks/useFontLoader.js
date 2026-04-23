@@ -297,7 +297,8 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     }
   }, [setFonts, loadFontStyleVariant, findStyleInfoByWeightAndStyle]);
 
-  const handleLocalFontsUpload = useCallback(async (newFonts) => {
+  const handleLocalFontsUpload = useCallback(async (newFonts, options = {}) => {
+    const { silent = false, noSelect = false } = options;
     if (!Array.isArray(newFonts) || newFonts.length === 0) {
       toast.error('Ошибка: Не указаны файлы шрифтов');
       return null;
@@ -326,15 +327,19 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
 
           // Сохраняем новые шрифты в IndexedDB
           await Promise.all(trulyNewFonts.map(fontToSave => saveFont(fontToSave)));
-          toast.success(`Успешно загружено и сохранено новых локальных шрифтов: ${trulyNewFonts.length}`);
+          if (!silent) {
+            toast.success(`Успешно загружено и сохранено новых локальных шрифтов: ${trulyNewFonts.length}`);
+          }
           
           // Выбираем первый из *только что добавленных*
-          if (typeof safeSelectFont === 'function') {
+          if (!noSelect && typeof safeSelectFont === 'function') {
             safeSelectFont(trulyNewFonts[0]);
           }
           return trulyNewFonts[0];
         }
-        toast.info("Загруженные локальные шрифты уже были добавлены ранее.");
+        if (!silent) {
+          toast.info("Загруженные локальные шрифты уже были добавлены ранее.");
+        }
         return null;
       }
       toast.warning('Не удалось обработать ни одного из загруженных локальных файлов.');
@@ -348,7 +353,12 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     }
   }, [setFonts, setIsLoading, safeSelectFont, processLocalFont, saveFont, currentFonts]);
 
-  const loadAndSelectFontsourceFont = useCallback(async (fontFamilyName, forceVariableFont = false) => {
+  const loadAndSelectFontsourceFont = useCallback(async (
+    fontFamilyName,
+    forceVariableFont = false,
+    options = {},
+  ) => {
+    const { silent = false, noSelect = false } = options;
     try {
       // Проверяем существующие шрифты (переданные как currentFonts)
       const existingFont = currentFonts.find(font => {
@@ -360,9 +370,11 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       });
 
       if (existingFont) {
-        if (typeof safeSelectFont === 'function') {
+        if (!noSelect && typeof safeSelectFont === 'function') {
           safeSelectFont(existingFont);
-          toast.info(`Шрифт ${existingFont.displayName} уже загружен.`);
+          if (!silent) {
+            toast.info(`Шрифт ${existingFont.displayName} уже загружен.`);
+          }
         }
         return existingFont;
       }
@@ -373,10 +385,12 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       if (fontObj) {
         await saveFont(fontObj); // Сохраняем в DB
         setFonts(prevFonts => [...prevFonts, fontObj]); // Добавляем в состояние
-        if (typeof safeSelectFont === 'function') {
+        if (!noSelect && typeof safeSelectFont === 'function') {
              safeSelectFont(fontObj); // Выбираем новый шрифт
         }
-        toast.success(`Шрифт ${fontObj.displayName} успешно загружен и добавлен`);
+        if (!silent) {
+          toast.success(`Шрифт ${fontObj.displayName} успешно загружен и добавлен`);
+        }
         return fontObj;
       }
       // Ошибка уже обработана и показана в loadAllFontsourceStyles
@@ -396,4 +410,3 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     loadFontsourceStyleVariant: loadFontStyleVariant,
   };
 }
-

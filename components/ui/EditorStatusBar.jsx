@@ -33,7 +33,7 @@ function DefaultTrailing() {
 export function EditorStatusBar({ leading = null, center = null, trailing, beforeTrailing = null, className = '' }) {
   return (
     <div className={`${EDITOR_PREVIEW_BOTTOM_BAR_CLASS} ${className}`.trim()}>
-      <div className="relative z-20 flex min-w-0 max-w-[42%] shrink-0 items-center bg-white py-0.5 pl-2 pr-2 sm:max-w-[38%]">
+      <div className="relative z-20 flex min-w-0 max-w-[42%] shrink-0 items-center bg-white sm:max-w-[38%]">
         {leading != null && leading !== '' ? (
           <span className="truncate text-left text-xs font-semibold uppercase tabular-nums text-gray-800">
             {leading}

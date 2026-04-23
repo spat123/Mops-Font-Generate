@@ -1,5 +1,6 @@
 import React from 'react';
 import EditableText from './EditableText';
+import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 import { useSettings } from '../contexts/SettingsContext';
 import { useTextDisplayBuffer } from '../hooks/useTextDisplayBuffer';
 
@@ -24,13 +25,17 @@ function TextMode({
   });
 
   return (
-    <div ref={textContainerRef} className="relative flex flex-col h-full animated-text-container">
+    <div
+      ref={textContainerRef}
+      className="relative flex h-full min-h-full w-full flex-col pb-8 pr-8 animated-text-container"
+    >
       <EditableText
         style={{ ...contentStyle, position: 'relative', zIndex: 10, color: 'transparent', caretColor: contentStyle.color || 'black' }}
         isStyles={false}
         syncId="text"
         autoFocus={true}
       />
+      <PreviewEditTextHint />
     </div>
   );
 }

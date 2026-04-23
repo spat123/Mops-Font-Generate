@@ -6,21 +6,21 @@ export function CatalogLibraryActions({
   busy = false,
   busyIndicator = null,
   libraryEntry = null,
-  onAddToSession,
   onAddFontToLibrary,
   onRequestCreateLibrary,
+  appearance = 'default',
+  stateKey = '',
 }) {
   return (
     <CatalogAddTargetMenu
       libraries={libraries}
       busy={busy}
       busyIndicator={busyIndicator}
-      onAddToSession={onAddToSession}
+      appearance={appearance}
+      stateKey={stateKey || libraryEntry?.id || ''}
       onAddToLibrary={async (libraryId) => {
-        const ok = await onAddToSession?.();
-        if (ok && libraryEntry) {
-          onAddFontToLibrary?.(libraryId, libraryEntry);
-        }
+        if (!libraryEntry) return false;
+        return (await onAddFontToLibrary?.(libraryId, libraryEntry)) !== false;
       }}
       onCreateLibrary={() => {
         if (libraryEntry) {

@@ -55,17 +55,28 @@ export function CardActionsMenu({ items = [], triggerLabel = 'Действия',
           className="absolute right-0 top-10 z-20 min-w-[10rem] overflow-hidden rounded-md bg-white shadow-md"
           role="menu"
         >
-          {items.map((item) => (
+          {items.map((item, index) => (
             <button
               key={item.key}
               type="button"
               role="menuitem"
+              disabled={Boolean(item.disabled)}
               onClick={() => {
+                if (item.disabled) return;
                 item.onSelect?.();
                 setOpen(false);
               }}
-              className={`flex w-full items-center px-3 py-2 text-left text-xs border-b border-gray-200 font-medium uppercase transition-colors hover:bg-accent hover:text-white
-              `}
+              className={[
+                'flex w-full items-center border-b border-gray-200 px-3 py-2 text-left text-xs font-medium uppercase transition-colors',
+                index === items.length - 1 ? 'border-b-0' : '',
+                item.disabled
+                  ? 'cursor-not-allowed text-gray-400'
+                  : item.tone === 'danger'
+                    ? 'text-gray-900 hover:bg-red-600 hover:text-white'
+                    : 'text-gray-900 hover:bg-accent hover:text-white',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
               {item.icon ? <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center">{item.icon}</span> : null}
               {item.label}

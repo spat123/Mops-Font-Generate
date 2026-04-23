@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeLibraryText } from '../../utils/fontLibraryUtils';
 
 export function FontLibraryStatusMenu({
   libraries = [],
@@ -10,15 +11,49 @@ export function FontLibraryStatusMenu({
   const rootRef = useRef(null);
 
   const entryId = String(libraryEntry?.id || '');
+  const entrySource = String(libraryEntry?.source || '').trim();
+  const entryLabel = normalizeLibraryText(libraryEntry?.label || '').toLowerCase();
+  const candidateIds = Array.isArray(libraryEntry?.candidateIds)
+    ? libraryEntry.candidateIds.map((value) => String(value || '').trim()).filter(Boolean)
+    : [];
+  const candidateLabels = Array.isArray(libraryEntry?.candidateLabels)
+    ? libraryEntry.candidateLabels
+        .map((value) => normalizeLibraryText(value || '').toLowerCase())
+        .filter(Boolean)
+    : [];
   const availableLibraries = Array.isArray(libraries) ? libraries : [];
   const attachedLibraryIds = useMemo(() => {
-    if (!entryId) return new Set();
+    if (!entryId && !entryLabel && candidateIds.length === 0 && candidateLabels.length === 0) return new Set();
     return new Set(
       availableLibraries
-        .filter((lib) => Array.isArray(lib?.fonts) && lib.fonts.some((f) => String(f?.id || '') === entryId))
+        .filter(
+          (lib) =>
+            Array.isArray(lib?.fonts) &&
+            lib.fonts.some((f) => {
+              const fontId = String(f?.id || '').trim();
+              if (entryId && fontId === entryId) return true;
+              if (candidateIds.includes(fontId)) return true;
+              const fontSource = String(f?.source || '').trim();
+              const fontLabel = normalizeLibraryText(f?.label || '').toLowerCase();
+              if (
+                candidateLabels.length > 0 &&
+                entrySource &&
+                fontSource === entrySource &&
+                candidateLabels.includes(fontLabel)
+              ) {
+                return true;
+              }
+              return Boolean(
+                entryLabel &&
+                  entrySource &&
+                  fontSource === entrySource &&
+                  fontLabel === entryLabel,
+              );
+            }),
+        )
         .map((lib) => lib.id),
     );
-  }, [availableLibraries, entryId]);
+  }, [availableLibraries, candidateIds, candidateLabels, entryId, entryLabel, entrySource]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -47,7 +82,7 @@ export function FontLibraryStatusMenu({
     : 'Не в библиотеке';
 
   return (
-    <div ref={rootRef} className="relative flex h-full shrink-0 items-center pr-2">
+    <div ref={rootRef} className="relative flex h-full shrink-0 items-center pr-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -86,7 +121,7 @@ export function FontLibraryStatusMenu({
                     <span className="truncate">{library.name}</span>
                     {isAdded ? (
                       <span className="ml-2 shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] uppercase text-gray-900">
-                        текущая
+                        здесь
                       </span>
                     ) : null}
                   </button>

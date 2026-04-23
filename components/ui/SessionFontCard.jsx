@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { CardActionsMenu } from './CardActionsMenu';
+import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
 
 const PREVIEW_SAMPLE = 'AaBbCcDdEe';
 
@@ -25,6 +27,10 @@ export function SessionFontCard({
   previewStyle,
   onCardClick,
   onRemove,
+  /** Меню «⋯» (например в сохранённой библиотеке); если задано, крестик не показывается */
+  menuItems,
+  /** Нижний правый угол: CatalogDownloadSplitButton (как в каталоге) */
+  downloadSplitButtonProps,
   variant = 'default',
   previewClassName,
   shellClassName = '',
@@ -34,8 +40,10 @@ export function SessionFontCard({
   onDrop,
   onDragEnd,
 }) {
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+
   const base =
-    `relative rounded-lg bg-surface-card transition-all duration-200 ${
+    `group relative rounded-lg bg-surface-card transition-all duration-200 ${
       onCardClick ? 'cursor-pointer ' : ''
     }` +
     (selected
@@ -70,13 +78,40 @@ export function SessionFontCard({
         {PREVIEW_SAMPLE}
       </div>
       <div className={subCls}>{subtitle}</div>
-      {onRemove ? (
+      {Array.isArray(menuItems) && menuItems.length > 0 ? (
+        <div
+          className="absolute right-2 top-2 z-20"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <CardActionsMenu triggerLabel={`Действия: ${title}`} items={menuItems} />
+        </div>
+      ) : onRemove ? (
         <CardRemoveButton
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
           }}
         />
+      ) : null}
+      {downloadSplitButtonProps ? (
+        <div
+          className={[
+            'absolute bottom-2 right-2 z-[11] max-w-[calc(100%-0.75rem)] opacity-0 transition-opacity duration-200',
+            'pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100',
+            'focus-within:pointer-events-auto focus-within:opacity-100',
+            downloadMenuOpen ? '!pointer-events-auto !opacity-100' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <CatalogDownloadSplitButton
+            {...downloadSplitButtonProps}
+            onMenuOpenChange={setDownloadMenuOpen}
+          />
+        </div>
       ) : null}
     </div>
   );

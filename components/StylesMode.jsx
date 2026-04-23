@@ -9,6 +9,7 @@ import {
   ITALIC_VARIATIONS,
   WEIGHT_VARIATIONS,
 } from '../utils/stylesPreviewModel';
+import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 
 /**
  * Компонент для режима отображения стилей шрифта
@@ -50,7 +51,7 @@ function StylesMode({
   const chrome = useMemo(() => getPreviewChromeFromBackground(backgroundColor), [backgroundColor]);
 
   return (
-    <div className="min-w-0 max-w-full overflow-x-hidden px-4 pb-8 pt-4 sm:px-6">
+    <div className="relative min-h-full min-w-0 max-w-full overflow-x-hidden px-4 pb-8 pt-4 sm:px-6">
       {/* Статические стили шрифта */}
       {showStaticStyles && (
         <div className="mb-8 overflow-x-hidden">
@@ -291,6 +292,8 @@ function StylesMode({
           </p>
         </div>
       </div>
+
+      <PreviewEditTextHint />
     </div>
   );
 }

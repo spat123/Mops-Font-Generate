@@ -20,7 +20,7 @@ import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchIcon } from './ui/CommonIcons';
 import { IconCircleButton } from './ui/IconCircleButton';
 import { FontLibraryStatusMenu } from './ui/FontLibraryStatusMenu';
-import { createCatalogLibraryEntry } from '../utils/fontLibraryUtils';
+import { createCatalogLibraryEntry, normalizeLibraryText } from '../utils/fontLibraryUtils';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 
 // --- Ленивая загрузка компонентов режимов ---
@@ -484,15 +484,54 @@ export default function FontPreview({
   const statusLibraryEntry = useMemo(() => {
     if (!selectedFont) return null;
     const label = selectedFont.displayName || selectedFont.fontFamily || selectedFont.name || 'Шрифт';
+    const candidateLabels = Array.from(
+      new Set(
+        [
+          selectedFont.displayName,
+          selectedFont.fontFamily,
+          selectedFont.name,
+          label,
+        ]
+          .map((value) =>
+            normalizeLibraryText(String(value || ''))
+              .replace(/\.woff2$/i, '')
+              .replace(/\s+variable$/i, '')
+              .trim(),
+          )
+          .filter(Boolean),
+      ),
+    );
     if (selectedFont.source === 'google') {
-      const family = String(label || selectedFont.name || '').replace(/\.woff2$/i, '').trim();
+      const family = normalizeLibraryText(
+        selectedFont.fontFamily || selectedFont.displayName || selectedFont.name || '',
+      )
+        .replace(/\.woff2$/i, '')
+        .replace(/\s+variable$/i, '')
+        .trim();
       if (!family) return null;
-      return createCatalogLibraryEntry({ source: 'google', key: family, label: family });
+      const entry = createCatalogLibraryEntry({ source: 'google', key: family, label: family });
+      if (!entry) return null;
+      return {
+        ...entry,
+        candidateIds: [`google:${family}`],
+        candidateLabels: Array.from(new Set([family, ...candidateLabels])),
+      };
     }
     if (selectedFont.source === 'fontsource') {
       const key = String(selectedFont.name || selectedFont.displayName || selectedFont.id || '').trim();
+      const familyLabel = normalizeLibraryText(
+        selectedFont.displayName || selectedFont.fontFamily || selectedFont.name || '',
+      )
+        .replace(/\s+variable$/i, '')
+        .trim();
       if (!key) return null;
-      return createCatalogLibraryEntry({ source: 'fontsource', key, label });
+      const entry = createCatalogLibraryEntry({ source: 'fontsource', key, label: familyLabel || key });
+      if (!entry) return null;
+      return {
+        ...entry,
+        candidateIds: [`fontsource:${key}`],
+        candidateLabels: Array.from(new Set([familyLabel || key, ...candidateLabels])),
+      };
     }
     const fallbackId = String(selectedFont.id || selectedFont.name || label).trim();
     if (!fallbackId) return null;
@@ -500,6 +539,20 @@ export default function FontPreview({
       id: `session:${fallbackId}`,
       label,
       source: String(selectedFont.source || 'session'),
+      candidateIds: Array.from(
+        new Set(
+          [
+            selectedFont.id,
+            selectedFont.name,
+            selectedFont.displayName,
+            fallbackId,
+          ]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+            .map((value) => `session:${value}`),
+        ),
+      ),
+      candidateLabels,
     };
   }, [selectedFont]);
 

@@ -372,8 +372,8 @@ export function useFontManager() {
     return createStaticFontFromExportHook(selectedFont, selectedFontName, variableSettings, setExportedFont);
   }, [createStaticFontFromExportHook, selectedFont, selectedFontName, variableSettings, setExportedFont]);
 
-  const handleFontsUploaded = useCallback(async (newFonts) => {
-    return await handleLocalFontsUpload(newFonts);
+  const handleFontsUploaded = useCallback(async (newFonts, options = {}) => {
+    return await handleLocalFontsUpload(newFonts, options);
   }, [handleLocalFontsUpload]);
 
   const removeFont = useCallback((fontId) => {
@@ -410,8 +410,6 @@ export function useFontManager() {
       
       return updatedFonts;
     });
-    
-    toast.success('Шрифт удален');
   }, [selectedFont, setFonts, setSelectedFont]);
 
   // Обертки для совместимости с предыдущим API
@@ -419,8 +417,12 @@ export function useFontManager() {
     return exportToCSSFromExportHook(selectedFont, selectedFontName, download);
   }, [exportToCSSFromExportHook, selectedFont, selectedFontName]);
 
-  const selectOrAddFontsourceFont = useCallback(async (fontFamilyName, forceVariableFont = false) => {
-    return loadAndSelectFontsourceFont(fontFamilyName, forceVariableFont);
+  const selectOrAddFontsourceFont = useCallback(async (
+    fontFamilyName,
+    forceVariableFont = false,
+    options = {},
+  ) => {
+    return loadAndSelectFontsourceFont(fontFamilyName, forceVariableFont, options);
   }, [loadAndSelectFontsourceFont]);
   
   const resetApplicationState = useCallback(async () => {

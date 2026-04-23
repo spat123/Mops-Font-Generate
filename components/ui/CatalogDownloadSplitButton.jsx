@@ -21,16 +21,22 @@ function DownloadIcon({ className = 'h-3.5 w-3.5' }) {
 export function CatalogDownloadSplitButton({
   disabled = false,
   onPrimaryClick,
+  onActionComplete,
   primaryLabel = 'Скачать',
   primaryAriaLabel = 'Скачать',
   menuItems = [],
   tone = 'light',
   className = '',
+  onMenuOpenChange,
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const menuRef = useRef(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, ready: false });
+
+  useEffect(() => {
+    onMenuOpenChange?.(open);
+  }, [open, onMenuOpenChange]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -99,14 +105,48 @@ export function CatalogDownloadSplitButton({
   const rootClassName = `relative inline-flex h-8 w-40.5 items-stretch ${className}`.trim();
   const primaryClassName = isAccent
     ? 'inline-flex items-center gap-1.5 w-full rounded-l-sm bg-accent px-3 text-xs uppercase font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400'
-    : 'inline-flex items-center gap-1.5 rounded-l-md border border-r-0 border-gray-200 bg-white/95 px-2 text-[11px] uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70';
+    : 'inline-flex items-center gap-1.5 rounded-l-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70';
   const secondaryClassName = isAccent
-    ? `inline-flex w-7 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
+    ? `inline-flex w-8 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
         open ? 'bg-accent-hover' : ''
       }`
-    : `inline-flex w-7 items-center justify-center rounded-r-md border border-gray-200 bg-white/95 text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70 ${
+    : `inline-flex w-7 items-center justify-center rounded-r-md border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70 ${
         open ? 'bg-white' : ''
       }`;
+
+  const menuDropdownEl = (
+    <div
+      ref={menuRef}
+      className={`fixed z-[110] min-w-[13rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg ${
+        menuPosition.ready ? 'opacity-100' : 'opacity-0'
+      }`}
+      role="menu"
+      style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
+    >
+      {(menuItems || [])
+        .filter((item) => !item?.hidden)
+        .map((item, index) => (
+          <button
+            key={item.key}
+            type="button"
+            role="menuitem"
+            data-no-card-select="true"
+            disabled={item.disabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen(false);
+              item.onSelect?.();
+              onActionComplete?.();
+            }}
+            className={`flex w-full items-center px-3 py-2 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
+              index > 0 ? 'border-t border-gray-200' : ''
+            }`}
+          >
+            <span className="truncate">{item.label}</span>
+          </button>
+        ))}
+    </div>
+  );
 
   return (
     <div ref={rootRef} className={rootClassName}>
@@ -117,6 +157,7 @@ export function CatalogDownloadSplitButton({
         onClick={(event) => {
           event.stopPropagation();
           onPrimaryClick?.();
+          onActionComplete?.();
         }}
         className={primaryClassName}
         aria-label={primaryAriaLabel}
@@ -139,41 +180,7 @@ export function CatalogDownloadSplitButton({
       >
         <ChevronDownIcon />
       </button>
-      {open && typeof document !== 'undefined'
-        ? createPortal(
-            <div
-              ref={menuRef}
-              className={`fixed z-[110] min-w-[13rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg ${
-                menuPosition.ready ? 'opacity-100' : 'opacity-0'
-              }`}
-              role="menu"
-              style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
-            >
-              {(menuItems || [])
-                .filter((item) => !item?.hidden)
-                .map((item, index) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    role="menuitem"
-                    data-no-card-select="true"
-                    disabled={item.disabled}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setOpen(false);
-                      item.onSelect?.();
-                    }}
-                    className={`flex w-full items-center px-3 py-2 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
-                      index > 0 ? 'border-t border-gray-200' : ''
-                    }`}
-                  >
-                    <span className="truncate">{item.label}</span>
-                  </button>
-                ))}
-            </div>,
-            document.body,
-          )
-        : null}
+      {open && typeof document !== 'undefined' ? createPortal(menuDropdownEl, document.body) : null}
     </div>
   );
 }
