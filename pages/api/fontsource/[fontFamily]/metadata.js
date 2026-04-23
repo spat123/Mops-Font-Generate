@@ -6,6 +6,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
+import { slugifyFontKey } from '../../../../utils/fontSlug';
 import { findFontsourcePackagePath } from '../../../../utils/serverUtils';
 
 export default async function handler(req, res) {
@@ -21,8 +22,7 @@ export default async function handler(req, res) {
       });
     }
     
-    // Нормализуем имя шрифта для поиска пакета
-    const packageName = fontFamily.toLowerCase().replace(/\s+/g, '-');
+    const packageName = slugifyFontKey(fontFamily);
 
     // Находим путь к пакету Fontsource
     // Для вариативных шрифтов используем префикс variable/

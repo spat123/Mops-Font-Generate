@@ -118,14 +118,53 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
       }
       
       const metadata = JSON.parse(metaResponseText);
+      const metadataPayload =
+        metadata && typeof metadata === 'object' && metadata.metadata && typeof metadata.metadata === 'object'
+          ? metadata.metadata
+          : metadata;
 
-      const actualIsVariableFont = metadata?.metadata?.variable && forceVariableFont;
+      const variableMeta = metadataPayload?.variable;
+      const hasVariableSupport = Boolean(variableMeta);
+      const actualIsVariableFont = hasVariableSupport && forceVariableFont;
       const familyLabel =
-        metadata?.family || metadata?.metadata?.family || fontFamily;
+        metadataPayload?.family || metadata?.family || fontFamily;
       const displayName = actualIsVariableFont
         ? `${familyLabel} Variable`
         : familyLabel;
       const fontId = `fontsource-${fontFamily}-${actualIsVariableFont ? 'variable' : 'static'}`;
+      const weightsArrayRaw = Array.isArray(metadataPayload?.weights) ? metadataPayload.weights : [];
+      const stylesArrayRaw = Array.isArray(metadataPayload?.styles) ? metadataPayload.styles : [];
+      const stylesArray = stylesArrayRaw
+        .map((style) => String(style || '').trim().toLowerCase())
+        .filter(Boolean);
+      const hasItalicStyles = stylesArray.includes('italic');
+      const parsedVariableAxes =
+        actualIsVariableFont && variableMeta && typeof variableMeta === 'object'
+          ? Object.entries(variableMeta).reduce((acc, [axisTag, axisValue]) => {
+              if (!axisValue || typeof axisValue !== 'object') return acc;
+              const min = Number(axisValue.min);
+              const max = Number(axisValue.max);
+              const def = Number(axisValue.default);
+              const step = Number(axisValue.step);
+              if (!Number.isFinite(min) || !Number.isFinite(max)) return acc;
+              acc[axisTag] = {
+                min,
+                max,
+                default: Number.isFinite(def) ? def : min,
+                step: Number.isFinite(step) ? step : 1,
+              };
+              return acc;
+            }, {})
+          : {};
+      const italicMode = actualIsVariableFont
+        ? (parsedVariableAxes.ital
+          ? 'axis-ital'
+          : parsedVariableAxes.slnt
+            ? 'axis-slnt'
+            : hasItalicStyles
+              ? 'separate-style'
+              : 'none')
+        : 'none';
 
       const fontObj = {
         id: fontId,
@@ -134,30 +173,43 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         source: 'fontsource',
         // Имя для FontFace/CSS без лишних кавычек; кавычки добавляет useFontCss.getFontFamily
         fontFamily: displayName,
-        variableAxes: actualIsVariableFont ? metadata?.metadata?.axes : {},
+        variableAxes: parsedVariableAxes,
         isVariableFont: actualIsVariableFont,
+        italicMode,
+        hasItalicStyles,
         availableStyles: [],
         loadedStyles: [],
         file: null,
         url: null
       };
 
-      if (actualIsVariableFont && metadata.variable && metadata.variable.url) {
+      if (actualIsVariableFont) {
         try {
-          const fontFileResponse = await fetch(metadata.variable.url);
-          if (!fontFileResponse.ok) throw new Error(`Не удалось загрузить файл вариативного шрифта (статус ${fontFileResponse.status})`);
-          const fontBuffer = await fontFileResponse.arrayBuffer();
-          const fileExtension = metadata.variable.url.split('.').pop()?.toLowerCase() || 'woff2';
-          const mimeType = `font/${fileExtension === 'ttf' ? 'ttf' : fileExtension === 'otf' ? 'otf' : fileExtension === 'woff' ? 'woff' : 'woff2'}`;
-          const blob = new Blob([fontBuffer], { type: mimeType });
+          const loadVariableStylePayload = async (targetStyle = 'normal') => {
+            const variableApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}/variable?subset=latin&style=${encodeURIComponent(targetStyle)}&forceVariable=true`;
+            const fontFileResponse = await fetch(variableApiUrl);
+            if (!fontFileResponse.ok) throw new Error(`Не удалось загрузить файл вариативного шрифта (статус ${fontFileResponse.status})`);
+            const variablePayload = await fontFileResponse.json();
+            const fontBufferBase64 = variablePayload?.fontBufferBase64;
+            const fileName = String(variablePayload?.fileName || '');
+            if (!fontBufferBase64) throw new Error('Пустой буфер вариативного шрифта');
+            const fontBuffer = base64ToArrayBuffer(fontBufferBase64);
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'woff2';
+            const mimeType = `font/${fileExtension === 'ttf' ? 'ttf' : fileExtension === 'otf' ? 'otf' : fileExtension === 'woff' ? 'woff' : 'woff2'}`;
+            const blob = new Blob([fontBuffer], { type: mimeType });
+            const blobUrl = URL.createObjectURL(blob);
+            return { blob, fileExtension, blobUrl };
+          };
 
-          fontObj.file = blob;
-          fontObj.url = URL.createObjectURL(blob);
+          const normalFace = await loadVariableStylePayload('normal');
+          fontObj.file = normalFace.blob;
+          fontObj.url = normalFace.blobUrl;
 
           const fontFaceRule = `
               @font-face {
                   font-family: ${JSON.stringify(displayName)};
-                  src: url('${fontObj.url}') format('${fileExtension === 'ttf' ? 'truetype' : fileExtension === 'otf' ? 'opentype' : fileExtension}');
+                  src: url('${normalFace.blobUrl}') format('${normalFace.fileExtension === 'ttf' ? 'truetype' : normalFace.fileExtension === 'otf' ? 'opentype' : normalFace.fileExtension}');
+                  font-style: normal;
                   font-display: swap;
               }
             `;
@@ -165,30 +217,52 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
           styleElement.textContent = fontFaceRule;
           document.head.appendChild(styleElement);
 
+          if (italicMode === 'separate-style' && hasItalicStyles) {
+            try {
+              const italicFace = await loadVariableStylePayload('italic');
+              const italicRule = `
+                @font-face {
+                    font-family: ${JSON.stringify(displayName)};
+                    src: url('${italicFace.blobUrl}') format('${italicFace.fileExtension === 'ttf' ? 'truetype' : italicFace.fileExtension === 'otf' ? 'opentype' : italicFace.fileExtension}');
+                    font-style: italic;
+                    font-display: swap;
+                }
+              `;
+              const italicStyleElement = document.createElement('style');
+              italicStyleElement.textContent = italicRule;
+              document.head.appendChild(italicStyleElement);
+            } catch (italicLoadError) {
+              console.warn(`[FontLoader] Не удалось догрузить italic-face для ${displayName}:`, italicLoadError);
+            }
+          }
+
         } catch (loadError) {
           console.error(`[FontLoader] Ошибка при загрузке/обработке вариативного файла ${displayName}:`, loadError);
-          toast.error(`Ошибка загрузки вариативного шрифта ${displayName}`);
+          throw loadError;
         }
       }
 
-      const weightsArray = Array.isArray(metadata?.metadata?.weights) ? metadata.metadata.weights : [];
-      const stylesArray = Array.isArray(metadata?.metadata?.styles) ? metadata.metadata.styles : [];
+      const weightsArray = weightsArrayRaw
+        .map((weight) => parseInt(weight, 10))
+        .filter((weight) => Number.isFinite(weight));
+      const weightsForStyles = weightsArray.length > 0 ? weightsArray : [400];
+      const stylesForStyles = stylesArray.length > 0 ? stylesArray : ['normal'];
 
-      const availableStyles = weightsArray.flatMap(weight => {
-        return stylesArray.map(style => {
+      const availableStyles = weightsForStyles.flatMap(weight => {
+        return stylesForStyles.map(style => {
           const weightNum = parseInt(weight, 10) || 400;
           const styleInfo = findStyleInfoByWeightAndStyle(weightNum, style);
-          return { name: styleInfo ? styleInfo.name : `${weight} ${style}`, weight: weightNum, style: style };
+          return { name: styleInfo ? styleInfo.name : `${weightNum} ${style}`, weight: weightNum, style: style };
         });
       });
       fontObj.availableStyles = availableStyles;
 
       if (!actualIsVariableFont) {
-        const regularWeight = weightsArray.includes('400') ? '400' : (weightsArray[0] || '400');
-        const regularStyle = stylesArray.includes('normal') ? 'normal' : (stylesArray[0] || 'normal');
+        const regularWeight = weightsForStyles.includes(400) ? 400 : (weightsForStyles[0] || 400);
+        const regularStyle = stylesForStyles.includes('normal') ? 'normal' : (stylesForStyles[0] || 'normal');
 
         try {
-          const mainStyleBlob = await loadFontStyleVariant(fontFamily, parseInt(regularWeight, 10), regularStyle, fontObj, true);
+          const mainStyleBlob = await loadFontStyleVariant(fontFamily, regularWeight, regularStyle, fontObj, true);
           if (mainStyleBlob instanceof Blob) {
             fontObj.file = mainStyleBlob;
             fontObj.url = URL.createObjectURL(mainStyleBlob);
@@ -203,10 +277,10 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         // Загружаем остальные стили в фоне
         setTimeout(async () => {
           const promises = [];
-          for (const weight of weightsArray) {
-            for (const style of stylesArray) {
+          for (const weight of weightsForStyles) {
+            for (const style of stylesForStyles) {
               if (weight === regularWeight && style === regularStyle) continue;
-              promises.push(loadFontStyleVariant(fontFamily, parseInt(weight, 10), style, fontObj, false)
+              promises.push(loadFontStyleVariant(fontFamily, weight, style, fontObj, false)
                 .catch(error => console.error(`Ошибка фоновой загрузки стиля ${fontFamily} ${weight} ${style}:`, error)));
             }
           }

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
+import { slugifyFontKey } from '../utils/fontSlug';
 
 /**
  * Экспорт CSS: формат файла, предпросмотр, копирование, скачивание.
@@ -43,7 +44,7 @@ export default function ExportModal({ isOpen, onClose, cssCode, fontName }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(fontName || 'font').replace(/\s+/g, '-').toLowerCase()}-export.${ext}`;
+    a.download = `${slugifyFontKey(fontName || 'font')}-export.${ext}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

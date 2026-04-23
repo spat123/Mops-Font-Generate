@@ -1,6 +1,5 @@
 import React from 'react';
 import EditableText from './EditableText';
-import { useSettings } from '../contexts/SettingsContext';
 
 /**
  * Компонент для режима простого текста
@@ -9,11 +8,6 @@ import { useSettings } from '../contexts/SettingsContext';
  * @param {Object} props.contentStyle - Стили содержимого
  */
 function PlainTextMode({ containerStyle, contentStyle, variant = 'default' }) {
-  // Получаем text и setText из контекста
-  const { text } = useSettings();
-
-  // Обеспечиваем, что текст всегда имеет значение
-  const displayText = text || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const isFullscreen = variant === 'fullscreen';
 
   return (

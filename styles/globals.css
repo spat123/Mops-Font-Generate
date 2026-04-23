@@ -77,6 +77,21 @@
   --border-radius-4xl: 2rem;
 }
 
+html.theme-dark {
+  --color-gray-50: #111214;
+  --color-gray-100: #17181b;
+  --color-gray-200: #24262b;
+  --color-gray-300: #353842;
+  --color-gray-400: #7f8797;
+  --color-gray-500: #a9b1c2;
+  --color-gray-600: #c5ccda;
+  --color-gray-700: #d8deea;
+  --color-gray-800: #e7ebf3;
+  --color-gray-900: #f4f6fa;
+  --color-gray-950: #ffffff;
+  --color-surface-card: #1b1d22;
+}
+
 /* Базовые стили */
 html {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -151,6 +166,21 @@ input[type='number'].no-arrows {
   -moz-appearance: textfield;
 }
 
+input[type='search']::-webkit-search-decoration,
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-results-button,
+input[type='search']::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='search']::-ms-clear,
+input[type='search']::-ms-reveal {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* Режим Styles: без системного синего у выделения, фокуса и tap-highlight у contenteditable */
 .styles-editable {
   caret-color: var(--color-accent);
@@ -164,7 +194,8 @@ input[type='number'].no-arrows {
 
 .styles-editable:focus-visible {
   outline: 2px solid var(--color-accent) !important;
-  outline-offset: 2px;
+  /* без положительного offset — кольцо не вылезает за колонку и не даёт гориз. скролл */
+  outline-offset: 0;
   box-shadow: none;
 }
 

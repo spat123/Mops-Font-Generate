@@ -38,6 +38,7 @@ const LOCAL_STORAGE_KEYS = {
   /** Вертикальное положение текста в превью: top | middle | bottom */
   VERTICAL_ALIGNMENT: 'verticalAlignment',
   TEXT_FILL: 'textFill',
+  DARK_THEME: 'darkTheme',
 };
 
 const DEFAULT_SETTINGS = {
@@ -91,6 +92,7 @@ const DEFAULT_SETTINGS = {
   /** @type {'top'|'middle'|'bottom'} */
   VERTICAL_ALIGNMENT: 'top',
   TEXT_FILL: false,
+  DARK_THEME: false,
 };
 
 /** Текст превью по умолчанию (как при сбросе настроек). */
@@ -131,6 +133,7 @@ export function getDefaultPreviewSettingsSnapshot() {
     textCenter: DEFAULT_SETTINGS.TEXT_CENTER,
     verticalAlignment: DEFAULT_SETTINGS.VERTICAL_ALIGNMENT,
     textFill: DEFAULT_SETTINGS.TEXT_FILL,
+    darkTheme: DEFAULT_SETTINGS.DARK_THEME,
     previewBackgroundImage: null,
   };
 }
@@ -202,6 +205,7 @@ export const SettingsProvider = ({ children }) => {
   const [textCenter, setTextCenter] = useState(DEFAULT_SETTINGS.TEXT_CENTER);
   const [verticalAlignment, setVerticalAlignment] = useState(DEFAULT_SETTINGS.VERTICAL_ALIGNMENT);
   const [textFill, setTextFill] = useState(DEFAULT_SETTINGS.TEXT_FILL);
+  const [darkTheme, setDarkTheme] = useState(DEFAULT_SETTINGS.DARK_THEME);
   /** Data URL изображения на фоне области превью или null */
   const [previewBackgroundImage, setPreviewBackgroundImage] = useState(null);
 
@@ -289,6 +293,7 @@ export const SettingsProvider = ({ children }) => {
     }
     setVerticalAlignment(va);
     setTextFill(getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_FILL, DEFAULT_SETTINGS.TEXT_FILL));
+    setDarkTheme(Boolean(getLocalStorageItem(LOCAL_STORAGE_KEYS.DARK_THEME, DEFAULT_SETTINGS.DARK_THEME)));
     const img = getLocalStorageItem(LOCAL_STORAGE_KEYS.PREVIEW_BACKGROUND_IMAGE, null);
     setPreviewBackgroundImage(typeof img === 'string' && img.length > 0 ? img : null);
   }, []);
@@ -328,7 +333,18 @@ export const SettingsProvider = ({ children }) => {
     setTextCenter(verticalAlignment === 'middle');
   }, [verticalAlignment, setTextCenter]);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_FILL, textFill);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.DARK_THEME, darkTheme);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.PREVIEW_BACKGROUND_IMAGE, previewBackgroundImage);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const root = document.documentElement;
+    if (darkTheme) {
+      root.classList.add('theme-dark');
+    } else {
+      root.classList.remove('theme-dark');
+    }
+  }, [darkTheme]);
 
   const resetSettings = useCallback(() => {
     setText(DEFAULT_SETTINGS.TEXT);
@@ -363,6 +379,7 @@ export const SettingsProvider = ({ children }) => {
     setTextCenter(DEFAULT_SETTINGS.TEXT_CENTER);
     setVerticalAlignment(DEFAULT_SETTINGS.VERTICAL_ALIGNMENT);
     setTextFill(DEFAULT_SETTINGS.TEXT_FILL);
+    setDarkTheme(DEFAULT_SETTINGS.DARK_THEME);
     setPreviewBackgroundImage(null);
 
     Object.values(LOCAL_STORAGE_KEYS).forEach((key) => {
@@ -437,6 +454,8 @@ export const SettingsProvider = ({ children }) => {
     setVerticalAlignment,
     textFill,
     setTextFill,
+    darkTheme,
+    setDarkTheme,
     previewBackgroundImage,
     setPreviewBackgroundImage,
     resetSettings,

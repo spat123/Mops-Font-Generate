@@ -30,7 +30,8 @@ export function SortableFontCardGrid({
             draggable={draggable}
             shellClassName={[
               isDragging ? 'opacity-55' : '',
-              isDragOver ? 'ring-2 ring-accent ring-offset-2' : '',
+              /* ring-inset — внутри карточки, не обрезается overflow-hidden у предков */
+              isDragOver ? 'ring-2 ring-inset ring-accent' : '',
             ]
               .filter(Boolean)
               .join(' ')}

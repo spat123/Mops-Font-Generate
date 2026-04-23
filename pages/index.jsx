@@ -17,6 +17,7 @@ import { EditorTabBar, EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { ScopeFilterToolbar } from '../components/ui/ScopeFilterToolbar';
 import { UploadFromDiskCard } from '../components/ui/UploadFromDiskCard';
+import { EditorStatusBar } from '../components/ui/EditorStatusBar';
 import { updateFontSettings } from '../utils/db';
 import { useFontLibraries } from '../hooks/useFontLibraries';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
@@ -25,6 +26,10 @@ import {
   collectPerFontPreviewSnapshot,
   applyPerFontPreviewSnapshot,
 } from '../utils/perFontPreviewSettings';
+import { preloadFontsourcePreviewSlugs } from '../utils/fontsourcePreviewRuntimeCache';
+import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
+import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
+import { formatCatalogAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
 
 function isFontTabId(tab) {
   return typeof tab === 'string' && tab !== 'library' && !tab.startsWith(EMPTY_PREFIX);
@@ -98,7 +103,7 @@ function readEditorShellFromStorage() {
 /** Вкладки внутри экрана «Все шрифты»: сессия · единый каталог */
 const LIBRARY_MAIN_TABS = [
   { id: 'session', label: 'В сессии' },
-  { id: 'catalog', label: 'Все' },
+  { id: 'catalog', label: 'Каталог' },
 ];
 
 function makeSavedLibraryTabId(libraryId) {
@@ -123,6 +128,10 @@ const SESSION_FONTS_SCOPE_TABS = [
   { id: 'google', label: 'Google' },
   { id: 'fontsource', label: 'Fontsource' },
 ];
+
+const FONTSOURCE_PREWARM_LIMIT = 24;
+const FONTSOURCE_PREWARM_CONCURRENCY = 2;
+const FONTSOURCE_PREWARM_DELAY_MS = 1200;
 
 function countFontsByScope(fonts) {
   const list = Array.isArray(fonts) ? fonts : [];
@@ -243,7 +252,6 @@ export default function Home() {
   
   // Оставляем состояния, которые не были перенесены
   const [isAnimating, setIsAnimating] = useState(false);
-  const [animationSpeed, setAnimationSpeed] = useState(1);
   const [cssString, setCssString] = useState('');
   /** Пустые слоты «Новый» — после mount подставляются из localStorage (может быть []). */
   const [emptySlotIds, setEmptySlotIds] = useState([]);
@@ -253,6 +261,9 @@ export default function Home() {
   const [fontsLibraryTab, setFontsLibraryTab] = useState('session');
   /** Источник внутри вкладки «Все» */
   const [catalogSource, setCatalogSource] = useState('google');
+  /** Размер каталога для нижней полосы (обновляют панели каталога). */
+  const [googleCatalogTotalItems, setGoogleCatalogTotalItems] = useState(0);
+  const [fontsourceCatalogTotalItems, setFontsourceCatalogTotalItems] = useState(0);
   /** Вкладки редактора: скрытые id остаются в сессии, снова открываются с карточки */
   const [closedFontTabIds, setClosedFontTabIds] = useState([]);
   const closedFontTabIdsRef = useRef(closedFontTabIds);
@@ -383,6 +394,7 @@ export default function Home() {
   const lastMainTabForPreviewRef = useRef(null);
   const initialSessionFontOrderIdsRef = useRef([]);
   const hasAppliedInitialSessionFontOrderRef = useRef(false);
+  const hasStartedFontsourcePreviewPrewarmRef = useRef(false);
 
   /** После чтения shell из LS — можно безопасно писать mainTab и emptySlotIds обратно. */
   const [hasRestoredEditorMainTab, setHasRestoredEditorMainTab] = useState(false);
@@ -540,6 +552,74 @@ export default function Home() {
       /* ignore */
     }
   }, [fonts, isInitialLoadComplete]);
+
+  /** Фоновый prewarm превью Fontsource (даже до открытия вкладки Fontsource). */
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (!hasRestoredEditorMainTab) return undefined;
+    if (hasStartedFontsourcePreviewPrewarmRef.current) return undefined;
+    hasStartedFontsourcePreviewPrewarmRef.current = true;
+
+    let cancelled = false;
+    let idleHandle = null;
+    let timeoutHandle = null;
+
+    const runPrewarm = async () => {
+      if (cancelled) return;
+
+      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      const saveData = Boolean(connection?.saveData);
+      const effectiveType = String(connection?.effectiveType || '').toLowerCase();
+      if (saveData || effectiveType === '2g' || effectiveType === 'slow-2g') {
+        return;
+      }
+
+      try {
+        const catalogRes = await fetch('/api/fontsource-catalog');
+        if (!catalogRes.ok) return;
+        const catalogData = await catalogRes.json();
+        const slugs = (Array.isArray(catalogData?.items) ? catalogData.items : [])
+          .map((row) => row?.id || row?.slug)
+          .filter(Boolean)
+          .slice(0, FONTSOURCE_PREWARM_LIMIT);
+
+        if (slugs.length === 0) return;
+
+        await preloadFontsourcePreviewSlugs(slugs, {
+          concurrency: FONTSOURCE_PREWARM_CONCURRENCY,
+          weight: 400,
+          style: 'normal',
+          subset: 'latin',
+        });
+      } catch (e) {
+        // Игнорируем: prewarm необязателен
+      }
+    };
+
+    const start = () => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleHandle = window.requestIdleCallback(() => {
+          runPrewarm();
+        }, { timeout: 4000 });
+      } else {
+        timeoutHandle = window.setTimeout(() => {
+          runPrewarm();
+        }, FONTSOURCE_PREWARM_DELAY_MS);
+      }
+    };
+
+    start();
+
+    return () => {
+      cancelled = true;
+      if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleHandle);
+      }
+      if (timeoutHandle !== null) {
+        window.clearTimeout(timeoutHandle);
+      }
+    };
+  }, [hasRestoredEditorMainTab]);
 
   /** Настройки левой панели / превью — отдельно на каждую вкладку шрифта */
   useEffect(() => {
@@ -1200,13 +1280,13 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
             Экспорт
           </button>
         </Tooltip>
-        <div className="flex self-stretch border-l border-gray-200">
+        <div className="flex self-stretch">
           <Tooltip content="Полноэкранное превью" className="h-full">
             <button
               type="button"
               onClick={() => setPlainPreviewOpen(true)}
               aria-label="Полноэкранное превью текста (plain)"
-              className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-0 px-2 text-gray-800 transition-colors hover:text-accent"
+              className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -1226,6 +1306,55 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       </>
     );
   }, [mainTab, selectedFont, handleExportClick, handleGenerateClick]);
+
+  const libraryStatusBar = useMemo(() => {
+    if (fontsLibraryTab === 'session') {
+      return {
+        leading: `В сессии: ${fonts.length} шт.`,
+        center: <span className="truncate uppercase">Все шрифты · сессия</span>,
+      };
+    }
+    if (fontsLibraryTab === 'catalog') {
+      const stats = getCatalogUnionStats(readGoogleFontCatalogCache(), readFontsourceCatalogCache());
+      const isGoogle = catalogSource === 'google';
+      const loaded = isGoogle ? stats.googleTotal > 0 : stats.fontsourceTotal > 0;
+      const leading = loaded
+        ? formatCatalogAvailabilityShort(stats, catalogSource)
+        : isGoogle
+          ? 'Google Fonts: загрузка каталога…'
+          : 'Fontsource: загрузка каталога…';
+      return {
+        leading,
+        center: (
+          <span className="truncate uppercase">
+            {isGoogle ? 'Google Fonts' : 'Fontsource'}
+          </span>
+        ),
+      };
+    }
+    if (activeSavedLibrary) {
+      const n = activeSavedLibrary.fonts?.length ?? 0;
+      return {
+        leading: `Шрифтов: ${n} шт.`,
+        center: (
+          <span className="truncate uppercase" title={activeSavedLibrary.name}>
+            {activeSavedLibrary.name}
+          </span>
+        ),
+      };
+    }
+    return {
+      leading: '',
+      center: <span className="truncate uppercase">Библиотеки</span>,
+    };
+  }, [
+    fontsLibraryTab,
+    fonts.length,
+    catalogSource,
+    googleCatalogTotalItems,
+    fontsourceCatalogTotalItems,
+    activeSavedLibrary,
+  ]);
 
   return (
     <div className="flex h-screen min-h-0 flex-row overflow-hidden bg-gray-50">
@@ -1290,8 +1419,6 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           resetVariableSettings={resetVariableSettings}
           isAnimating={isAnimating}
           toggleAnimation={toggleAnimation}
-          animationSpeed={animationSpeed}
-          setAnimationSpeed={setAnimationSpeed}
           sampleTexts={sampleTexts}
         />
       </div>
@@ -1344,8 +1471,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           )}
 
           {mainTab === 'library' && (
-            <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white p-6">
-              <div className="mb-4 flex shrink-0 overflow-x-auto border-b border-gray-200">
+            <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
+              <div className="flex shrink-0 overflow-x-auto border-b border-gray-200 px-6 pt-6">
                 {libraryTabs.map((tab) => (
                   <UnderlineTab
                     key={tab.id}
@@ -1357,6 +1484,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                 ))}
               </div>
 
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 pt-4">
               {fontsLibraryTab === 'session' && (
                 <div className="relative flex min-h-0 flex-1 flex-col">
                   <ScopeFilterToolbar
@@ -1418,6 +1546,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                       fontLibraries={fontLibraries}
                       onAddFontToLibrary={addFontEntryToLibrary}
                       onRequestCreateLibrary={requestCreateLibraryWithFonts}
+                      onTotalItemsChange={setGoogleCatalogTotalItems}
                       trailingToolbar={
                         <SegmentedControl
                           value={catalogSource}
@@ -1429,26 +1558,23 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                       }
                     />
                   ) : (
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
-                      <div className="mb-2 flex shrink-0 justify-start border-b border-gray-200 pb-2">
-                        <SegmentedControl
-                          value={catalogSource}
-                          onChange={setCatalogSource}
-                          options={CATALOG_SOURCE_OPTIONS}
-                          variant="pairOutline"
-                          className="max-w-full"
-                        />
-                      </div>
-                      <p className="mb-2 max-w-3xl shrink-0 text-xs text-gray-500">
-                        Пакеты @fontsource из package.json всегда в списке. Удаление из сессии не убирает строку —
-                        снова нажмите «Добавить в сессию».
-                      </p>
+                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                       <FontsourceCatalogPanel
                         fonts={fonts}
                         selectOrAddFontsourceFont={selectOrAddFontsourceFontWithNav}
                         fontLibraries={fontLibraries}
                         onAddFontToLibrary={addFontEntryToLibrary}
                         onRequestCreateLibrary={requestCreateLibraryWithFonts}
+                        onTotalItemsChange={setFontsourceCatalogTotalItems}
+                        trailingToolbar={
+                          <SegmentedControl
+                            value={catalogSource}
+                            onChange={setCatalogSource}
+                            options={CATALOG_SOURCE_OPTIONS}
+                            variant="pairOutline"
+                            className="max-w-full"
+                          />
+                        }
                       />
                     </div>
                   )}
@@ -1497,6 +1623,11 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                   ) : null}
                 </div>
               )}
+              </div>
+              <EditorStatusBar
+                leading={libraryStatusBar.leading}
+                center={libraryStatusBar.center}
+              />
             </div>
           )}
         </div>

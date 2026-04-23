@@ -42,12 +42,55 @@ export function mapSessionFontsToLibraryEntries(sessionFonts) {
   }));
 }
 
+export function createCatalogLibraryEntry({ source, key, label }) {
+  const normalizedKey = normalizeLibraryText(key);
+  const normalizedLabel = normalizeLibraryText(label || key);
+  if (!source || !normalizedKey || !normalizedLabel) return null;
+  return {
+    id: `${source}:${normalizedKey}`,
+    label: normalizedLabel,
+    source,
+  };
+}
+
 export function mapGoogleCatalogItemsToLibraryEntries(items) {
-  return (Array.isArray(items) ? items : []).map((item) => ({
-    id: `google:${item.family}`,
-    label: item.family,
-    source: 'google',
-  }));
+  return (Array.isArray(items) ? items : [])
+    .map((item) =>
+      createCatalogLibraryEntry({
+        source: 'google',
+        key: item.family,
+        label: item.family,
+      }),
+    )
+    .filter(Boolean);
+}
+
+export function mapFontsourceCatalogItemsToLibraryEntries(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) =>
+      createCatalogLibraryEntry({
+        source: 'fontsource',
+        key: item.id || item.slug,
+        label: item.family || item.label || item.id || item.slug,
+      }),
+    )
+    .filter(Boolean);
+}
+
+export function isGoogleFontInSession(fonts, family) {
+  return (Array.isArray(fonts) ? fonts : []).some(
+    (font) =>
+      font?.source === 'google' &&
+      (font.originalName === `${family}.woff2` ||
+        font.name === family ||
+        font.displayName === family),
+  );
+}
+
+export function isFontsourceFontInSession(fonts, slug) {
+  return (Array.isArray(fonts) ? fonts : []).some(
+    (font) => font?.source === 'fontsource' && font.name === slug,
+  );
 }
 
 export function mergeLibraryEntries(...groups) {

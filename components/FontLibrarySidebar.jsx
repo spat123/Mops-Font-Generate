@@ -2,12 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { SelectableChip } from './ui/SelectableChip';
 import { CardActionsMenu } from './ui/CardActionsMenu';
-import { PlusIcon, EditIcon, TrashIcon } from './ui/CommonIcons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon } from './ui/CommonIcons';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
+import { SearchClearButton } from './ui/SearchClearButton';
 import { Tooltip } from './ui/Tooltip';
+import { IconCircleButton } from './ui/IconCircleButton';
 import { matchesSearch } from '../utils/searchMatching';
+import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 import {
   getLibrarySourceLabel,
+  mapFontsourceCatalogItemsToLibraryEntries,
   mapGoogleCatalogItemsToLibraryEntries,
   mapSessionFontsToLibraryEntries,
   mergeLibraryEntries,
@@ -17,25 +21,9 @@ import {
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
 const FONT_LIBRARY_DRAFT_STORAGE_KEY = 'fontLibrarySidebarDraft';
-const GOOGLE_CATALOG_CACHE_KEY = 'mops-google-fonts-catalog-v6';
 
 function readCachedGoogleCatalog() {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = window.sessionStorage.getItem(GOOGLE_CATALOG_CACHE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    const ok =
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      parsed[0] &&
-      Array.isArray(parsed[0].subsets) &&
-      parsed.some((row) => row && Array.isArray(row.axes)) &&
-      Object.prototype.hasOwnProperty.call(parsed[0], 'primaryScript');
-    return ok ? mapGoogleCatalogItemsToLibraryEntries(parsed) : [];
-  } catch {
-    return [];
-  }
+  return mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache());
 }
 
 function createEmptyDraft() {
@@ -182,11 +170,9 @@ export default function FontLibrarySidebar({
 
         if (fontsourceRes.status === 'fulfilled' && fontsourceRes.value.ok) {
           const data = await fontsourceRes.value.json();
-          fontsourceItems = (Array.isArray(data.items) ? data.items : []).map((item) => ({
-            id: `fontsource:${item.slug}`,
-            label: item.label || item.slug,
-            source: 'fontsource',
-          }));
+          fontsourceItems = mapFontsourceCatalogItemsToLibraryEntries(
+            Array.isArray(data.items) ? data.items : [],
+          );
         }
 
         if (!cancelled) {
@@ -321,10 +307,9 @@ export default function FontLibrarySidebar({
             >
               <div className="flex items-start justify-between gap-4">
                 <h3 className="text-lg font-semibold uppercase text-gray-900">{dialogTitle}</h3>
-                <button
-                  type="button"
+                <IconCircleButton
+                  variant="gray100Close"
                   onClick={closeDialog}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-600 transition-colors hover:bg-gray-200 hover:text-gray-900"
                   aria-label="Закрыть окно"
                 >
                   <svg
@@ -332,13 +317,13 @@ export default function FontLibrarySidebar({
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
-                    strokeWidth={1.8}
-                    className="h-4 w-4"
+                    strokeWidth={1.6}
+                    className="h-6 w-6"
                     aria-hidden
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                   </svg>
-                </button>
+                </IconCircleButton>
               </div>
 
               <div className="mt-4">
@@ -372,19 +357,16 @@ export default function FontLibrarySidebar({
                     autoComplete="off"
                     spellCheck={false}
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.8}
-                      className="h-4 w-4"
-                      aria-hidden
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                    </svg>
-                  </span>
+                  {searchQuery ? (
+                    <SearchClearButton
+                      onClick={() => patchDraft({ searchQuery: '' })}
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
+                    />
+                  ) : (
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <SearchIcon className="h-4 w-4" />
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -406,7 +388,7 @@ export default function FontLibrarySidebar({
               ) : null}
 
               {hasSearchInput ? (
-                <div className="mt-3 max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-3">
+                <div className="mt-3 max-h-48 overflow-y-auto">
                   {catalogError ? (
                     <p className="text-sm text-red-600">{catalogError}</p>
                   ) : filteredEntries.length > 0 ? (
@@ -421,7 +403,6 @@ export default function FontLibrarySidebar({
                             type="button"
                             active={false}
                             onClick={() => addFontToDraft(entry)}
-                            className="max-w-full !border-gray-200 !text-gray-900 hover:!bg-gray-100 hover:!text-gray-900"
                             title={getLibrarySourceLabel(entry.source)}
                           >
                             <span className="truncate">{entry.label}</span>
@@ -443,7 +424,7 @@ export default function FontLibrarySidebar({
                 <button
                   type="button"
                   onClick={closeDialog}
-                  className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-gray-50"
+                  className="w-full rounded-md min-h-10 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
                 >
                   Отмена
                 </button>
@@ -451,7 +432,7 @@ export default function FontLibrarySidebar({
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitDisabled}
-                  className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-md min-h-10 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitLabel}
                 </button>
@@ -467,7 +448,7 @@ export default function FontLibrarySidebar({
       <div className="flex min-h-0 flex-1 flex-col p-4">
         {libraries.length > 0 ? (
           <>
-            <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-gray-500">Библиотеки</div>
+            <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-900">Библиотеки</div>
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="space-y-3">
                 {libraries.map((library) => {
@@ -476,7 +457,7 @@ export default function FontLibrarySidebar({
                     <div
                       key={library.id}
                       className={`group rounded-xl border p-2 transition-colors ${
-                        isActive ? 'border-accent bg-gray-50' : 'border-gray-200 bg-white'
+                        isActive ? 'border-accent bg-accent' : 'border-gray-200 bg-white'
                       } ${draggedLibraryId === library.id ? 'opacity-55' : ''} ${
                         dragOverLibraryId === library.id && draggedLibraryId !== library.id
                           ? 'ring-2 ring-accent ring-offset-2'
@@ -544,7 +525,7 @@ export default function FontLibrarySidebar({
                           {library.fonts.map((font) => (
                             <span
                               key={font.id}
-                              className="inline-flex max-w-full items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700"
+                              className="inline-flex max-w-full items-center rounded-sm bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700"
                               title={`${font.label} · ${getLibrarySourceLabel(font.source)}`}
                             >
                               <span className="truncate">{font.label}</span>
@@ -558,14 +539,14 @@ export default function FontLibrarySidebar({
               </div>
               <div className="sticky bottom-0 flex justify-center bg-white/95 pt-4 pb-1 backdrop-blur-sm">
                 <Tooltip content="Добавить библиотеку">
-                  <button
-                    type="button"
+                  <IconCircleButton
+                    variant="accent"
+                    size="md"
                     onClick={openCreateDialog}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover"
                     aria-label="Добавить библиотеку"
                   >
                     <PlusIcon />
-                  </button>
+                  </IconCircleButton>
                 </Tooltip>
               </div>
             </div>
@@ -577,9 +558,9 @@ export default function FontLibrarySidebar({
               onClick={openCreateDialog}
               className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
             >
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover">
+              <IconCircleButton as="span" variant="accent" size="lg">
                 <PlusIcon className="h-5 w-5" />
-              </span>
+              </IconCircleButton>
               <span className="max-w-[12rem] leading-5">Добавить библиотеку</span>
             </button>
           </div>

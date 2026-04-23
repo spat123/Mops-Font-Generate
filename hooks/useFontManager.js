@@ -15,6 +15,11 @@ import { useVariableFontControls } from './useVariableFontControls';
 import { useFontStyleManager } from './useFontStyleManager';
 import { useFontCss } from './useFontCss';
 import { useFontExport } from './useFontExport';
+import {
+  getFontsourceVariableSettings,
+  setFontsourceVariableSettings,
+  clearFontsourceVariableSettings,
+} from '../utils/fontsourceVariableSettingsCache';
 
 /** Центральный хук: шрифты, VF, CSS, персистентность, экспорт. */
 export function useFontManager() {
@@ -53,7 +58,12 @@ export function useFontManager() {
       setSelectedFont,
       setFonts,
       debouncedUpdateVariableFontSettings,
-      useCallback((settings) => saveLastVariableSettingsRef.current?.(settings), [])
+      useCallback((settings) => saveLastVariableSettingsRef.current?.(settings), []),
+      useCallback((font, settings) => {
+        const slug = font?.name;
+        if (!slug) return;
+        setFontsourceVariableSettings(slug, settings, font?.variableAxes);
+      }, [])
   );
 
   // Колбэк для сохранения настроек пресета в IndexedDB
@@ -144,6 +154,18 @@ export function useFontManager() {
         }
       }, 0);
       settingsApplied = true;
+    }
+    else if (font.isVariableFont && font.source === 'fontsource') {
+      const cachedFontsourceAxes = getFontsourceVariableSettings(font.name, font.variableAxes);
+      if (cachedFontsourceAxes && Object.keys(cachedFontsourceAxes).length > 0) {
+        setVariableSettings(cachedFontsourceAxes);
+        setTimeout(() => {
+          if (applyVariableSettings) {
+            applyVariableSettings(cachedFontsourceAxes, true, font);
+          }
+        }, 0);
+        settingsApplied = true;
+      }
     }
     // Приоритет 2: Сохраненный пресет
     else if (font.lastUsedPresetName && applyPresetStyle) {
@@ -458,6 +480,9 @@ export function useFontManager() {
 
     if (applyVariableSettings) {
       applyVariableSettings(defaultSettings, true, selectedFont);
+    }
+    if (selectedFont?.source === 'fontsource') {
+      clearFontsourceVariableSettings(selectedFont.name);
     }
 
     toast.success(`Настройки шрифта "${selectedFont.name}" сброшены`);

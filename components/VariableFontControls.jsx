@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useFontContext } from '../contexts/FontContext';
 import { toast } from 'react-toastify';
 import { hasSignificantChanges } from '../utils/cssGenerator';
+import { variableFontShowsItalicControl } from '../utils/fontUtilsCommon';
 import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
 import { SegmentedControl } from './ui/SegmentedControl';
 import { Tooltip } from './ui/Tooltip';
+import { IconCircleButton } from './ui/IconCircleButton';
 
 // Функция для обрезания длинного текста и добавления многоточия
 const truncateText = (text, maxLength = 15) => {
@@ -15,17 +17,13 @@ const truncateText = (text, maxLength = 15) => {
 // Максимальная длина названия оси перед обрезкой
 const AXIS_NAME_MAX_LENGTH = 22;
 
-/** Как кнопки «картинка фона» и «сброс цветов» в сайдбаре (rounded-full, bg-gray-50) */
-const VF_TOOLBAR_BTN_BASE =
-  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors';
-const VF_TOOLBAR_BTN_IDLE = `${VF_TOOLBAR_BTN_BASE} bg-gray-50 text-gray-800 hover:text-accent`;
-/** Активное состояние — как выбранное фоновое изображение (bg-accent/15) */
-const VF_TOOLBAR_BTN_ACTIVE = `${VF_TOOLBAR_BTN_BASE} bg-accent text-white hover:text-white`;
+const AXIS_ANIMATION_MULTIPLIERS = [1, 2, 3];
 
-export default function VariableFontControls({ font, onSettingsChange, isAnimating = false, toggleAnimation, animationSpeed = 1, setAnimationSpeed }) {
+export default function VariableFontControls({ font, onSettingsChange, isAnimating = false, toggleAnimation }) {
   const [axes, setAxes] = useState([]);
   const [settings, setSettings] = useState({});
   const [animationDirections, setAnimationDirections] = useState({});
+  const [axisAnimationMultipliers, setAxisAnimationMultipliers] = useState({});
   const animationRef = useRef(null);
   /** Снимок значений и направлений во время проигрывания — без лишних setState на каждом кадре */
   const animSettingsRef = useRef({});
@@ -38,19 +36,6 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   const isUpdatingFromExternal = useRef(false);
   // Для отслеживания редактируемого маркера
   const [editingAxis, setEditingAxis] = useState(null);
-  
-  // Локальное состояние для скорости анимации (используется, если не передан setAnimationSpeed)
-  const [localAnimationSpeed, setLocalAnimationSpeed] = useState(animationSpeed);
-  
-  // Актуальное значение скорости анимации
-  const effectiveAnimationSpeed = useMemo(() => {
-    // Контролируемый режим: значение из родителя (иначе слайдер «залипает» на дефолте при отсутствии setAnimationSpeed)
-    if (typeof setAnimationSpeed === 'function') {
-      const v = animationSpeed;
-      return Number.isFinite(v) ? v : localAnimationSpeed;
-    }
-    return localAnimationSpeed;
-  }, [animationSpeed, localAnimationSpeed, setAnimationSpeed]);
   
   // Сохраняем ID загруженного шрифта, чтобы не перезагружать его повторно
   const loadedFontId = useRef(null);
@@ -85,17 +70,6 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     }
   }, [variableSettings]);
   
-  // Обработчик изменения скорости анимации
-  const handleAnimationSpeedChange = useCallback((value) => {
-    if (typeof setAnimationSpeed === 'function') {
-      // Если передана внешняя функция обновления, используем ее
-      setAnimationSpeed(value);
-    } else {
-      // Иначе обновляем локальное состояние
-      setLocalAnimationSpeed(value);
-    }
-  }, [setAnimationSpeed]);
-
   const updateFontStyleState = useCallback((targetStyle) => {
     const normalizedStyle = targetStyle === 'italic' ? 'italic' : 'normal';
     const liveWeight =
@@ -263,14 +237,25 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     axesRef.current = axes;
   }, [axes]);
 
+  useEffect(() => {
+    setAxisAnimationMultipliers((prev) =>
+      axes.reduce((acc, axis) => {
+        const current = Number(prev?.[axis.tag]);
+        acc[axis.tag] = AXIS_ANIMATION_MULTIPLIERS.includes(current) ? current : 1;
+        return acc;
+      }, {})
+    );
+  }, [axes]);
+
   // Мемоизированный объект для хранения шагов анимации
   // Это предотвращает повторные вычисления при каждом рендеринге
   const animationSteps = useMemo(() => {
     return axes.reduce((steps, axis) => {
-      steps[axis.tag] = ((axis.max - axis.min) / 100) * effectiveAnimationSpeed;
+      const multiplier = axisAnimationMultipliers[axis.tag] ?? 1;
+      steps[axis.tag] = ((axis.max - axis.min) / 100) * multiplier;
       return steps;
     }, {});
-  }, [axes, effectiveAnimationSpeed]);
+  }, [axes, axisAnimationMultipliers]);
 
   useEffect(() => {
     animationStepsRef.current = animationSteps;
@@ -447,6 +432,12 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     // Обновляем локальное состояние
     setSettings(defaultSettings);
     setAnimationDirections(defaultDirections);
+    setAxisAnimationMultipliers(
+      axes.reduce((acc, axis) => {
+        acc[axis.tag] = 1;
+        return acc;
+      }, {})
+    );
     
     // Отмечаем, что обновление идет из локального источника
     isUpdatingFromExternal.current = true;
@@ -463,15 +454,32 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     toast.info('Все настройки сброшены до значений по умолчанию');
   }, [axes, isAnimating, toggleAnimation, resetVariableSettings, onSettingsChange, updateFontStyleState]);
 
+  const cycleAxisAnimationMultiplier = useCallback((tag) => {
+    setAxisAnimationMultipliers((prev) => {
+      const current = prev[tag] ?? 1;
+      const currentIndex = AXIS_ANIMATION_MULTIPLIERS.indexOf(current);
+      const nextMultiplier =
+        currentIndex >= 0
+          ? AXIS_ANIMATION_MULTIPLIERS[(currentIndex + 1) % AXIS_ANIMATION_MULTIPLIERS.length]
+          : 1;
+      return {
+        ...prev,
+        [tag]: nextMultiplier,
+      };
+    });
+  }, []);
+
   // Мемоизированное значение для проверки наличия осей
-  const hasAxes = useMemo(() => axes.length > 0, [axes]);
-  const canShowItalicControl = useMemo(() => {
-    if (!font || !font.isVariableFont) return false;
-    if (font.italicMode === 'axis-ital' || font.italicMode === 'separate-style') {
-      return true;
+  const axesForDisplay = useMemo(() => {
+    if (!Array.isArray(axes)) return [];
+    if (font?.italicMode === 'axis-ital') {
+      // При axis-ital осью управляет Roman/Italic toggle, чтобы не было дублирующего UI.
+      return axes.filter((axis) => axis?.tag !== 'ital');
     }
-    return font.hasItalicStyles === true && font.italicMode !== 'axis-slnt';
-  }, [font]);
+    return axes;
+  }, [axes, font?.italicMode]);
+  const hasAxes = useMemo(() => axesForDisplay.length > 0, [axesForDisplay]);
+  const canShowItalicControl = useMemo(() => variableFontShowsItalicControl(font), [font]);
   const italicControlValue = useMemo(() => {
     if (!canShowItalicControl) return '0';
     if (font?.italicMode === 'axis-ital') {
@@ -521,13 +529,13 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
 
   return (
     <div className="space-y-4">
-      <div className="mb-2 flex min-w-0 items-center justify-between gap-2">
+      <div className="mb-3.5 flex min-w-0 items-center justify-between gap-2">
         <h2 className="min-w-0 shrink uppercase font-semibold text-sm text-gray-900">Variable Axes</h2>
         <div className="flex shrink-0 items-center gap-2">
           <Tooltip content={isAnimating ? 'Остановить анимацию' : 'Воспроизвести анимацию'}>
-            <button
-              type="button"
-              className={isAnimating ? VF_TOOLBAR_BTN_ACTIVE : VF_TOOLBAR_BTN_IDLE}
+            <IconCircleButton
+              variant="toolbar"
+              pressed={isAnimating}
               onClick={toggleAnimation}
               aria-label={isAnimating ? 'Остановить анимацию' : 'Воспроизвести анимацию'}
             >
@@ -540,16 +548,11 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
                 </svg>
               )}
-            </button>
+            </IconCircleButton>
           </Tooltip>
 
           <Tooltip content="Сбросить все оси">
-            <button
-              type="button"
-              className={VF_TOOLBAR_BTN_IDLE}
-              onClick={handleResetAll}
-              aria-label="Сбросить все оси"
-            >
+            <IconCircleButton variant="toolbar" onClick={handleResetAll} aria-label="Сбросить все оси">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
@@ -564,7 +567,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </svg>
-            </button>
+            </IconCircleButton>
           </Tooltip>
         </div>
       </div>
@@ -584,28 +587,9 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         </div>
       ) : null}
 
-      {hasAxes ? (
-        <div className="mb-3.5">
-          <div className="mb-0.5">
-            <p className="text-xs font-medium text-gray-600">Скорость анимации</p>
-            <p className="mt-0.5 text-[0.65rem] leading-snug text-gray-500">
-            </p>
-          </div>
-          <div className="variable-font-slider-container">
-            <DraggableValueRangeSlider
-              min={0.1}
-              max={5}
-              step={0.1}
-              value={Math.min(5, Math.max(0.1, Number(effectiveAnimationSpeed) || 1))}
-              onChange={handleAnimationSpeedChange}
-              formatDisplay={(v) => Number(v).toFixed(1)}
-            />
-          </div>
-        </div>
-      ) : null}
-
-      {axes.map(axis => {
+      {axesForDisplay.map(axis => {
         const value = settings[axis.tag] !== undefined ? settings[axis.tag] : axis.default;
+        const axisAnimationMultiplier = axisAnimationMultipliers[axis.tag] ?? 1;
         
         // Получаем имя оси с учетом возможных форматов
         const axisName = typeof axis.name === 'object' 
@@ -618,28 +602,40 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         return (
           <div key={axis.tag} className="mb-3.5">
             <div className="flex justify-between mb-0.5">
-              <div className="text-[0.75rem] font-medium text-gray-600 flex items-center h-5 max-w-[80%] hover:text-gray-950 transition-colors">
+              <div className="text-[0.75rem] font-medium text-gray-600 flex items-center h-5 max-w-[75%] hover:text-gray-950 transition-colors">
                 <Tooltip content={axisName} className="min-w-0">
                   <span className="truncate mr-1">{truncatedName}</span>
                 </Tooltip>
                 <span className="text-[0.7rem] font-normal text-gray-500 px-0.5 py-px rounded-sm whitespace-nowrap flex-shrink-0 leading-tight">({axis.tag})</span>
               </div>
-              <Tooltip content="Сбросить к значению по умолчанию">
-                <button 
-                  className={`text-gray-800 hover:text-accent w-4 h-4 flex items-center justify-center ${isAnimating ? 'opacity-50 cursor-default' : ''}`}
-                  onClick={() => {
-                    if (!isAnimating) {
-                      handleSliderChange(axis.tag, axis.default);
-                    }
-                  }}
-                  disabled={isAnimating}
-                  aria-label="Сбросить к значению по умолчанию"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                  </svg>
-                </button>
-              </Tooltip>
+              <div className="flex items-center justify-center gap-1.5">
+                <Tooltip content="Скорость анимации оси">
+                  <button
+                    type="button"
+                    className="min-w-[1rem] text-right text-[0.75rem] font-normal text-gray-800 transition-colors hover:text-accent"
+                    onClick={() => cycleAxisAnimationMultiplier(axis.tag)}
+                    aria-label={`Скорость анимации оси ${axisName}: x${axisAnimationMultiplier.toFixed(1)}`}
+                  >
+                    {`x${axisAnimationMultiplier.toFixed(1)}`}
+                  </button>
+                </Tooltip>
+                <Tooltip content="Сбросить к значению по умолчанию">
+                  <button 
+                    className={`text-gray-800 hover:text-accent w-4 h-4 flex items-center justify-center ${isAnimating ? 'opacity-50 cursor-default' : ''}`}
+                    onClick={() => {
+                      if (!isAnimating) {
+                        handleSliderChange(axis.tag, axis.default);
+                      }
+                    }}
+                    disabled={isAnimating}
+                    aria-label="Сбросить к значению по умолчанию"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                    </svg>
+                  </button>
+                </Tooltip>
+              </div>
             </div>
             
             <DraggableValueRangeSlider

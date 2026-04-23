@@ -29,6 +29,13 @@ export const PRESET_STYLES = [
  * @param {Record<string, { min?: number, max?: number }>|null|undefined} variableAxes
  * @param {'none'|'axis-ital'|'axis-slnt'|'separate-style'|string|null|undefined} italicMode
  */
+/** Показывать ли в UI переключатель Italic для вариативного шрифта (Variable Axes). */
+export function variableFontShowsItalicControl(font) {
+  if (!font || !font.isVariableFont) return false;
+  if (font.italicMode === 'axis-ital' || font.italicMode === 'separate-style') return true;
+  return font.hasItalicStyles === true && font.italicMode !== 'axis-slnt';
+}
+
 export function variableFontAllowsItalicPresets(variableAxes, italicMode) {
   if (italicMode === 'separate-style') return true;
   if (!variableAxes || typeof variableAxes !== 'object') return false;

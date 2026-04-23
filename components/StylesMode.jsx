@@ -3,40 +3,12 @@ import EditableText from './EditableText';
 import { findStyleInfoByWeightAndStyle } from '../utils/fontUtilsCommon';
 import { useSettings } from '../contexts/SettingsContext';
 import { getPreviewChromeFromBackground } from '../utils/previewChromeTheme';
-
-/**
- * Генерирует строку значений font-variation-settings на основе объекта стилей и поддерживаемых осей
- * @param {Object} styleObj - Объект с настройками стилей (wght, ital, slnt и т.д.)
- * @param {Object} supportedAxes - Объект с поддерживаемыми осями (wght, ital, slnt и т.д.)
- * @returns {string} Строка с настройками вариативных осей
- */
-const generateVariationSettings = (styleObj, supportedAxes) => {
-  if (!styleObj || !supportedAxes) return '';
-  
-  const settings = [];
-  
-  // Добавляем поддерживаемые оси
-  if (supportedAxes['wght'] !== undefined && styleObj.wght !== undefined) {
-    settings.push(`"wght" ${styleObj.wght}`);
-  }
-  
-  if (supportedAxes['ital'] !== undefined && styleObj.ital !== undefined) {
-    settings.push(`"ital" ${styleObj.ital}`);
-  }
-  
-  if (supportedAxes['slnt'] !== undefined && styleObj.slnt !== undefined) {
-    settings.push(`"slnt" ${styleObj.slnt}`);
-  }
-  
-  // Добавляем другие оси, если они есть в styleObj
-  Object.entries(styleObj).forEach(([key, value]) => {
-    if (!['wght', 'ital', 'slnt'].includes(key) && supportedAxes[key] !== undefined) {
-      settings.push(`"${key}" ${value}`);
-    }
-  });
-  
-  return settings.join(', ');
-};
+import { generateVariationSettings } from '../utils/fontVariationSettings';
+import {
+  AXIS_RATIOS,
+  ITALIC_VARIATIONS,
+  WEIGHT_VARIATIONS,
+} from '../utils/stylesPreviewModel';
 
 /**
  * Компонент для режима отображения стилей шрифта
@@ -44,21 +16,13 @@ const generateVariationSettings = (styleObj, supportedAxes) => {
  * @param {Object} props - Свойства компонента
  * @param {Object} props.selectedFont - Выбранный шрифт
  * @param {string} props.fontFamilyValue - Семейство шрифтов (передаваемое из FontPreview)
- * @param {Array<Object>} props.weightVariations - Предустановленные вариации веса
- * @param {Array<Object>} props.italicVariations - Предустановленные вариации курсива/наклона
- * @param {Array<number>} props.axisRatios - Соотношения для других осей
- * @param {Function} props.generateVariationSettings - Хелпер для генерации настроек
  */
 function StylesMode({
   selectedFont,
   fontFamilyValue,
-  weightVariations,
-  italicVariations,
-  axisRatios,
-  generateVariationSettings
 }) {
   const { 
-    text, setText, 
+    text,
     stylesFontSize,
     stylesLetterSpacing,
     textColor, 
@@ -86,7 +50,7 @@ function StylesMode({
   const chrome = useMemo(() => getPreviewChromeFromBackground(backgroundColor), [backgroundColor]);
 
   return (
-    <div className="px-4 pb-8 pt-4 sm:px-6">
+    <div className="min-w-0 max-w-full overflow-x-hidden px-4 pb-8 pt-4 sm:px-6">
       {/* Статические стили шрифта */}
       {showStaticStyles && (
         <div className="mb-8 overflow-x-hidden">
@@ -101,10 +65,10 @@ function StylesMode({
                   .filter(style => style.style === 'normal')
                   .sort((a, b) => a.weight - b.weight)
                   .map((style, index) => (
-                    <div key={`static-normal-${index}`} className={`border-t ${chrome.divider} pt-4`}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div className={chrome.rowTitle}>{style.name}</div>
-                        <div className={chrome.meta}>Weight: {style.weight}</div>
+                    <div key={`static-normal-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
+                      <div className="flex min-w-0 items-baseline justify-between gap-3">
+                        <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
+                        <div className={`shrink-0 ${chrome.meta}`}>Weight: {style.weight}</div>
                       </div>
                       <EditableText 
                         style={{
@@ -121,6 +85,8 @@ function StylesMode({
                           textTransform: textCase,
                           textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
                           whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          maxWidth: '100%',
                           scrollBehavior: 'auto',
                         }}
                         isStyles={true}
@@ -141,10 +107,10 @@ function StylesMode({
                   .filter(style => style.style === 'italic')
                   .sort((a, b) => a.weight - b.weight)
                   .map((style, index) => (
-                    <div key={`static-italic-${index}`} className={`border-t ${chrome.divider} pt-4`}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div className={chrome.rowTitle}>{style.name}</div>
-                        <div className={chrome.meta}>Weight: {style.weight}, Style: italic</div>
+                    <div key={`static-italic-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
+                      <div className="flex min-w-0 items-baseline justify-between gap-3">
+                        <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
+                        <div className={`shrink-0 ${chrome.meta}`}>Weight: {style.weight}, Style: italic</div>
                       </div>
                       <EditableText 
                         style={{
@@ -161,6 +127,8 @@ function StylesMode({
                           textTransform: textCase,
                           textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
                           whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          maxWidth: '100%',
                           scrollBehavior: 'auto',
                         }}
                         isStyles={true}
@@ -176,18 +144,18 @@ function StylesMode({
       
       {/* Вариативные возможности шрифта */}
       {hasVariableAxes && (
-        <div>
+        <div className="min-w-0 max-w-full overflow-x-hidden">
 
           {/* Группа Weight стилей */}
           {selectedFont.variableAxes['wght'] !== undefined && (
             <div className="mb-8">
               <h4 className={`${chrome.subsectionTitle} mb-2`}>Вес (wght)</h4>
               <div className="space-y-4">
-                {weightVariations.map((style, index) => (
-                  <div key={`var-weight-${index}`} className={`border-t ${chrome.divider} pt-4`}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <div className={chrome.rowTitle}>{style.name}</div>
-                      <div className={chrome.meta}>Weight: {style.wght}</div>
+                {WEIGHT_VARIATIONS.map((style, index) => (
+                  <div key={`var-weight-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
+                    <div className="flex min-w-0 items-baseline justify-between gap-3">
+                      <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
+                      <div className={`shrink-0 ${chrome.meta}`}>Weight: {style.wght}</div>
                     </div>
                     <EditableText 
                       style={{
@@ -202,6 +170,7 @@ function StylesMode({
                         textTransform: textCase,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
+                        maxWidth: '100%',
                         scrollBehavior: 'auto',
                       }}
                       isStyles={true}
@@ -218,11 +187,11 @@ function StylesMode({
             <div className="mb-8 ">
               <h4 className={`${chrome.subsectionTitle} mb-2`}>Курсив / наклон</h4>
               <div className="space-y-4">
-                {italicVariations.map((style, index) => (
-                  <div key={`var-italic-${index}`} className={`border-t ${chrome.divider} pt-4`}>
-                    <div className="mb-2 flex items-baseline justify-between gap-3">
-                      <div className={chrome.rowTitle}>{style.name}</div>
-                      <div className={chrome.meta}>
+                {ITALIC_VARIATIONS.map((style, index) => (
+                  <div key={`var-italic-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
+                    <div className="mb-2 flex min-w-0 items-baseline justify-between gap-3">
+                      <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
+                      <div className={`min-w-0 max-w-[min(100%,18rem)] break-words text-right text-xs leading-snug sm:max-w-[55%] ${chrome.meta}`}>
                         Weight: {style.wght},
                         {selectedFont.variableAxes['ital'] !== undefined && ` Italic: ${style.ital},`}
                         {selectedFont.variableAxes['slnt'] !== undefined && ` Slant: ${style.slnt}`}
@@ -240,6 +209,8 @@ function StylesMode({
                         textAlign: textAlignment,
                         textTransform: textCase,
                         whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        maxWidth: '100%',
                         scrollBehavior: 'auto',
                       }}
                       isStyles={true}
@@ -255,18 +226,18 @@ function StylesMode({
           {Object.keys(selectedFont.variableAxes)
             .filter(axis => !['wght', 'ital', 'slnt'].includes(axis))
             .map(axis => (
-              <div key={axis} className="mb-8">
+              <div key={axis} className="mb-8 min-w-0 max-w-full">
                 <h4 className={`${chrome.subsectionTitle} mb-2`}>Ось {axis.toUpperCase()}</h4>
                 <div className="space-y-4">
-                  {axisRatios.map((ratio, index) => {
+                  {AXIS_RATIOS.map((ratio, index) => {
                     const axisInfo = selectedFont.variableAxes[axis];
                     const value = axisInfo.min + (axisInfo.max - axisInfo.min) * ratio;
                     const style = { [axis]: value };
                     
                     return (
-                      <div key={`var-${axis}-${index}`} className={`border-t ${chrome.divider} pt-4`}>
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className={chrome.rowTitle}>
+                      <div key={`var-${axis}-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
+                        <div className="flex min-w-0 items-baseline justify-between gap-3">
+                          <div className={`min-w-0 truncate ${chrome.rowTitle}`}>
                             {axis.toUpperCase()}: {value}
                           </div>
                         </div>
@@ -283,6 +254,7 @@ function StylesMode({
                             textTransform: textCase,
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
+                            maxWidth: '100%',
                             scrollBehavior: 'auto',
                           }}
                           isStyles={true}

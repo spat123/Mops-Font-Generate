@@ -1,39 +1,24 @@
-import React, { useCallback, useMemo, useRef, useEffect, memo, useState, lazy, Suspense } from 'react';
-
-/** Совпадает с логикой подсчёта блоков в StylesMode */
-function getStylesPreviewRowCount(selectedFont, weightVariations, italicVariations, axisRatios) {
-  if (!selectedFont) return { n: 0, kind: 'none' };
-  const hasStaticStyles = selectedFont.availableStyles && selectedFont.availableStyles.length > 1;
-  const hasVariableAxes =
-    selectedFont.isVariableFont &&
-    selectedFont.variableAxes &&
-    Object.keys(selectedFont.variableAxes).length > 0;
-  const showStaticStyles = hasStaticStyles && (!selectedFont.isVariableFont || !hasVariableAxes);
-
-  if (showStaticStyles) {
-    return { n: selectedFont.availableStyles.length, kind: 'static' };
-  }
-  if (hasVariableAxes) {
-    const axes = selectedFont.variableAxes;
-    let n = 0;
-    if (axes.wght !== undefined) n += weightVariations.length;
-    if (axes.ital !== undefined || axes.slnt !== undefined) n += italicVariations.length;
-    const otherKeys = Object.keys(axes).filter((a) => !['wght', 'ital', 'slnt'].includes(a));
-    n += otherKeys.length * axisRatios.length;
-    return { n, kind: 'variable' };
-  }
-  return { n: 0, kind: 'none' };
-}
+import React, { useCallback, useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
 import FontUploader from './FontUploader';
-import { EDITOR_PREVIEW_BOTTOM_BAR_CLASS } from './ui/editorChromeClasses';
+import { EditorStatusBar } from './ui/EditorStatusBar';
+import { Tooltip } from './ui/Tooltip';
 import { toast } from 'react-toastify';
 import { useSettings } from '../contexts/SettingsContext';
-import { useFontContext } from '../contexts/FontContext';
-import EditableText from './EditableText';
 import dynamic from 'next/dynamic';
 import { fetchGoogleVariableFontSlicesAll } from '../utils/googleFontLoader';
 import { GOOGLE_PRESET_FONT_NAMES } from '../utils/googlePresetFonts';
 import { getPreviewAreaBackgroundStyle } from '../utils/previewAreaBackgroundStyle';
+import { getStylesPreviewStats } from '../utils/stylesPreviewModel';
+import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
+import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
+import { formatCatalogUnionAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
+import { ensureGoogleFontPreviewCss } from '../utils/googleFontPreviewCss';
+import { matchesSearch } from '../utils/searchMatching';
+import { SearchClearButton } from './ui/SearchClearButton';
+import { CatalogFontCard } from './ui/CatalogFontCard';
+import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
+import { SearchIcon } from './ui/CommonIcons';
+import { IconCircleButton } from './ui/IconCircleButton';
 
 // --- Ленивая загрузка компонентов режимов --- 
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -43,174 +28,12 @@ const GlyphsMode = lazy(() => import('./GlyphsMode'));
 const TextMode = lazy(() => import('./TextMode'));
 // --- Конец ленивой загрузки ---
 
-// После импортов добавляем новую переменную для буферизации текста
-// Функция для буферизации обновлений отображения шрифта
-const createTextDisplayBuffer = () => {
-  // Буфер отображения текста для предотвращения моргания
-  const buffer = {
-    // Основной и теневой элементы для двойной буферизации
-    elements: {
-      main: null,
-      shadow: null,
-    },
-    // Контейнер, в котором находятся элементы
-    container: null,
-    // Таймер для переключения буферов
-    switchTimer: null,
-    // Флаг, указывающий, идет ли переключение
-    switching: false,
-    // Инициализирует буфер в контейнере
-    init: (containerElement) => {
-      if (!containerElement) return false;
-      
-      // Сохраняем контейнер
-      buffer.container = containerElement;
-      
-      // Создаем основной элемент, если его еще нет
-      if (!buffer.elements.main) {
-        buffer.elements.main = document.createElement('div');
-        buffer.elements.main.className = 'font-display-buffer main';
-        buffer.elements.main.style.transition = 'opacity 0.1s ease-in-out';
-        buffer.elements.main.style.position = 'absolute';
-        buffer.elements.main.style.top = '0';
-        buffer.elements.main.style.left = '0';
-        buffer.elements.main.style.width = '100%';
-        buffer.elements.main.style.height = '100%';
-        buffer.elements.main.style.zIndex = '1';
-        buffer.container.appendChild(buffer.elements.main);
-      }
-      
-      // Создаем теневой элемент, если его еще нет
-      if (!buffer.elements.shadow) {
-        buffer.elements.shadow = document.createElement('div');
-        buffer.elements.shadow.className = 'font-display-buffer shadow';
-        buffer.elements.shadow.style.transition = 'opacity 0.1s ease-in-out';
-        buffer.elements.shadow.style.position = 'absolute';
-        buffer.elements.shadow.style.top = '0';
-        buffer.elements.shadow.style.left = '0';
-        buffer.elements.shadow.style.width = '100%';
-        buffer.elements.shadow.style.height = '100%';
-        buffer.elements.shadow.style.zIndex = '0';
-        buffer.elements.shadow.style.opacity = '0';
-        buffer.container.appendChild(buffer.elements.shadow);
-      }
-      
-      // Обновляем стили контейнера
-      buffer.container.style.position = 'relative';
-      buffer.container.style.overflow = 'hidden';
-      
-      return true;
-    },
-    // Обновляет содержимое в теневом буфере и переключает буферы
-    update: (content, style) => {
-      if (!buffer.elements.shadow || !buffer.elements.main) return;
-      
-      // Если переключение уже запланировано, не создаем новый таймер
-      if (buffer.switchTimer) {
-        // Просто обновляем содержимое теневого элемента
-        buffer.elements.shadow.innerHTML = content;
-        Object.assign(buffer.elements.shadow.style, style || {});
-        return;
-      }
-      
-      // Обновляем содержимое теневого элемента
-      buffer.elements.shadow.innerHTML = content;
-      Object.assign(buffer.elements.shadow.style, style || {});
-      
-      // Планируем переключение с небольшой задержкой (16.7ms ≈ один кадр анимации)
-      buffer.switchTimer = setTimeout(() => {
-        // Устанавливаем флаг переключения
-        buffer.switching = true;
-        
-        // Меняем z-index элементов
-        buffer.elements.main.style.zIndex = '0';
-        buffer.elements.shadow.style.zIndex = '1';
-        
-        // Меняем opacity элементов
-        buffer.elements.main.style.opacity = '0';
-        buffer.elements.shadow.style.opacity = '1';
-        
-        // Ожидаем завершения анимации
-        setTimeout(() => {
-          // Меняем содержимое основного элемента
-          buffer.elements.main.innerHTML = buffer.elements.shadow.innerHTML;
-          Object.assign(buffer.elements.main.style, buffer.elements.shadow.style);
-          
-          // Восстанавливаем z-index элементов
-          buffer.elements.main.style.zIndex = '1';
-          buffer.elements.shadow.style.zIndex = '0';
-          
-          // Восстанавливаем opacity элементов
-          buffer.elements.main.style.opacity = '1';
-          buffer.elements.shadow.style.opacity = '0';
-          
-          // Сбрасываем флаг переключения и таймер
-          buffer.switching = false;
-          buffer.switchTimer = null;
-        }, 100);
-      }, 16.7);
-    },
-    // Очищает буфер и удаляет элементы
-    cleanup: () => {
-      if (buffer.switchTimer) {
-        clearTimeout(buffer.switchTimer);
-        buffer.switchTimer = null;
-      }
-      
-      if (buffer.elements.main && buffer.elements.main.parentNode) {
-        buffer.elements.main.parentNode.removeChild(buffer.elements.main);
-      }
-      
-      if (buffer.elements.shadow && buffer.elements.shadow.parentNode) {
-        buffer.elements.shadow.parentNode.removeChild(buffer.elements.shadow);
-      }
-      
-      buffer.elements.main = null;
-      buffer.elements.shadow = null;
-      buffer.container = null;
-    }
-  };
-  
-  return buffer;
-};
-
-// Инициализируем буфер
-const textDisplayBuffer = createTextDisplayBuffer();
-
-// Вспомогательная функция для генерации строки font-variation-settings (оставляем здесь, т.к. используется в нескольких местах)
-const generateVariationSettings = (styleObj, supportedAxes) => {
-  if (!styleObj || !supportedAxes) return '';
-  
-  const settings = [];
-  
-  // Добавляем поддерживаемые оси
-  if (supportedAxes['wght'] !== undefined && styleObj.wght !== undefined) {
-    settings.push(`"wght" ${styleObj.wght}`);
-  }
-  
-  if (supportedAxes['ital'] !== undefined && styleObj.ital !== undefined) {
-    settings.push(`"ital" ${styleObj.ital}`);
-  }
-  
-  if (supportedAxes['slnt'] !== undefined && styleObj.slnt !== undefined) {
-    settings.push(`"slnt" ${styleObj.slnt}`);
-  }
-  
-  // Добавляем другие оси, если они есть в styleObj
-  Object.entries(styleObj).forEach(([key, value]) => {
-    if (!['wght', 'ital', 'slnt'].includes(key) && supportedAxes[key] !== undefined) {
-      settings.push(`"${key}" ${value}`);
-    }
-  });
-  
-  return settings.join(', ');
-};
+const EMPTY_STATE_GOOGLE_RESULTS_LIMIT = 8;
 
 export default function FontPreview({
   selectedFont,
   variableSettings, 
   exportedFont, 
-  handleExport,
   handleFontsUploaded,
   /** Fallback: Fontsource, если Google недоступен */
   selectOrAddFontsourceFont,
@@ -225,14 +48,13 @@ export default function FontPreview({
   onClosePlainPreview,
 }) {
   const { 
-    text, setText, 
+    text,
     fontSize, 
     lineHeight, 
     letterSpacing, 
     textColor, 
     backgroundColor, 
-    viewMode, 
-    setViewMode,
+    viewMode,
     textDirection, 
     textAlignment, 
     textCase,
@@ -250,12 +72,22 @@ export default function FontPreview({
 
   /** Общий скролл области превью — режим Glyphs подписывается на этот узел для своей виртуализации */
   const previewBodyScrollRef = useRef(null);
+  const emptyStateSearchWrapRef = useRef(null);
 
   const [glyphFooterCount, setGlyphFooterCount] = useState(null);
+  const [presetSearchQuery, setPresetSearchQuery] = useState('');
+  const [isEmptyStateSearchExpanded, setIsEmptyStateSearchExpanded] = useState(false);
+  const [googleCatalogEntries, setGoogleCatalogEntries] = useState([]);
+  const emptyStateSearchInputRef = useRef(null);
 
   useEffect(() => {
     if (viewMode !== 'glyphs') setGlyphFooterCount(null);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (selectedFont || typeof window === 'undefined') return;
+    setGoogleCatalogEntries(readGoogleFontCatalogCache());
+  }, [selectedFont]);
 
   const styleValues = useMemo(() => {
     const letterSpacingValue = `${(letterSpacing / 100) * 0.5}em`; 
@@ -483,6 +315,49 @@ export default function FontPreview({
   }, [handleFontsUploaded, selectOrAddFontsourceFont]);
   
   const presetFonts = useMemo(() => [...GOOGLE_PRESET_FONT_NAMES], []);
+  const filteredPresetFonts = useMemo(() => {
+    if (!presetSearchQuery.trim()) return presetFonts;
+    return presetFonts.filter((fontName) => matchesSearch([fontName], presetSearchQuery));
+  }, [presetFonts, presetSearchQuery]);
+  const emptyStateSearchQuery = presetSearchQuery.trim();
+  const emptyStateSearchActive = isEmptyStateSearchExpanded || emptyStateSearchQuery.length > 0;
+
+  useEffect(() => {
+    if (!emptyStateSearchActive || typeof window === 'undefined') return;
+
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      setPresetSearchQuery('');
+      setIsEmptyStateSearchExpanded(false);
+      emptyStateSearchInputRef.current?.blur();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [emptyStateSearchActive]);
+
+  const emptyStateSearchFieldClass = `box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${NATIVE_SELECT_FIELD_INTERACTIVE} focus:border-black/[0.14] focus:outline-none sm:pl-3`;
+  const filteredGoogleCatalogResults = useMemo(() => {
+    if (!emptyStateSearchQuery) return [];
+    return googleCatalogEntries
+      .filter((entry) => entry?.family && entry.isVariable)
+      .filter((entry) =>
+        matchesSearch(
+          [
+            entry.family,
+            entry.category,
+            entry.primaryScript,
+            ...(Array.isArray(entry.subsets) ? entry.subsets : []),
+          ],
+          emptyStateSearchQuery,
+        ),
+      )
+      .slice(0, EMPTY_STATE_GOOGLE_RESULTS_LIMIT);
+  }, [googleCatalogEntries, emptyStateSearchQuery]);
+
+  useEffect(() => {
+    filteredGoogleCatalogResults.forEach((entry) => ensureGoogleFontPreviewCss(entry));
+  }, [filteredGoogleCatalogResults]);
   
   const effectiveWaterfallSizes = useMemo(() => {
     const n = Math.max(1, Math.min(40, Math.round(Number(waterfallRows) || 20)));
@@ -513,27 +388,11 @@ export default function FontPreview({
     return out;
   }, [waterfallRows, waterfallScaleRatio, waterfallBaseSize, waterfallRoundPx]);
   
-  const weightVariations = useMemo(() => {
-    return [
-      { name: 'Thin', wght: 100 }, { name: 'ExtraLight', wght: 200 }, { name: 'Light', wght: 300 },
-      { name: 'Regular', wght: 400 }, { name: 'Medium', wght: 500 }, { name: 'SemiBold', wght: 600 },
-      { name: 'Bold', wght: 700 }, { name: 'ExtraBold', wght: 800 }, { name: 'Black', wght: 900 }
-    ];
-  }, []);
-  const italicVariations = useMemo(() => {
-    return [
-      { name: 'Thin Italic', wght: 100, slnt: -10, ital: 1 }, { name: 'Light Italic', wght: 300, slnt: -10, ital: 1 },
-      { name: 'Italic', wght: 400, slnt: -10, ital: 1 }, { name: 'Medium Italic', wght: 500, slnt: -10, ital: 1 },
-      { name: 'Bold Italic', wght: 700, slnt: -10, ital: 1 }, { name: 'Black Italic', wght: 900, slnt: -10, ital: 1 }
-    ];
-  }, []);
-  const axisRatios = useMemo(() => [0, 0.25, 0.5, 0.75, 1], []);
-
   const plainCharCount = useMemo(() => [...String(text ?? '')].length, [text]);
 
   const stylesPreviewStats = useMemo(
-    () => getStylesPreviewRowCount(selectedFont, weightVariations, italicVariations, axisRatios),
-    [selectedFont, weightVariations, italicVariations, axisRatios],
+    () => getStylesPreviewStats(selectedFont),
+    [selectedFont],
   );
 
   const bottomBarModeHint = useMemo(() => {
@@ -589,31 +448,252 @@ export default function FontPreview({
     return () => window.removeEventListener('keydown', onKey);
   }, [plainPreviewOpen, onClosePlainPreview]);
 
+  const previewFontLabel = useMemo(() => {
+    return exportedFont
+      ? exportedFont.name.replace(/-static$/, '')
+      : selectedFont?.name ||
+          selectedFont?.family ||
+          (selectedFont?.fontFamily && selectedFont?.source !== 'google'
+            ? selectedFont.fontFamily
+            : 'Шрифт');
+  }, [exportedFont, selectedFont]);
+
+  const previewSourceLabel = useMemo(
+    () => (selectedFont?.source === 'google' ? 'Google Font' : 'Пользовательский'),
+    [selectedFont?.source],
+  );
+
+  const previewWeightValue = useMemo(() => {
+    const weight = Number(selectedFont?.currentWeight);
+    return Number.isFinite(weight) ? Math.round(weight) : null;
+  }, [selectedFont?.currentWeight]);
+
+  const showVariableBadge = Boolean(selectedFont?.isVariableFont);
+  const showItalicBadge = fontStyleValue === 'italic' || selectedFont?.currentStyle === 'italic';
+
+  const clearEmptyStateSearch = useCallback(() => {
+    setPresetSearchQuery('');
+    setIsEmptyStateSearchExpanded(false);
+    emptyStateSearchInputRef.current?.blur();
+  }, []);
+
+  const openEmptyStateSearch = useCallback(() => {
+    setIsEmptyStateSearchExpanded(true);
+    requestAnimationFrame(() => {
+      emptyStateSearchInputRef.current?.focus();
+    });
+  }, []);
+
+  const handleEmptyStateSearchBlur = useCallback(
+    (event) => {
+      const nextFocusedElement = event.relatedTarget;
+      if (
+        nextFocusedElement &&
+        emptyStateSearchWrapRef.current instanceof HTMLElement &&
+        emptyStateSearchWrapRef.current.contains(nextFocusedElement)
+      ) {
+        return;
+      }
+      if (!presetSearchQuery.trim()) {
+        setIsEmptyStateSearchExpanded(false);
+      }
+    },
+    [presetSearchQuery],
+  );
+
   if (!selectedFont) {
+    const googleListForStats =
+      googleCatalogEntries.length > 0 ? googleCatalogEntries : readGoogleFontCatalogCache();
+    const catalogStats = getCatalogUnionStats(googleListForStats, readFontsourceCatalogCache());
+    const emptyLeading =
+      emptyStateSearchQuery.trim().length > 0
+        ? `Найдено: ${filteredGoogleCatalogResults.length}`
+        : catalogStats.googleTotal + catalogStats.fontsourceTotal > 0
+          ? formatCatalogUnionAvailabilityShort(catalogStats)
+          : 'Шрифт не выбран';
+
     return (
-      <div className="flex h-full min-h-0 w-full flex-1 items-center justify-center bg-gray-50">
-        <div className="text-center p-8 max-w-md">
-          <h2 className="text-2xl font-bold uppercase text-gray-900 mb-4">Загрузите шрифт для начала работы</h2>
-          <p className="text-gray-600 mb-6">Загрузите TTF, OTF, WOFF или WOFF2 файл шрифта</p>
-          <div className="mb-8">
-            <FontUploader onFontsUploaded={handleFontsUploaded} />
-          </div>
-          <div className="text-sm text-gray-500">
-            Или выберите один из наших предустановленных шрифтов ниже:
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            {presetFonts.map(fontName => (
-              <button 
-                key={fontName}
-                onClick={() => loadPresetFont(fontName)}
-                type="button"
-                className="bg-white py-3 px-4 rounded-md border border-white text-gray-800 transition-all duration-200 hover:border-gray-400 font-sans font-medium"
+      <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-white">
+        <div
+          className={`flex w-full min-h-0 flex-1 flex-col overflow-y-auto ${
+            /* flex-col: cross axis = горизонталь → items-center по центру; main = вертикаль → justify-start к верху как раньше */
+            emptyStateSearchActive ? 'items-center justify-start pt-8' : 'items-center justify-center'
+          }`}
+        >
+        <div
+          className={`w-full px-6 ${
+            emptyStateSearchActive ? 'max-w-6xl py-8' : 'max-w-md py-8'
+          }`}
+        >
+          <div
+            className={`mx-auto ${
+              emptyStateSearchActive ? 'max-w-5xl text-left' : 'max-w-md text-center'
+            }`}
+          >
+            <div
+              ref={emptyStateSearchWrapRef}
+              className={`z-20 min-h-10 ${
+                emptyStateSearchActive ? 'sticky top-0 bg-white py-1' : ''
+              } flex items-center gap-3 ${
+                emptyStateSearchActive ? 'w-full justify-start' : 'justify-center'
+              }`}
+            >
+              <IconCircleButton
+                variant="searchToggle"
+                size="md"
+                pressed={emptyStateSearchActive}
+                className="focus:outline-none"
+                onClick={emptyStateSearchActive ? clearEmptyStateSearch : openEmptyStateSearch}
+                aria-label={emptyStateSearchActive ? 'Закрыть поиск' : 'Открыть поиск'}
               >
-                {fontName}
-              </button>
-            ))}
+                {emptyStateSearchActive ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.6}
+                    className="h-5 w-5"
+                    aria-hidden
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <SearchIcon className="h-5 w-5" />
+                )}
+              </IconCircleButton>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
+                  emptyStateSearchActive ? 'min-w-0 flex-1 opacity-100' : 'max-w-0 opacity-0'
+                }`}
+              >
+                <div className="relative">
+                  <input
+                    ref={emptyStateSearchInputRef}
+                    type="search"
+                    value={presetSearchQuery}
+                    onFocus={() => setIsEmptyStateSearchExpanded(true)}
+                    onBlur={handleEmptyStateSearchBlur}
+                    onChange={(e) => setPresetSearchQuery(e.target.value)}
+                    placeholder="Поиск шрифта Google"
+                    className={emptyStateSearchFieldClass}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  {presetSearchQuery ? (
+                    <SearchClearButton
+                      onClick={clearEmptyStateSearch}
+                      className="absolute right-2 top-1/2 -translate-y-1/2"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="relative mt-6">
+              <div
+                className={`${
+                  emptyStateSearchActive
+                    ? 'pointer-events-none absolute inset-x-0 top-0 opacity-0'
+                    : 'relative opacity-100'
+                }`}
+              >
+                <h2 className="mb-4 text-2xl font-bold uppercase text-gray-900">Загрузите шрифт для начала работы</h2>
+                <p className="mb-6 text-gray-600">Перетащите шрифт или нажмите на область</p>
+                <div className="mb-8">
+                  <FontUploader onFontsUploaded={handleFontsUploaded} />
+                </div>
+                {filteredPresetFonts.length > 0 ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {filteredPresetFonts.map((fontName) => (
+                      <button
+                        key={fontName}
+                        onClick={() => loadPresetFont(fontName)}
+                        type="button"
+                        className="rounded-md border border-gray-200 bg-white px-4 py-3 font-sans font-medium text-gray-800 transition-all duration-200 hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
+                      >
+                        {fontName}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-sm text-gray-500">Ничего не найдено. Попробуйте другой запрос.</p>
+                )}
+              </div>
+            </div>
+
+            {emptyStateSearchActive ? (
+              <div className="mt-4">
+                {emptyStateSearchQuery ? (
+                  filteredGoogleCatalogResults.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {filteredGoogleCatalogResults.map((entry) => (
+                        <button
+                          key={entry.family}
+                          type="button"
+                          onClick={() => loadPresetFont(entry.family)}
+                          className="w-full text-left"
+                        >
+                          <CatalogFontCard
+                            className="min-h-[148px]"
+                            title={entry.family}
+                            preview={
+                              <div
+                                className="mt-2 min-h-[1.75rem] flex-1 truncate text-[1.75rem] leading-tight text-gray-800"
+                                style={{ fontFamily: `'${entry.family}', sans-serif` }}
+                              >
+                                AaBbCcDdEe
+                              </div>
+                            }
+                            footer={
+                              <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
+                                <div className="flex min-w-0 flex-wrap items-center gap-1">
+                                  <span className="truncate text-[11px] font-semibold uppercase text-gray-500">
+                                    {entry.category || 'Google'}
+                                  </span>
+                                  {entry.isVariable ? (
+                                    <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-semibold uppercase text-gray-800">
+                                      vf
+                                    </span>
+                                  ) : null}
+                                  {entry.hasItalic ? (
+                                    <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-semibold uppercase text-gray-800">
+                                      italic
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <span className="text-[11px] font-semibold uppercase text-gray-500">
+                                  Google
+                                </span>
+                              </div>
+                            }
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  ) : googleCatalogEntries.length > 0 ? (
+                    <p className="py-6 text-center text-sm uppercase text-gray-500">
+                      Ничего не найдено. Попробуйте другой запрос.
+                    </p>
+                  ) : (
+                    <p className="py-6 text-center text-sm uppercase text-gray-500">
+                      Кэш каталога Google пока пуст. Откройте вкладку Google Fonts, и поиск здесь сразу начнет показывать карточки.
+                    </p>
+                  )
+                ) : (
+                  <p className="py-6 text-center text-sm uppercase text-gray-500">
+                    Начните вводить название шрифта, и здесь появятся карточки из каталога Google.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
+        </div>
+        <EditorStatusBar
+          leading={emptyLeading}
+          center={<span className="truncate">Новая вкладка</span>}
+        />
       </div>
     );
   }
@@ -651,10 +731,6 @@ export default function FontPreview({
             <StylesMode
               selectedFont={selectedFont}
               fontFamilyValue={fontFamilyValue}
-              weightVariations={weightVariations}
-              italicVariations={italicVariations}
-              axisRatios={axisRatios}
-              generateVariationSettings={generateVariationSettings}
             />
           </Suspense>
         )}
@@ -677,7 +753,6 @@ export default function FontPreview({
           <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
             <TextMode
               contentStyle={contentStyle}
-              textDisplayBuffer={textDisplayBuffer}
               fontFamily={fontFamilyValue}
               variationSettingsValue={variationSettingsValue}
             />
@@ -685,71 +760,28 @@ export default function FontPreview({
         )}
       </div>
 
-      <div className={EDITOR_PREVIEW_BOTTOM_BAR_CLASS}>
-        <div className="relative z-20 flex min-w-0 max-w-[42%] shrink-0 items-center bg-white py-0.5 pl-2 pr-2 sm:max-w-[38%]">
-          {bottomBarModeHint ? (
-            <span className="truncate text-left text-xs uppercase font-semibold tabular-nums text-gray-800">
-              {bottomBarModeHint}
-            </span>
-          ) : (
-            <span className="text-xs text-gray-400"> </span>
-          )}
-        </div>
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-4 sm:px-8">
-          {selectedFont && (
-            <div className="pointer-events-none max-w-[min(520px,calc(100%-20rem))] text-center text-xs uppercase leading-snug font-semibold text-gray-700 sm:max-w-[min(560px,calc(100%-18rem))]">
-              <span className="text-gray-800 mr-2">
-                {exportedFont
-                  ? exportedFont.name.replace(/-static$/, '')
-                  : selectedFont.name ||
-                    selectedFont.family ||
-                    (selectedFont.fontFamily && selectedFont.source !== 'google'
-                      ? selectedFont.fontFamily
-                      : 'Шрифт')}
-              </span>
-              <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-gray-800">
-                {selectedFont.source === 'google' ? 'Google Font' : 'Пользовательский'}
-              </span>
-              {(selectedFont.variationSettings || selectedFont.isVariableFont) && (
-                <>
-                  <span className="text-gray-400"> </span>
-                  <span className="inline-block rounded-full bg-gray-900 px-2.5 py-1 text-white">
-                    VF
-                  </span>
-                </>
-              )}
-              <span className="text-gray-400"> </span>
-              <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-gray-800">
-                {selectedFont.currentWeight}
-              </span>
-              {selectedFont.currentStyle === 'italic' && (
-                <>
-                  <span className="text-gray-400"> </span>
-                  <span className="inline-block rounded-full bg-gray-100 px-2.5 py-1 text-gray-800">
-                    Italic
-                  </span>
-                </>
-              )}
+      <EditorStatusBar
+        leading={bottomBarModeHint}
+        center={
+          selectedFont ? (
+            <div className="flex items-center justify-center gap-2">
+              <span className="truncate">{previewFontLabel}</span>
+              <span>{previewSourceLabel}</span>
+              {showVariableBadge ? (
+                <Tooltip content="Variable Font" className="pointer-events-auto">
+                  <span>VF</span>
+                </Tooltip>
+              ) : null}
+              {previewWeightValue !== null ? (
+                <Tooltip content="Font-weight" className="pointer-events-auto">
+                  <span>{previewWeightValue}</span>
+                </Tooltip>
+              ) : null}
+              {showItalicBadge ? <span>Italic</span> : null}
             </div>
-          )}
-        </div>
-        <div className="relative z-20 ml-auto flex shrink-0 flex-wrap justify-end gap-1.5 bg-white py-0.5 pl-2 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => handleScreenshotClick?.()}
-            className="flex items-center gap-1 rounded-sm bg-accent px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-accent-hover"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3">
-              <path
-                fillRule="evenodd"
-                d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Скриншот
-          </button>
-        </div>
-      </div>
+          ) : null
+        }
+      />
     </div>
 
     {plainPreviewOpen && typeof onClosePlainPreview === 'function' && (

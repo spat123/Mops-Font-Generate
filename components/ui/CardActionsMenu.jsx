@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { IconCircleButton } from './IconCircleButton';
 
 export function CardActionsMenu({ items = [], triggerLabel = 'Действия', className = '' }) {
   const [open, setOpen] = useState(false);
@@ -28,12 +29,12 @@ export function CardActionsMenu({ items = [], triggerLabel = 'Действия',
 
   return (
     <div ref={rootRef} className={`relative ${className}`.trim()}>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-all hover:bg-gray-200 hover:text-gray-900 ${
+      <IconCircleButton
+        variant="gray100Menu"
+        className={`transition-all ${
           open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'
         }`}
+        onClick={() => setOpen((value) => !value)}
         aria-label={triggerLabel}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -47,11 +48,11 @@ export function CardActionsMenu({ items = [], triggerLabel = 'Действия',
         >
           <path d="M12 7.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12 13.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3ZM12 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
         </svg>
-      </button>
+      </IconCircleButton>
 
       {open ? (
         <div
-          className="absolute right-0 top-10 z-20 min-w-[10rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-md"
+          className="absolute right-0 top-10 z-20 min-w-[10rem] overflow-hidden rounded-md bg-white shadow-md"
           role="menu"
         >
           {items.map((item) => (
@@ -63,11 +64,8 @@ export function CardActionsMenu({ items = [], triggerLabel = 'Действия',
                 item.onSelect?.();
                 setOpen(false);
               }}
-              className={`flex w-full items-center px-3 py-2 text-left text-sm font-semibold uppercase transition-colors ${
-                item.tone === 'danger'
-                  ? 'text-red-600 hover:bg-red-50'
-                  : 'text-gray-900 hover:bg-gray-100'
-              }`}
+              className={`flex w-full items-center px-3 py-2 text-left text-xs border-b border-gray-200 font-medium uppercase transition-colors hover:bg-accent hover:text-white
+              `}
             >
               {item.icon ? <span className="mr-2 inline-flex h-4 w-4 shrink-0 items-center justify-center">{item.icon}</span> : null}
               {item.label}

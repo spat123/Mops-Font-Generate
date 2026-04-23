@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { slugifyFontFilenameStub, slugifyFontKey } from '../utils/fontSlug';
 
 /** Скачивание файлов, CSS-экспорт, псевдо/реальная генерация статики из VF. */
 export function useFontExport(exportToCSSFromHook) {
@@ -61,7 +62,7 @@ export function useFontExport(exportToCSSFromHook) {
     const cssCode = exportToCSSFromHook(selectedFont, selectedFontName);
     
     if (download && cssCode) {
-      const filename = `${selectedFontName.replace(/\s+/g, '-').toLowerCase()}-styles.css`;
+      const filename = `${slugifyFontKey(selectedFontName)}-styles.css`;
       const success = downloadFile(cssCode, filename, 'text/css');
       
       if (success) {
@@ -175,10 +176,7 @@ export function useFontExport(exportToCSSFromHook) {
       const fontBlob = await generateStaticFontFile(selectedFont, variableSettings, format);
       
       if (fontBlob) {
-        const fontBaseName = (selectedFont.name || selectedFont.fontFamily || 'font')
-          .replace(/\s+/g, '-')
-          .toLowerCase()
-          .replace(/[^a-z0-9\-]/g, '');
+        const fontBaseName = slugifyFontFilenameStub(selectedFont.name || selectedFont.fontFamily || 'font');
 
         let axisInfo = '';
 

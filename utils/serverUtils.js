@@ -56,10 +56,13 @@ async function findProjectRoot(startDir) {
  * @param {string} packageName - Имя пакета БЕЗ префикса @fontsource/ (например, 'roboto').
  * @returns {Promise<string|null>} - Абсолютный путь или null, если пакет/metadata.json не найден.
  */
-export async function findFontsourcePackagePath(packageName) {
+export async function findFontsourcePackagePath(packageName, options = {}) {
+  const { silent = false } = options;
   const projectRoot = await findProjectRoot(__dirname);
   if (!projectRoot) {
-    console.error("[ServerUtils] Не удалось найти корневую директорию проекта (package.json).");
+    if (!silent) {
+      console.error("[ServerUtils] Не удалось найти корневую директорию проекта (package.json).");
+    }
     return null;
   }
 
@@ -83,7 +86,9 @@ export async function findFontsourcePackagePath(packageName) {
       await fs.access(metadataPath, fs.constants.F_OK);
       return packageDir;
     } catch (error) {
-      console.warn(`[ServerUtils] ⚠️ Вариативный пакет ${variablePackageName} не найден: ${error.message}`);
+      if (!silent) {
+        console.warn(`[ServerUtils] ⚠️ Вариативный пакет ${variablePackageName} не найден: ${error.message}`);
+      }
       // Если не нашли вариативный, продолжаем поиск обычного пакета
     }
   }
@@ -97,7 +102,9 @@ export async function findFontsourcePackagePath(packageName) {
     await fs.access(metadataPath, fs.constants.F_OK);
     return packageDir; // Возвращаем путь к директории пакета
   } catch (error) {
-    console.warn(`[ServerUtils] ⚠️ Обычный пакет ${normalPackageName} не найден: ${error.message}`);
+    if (!silent) {
+      console.warn(`[ServerUtils] ⚠️ Обычный пакет ${normalPackageName} не найден: ${error.message}`);
+    }
     
     // Если не запрашивали явно вариативный, попробуем его теперь
     if (!isVariableRequest) {
@@ -108,10 +115,12 @@ export async function findFontsourcePackagePath(packageName) {
         await fs.access(metadataPath, fs.constants.F_OK);
         return packageDir;
       } catch (variableError) {
-        console.error(`[ServerUtils] ❌ Не найдены пакеты ${normalPackageName} и ${variablePackageName}`);
-        console.error(`[ServerUtils] Попытки поиска:`);
-        console.error(`[ServerUtils] - ${path.join(projectRoot, 'node_modules', normalPackageName, 'metadata.json')}`);
-        console.error(`[ServerUtils] - ${path.join(projectRoot, 'node_modules', variablePackageName, 'metadata.json')}`);
+        if (!silent) {
+          console.error(`[ServerUtils] ❌ Не найдены пакеты ${normalPackageName} и ${variablePackageName}`);
+          console.error(`[ServerUtils] Попытки поиска:`);
+          console.error(`[ServerUtils] - ${path.join(projectRoot, 'node_modules', normalPackageName, 'metadata.json')}`);
+          console.error(`[ServerUtils] - ${path.join(projectRoot, 'node_modules', variablePackageName, 'metadata.json')}`);
+        }
       }
     }
     return null;

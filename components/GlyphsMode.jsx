@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import debounce from 'lodash.debounce';
+import { debounce } from '../utils/debounce';
 import { getGlyphDataForFont } from '../utils/fontParser';
 import { useSettings } from '../contexts/SettingsContext';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
@@ -397,7 +397,22 @@ function GlyphsMode({
       
     // Сообщение, если шрифт - Google Font (проверяется после isLoading)
     if (selectedFont?.source === 'google') {
-        return <div className="p-8 text-center text-gray-500">Просмотр глифов недоступен для шрифтов Google.</div>;
+        return (
+          <div className="flex min-h-full flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="w-full max-w-[8rem] aspect-square overflow-hidden rounded-lg">
+              <img
+                src="/assets/hell-no-oh-hell-no.gif"
+                alt="Просмотр глифов недоступен"
+                className="h-full w-full select-none object-cover"
+              />
+            </div>
+            <p className="mt-4 text-sm font-normal text-gray-800">
+              Просмотр глифов недоступен
+              <br />
+              для шрифтов Google
+            </p>
+          </div>
+        );
     }
 
     // Условие отображения ошибки или отсутствия данных (после попытки загрузки и не Google Font)

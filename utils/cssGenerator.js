@@ -1,6 +1,9 @@
 // Функции для генерации CSS правил (@font-face, font-variation-settings и т.д.) 
 import { toast } from 'react-toastify';
+import { debounce } from './debounce';
 import { getFormatFromExtension } from './fontUtilsCommon';
+
+export { debounce };
 
 // Восстанавливаем функцию hasSignificantChanges
 /**
@@ -219,21 +222,6 @@ export const loadFontFaceIfNeeded = async (
   fontFaceCache.set(cacheKey, loadPromise);
 
   return loadPromise;
-};
-
-/**
- * Создает дебаунсированную версию функции для предотвращения частых вызовов
- * @param {Function} func - Функция для дебаунсинга
- * @param {number} wait - Время ожидания в миллисекундах
- * @returns {Function} - Дебаунсированная функция
- */
-export const debounce = (func, wait = 50) => {
-  let timeout;
-  return function(...args) {
-    const context = this;
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(context, args), wait);
-  };
 };
 
 /**

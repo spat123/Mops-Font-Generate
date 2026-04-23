@@ -10,7 +10,8 @@ export function useVariableFontControls(
   setSelectedFont,
   setFonts,
   debouncedUpdateCssSettings,
-  saveLastVariableSettings
+  saveLastVariableSettings,
+  saveFontsourceVariableSettings = null
 ) {
 
   const applyVariableSettingsRef = useRef(null);
@@ -74,8 +75,16 @@ export function useVariableFontControls(
     if (isFinalUpdate && typeof saveLastVariableSettings === 'function') {
       saveLastVariableSettings(updatedSettings);
     }
+    if (
+      isFinalUpdate &&
+      typeof saveFontsourceVariableSettings === 'function' &&
+      fontToApply?.source === 'fontsource' &&
+      fontToApply?.isVariableFont
+    ) {
+      saveFontsourceVariableSettings(fontToApply, updatedSettings);
+    }
 
-  }, [selectedFont, variableSettings, setVariableSettings, setSelectedFont, setFonts, debouncedUpdateCssSettings, saveLastVariableSettings]);
+  }, [selectedFont, variableSettings, setVariableSettings, setSelectedFont, setFonts, debouncedUpdateCssSettings, saveLastVariableSettings, saveFontsourceVariableSettings]);
 
   applyVariableSettingsRef.current = applyVariableSettings;
 

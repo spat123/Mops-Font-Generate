@@ -25,7 +25,7 @@ function ResetButton({ onResetSelectedFont }) {
     }
   };
 
-  const buttonText = onResetSelectedFont ? 'Сбросить настройки шрифта' : 'Сбросить всё состояние';
+  const buttonText = onResetSelectedFont ? 'Сбросить настройки' : 'Сбросить всё состояние';
   const title = onResetSelectedFont
     ? 'Сбросить настройки выбранного шрифта'
     : 'Сбросить все настройки приложения и удалить локальные шрифты';
@@ -35,7 +35,7 @@ function ResetButton({ onResetSelectedFont }) {
       as="button"
       type="button"
       onClick={handleResetClick}
-      className="w-full h-full items-center justify-center text-center text-xs font-medium text-gray-400 uppercase transition-colors hover:bg-accent hover:text-white focus:outline-none focus:ring-2 focus:ring-gray-400/40 focus:ring-offset-1"
+      className="w-full items-center justify-center text-center text-xs font-medium text-gray-400 opacity-50 uppercase transition-colors hover:text-gray-800 hover:opacity-100 hover:border-accent"
       content={title}
       aria-label={title}
     >

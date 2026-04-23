@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-toastify';
+import { PlusIconGrayCircle } from './ui/PlusIconGrayCircle';
 
 export default function FontUploader({ onFontsUploaded }) {
   const [isUploading, setIsUploading] = useState(false);
@@ -115,27 +116,15 @@ export default function FontUploader({ onFontsUploaded }) {
   return (
     <div
       {...getRootProps()}
-      className={`p-4 border-2 border-dashed rounded-lg transition-all ${
+      className={`group p-4 border-2 border-dashed rounded-lg transition-all ${
         isDragActive 
           ? 'border-gray-500 bg-gray-100'
-          : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+          : 'border-gray-300 hover:bg-gray-50'
       }`}
     >
       <input {...getInputProps()} />
       <div className="flex flex-col items-center justify-center space-y-2 py-1">
-        <svg
-          className={`w-6 h-6 ${isDragActive ? 'text-gray-700' : 'text-gray-500'}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          />
-        </svg>
+        <PlusIconGrayCircle active={isDragActive} />
         <div className={`text-sm font-medium ${isDragActive ? 'text-gray-800' : 'text-gray-700'}`}>
           {isDragActive 
             ? 'Отпустите файлы' 

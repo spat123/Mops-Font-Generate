@@ -6,6 +6,7 @@ import {
   debouncedUpdateVariableFontSettings,
   buildVariableFontFaceDescriptors,
 } from '../utils/cssGenerator';
+import { slugifyFontKey } from '../utils/fontSlug';
 
 /** CSS для превью: font-family, variation-settings, FontFace, экспорт строки. */
 export function useFontCss(selectedFont, variableSettings, isSelectedFontVariable) {
@@ -85,9 +86,15 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
       if (variationSettings && variationSettings !== 'normal') {
         properties.fontVariationSettings = variationSettings;
       }
-      if (selectedFont?.italicMode === 'separate-style' && selectedFont?.currentStyle === 'italic') {
-        properties.fontStyle = 'italic';
-      }
+      const italValueFromSettings = Number(
+        variableSettings?.ital ??
+        selectedFont?.variableAxes?.ital?.currentValue ??
+        selectedFont?.variableAxes?.ital?.default ??
+        0
+      );
+      const isAxisItalActive = selectedFont?.italicMode === 'axis-ital' && Number.isFinite(italValueFromSettings) && italValueFromSettings >= 1;
+      const wantsItalicStyle = selectedFont?.currentStyle === 'italic' || isAxisItalActive;
+      properties.fontStyle = wantsItalicStyle ? 'italic' : 'normal';
     } else {
       // Для статических шрифтов добавляем weight и style
       if (selectedFont.currentWeight) {
@@ -180,7 +187,7 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     const css = generateCSS(); // Получаем { fontFamily, fontVariationSettings?, fontWeight?, fontStyle? }
     
     let cssString = `/* CSS для шрифта: ${targetFontName} */\n`;
-    cssString += `.font-${targetFontName.replace(/\s+/g, '-').toLowerCase()} {\n`;
+    cssString += `.font-${slugifyFontKey(targetFontName)} {\n`;
     
     Object.entries(css).forEach(([property, value]) => {
       // Конвертируем camelCase в kebab-case

@@ -18,6 +18,7 @@ import { CustomSelect } from './ui/CustomSelect';
 import { EDITOR_SIDEBAR_FOOTER_BAR_CLASS } from './ui/editorChromeClasses';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { Tooltip } from './ui/Tooltip';
+import { IconCircleButton } from './ui/IconCircleButton';
 
 const sidebarSelectClass = customSelectTriggerClass({ compact: true });
 
@@ -505,8 +506,6 @@ export default function Sidebar({
   setSelectedFont,
   isAnimating,
   toggleAnimation,
-  animationSpeed,
-  setAnimationSpeed,
   sampleTexts,
   availableStyles,
   selectedPresetName,
@@ -561,6 +560,8 @@ export default function Sidebar({
     verticalAlignment,
     setVerticalAlignment,
     textFill, setTextFill,
+    darkTheme,
+    setDarkTheme,
     previewBackgroundImage,
     setPreviewBackgroundImage,
     viewMode,
@@ -959,6 +960,9 @@ export default function Sidebar({
 
   const sidebarScrollRef = useRef(null);
   const sidebarScrollIdleTimerRef = useRef(null);
+  const settingsPopoverRef = useRef(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [sidebarScrollbarVisible, setSidebarScrollbarVisible] = useState(false);
   const [sidebarScrollLayout, setSidebarScrollLayout] = useState({
     scrollTop: 0,
@@ -1027,6 +1031,27 @@ export default function Sidebar({
     };
   }, [syncSidebarScrollLayout]);
 
+  useEffect(() => {
+    if (!isAppSettingsOpen) return;
+
+    const onPointerDown = (event) => {
+      const root = settingsPopoverRef.current;
+      if (!root || root.contains(event.target)) return;
+      setIsAppSettingsOpen(false);
+    };
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setIsAppSettingsOpen(false);
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isAppSettingsOpen]);
+
   const sidebarOverlayThumb = useMemo(() => {
     const { scrollTop, scrollHeight, clientHeight } = sidebarScrollLayout;
     /** Совпадает с `top-2` / `bottom-2` у дорожки полосы (0.5rem ≈ 8px). */
@@ -1041,11 +1066,20 @@ export default function Sidebar({
   }, [sidebarScrollLayout]);
 
   return (
-    <div className="flex h-screen min-h-0 w-64 flex-col overflow-hidden border-r border-gray-200 bg-white shadow-sm">
+    <div
+      className={`flex h-screen min-h-0 flex-col overflow-hidden border-r border-gray-200 bg-white shadow-sm transition-[width] duration-200 ${
+        isSidebarCollapsed ? 'w-16' : 'w-64'
+      }`}
+    >
       <div className="flex h-12 min-h-12 shrink-0 items-center justify-center border-b border-gray-200 px-4">
-        <img src="/logo/Logo%20Dinamic.svg" alt="Dynamic font" className="w-auto select-none" />
+        {isSidebarCollapsed ? (
+          <span className="text-xs font-semibold uppercase text-gray-700">DF</span>
+        ) : (
+          <img src="/logo/Logo%20Dinamic.svg" alt="Dynamic font" className="w-auto select-none" />
+        )}
       </div>
 
+      {!isSidebarCollapsed ? (
       <div className="relative min-h-0 flex flex-1 flex-col">
         <div
           ref={sidebarScrollRef}
@@ -1395,19 +1429,15 @@ export default function Sidebar({
                     className="min-w-0 flex-1"
                   />
                   <Tooltip content={waterfallRoundPx === false ? 'Округление: выкл.' : 'Округление: вкл.'}>
-                    <button
-                      type="button"
+                    <IconCircleButton
+                      variant="toolbar"
+                      pressed={waterfallRoundPx !== false}
                       aria-pressed={waterfallRoundPx !== false}
                       aria-label="Переключить округление размеров Waterfall"
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
-                        waterfallRoundPx === false
-                          ? 'bg-gray-50 text-gray-800 hover:text-accent'
-                          : 'bg-accent text-white hover:bg-accent-hover'
-                      }`.trim()}
                       onClick={() => setWaterfallRoundPx((v) => !v)}
                     >
                       <IconRoundingUp className="h-4 w-4 shrink-0" />
-                    </button>
+                    </IconCircleButton>
                   </Tooltip>
                 </div>
               </div>
@@ -1428,8 +1458,6 @@ export default function Sidebar({
               onSettingsChange={handleVariableSettingsChange}
               isAnimating={isAnimating}
               toggleAnimation={toggleAnimation}
-              animationSpeed={animationSpeed}
-              setAnimationSpeed={setAnimationSpeed}
             />
           </div>
         )}
@@ -1449,9 +1477,8 @@ export default function Sidebar({
               ]}
             />
             <Tooltip content="Поменять цвета местами">
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50 text-gray-800 transition-colors hover:text-accent"
+              <IconCircleButton
+                variant="toolbar"
                 onClick={() => {
                   const tempColor = textColor;
                   const tempPos = fgColorPos;
@@ -1470,7 +1497,7 @@ export default function Sidebar({
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-4 w-4" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
                 </svg>
-              </button>
+              </IconCircleButton>
             </Tooltip>
             <input
               ref={previewBgFileInputRef}
@@ -1487,11 +1514,9 @@ export default function Sidebar({
                   : 'Фон области превью'
               }
             >
-              <button
-                type="button"
-                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:text-accent ${
-                  previewBackgroundImage ? 'bg-accent text-white hover:text-white' : 'bg-gray-50 text-gray-800'
-                }`}
+              <IconCircleButton
+                variant="toolbar"
+                pressed={Boolean(previewBackgroundImage)}
                 onClick={() => {
                   if (previewBackgroundImage) {
                     setPreviewBackgroundImage(null);
@@ -1516,7 +1541,7 @@ export default function Sidebar({
                   <path d="M17.0004 5C17.0004 6.65685 15.6572 8 14.0004 8C12.3435 8 11.0004 6.65685 11.0004 5C11.0004 3.34315 12.3435 2 14.0004 2C15.6572 2 17.0004 3.34315 17.0004 5Z" fill="currentColor"/>
                 </svg>
               )}
-              </button>
+              </IconCircleButton>
             </Tooltip>
           </div>
           
@@ -1793,6 +1818,63 @@ export default function Sidebar({
             />
           </div>
         ) : null}
+      </div>
+      ) : (
+        <div className="flex min-h-0 flex-1" />
+      )}
+
+      <div className="relative border-t min-h-[52px] border-gray-200 bg-white p-2" ref={settingsPopoverRef}>
+        {isAppSettingsOpen ? (
+          <div className="absolute bottom-[calc(100%+8px)] left-2 right-2 z-30 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+            <p className="mb-2 text-xs font-semibold uppercase text-gray-700">Настройки</p>
+            <label className="flex items-center justify-between gap-3 rounded-md bg-gray-50 px-3 py-2 text-xs font-semibold uppercase text-gray-800">
+              <span className="truncate">Темная тема</span>
+              <button
+                type="button"
+                aria-pressed={darkTheme}
+                onClick={() => setDarkTheme((prev) => !prev)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  darkTheme ? 'bg-accent' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
+                    darkTheme ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </label>
+          </div>
+        ) : null}
+        <div className={`grid ${isSidebarCollapsed ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-2 h-full'}`}>
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            className="inline-flex items-center justify-center rounded-md bg-gray-50 text-gray-800 transition-colors hover:text-accent"
+            aria-label={isSidebarCollapsed ? 'Развернуть левую панель' : 'Свернуть левую панель'}
+            title={isSidebarCollapsed ? 'Развернуть левую панель' : 'Свернуть левую панель'}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden>
+              {isSidebarCollapsed ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+              )}
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAppSettingsOpen((prev) => !prev)}
+            className="inline-flex items-center justify-center rounded-md bg-gray-50 text-gray-800 transition-colors hover:text-accent"
+            aria-label="Настройки приложения"
+            title="Настройки приложения"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317a1.724 1.724 0 0 1 3.35 0l.159.81a1.724 1.724 0 0 0 2.573 1.154l.713-.406a1.724 1.724 0 0 1 2.294.633 1.724 1.724 0 0 1-.49 2.265l-.654.495a1.724 1.724 0 0 0 0 2.764l.654.495a1.724 1.724 0 0 1 .49 2.265 1.724 1.724 0 0 1-2.294.633l-.713-.406a1.724 1.724 0 0 0-2.573 1.154l-.159.81a1.724 1.724 0 0 1-3.35 0l-.159-.81a1.724 1.724 0 0 0-2.573-1.154l-.713.406a1.724 1.724 0 0 1-2.294-.633 1.724 1.724 0 0 1 .49-2.265l.654-.495a1.724 1.724 0 0 0 0-2.764l-.654-.495a1.724 1.724 0 0 1-.49-2.265 1.724 1.724 0 0 1 2.294-.633l.713.406a1.724 1.724 0 0 0 2.573-1.154l.159-.81Z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
