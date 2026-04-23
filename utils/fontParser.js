@@ -1,13 +1,13 @@
-// Функции для парсинга файлов шрифтов с использованием opentype.js
-import opentype from 'opentype.js'; // Оставляем стандартный импорт
-import { toast } from 'react-toastify'; // toast используется в parseFontFile
+// Функции для парсинга файлов шрифтов с использованием opentype.js.
+import opentype from 'opentype.js';
+import { toast } from './appNotify'; // toast используется в parseFontFile
 import { extractBasicGlyphData } from './glyphUtils';
 
-// --- ИМПОРТИРУЕМ ДЕКОМПРЕССОР ИЗ НОВОГО ПАКЕТА ---
+// --- Импорт декомпрессора WOFF2 ---
 import decompress from 'woff2-encoder/decompress';
 
 /**
- * Проверяет первые 4 байта буфера на сигнатуру WOFF2 ('wOF2')
+ * Проверяет первые 4 байта буфера на сигнатуру WOFF2 (`wOF2`).
  */
 const isWoff2 = (buffer) => {
   if (!buffer || buffer.byteLength < 4) return false;
@@ -23,14 +23,14 @@ const isWoff2 = (buffer) => {
   
 /**
  * Проверяет, является ли шрифт вариативным (содержит таблицу fvar).
- * @param {opentype.Font} fontData - Объект шрифта, полученный из opentype.parse.
- * @returns {boolean} - true, если шрифт вариативный, иначе false.
+ * @param {opentype.Font} fontData - Объект шрифта из opentype.parse
+ * @returns {boolean} true, если шрифт вариативный
  */
 export const isVariableFont = (fontData) => {
   return !!(fontData && fontData.tables && fontData.tables.fvar);
 };
 
-/** Тег оси в fvar → 4-символьная строка (opentype может отдавать string или массив байт). */
+/** Тег оси в fvar -> 4-символьная строка (opentype может отдавать string или массив байт). */
 export function normalizeFvarAxisTag(tag) {
   if (tag == null) return '';
   if (typeof tag === 'string') {
@@ -54,10 +54,10 @@ function axisDisplayName(axis, tag) {
 }
 
 /**
- * У региональных woff2-слайсов Google VF часто урезанный fvar (например только wght).
- * Собираем объединение осей по всем слайсам: min/max по всем файлам; default и имя — из самого «полного» fvar.
+ * У региональных woff2-слайсов Google VF часто урезанный fvar (например, только wght).
+ * Объединяем оси по всем слайсам: min/max по всем файлам; default и имя из наиболее полного fvar.
  *
- * @param {Array<object|Blob|ArrayBuffer|null|undefined>} inputs — уже распарсенный Font opentype или бинарник слайса
+ * @param {Array<object|Blob|ArrayBuffer|null|undefined>} inputs — распарсенный opentype Font или бинарник слайса
  * @returns {Promise<Record<string, { name: string, min: number, max: number, default: number }>|null>}
  */
 export async function mergeFvarAxesFromFontInputs(inputs) {
@@ -121,12 +121,12 @@ export async function mergeFvarAxesFromFontInputs(inputs) {
 
 /**
  * [Только основной поток] Асинхронно парсит ArrayBuffer шрифта.
- * Декомпрессирует WOFF2 при необходимости.
+ * При необходимости декомпрессирует WOFF2.
  * Возвращает полный объект opentype.Font или null при ошибке.
  *
- * @param {ArrayBuffer} buffer - ArrayBuffer с данными шрифта.
- * @param {string} [fontName='unknown'] - Имя шрифта для логирования.
- * @returns {Promise<opentype.Font|null>} Промис с объектом шрифта или null.
+ * @param {ArrayBuffer} buffer - ArrayBuffer с данными шрифта
+ * @param {string} [fontName='unknown'] - Имя шрифта для логирования
+ * @returns {Promise<opentype.Font|null>} Промис с объектом шрифта или null
  */
 export async function parseFontBuffer(buffer, fontName = 'unknown') {
   return parseFontBufferFromArrayBuffer(buffer, fontName);
@@ -175,7 +175,7 @@ async function parseFontBufferFromArrayBuffer(buffer, fontName = 'font') {
 /**
  * [Только основной поток] Получает данные глифов для шрифта.
  * @param {Object} fontObj - Объект шрифта
- * @returns {Promise<Object|null>} - Промис с данными глифов или null.
+ * @returns {Promise<Object|null>} Промис с данными глифов или null
  */
 export const getGlyphDataForFont = async (fontObj) => {
   if (!fontObj || !fontObj.file) {
@@ -193,7 +193,7 @@ export const getGlyphDataForFont = async (fontObj) => {
       throw new Error("Font file buffer is empty.");
     }
 
-    // --- Используем только основной поток ---
+    // --- Main-thread processing only ---
     // Парсим буфер в основном потоке
     const font = await parseFontBuffer(buffer, fontObj.name);
         if (!font) {
@@ -201,14 +201,14 @@ export const getGlyphDataForFont = async (fontObj) => {
             throw new Error('Ошибка при парсинге шрифта в основном потоке');
         }
 
-    // Извлекаем глифы
+    // Extract glyph data.
     const resultData = extractBasicGlyphData(font, 'main');
 
         if (!resultData) {
           console.error(`[fontParser] Main thread: extractBasicGlyphData returned null for ${fontObj.name}.`);
           throw new Error('Ошибка при извлечении данных глифов в основном потоке');
         }
-    // --- Конец использования основного потока --- 
+    // --- End main-thread processing ---
       
     // Логируем ошибки, если они были
       if (resultData.errors && resultData.errors.length > 0) {
@@ -221,11 +221,11 @@ export const getGlyphDataForFont = async (fontObj) => {
         return null; 
       }
 
-    return resultData; // Возвращаем { allGlyphs, names, unicodes, advanceWidths, errors }
+    return resultData; // Return { allGlyphs, names, unicodes, advanceWidths, errors }.
 
   } catch (error) {
     console.error(`[fontParser] Error in getGlyphDataForFont for ${fontId}:`, error);
-    // toast.error('Ошибка при загрузке данных о глифах'); // Можно раскомментировать, если нужно
-    return null; // Возвращаем null при критической ошибке
+    // toast.error('Ошибка при загрузке данных о глифах');
+    return null; // Return null on critical error.
   }
 }; 

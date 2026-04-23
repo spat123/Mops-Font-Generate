@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFontContext } from '../contexts/FontContext';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { hasSignificantChanges } from '../utils/cssGenerator';
 import { variableFontShowsItalicControl } from '../utils/fontUtilsCommon';
 import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
@@ -8,13 +8,13 @@ import { SegmentedControl } from './ui/SegmentedControl';
 import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
 
-// Функция для обрезания длинного текста и добавления многоточия
+// Helper to truncate long labels with ellipsis.
 const truncateText = (text, maxLength = 15) => {
   if (!text) return '';
   return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
 };
 
-// Максимальная длина названия оси перед обрезкой
+// Max axis name length before truncation.
 const AXIS_NAME_MAX_LENGTH = 22;
 
 const AXIS_ANIMATION_MULTIPLIERS = [1, 2, 3];
@@ -25,7 +25,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   const [animationDirections, setAnimationDirections] = useState({});
   const [axisAnimationMultipliers, setAxisAnimationMultipliers] = useState({});
   const animationRef = useRef(null);
-  /** Снимок значений и направлений во время проигрывания — без лишних setState на каждом кадре */
+  /** Snapshot of values/directions during animation to avoid setState on each frame. */
   const animSettingsRef = useRef({});
   const animDirectionsRef = useRef({});
   const axesRef = useRef([]);
@@ -34,10 +34,10 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   const onSettingsChangeRef = useRef(null);
   const prevIsAnimatingRef = useRef(isAnimating);
   const isUpdatingFromExternal = useRef(false);
-  // Для отслеживания редактируемого маркера
+  // Track currently edited marker.
   const [editingAxis, setEditingAxis] = useState(null);
   
-  // Сохраняем ID загруженного шрифта, чтобы не перезагружать его повторно
+  // Keep loaded font ID to avoid repeated initialization.
   const loadedFontId = useRef(null);
   
   const {
@@ -53,18 +53,18 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
   handleVariableSettingsChangeRef.current = handleVariableSettingsChange;
   onSettingsChangeRef.current = onSettingsChange;
 
-  // Для хранения предыдущих настроек (для сравнения)
+  // Previous settings snapshot for comparison.
   const prevSettingsRef = useRef({});
 
-  // Синхронизация между локальным состоянием и глобальным variableSettings
+  // Sync local state with global variableSettings.
   useEffect(() => {
-    // Если идет обновление из внешнего источника - игнорируем
+    // Ignore updates coming from external source.
     if (isUpdatingFromExternal.current) {
       isUpdatingFromExternal.current = false;
       return;
     }
     
-    // Проверяем, отличаются ли настройки
+    // Update only when settings differ.
     if (JSON.stringify(settings) !== JSON.stringify(variableSettings)) {
       setSettings(variableSettings);
     }
@@ -111,31 +111,31 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     });
   }, [font, saveFontSettings, setFonts, setSelectedFont, settings]);
   
-  // Оптимизированный эффект для загрузки осей шрифта
+  // Optimized effect to load font axes.
   useEffect(() => {
-    // Защита от пустого шрифта
+    // Guard for empty font.
     if (!font) {
       setAxes([]);
       return;
     }
 
-    // Получаем ID шрифта для проверки изменений
+    // Font ID for change tracking.
     const fontId = font.id ? font.id : null;
     
-    // Если у нас уже есть информация, что шрифт не вариативный, то сразу выходим
+    // Fast exit for known non-variable fonts.
     if (font.isVariableFont === false) {
       setAxes([]);
       return;
     }
 
-    // ПРИОРИТЕТ 1: Если у шрифта уже есть определенные вариативные оси
+    // PRIORITY 1: axes already present in font object.
     if (font.variableAxes && Object.keys(font.variableAxes).length > 0) {
-      // Преобразуем объект variableAxes в массив осей для отображения
+      // Convert variableAxes map to list for rendering.
       const fontAxes = Object.entries(font.variableAxes).map(([tag, axisData]) => {
-        // Используем имя из метаданных или тег как имя, если имя не определено
+        // Use metadata name or fallback to tag.
         let name = axisData.name || tag;
         
-        // Берем значения мин/макс/дефолт напрямую из данных оси
+        // Use min/max/default directly from axis data.
         return {
           tag,
           name,
@@ -145,10 +145,10 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         };
       });
       
-      // Проверяем поддерживаемые оси
+      // Filter by supported axes when provided.
       let filteredAxes = fontAxes;
       if (font.supportedAxes && Array.isArray(font.supportedAxes) && font.supportedAxes.length > 0) {
-        // Фильтруем только те оси, которые указаны в supportedAxes
+        // Keep only axes listed in supportedAxes.
         filteredAxes = fontAxes.filter(axis => 
           font.supportedAxes.includes(axis.tag)
         );
@@ -158,26 +158,26 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         }
       }
       
-      // Если есть оси для отображения, обновляем состояние
+      // If there are axes to show, update state.
       if (filteredAxes.length > 0) {
         setAxes(filteredAxes);
         
-        // Если ID шрифта изменился или мы не имеем настроек - инициализируем их
+        // Reinitialize values when font ID changes.
         if (fontId !== loadedFontId.current) {
           loadedFontId.current = fontId;
           
-          // Устанавливаем начальные значения из осей
+          // Initialize settings from axis defaults.
           const initialSettings = {};
           const initialDirections = {};
           
-          // Используем только отфильтрованные оси
+          // Use filtered axes only.
           filteredAxes.forEach(axis => {
-            // Начальное значение - берем дефолтное значение оси
+            // Initial value equals axis default.
             initialSettings[axis.tag] = axis.default;
             initialDirections[axis.tag] = 1;
           });
           
-          // Синхронизируем состояния
+          // Sync local states.
           setSettings(initialSettings);
           setAnimationDirections(initialDirections);
         }
@@ -186,10 +186,10 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       }
     }
     
-    // ПРИОРИТЕТ 2 и 3: getVariableAxes из контекста шрифтов
+    // PRIORITY 2/3: getVariableAxes from context.
     const loadFontAxes = async () => {
       try {
-        // Получаем оси шрифта через централизованную функцию
+        // Load axes through centralized function.
         const fontAxes = await getVariableAxes(font);
         
         if (!fontAxes || fontAxes.length === 0) {
@@ -199,11 +199,11 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         
         setAxes(fontAxes);
         
-        // Если ID шрифта изменился - инициализируем их
+        // Reinitialize when font ID changes.
         if (fontId !== loadedFontId.current) {
           loadedFontId.current = fontId;
           
-          // Устанавливаем начальные значения из осей
+          // Set initial values from axes.
           const initialSettings = {};
           const initialDirections = {};
           
@@ -212,7 +212,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
             initialDirections[axis.tag] = 1;
           });
           
-          // Синхронизируем состояния
+          // Sync local states.
           setSettings(initialSettings);
           setAnimationDirections(initialDirections);
         }
@@ -224,7 +224,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     
     loadFontAxes();
 
-    // Очищаем анимацию при размонтировании
+    // Cleanup animation on unmount.
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
@@ -247,8 +247,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     );
   }, [axes]);
 
-  // Мемоизированный объект для хранения шагов анимации
-  // Это предотвращает повторные вычисления при каждом рендеринге
+  // Memoized axis animation step map to avoid recalculations on each render.
   const animationSteps = useMemo(() => {
     return axes.reduce((steps, axis) => {
       const multiplier = axisAnimationMultipliers[axis.tag] ?? 1;
@@ -261,7 +260,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     animationStepsRef.current = animationSteps;
   }, [animationSteps]);
 
-  // Снимок при старте и полное применение при остановке (оси в selectedFont / списке шрифтов)
+  // Snapshot on start and full apply on stop.
   useEffect(() => {
     const wasAnimating = prevIsAnimatingRef.current;
     prevIsAnimatingRef.current = isAnimating;
@@ -285,7 +284,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     }
   }, [isAnimating, settings, animationDirections, axes, handleVariableSettingsChange, onSettingsChange]);
 
-  /** Стабильный колбэк: не зависит от settings/directions — иначе каждый кадр сбрасывался rAF */
+  /** Stable callback: not dependent on settings/directions to avoid rAF reset each frame. */
   const animateAxes = useCallback(() => {
     const ax = axesRef.current;
     const steps = animationStepsRef.current;
@@ -326,7 +325,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     animationRef.current = requestAnimationFrame(animateAxes);
   }, []);
 
-  // Один непрерывный цикл rAF на время анимации (без пересоздания из-за смены settings)
+  // Single continuous rAF loop while animation is active.
   useEffect(() => {
     if (isAnimating && axes.length > 0) {
       if (!animationRef.current) {
@@ -345,29 +344,28 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     }
   }, [isAnimating, axes.length, animateAxes]);
 
-  // Оптимизированный обработчик изменения значения слайдера
+  // Optimized slider value change handler.
   const handleSliderChange = useCallback((tag, value, isDragging = false) => {
     if (!settings || !tag) return 0;
     
-    // Если идет анимация или редактирование другой оси, игнорируем
+    // Ignore while animating or while another axis is being edited.
     if (isAnimating || (editingAxis && editingAxis !== tag)) return 0;
     
-    // Округляем значение до целого числа
+    // Round value to integer.
     const roundedValue = Math.round(value);
     
-    // Проверяем, изменилось ли значение по сравнению с текущим
+    // Skip if value didn't change.
     if (settings[tag] === roundedValue) {
-      return roundedValue; // Если значение не изменилось, ничего не делаем
+      return roundedValue;
     }
     
-    // Создаем копию текущих настроек
+    // Create a new settings object.
     const newSettings = { ...settings, [tag]: roundedValue };
     
-    // Проверяем, является ли изменение значимым (> 3 единиц)
-    // Только для режима перетаскивания, чтобы уменьшить количество обновлений
+    // For dragging mode, apply threshold to reduce update frequency.
     const isSignificant = !isDragging || hasSignificantChanges(prevSettingsRef.current, newSettings, 3);
     
-    // Если изменение не значимое и это режим перетаскивания, просто обновляем локальное состояние без вызова глобальных обновлений
+    // In drag mode with minor changes, update local state only.
     if (isDragging && !isSignificant) {
       setSettings(newSettings);
       return roundedValue;
@@ -375,22 +373,22 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     
     setSettings(newSettings);
     
-    // Сохраняем текущие настройки как предыдущие для следующего сравнения
+    // Store settings snapshot for the next comparison.
     prevSettingsRef.current = { ...newSettings };
     
-    // Отмечаем, что обновление идет из локального источника
+    // Mark update as local.
     isUpdatingFromExternal.current = true;
     
-    // В режиме перетаскивания используем троттлинг для обновлений CSS
+    // While dragging, use lightweight updates.
     if (isDragging) {
-      // При перетаскивании используем легкую версию обновления, которая не вызывает полного ререндеринга
+      // Lightweight update during drag (without full rerender).
       handleVariableSettingsChange(newSettings, false);
     } else {
-      // Для обычных кликов используем полное обновление с ререндерингом
+      // For regular clicks, run full update with rerender.
       handleVariableSettingsChange(newSettings, true);
     }
 
-    // Уведомляем родителя об изменениях
+    // Notify parent about changes.
     if (typeof onSettingsChange === 'function') {
       onSettingsChange(newSettings);
     }
@@ -398,38 +396,38 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     return roundedValue;
   }, [settings, handleVariableSettingsChange, onSettingsChange, isAnimating, editingAxis]);
   
-  // Сброс всех слайдеров на значения по умолчанию
+  // Reset all sliders to default values.
   const handleResetAll = useCallback(() => {
-    // Создаем объект для хранения дефолтных значений и убеждаемся, что у нас есть оси
+    // Ensure axes exist before reset.
     if (axes.length === 0) {
       return;
     }
     
-    // Останавливаем анимацию, если она активна
+    // Stop animation if active.
     if (isAnimating && typeof toggleAnimation === 'function') {
       toggleAnimation();
     }
     
-    // Принудительно очищаем анимацию
+    // Force cleanup animation frame.
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
     
-    // Создаем объект с дефолтными значениями осей
+    // Build default axis values map.
     const defaultSettings = {};
     
     axes.forEach(axis => {
       defaultSettings[axis.tag] = axis.default;
     });
     
-    // Сбрасываем направления анимации
+    // Reset animation directions.
     const defaultDirections = {};
     axes.forEach(axis => {
       defaultDirections[axis.tag] = 1;
     });
     
-    // Обновляем локальное состояние
+    // Update local state.
     setSettings(defaultSettings);
     setAnimationDirections(defaultDirections);
     setAxisAnimationMultipliers(
@@ -439,14 +437,14 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
       }, {})
     );
     
-    // Отмечаем, что обновление идет из локального источника
+    // Mark update as local.
     isUpdatingFromExternal.current = true;
     
-    // Используем resetVariableSettings из хука для централизованной обработки
+    // Use context reset for centralized handling.
     resetVariableSettings();
     updateFontStyleState('normal');
     
-    // Также уведомляем родительский компонент о сбросе настроек
+    // Notify parent about reset.
     if (typeof onSettingsChange === 'function') {
       onSettingsChange(defaultSettings);
     }
@@ -469,11 +467,11 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     });
   }, []);
 
-  // Мемоизированное значение для проверки наличия осей
+  // Memoized list of axes for UI display.
   const axesForDisplay = useMemo(() => {
     if (!Array.isArray(axes)) return [];
     if (font?.italicMode === 'axis-ital') {
-      // При axis-ital осью управляет Roman/Italic toggle, чтобы не было дублирующего UI.
+      // For axis-ital mode, hide `ital` slider to avoid duplicate UI.
       return axes.filter((axis) => axis?.tag !== 'ital');
     }
     return axes;
@@ -591,12 +589,12 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         const value = settings[axis.tag] !== undefined ? settings[axis.tag] : axis.default;
         const axisAnimationMultiplier = axisAnimationMultipliers[axis.tag] ?? 1;
         
-        // Получаем имя оси с учетом возможных форматов
+        // Resolve axis name from possible formats.
         const axisName = typeof axis.name === 'object' 
           ? (axis.name.en || Object.values(axis.name)[0] || axis.tag) 
           : (axis.name || axis.tag);
         
-        // Обрезаем длинное название
+        // Truncate long axis names.
         const truncatedName = truncateText(axisName, AXIS_NAME_MAX_LENGTH);
         
         return (
@@ -662,3 +660,4 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     </div>
   );
 } 
+

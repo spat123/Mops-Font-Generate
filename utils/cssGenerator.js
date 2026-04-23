@@ -1,81 +1,81 @@
-// Функции для генерации CSS правил (@font-face, font-variation-settings и т.д.) 
-import { toast } from 'react-toastify';
+// Утилиты генерации CSS-правил (@font-face, font-variation-settings и т.д.).
+import { toast } from './appNotify';
 import { debounce } from './debounce';
 import { getFormatFromExtension } from './fontUtilsCommon';
 
 export { debounce };
 
-// Восстанавливаем функцию hasSignificantChanges
+// Проверка значимости изменений в осях
 /**
- * Проверяет, являются ли изменения в настройках вариативных осей "значительными"
- * Используется для оптимизации обновлений CSS (например, при перетаскивании слайдера)
+ * Проверяет, являются ли изменения в настройках вариативных осей значительными.
+ * Используется для оптимизации CSS-обновлений (например, во время перетаскивания слайдера).
  * @param {Object} prevSettings - Предыдущие настройки
  * @param {Object} currentSettings - Текущие настройки
- * @param {number} threshold - Порог "значительности" изменения для одной оси
+ * @param {number} threshold - Порог значимости изменения для одной оси
  * @returns {boolean} true, если изменения значительны
  */
 export const hasSignificantChanges = (prevSettings, currentSettings, threshold = 10) => {
-  // Если предыдущих настроек нет, считаем изменение значительным
+  // Если предыдущих настроек нет, считаем изменения значительными
   if (!prevSettings) return true;
   
   // Получаем ключи (теги осей) из обоих объектов
   const prevKeys = Object.keys(prevSettings);
   const currentKeys = Object.keys(currentSettings);
 
-  // Если количество осей изменилось, считаем изменение значительным
+  // Если количество осей изменилось, считаем изменения значительными
   if (prevKeys.length !== currentKeys.length) return true;
 
   // Проверяем каждую ось
   for (const key of currentKeys) {
-    // Если ось новая или значение изменилось значительно, считаем изменение значительным
+    // Если ось новая или значение изменилось заметно — изменения значительные
     if (!(key in prevSettings) || 
         Math.abs(parseFloat(prevSettings[key]) - parseFloat(currentSettings[key])) >= threshold) {
       return true;
     }
   }
 
-  // Если ни одно из условий выше не сработало, изменения незначительны
+  // Иначе изменения считаем незначительными
   return false;
 };
 
 /**
- * Буфер для CSS обновлений
- * Помогает предотвратить моргание шрифта при частом обновлении
+ * Буфер для CSS-обновлений.
+ * Помогает предотвращать мерцание шрифта при частом обновлении.
  */
 const fontCssBuffer = {
-  // Основной буфер (активный)
+  // Main (active) buffer.
   main: new Map(),
-  // Вторичный буфер (для подготовки)
+  // Shadow buffer for staged updates.
   shadow: new Map(),
-  // Флаг отслеживания активного переключения
+  // Tracks active switch state.
   switching: false,
-  // ID кадра анимации для отмены
+  // requestAnimationFrame id for cancellation.
   animationFrameId: null
 };
 
 /**
- * Обновляет CSS правило с использованием двойной буферизации и requestAnimationFrame
+ * Обновляет CSS-правило с двойной буферизацией и requestAnimationFrame.
  * @param {string} fontId - ID шрифта
- * @param {string} cssRule - CSS правило
+ * @param {string} cssRule - CSS-правило
  */
 const updateBufferedFontCss = (fontId, cssRule) => {
-  // Сохраняем правило в теневом буфере
+  // Store rule in shadow buffer.
   fontCssBuffer.shadow.set(fontId, cssRule);
 
-  // Если кадр анимации уже запланирован, не создаем новый
+  // If rAF is already scheduled, skip creating another one.
   if (fontCssBuffer.animationFrameId) {
     return;
   }
 
   // Планируем переключение на следующий кадр анимации
   fontCssBuffer.animationFrameId = requestAnimationFrame(() => {
-    // Устанавливаем флаг переключения
+    // Ставим флаг переключения
     fontCssBuffer.switching = true;
 
-    // Применяем все CSS правила из теневого буфера
+    // Apply all pending CSS rules from shadow buffer.
     fontCssBuffer.shadow.forEach((rule, id) => {
       try {
-        // Находим существующий элемент style или создаем новый
+        // Находим существующий style-элемент или создаём новый
         let styleElement = document.querySelector(`style[data-font-id="${id}"]`);
 
         if (!styleElement) {
@@ -84,7 +84,7 @@ const updateBufferedFontCss = (fontId, cssRule) => {
           document.head.appendChild(styleElement);
         }
 
-        // Обновляем содержимое, только если оно изменилось
+        // Update style text only when content changed.
         if (styleElement.textContent !== rule) {
           styleElement.textContent = rule;
         }
@@ -92,31 +92,30 @@ const updateBufferedFontCss = (fontId, cssRule) => {
         // Копируем правило в основной буфер
         fontCssBuffer.main.set(id, rule);
 
-        // УДАЛЕНО: Принудительная перерисовка страницы
+        // Удалено: принудительная перерисовка страницы
         // document.body.offsetHeight;
       } catch (error) {
         console.error(`Ошибка при обновлении CSS для шрифта ${id}:`, error);
       }
     });
 
-    // Очищаем теневой буфер
+    // Clear shadow buffer.
     fontCssBuffer.shadow.clear();
 
-    // Сбрасываем флаг переключения и ID кадра анимации
+    // Reset switch flag and frame id.
     fontCssBuffer.switching = false;
     fontCssBuffer.animationFrameId = null;
   });
 };
 
 /**
- * Кэш для хранения загруженных объектов FontFace
- * Ключ: `${fontFamily}_${url}`, Значение: Promise<FontFace>
+ * Кэш для хранения загруженных объектов FontFace.
+ * Key: `${fontFamily}_${url}`, value: Promise<FontFace>
  */
 const fontFaceCache = new Map();
 
 /**
- * Дескрипторы FontFace для variable fonts (диапазон веса/ширины), иначе движок может
- * сопоставлять глифы только с «одним» начертанием.
+ * Дескрипторы FontFace для variable fonts (диапазон веса/ширины).
  * @param {Record<string, { min?: number, max?: number }>|null|undefined} variableAxes
  * @param {FontFaceDescriptors} [extraDescriptors]
  * @returns {FontFaceDescriptors}
@@ -151,12 +150,12 @@ export const buildVariableFontFaceDescriptors = (variableAxes, extraDescriptors 
 };
 
 /**
- * Загружает шрифт с использованием FontFace API и кэширования
- * @param {string} fontFamily - Имя семейства шрифтов (без CSS-кавычек вокруг имени)
- * @param {string|ArrayBuffer|ArrayBufferView} urlOrBuffer - blob/data URL или бинарные данные шрифта
+ * Загружает шрифт через FontFace API с кэшированием.
+ * @param {string} fontFamily - Имя семейства шрифтов
+ * @param {string|ArrayBuffer|ArrayBufferView} urlOrBuffer - blob/data URL или бинарные данные
  * @param {Object} settings - Настройки вариативных осей (опционально)
- * @param {string} [binaryCacheId] - уникальный суффикс ключа кэша при передаче ArrayBuffer (например id шрифта из IndexedDB)
- * @param {FontFaceDescriptors} [faceDescriptors] - дескрипторы FontFace (например weight: "100 900" для VF)
+ * @param {string} [binaryCacheId] - Уникальный суффикс ключа кэша для бинарных данных
+ * @param {FontFaceDescriptors} [faceDescriptors] - Дескрипторы FontFace
  * @returns {Promise<FontFace>} - Промис с объектом FontFace
  */
 export const loadFontFaceIfNeeded = async (
@@ -179,24 +178,24 @@ export const loadFontFaceIfNeeded = async (
   if (fontFaceCache.has(cacheKey)) {
     try {
       const cachedPromise = fontFaceCache.get(cacheKey);
-      const fontFace = await cachedPromise; // Дожидаемся разрешения промиса из кэша
-      // Проверяем, добавлен ли шрифт в document.fonts (на случай, если он был удален)
+      const fontFace = await cachedPromise; // Wait for cached promise resolution.
+      // Проверяем, что шрифт присутствует в document.fonts
       if (typeof document !== 'undefined' && document.fonts && !document.fonts.has(fontFace)) {
          document.fonts.add(fontFace);
       }
       return fontFace;
     } catch (error) {
-      // Если промис в кэше был отклонен, удаляем его и продолжаем загрузку
+      // Если промис в кэше был отклонён, удаляем его и повторяем загрузку
       console.warn(`Ошибка при использовании кэшированного FontFace для ${fontFamily}, повторная загрузка:`, error);
       fontFaceCache.delete(cacheKey);
     }
   }
 
-  // Создаем промис для загрузки (чтобы закэшировать сам промис)
+  // Создаём промис загрузки (кэшируем именно промис)
   const loadPromise = (async () => {
     try {
-      // ИСПРАВЛЕНИЕ: НЕ устанавливаем variationSettings в FontFace опциях!
-      // Это позволит динамически изменять оси через CSS font-variation-settings
+      // Не устанавливаем variationSettings в опциях FontFace.
+      // This enables dynamic axis updates via CSS font-variation-settings.
       const options =
         faceDescriptors && typeof faceDescriptors === 'object' && Object.keys(faceDescriptors).length
           ? { ...faceDescriptors }
@@ -214,7 +213,7 @@ export const loadFontFaceIfNeeded = async (
     } catch (error) {
       console.error(`Ошибка при загрузке шрифта ${fontFamily} через FontFace API:`, error);
       fontFaceCache.delete(cacheKey); // Удаляем из кэша при ошибке загрузки
-      throw error; // Пробрасываем ошибку дальше
+      throw error; // Rethrow for upstream handling.
     }
   })();
 
@@ -225,10 +224,10 @@ export const loadFontFaceIfNeeded = async (
 };
 
 /**
- * Переименовываем updateFontFaceIfNeeded в updateVariableFontSettings
+ * Применяет изменения вариативных осей через CSS.
  * @param {Object} fontObj - Объект шрифта
- * @param {Object} currentSettings - Объект с текущими настройками осей { tag: value, ... }
- * @param {Object} prevSettings - Предыдущие настройки (опционально, для hasSignificantChanges)
+ * @param {Object} currentSettings - Текущие настройки осей { tag: value, ... }
+ * @param {Object} prevSettings - Предыдущие настройки (опционально)
  * @returns {Object} - Исходный fontObj
  */
 export const updateVariableFontSettings = (fontObj, currentSettings, prevSettings = null) => {
@@ -237,39 +236,40 @@ export const updateVariableFontSettings = (fontObj, currentSettings, prevSetting
         return fontObj;
     }
     if (!currentSettings || typeof currentSettings !== 'object') {
-        console.warn('updateVariableFontSettings: Не предоставлены currentSettings.');
+        console.warn('updateVariableFontSettings: не переданы currentSettings.');
         return fontObj;
     }
 
     const fontFamilyName = fontObj.fontFamily;
-    const fontId = fontObj.id || fontFamilyName; // Нужен ID для updateBufferedFontCss
+    const fontId = fontObj.id || fontFamilyName; // Required for updateBufferedFontCss.
 
-    // Опциональная проверка на значительные изменения
+    // Optional significant-change check.
     // if (prevSettings && !hasSignificantChanges(prevSettings, currentSettings)) {
     //     return fontObj; // Нет значительных изменений
     // }
 
-    // Формируем CSS правило ТОЛЬКО для font-variation-settings
+    // Формируем CSS-правило только для font-variation-settings
     let variationSettingsRule = '';
     const settingsToApply = Object.entries(currentSettings);
     if (settingsToApply.length > 0) {
         const settingsArray = settingsToApply.map(([tag, value]) => `\"${tag}\" ${value}`);
-        // Используем data-атрибут как селектор. Убедись, что элемент превью имеет этот атрибут!
+        // Use data-attribute selector; preview element must include this attribute.
         variationSettingsRule = `[data-font-family="${fontFamilyName}"] { font-variation-settings: ${settingsArray.join(', ')}; }`;
-        // Альтернатива: CSS переменные (требует изменений в компоненте)
+        // Alternative: CSS variables (requires component changes).
         // variationSettingsRule = `:root { ${settingsArray.map(([tag, value]) => `--${fontId}-${tag}: ${value};`).join('\n')} }`;
     }
 
-    // Обновляем CSS через буфер
+    // Update CSS through buffer.
     if (variationSettingsRule) {
-        updateBufferedFontCss(fontId + '-settings', variationSettingsRule); // Используем уникальный ID для стилей настроек
+        updateBufferedFontCss(fontId + '-settings', variationSettingsRule); // Используем уникальный ID для style-правил
     } else {
-        // Если настроек нет, возможно, нужно удалить предыдущее правило?
-        // updateBufferedFontCss(fontId + '-settings', ''); // Очистить стиль
+        // Если настроек нет, при необходимости можно очистить предыдущее правило.
+        // updateBufferedFontCss(fontId + '-settings', '');
     }
 
     return fontObj;
 };
 
-// Дебаунсированная версия updateVariableFontSettings (остается)
+// Дебаунс-версия updateVariableFontSettings
 export const debouncedUpdateVariableFontSettings = debounce(updateVariableFontSettings, 50);
+

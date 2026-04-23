@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { slugifyFontFilenameStub, slugifyFontKey } from '../utils/fontSlug';
 
 /** Скачивание файлов, CSS-экспорт, псевдо/реальная генерация статики из VF. */
@@ -234,3 +234,4 @@ export function useFontExport(exportToCSSFromHook) {
     downloadStaticFont,
   };
 }
+

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
@@ -86,7 +86,7 @@ export default function GenerateFontModal({
     const o = genSettings || {};
     return Object.entries(o)
       .map(([k, v]) => `${k}: ${typeof v === 'number' ? Math.round(v * 100) / 100 : v}`)
-      .join(' · ');
+      .join(' В· ');
   }, [genSettings]);
 
   const handleBackdrop = (e) => {
@@ -211,8 +211,8 @@ export default function GenerateFontModal({
           </label>
 
           <p className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-xs leading-snug text-gray-600">
-            При отсутствии серверной генерации используется псевдо-статика (тот же файл с фиксацией осей в CSS) — см.
-            уведомления после запуска.
+            При отсутствии серверной генерации используется псевдо-статика (тот же файл с фиксацией осей в CSS) —
+            см. уведомления после запуска.
           </p>
         </div>
 
@@ -238,3 +238,4 @@ export default function GenerateFontModal({
     </div>
   );
 }
+

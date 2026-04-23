@@ -1,19 +1,19 @@
-// Функции для обработки локально загруженных шрифтов (кэширование, FontFace)
-import { toast } from 'react-toastify';
+// Функции для обработки локально загруженных шрифтов (кэширование, FontFace).
+import { toast } from './appNotify';
 import { parseFontBuffer, isVariableFont, mergeFvarAxesFromFontInputs, normalizeFvarAxisTag } from './fontParser';
 import { filterPresetStylesForVariableAxes, findStyleInfoByWeightAndStyle, getFormatFromExtension } from './fontUtilsCommon';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGenerator';
 
 /**
- * Кэш для хранения результатов анализа локальных шрифтов
- * Ключ - хеш содержимого шрифта.
- * Значение - объект metadata, полученный из воркера.
+ * Кэш для хранения результатов анализа локальных шрифтов.
+ * Ключ: хэш содержимого шрифта.
+ * Значение: объект metadata.
  * @type {Object.<string, Object>}
  */
 const localFontCache = {};
 
 /**
- * Освобождает URL, созданный через URL.createObjectURL()
+ * Освобождает URL, созданный через URL.createObjectURL().
  * @param {string} url - URL для освобождения
  */
 export const revokeObjectURL = (url) => {
@@ -21,13 +21,12 @@ export const revokeObjectURL = (url) => {
     try {
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.warn('Failed to revoke Object URL:', error); // Используем warn вместо error
-      // toast.error('Ошибка при освобождении URL'); // Не спамим пользователя
+      console.warn('Failed to revoke Object URL:', error);
     }
   }
 };
 
-/** Дескрипторы FontFace для одного сабсета статического Google Fonts (unicode-range + вес). */
+/** Дескрипторы FontFace для одного статического Google subset (unicode-range + вес). */
 export const buildGoogleStaticSliceFaceDescriptors = (slice) => {
   const w = Number(slice?.weight);
   const weight = Number.isFinite(w) ? Math.round(w) : 400;
@@ -41,8 +40,8 @@ export const buildGoogleStaticSliceFaceDescriptors = (slice) => {
 };
 
 /**
- * VF-сабсет Google (отдельный woff2 на unicode-range): диапазон веса из fvar + unicode-range из CSS.
- * Без unicode-range браузер не сопоставит глифы с нужным файлом → fallback на системный шрифт.
+ * VF-subset Google (woff2 на unicode-range): диапазон веса из fvar + unicode-range из CSS.
+ * Без unicode-range браузер может не сопоставить нужные глифы с нужным файлом.
  */
 export const buildGoogleVariableSliceFaceDescriptors = (sliceMeta, variableAxes) => {
   const base = buildVariableFontFaceDescriptors(variableAxes || {});
@@ -85,9 +84,9 @@ function resolveFontItalicMode(variableAxes, hasItalicStyles = false) {
 }
 
 /**
- * Асинхронно вычисляет SHA-256 хеш для Blob файла.
- * @param {Blob} file - Файл (Blob).
- * @returns {Promise<string|null>} - Промис с HEX-строкой хеша или null в случае ошибки.
+ * Асинхронно вычисляет SHA-256 хэш для Blob-файла.
+ * @param {Blob} file - Файл (Blob)
+ * @returns {Promise<string|null>} HEX-строка хэша или null при ошибке
  */
 const calculateFileHash = async (file) => {
   if (!(file instanceof Blob)) {
@@ -97,7 +96,7 @@ const calculateFileHash = async (file) => {
   try {
     const buffer = await file.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-    // Преобразуем ArrayBuffer хеша в HEX-строку
+    // Преобразуем ArrayBuffer хэша в HEX-строку
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     return hashHex;
@@ -112,7 +111,7 @@ const calculateFileHash = async (file) => {
  * Полностью анализирует локальный шрифт (из файла), определяя его характеристики.
  * Включает парсинг, извлечение метаданных, кэширование и добавление @font-face.
  * @param {Object} fontInput - Объект шрифта с file (Blob) и name (string)
- * @returns {Promise<Object|null>} - Промис с обработанным объектом шрифта или null при критической ошибке.
+ * @returns {Promise<Object|null>} Обработанный объект шрифта или null при критической ошибке
  */
 export const processLocalFont = async (incomingFontInput) => {
   if (!incomingFontInput || !(incomingFontInput.file instanceof Blob) || !incomingFontInput.name) {
@@ -124,7 +123,7 @@ export const processLocalFont = async (incomingFontInput) => {
   const cleanedName = fontInput.name.replace(/\.[^/.]+$/, '');
   const source = fontInput.source === 'google' ? 'google' : 'local';
 
-  /** gstatic-сабсеты: в fvar только wght; полный variable TTF — google/fonts на GitHub. */
+  /** gstatic-сабсеты: в fvar обычно только wght; полный variable TTF берём из google/fonts на GitHub. */
   if (
     source === 'google' &&
     Array.isArray(fontInput.googleFontAxesFromCatalog) &&
@@ -183,55 +182,55 @@ export const processLocalFont = async (incomingFontInput) => {
   let cacheKey = null; // Инициализируем cacheKey
 
   try {
-    // 1. Вычисляем хеш файла для использования в качестве ключа кэша
+    // 1. Вычисляем хэш файла для ключа кэша
     cacheKey = await calculateFileHash(file);
     if (!cacheKey) {
-      // Если хеш не удалось получить, кэширование невозможно, но продолжаем обработку
+      // If hash is unavailable, skip cache but continue processing.
       toast.warning('Не удалось создать ключ кэша для шрифта, кэширование будет пропущено.');
     }
 
-    // 2. Проверка кэша (теперь по хешу). Google multi-subset не кэшируем здесь — метаданные без доп. файлов.
+    // 2. Проверка кэша (по хэшу). Google multi-subset здесь не кэшируем.
     if (cacheKey && localFontCache[cacheKey] && !fontInput.googleFontSlices?.length) {
-      objectUrl = URL.createObjectURL(file); // Свежий URL нужен всегда
-      const cachedMetadata = { ...localFontCache[cacheKey] }; // Получаем метаданные из кэша
+      objectUrl = URL.createObjectURL(file); // Always need a fresh object URL.
+      const cachedMetadata = { ...localFontCache[cacheKey] }; // Берём метаданные из кэша
 
       const fontFamilyName = `font-${fontId}`; // Генерируем уникальное имя
 
-      // Создаем fontObj на основе кэшированных метаданных
+      // Build fontObj from cached metadata.
       const fontObj = {
         id: fontId,
-        name: cachedMetadata.preferredFamily || cachedMetadata.names?.fontFamily || cleanedName, // Используем имена из кэша
+        name: cachedMetadata.preferredFamily || cachedMetadata.names?.fontFamily || cleanedName, // Prefer names from cache.
         originalName: name,
         source,
-        currentWeight: 400, // Будет уточнено ниже
-        currentStyle: 'normal', // Будет уточнено ниже
-        isVariableFont: cachedMetadata.isVariable || false, // Используем флаг из кэша
+        currentWeight: 400, // Refined below.
+        currentStyle: 'normal', // Refined below.
+        isVariableFont: cachedMetadata.isVariable || false, // Use cache flag.
         variableAxes: {},
         supportedAxes: [],
         variationSettings: '',
         availableStyles: [],
         file: file, // Оставляем файл для возможного повторного использования
-        url: objectUrl, // Сохраняем blob URL для FontFace API
-        fontFamily: fontFamilyName, // Сохраняем сгенерированное имя!
+        url: objectUrl, // Keep blob URL for FontFace API.
+        fontFamily: fontFamilyName, // Keep generated family name.
       };
 
       // Восстанавливаем оси и стили из кэшированных метаданных
       if (fontObj.isVariableFont && cachedMetadata.supportedAxes) {
-         // Заполняем информацию об осях из кэша
+         // Fill axis info from cached metadata.
          fontObj.variableAxes = Object.entries(cachedMetadata.supportedAxes).reduce((acc, [tag, axisInfo]) => {
                 acc[tag] = { name: axisInfo.name || tag.toUpperCase(), min: axisInfo.min, max: axisInfo.max, default: axisInfo.default };
                 return acc;
          }, {});
          fontObj.supportedAxes = Object.keys(cachedMetadata.supportedAxes);
          fontObj.variationSettings = Object.entries(fontObj.variableAxes)
-            .map(([tag, value]) => `\"${tag}\" ${value.default || 400}`) // Запасное значение для веса
+            .map(([tag, value]) => `\"${tag}\" ${value.default || 400}`) // Fallback default for weight.
             .join(', ');
-         // Определяем начальные стили для вариативных шрифтов из кэша (может быть пересмотрено)
-         // Пока оставляем заглушку или определяем на основе дефолтных осей, если возможно
-         // TODO: Уточнить логику availableStyles для вариативных из кэша
+         // Определяем начальные стили для вариативных шрифтов из кэша
+         // Пока оставляем заглушку или берём значения из дефолтных осей
+         // TODO: Уточнить логику availableStyles для вариативных шрифтов из кэша
          fontObj.availableStyles = [{ name: 'Default', weight: 400, style: 'normal' }]; // Заглушка
       } else if (!fontObj.isVariableFont && cachedMetadata.names) {
-         // Определяем стиль/вес для невариативных из кэша
+         // Определяем стиль/вес для невариативных шрифтов из кэша
          let weight = 400;
          let style = 'normal';
          const subfamily = cachedMetadata.preferredSubfamily || cachedMetadata.names?.fontSubfamily || 'Regular';
@@ -265,7 +264,7 @@ export const processLocalFont = async (incomingFontInput) => {
         }, {});
       }
 
-      // !!! Используем loadFontFaceIfNeeded напрямую !!!
+      // Используем loadFontFaceIfNeeded напрямую.
       try {
         const faceDescriptors = fontObj.isVariableFont
           ? buildVariableFontFaceDescriptors(fontObj.variableAxes)
@@ -273,7 +272,7 @@ export const processLocalFont = async (incomingFontInput) => {
         // Вызываем функцию через именованный импорт
         await loadFontFaceIfNeeded(fontFamilyName, objectUrl, initialSettings, '', faceDescriptors);
         revokeObjectURL(objectUrl);
-        // Новый blob URL: старый отозван, иначе fontObj.url указывал бы на невалидный адрес → NetworkError в FontFace/CSS
+        // Новый blob URL: старый отозван, иначе fontObj.url был бы невалидным (NetworkError)
         fontObj.url = URL.createObjectURL(file);
         return fontObj;
       } catch (error) {
@@ -293,8 +292,8 @@ export const processLocalFont = async (incomingFontInput) => {
         objectUrl = URL.createObjectURL(file);
     }
 
-    // 4. Парсинг файла -> получение полного объекта шрифта через parseFontBuffer
-    // parseFontFile теперь возвращает объект metadata или null
+    // 4. Парсинг файла и получение полного объекта шрифта через parseFontBuffer
+    // parseFontFile теперь возвращает metadata-объект или null
     let parsedFontData = null;
     try {
        const buffer = await file.arrayBuffer();
@@ -305,7 +304,7 @@ export const processLocalFont = async (incomingFontInput) => {
         // Ниже всё равно собираем fontObj из метаданных, даже если parse не удался
     }
 
-    // Создаем базовый объект шрифта (как и раньше)
+    // Создаём базовый объект шрифта
     const fontObj = {
       id: fontId,
       name: cleanedName, // Уточним из metadata
@@ -329,7 +328,7 @@ export const processLocalFont = async (incomingFontInput) => {
       fontFamily: null, // Установим ниже
     };
 
-    // Установим fontObj.url и fontObj.fontFamily
+    // Устанавливаем fontObj.url и fontObj.fontFamily
     const fontFamilyName = `font-${fontId}`;
     fontObj.url = objectUrl;
     fontObj.fontFamily = fontFamilyName;
@@ -337,10 +336,10 @@ export const processLocalFont = async (incomingFontInput) => {
       fontObj.googleFontRecommendedSample = fontInput.googleFontRecommendedSample.trim();
     }
 
-    // 5. Заполнение fontObj из данных парсинга, если парсинг успешен
-    if (parsedFontData) { // Новая проверка
-      // Используем данные из объекта parsedFontData (результат opentype.parse)
-      // Получаем имена (предпочитаем английские)
+    // 5. Заполняем fontObj данными парсинга, если он успешен
+    if (parsedFontData) {
+      // Используем данные из parsedFontData (результат opentype.parse)
+      // Получаем имена (предпочтительно английские)
       const names = parsedFontData.names || {};
       const preferredFamily = names.preferredFamily?.en || names.fontFamily?.en;
       const preferredSubfamily = names.preferredSubfamily?.en || names.fontSubfamily?.en || 'Regular';
@@ -397,14 +396,14 @@ export const processLocalFont = async (incomingFontInput) => {
          fontObj.isVariableFont = false; // Считаем невариативным
          fontObj.availableStyles = [{ name: 'Regular', weight: 400, style: 'normal' }];
       } else {
-        // НЕвариативный шрифт - определяем стиль из имен
+        // НЕвариативный шрифт: определяем стиль по именам
         let weight = 400;
         let style = 'normal';
-        if (names) { // Новая проверка
-           const subfamily = preferredSubfamily; // Используем извлеченное имя
+        if (names) {
+           const subfamily = preferredSubfamily; // Используем извлечённое имя
            const subfamilyLower = subfamily.toLowerCase();
             style = (subfamilyLower.includes('italic') || subfamilyLower.includes('oblique')) ? 'italic' : 'normal';
-            // ... (логика определения веса из subfamily - без изменений) ...
+            // ... (логика определения веса из subfamily) ...
             if (subfamilyLower.includes('thin')) weight = 100;
             else if (subfamilyLower.includes('extralight') || subfamilyLower.includes('ultralight')) weight = 200;
             else if (subfamilyLower.includes('light')) weight = 300;
@@ -422,10 +421,9 @@ export const processLocalFont = async (incomingFontInput) => {
         fontObj.availableStyles = [{ name: styleInfo.name, weight, style }];
       }
 
-      // 6. Кэширование результата (метаданных - извлекаем из parsedFontData для совместимости кэша)
+      // 6. Кэшируем результат (метаданные)
       if (cacheKey && parsedFontData && !fontInput.googleFontSlices?.length) {
-        // Кэшируем объект, похожий на старый metadata, для обратной совместимости?
-        // Или кэшировать весь parsedFontData? Пока оставим как было, извлекая нужное
+        // Кэшируем объект, совместимый с предыдущим форматом metadata.
         const metadataToCache = {
             names: parsedFontData.names,
             preferredFamily: preferredFamily,
@@ -434,8 +432,8 @@ export const processLocalFont = async (incomingFontInput) => {
             supportedAxes: fontObj.isVariableFont ? parsedFontData.tables.fvar.axes.reduce((acc, axis) => {
                  acc[axis.tag] = { name: axis.name?.en, min: axis.minValue, max: axis.maxValue, default: axis.defaultValue };
                  return acc;
-                }, {}) : null, // Сохраняем null если не вариативный
-            // Добавить другие нужные поля если необходимо
+                }, {}) : null, // Сохраняем null если шрифт не вариативный
+            // При необходимости добавить другие поля
         };
         localFontCache[cacheKey] = metadataToCache;
       }
@@ -455,7 +453,7 @@ export const processLocalFont = async (incomingFontInput) => {
       }, {});
     }
 
-    // !!! Используем loadFontFaceIfNeeded напрямую (или несколько сабсетов Google static) !!!
+    // Используем loadFontFaceIfNeeded напрямую (или несколько Google static сабсетов).
     try {
       const googleSlices =
         Array.isArray(fontInput.googleFontSlices) && fontInput.googleFontSlices.length > 0
@@ -497,17 +495,18 @@ export const processLocalFont = async (incomingFontInput) => {
   } catch (error) {
       console.error(`Failed to load font ${fontFamilyName} using FontFace API:`, error);
       toast.error(`Ошибка при загрузке шрифта ${fontObj.name}.`);
-      revokeObjectURL(objectUrl); // Освобождаем blob URL при ошибке
+      revokeObjectURL(objectUrl); // Release blob URL on error.
       fontObj.error = 'Failed to load via FontFace API';
-      return fontObj; // Возвращаем объект с ошибкой
+      return fontObj; // Return object with error marker.
     }
 
-  } catch (error) { // Глобальный try...catch для processLocalFont
+  } catch (error) { // Global try...catch for processLocalFont.
     console.error(`Critical error processing font ${name}:`, error);
     toast.error(`Критическая ошибка при обработке шрифта ${name}.`);
     if (objectUrl) {
-        revokeObjectURL(objectUrl); // Освобождаем URL при любой критической ошибке
+        revokeObjectURL(objectUrl); // Release URL on any critical error.
     }
-    return null; // Возвращаем null при критической ошибке
+    return null; // Return null on critical failure.
   }
 }; 
+

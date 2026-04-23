@@ -1,14 +1,14 @@
-import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
-import { toast } from 'react-toastify';
+﻿import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { toast } from '../utils/appNotify';
 import { debounce } from '../utils/debounce';
 import { getGlyphDataForFont } from '../utils/fontParser';
 import { useSettings } from '../contexts/SettingsContext';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
 
-// Инициализируем глобальный кэш для глифов, чтобы не загружать их повторно
+// Глобальный кэш глифов, чтобы не загружать их повторно.
 const glyphDataCache = new Map();
 
-/** Квадратные ячейки: число колонок и высота строки = ширина контейнера / cols. targetSide растёт с fontSize → меньше колонок. */
+/** Квадратная сетка: размер ячейки зависит от размера шрифта и ширины контейнера. */
 function computeGlyphSquareGrid(innerWidthPx, fontSizePx) {
   const W = Math.max(64, innerWidthPx);
   const fs = fontSizePx || 40;
@@ -20,14 +20,14 @@ function computeGlyphSquareGrid(innerWidthPx, fontSizePx) {
 }
 
 /**
- * Компонент для режима отображения глифов шрифта
+ * Компонент режима просмотра глифов.
  * 
- * @param {Object} props - Свойства компонента
- * @param {Object} props.selectedFont - Выбранный шрифт
- * @param {string} props.fontFamily — значение CSS font-family (стек с fallback), как из useFontCss
- * @param {Object} props.glyphDisplayStyle - Стили для отображения глифов
- * @param {boolean} props.isActive - Активен ли режим глифов
- * @param {React.RefObject<HTMLElement|null>} props.scrollParentRef — узел с `overflow-y: auto` (область превью) для виртуальной сетки
+ * @param {Object} props - Свойства компонента.
+ * @param {Object} props.selectedFont - Выбранный шрифт.
+ * @param {string} props.fontFamily - CSS `font-family` (стек с fallback) из useFontCss.
+ * @param {Object} props.glyphDisplayStyle - Стили отображения глифов.
+ * @param {boolean} props.isActive - Активен ли режим глифов.
+ * @param {React.RefObject<HTMLElement|null>} props.scrollParentRef - Скролл-контейнер области превью.
  */
 function GlyphsMode({
   selectedFont,
@@ -35,7 +35,7 @@ function GlyphsMode({
   glyphDisplayStyle,
   isActive = true,
   scrollParentRef,
-  /** Сообщить родителю количество глифов для строки статистики в нижней панели */
+  /** Сообщить родителю количество отображаемых глифов (для нижней панели). */
   onDisplayableGlyphCountChange,
 }) {
   const { glyphsFontSize } = useSettings();
@@ -53,18 +53,18 @@ function GlyphsMode({
     const [glyphsData, setGlyphsData] = useState(null);
     const [glyphErrors, setGlyphErrors] = useState([]);
     const isLoadingGlyphs = useRef(false);
-    // Ref для отслеживания текущего запроса, чтобы предотвратить race condition
+    // Ref to track active request and prevent race conditions.
     const currentLoadId = useRef(null);
 
-    // Оборачиваем loadGlyphs в useCallback, чтобы ссылка на функцию была стабильной
+    // Оборачиваем loadGlyphs в useCallback для стабильной ссылки
     const loadGlyphsCallback = useCallback(async (currentAttemptLoadId, fontToLoad, attemptFontId) => {
-      // Проверяем, не отменен ли этот запрос (т.е. начался ли новый)
+      // Проверяем, не отменён ли этот запрос (например, стартовал новый)
       if (currentAttemptLoadId !== currentLoadId.current) {
           return; 
       }
       
       try {
-        // Сбрасываем состояние только если этот запрос все еще актуален
+        // Сбрасываем состояние только если запрос всё ещё актуален
         if (currentAttemptLoadId === currentLoadId.current) {
            setGlyphsLoaded(false);
            setGlyphsData(null);
@@ -86,18 +86,18 @@ function GlyphsMode({
           return;
         }
 
-        const data = await getGlyphDataForFont(fontToLoad); // Используем переданный fontToLoad
+        const data = await getGlyphDataForFont(fontToLoad); // Use provided fontToLoad.
 
-        // СНОВА проверяем, актуален ли запрос ПЕРЕД установкой состояния
+        // Снова проверяем актуальность запроса перед setState
         if (currentAttemptLoadId !== currentLoadId.current) {
             return; 
         }
 
         if (!data || !Array.isArray(data.allGlyphs)) {
-          throw new Error("Получены некорректные данные глифов (отсутствует allGlyphs).");
+          throw new Error('Получены некорректные данные глифов (отсутствует allGlyphs).');
         }
 
-        glyphDataCache.set(attemptFontId, data); // Используем attemptFontId для кэша
+        glyphDataCache.set(attemptFontId, data); // Use attemptFontId as cache key.
         setGlyphsData(data);
         setGlyphsLoaded(true);
         setGlyphErrors(data.errors || []);
@@ -115,7 +115,7 @@ function GlyphsMode({
       } 
     }, []); // Пустой массив зависимостей для useCallback
 
-    // Создаем мемоизированную debounced-версию
+    // Мемоизируем debounced-версию
     const debouncedLoadGlyphs = useMemo(() => {
         return debounce(loadGlyphsCallback, 200);
     }, [loadGlyphsCallback]);
@@ -137,7 +137,7 @@ function GlyphsMode({
         isLoadingGlyphs.current = false; // Сбрасываем флаг загрузки
       };
 
-      // --- Проверки перед загрузкой --- 
+      // --- Проверки перед загрузкой ---
       if (!selectedFont) {
         resetState();
         return;
@@ -153,12 +153,12 @@ function GlyphsMode({
       const isDataLoadedInState = glyphsLoaded && glyphsData && glyphsData.allGlyphs;
 
       if (!isDataLoadedInState) {
-        // Устанавливаем флаг загрузки ПЕРЕД вызовом debounced функции
+        // Поднимаем флаг загрузки перед вызовом debounced-функции
         isLoadingGlyphs.current = true;
-        // Вызываем debounced-функцию, передавая необходимые параметры
+        // Вызываем debounced-функцию с нужными параметрами
         debouncedLoadGlyphs(loadId, selectedFont, fontId);
       } else {
-        // Если данные уже загружены, но флаг загрузки все еще стоит (маловероятно, но возможно)
+        // Если данные уже есть, но флаг загрузки всё ещё true
         if (isLoadingGlyphs.current) {
              isLoadingGlyphs.current = false;
         }
@@ -166,18 +166,18 @@ function GlyphsMode({
 
       // Функция очистки для useEffect
       return () => {
-          // Отменяем любые отложенные вызовы debouncedLoadGlyphs
+          // Cancel pending debounced calls.
           debouncedLoadGlyphs.cancel();
-          // Сбрасываем currentLoadId, чтобы будущие колбэки от этого useEffect не выполнились
-          // currentLoadId.current = null; // Не сбрасываем здесь, чтобы обработать последний актуальный вызов
+          // Do not reset currentLoadId here to let latest valid call complete.
+          // currentLoadId.current = null; // Не сбрасываем здесь, чтобы завершить последний актуальный вызов
       };
 
     }, [selectedFont, isActive, debouncedLoadGlyphs]);
 
-    // Стили для отображения увеличенного глифа в модальном окне
+    // Styles for enlarged glyph in modal.
     const largeGlyphStyle = useMemo(() => {
       // Используем fontSize из useSettings вместо selectedFontSize
-      const baseSize = glyphsFontSize || 40; // Используем glyphsFontSize, fallback 40
+      const baseSize = glyphsFontSize || 40; // Use glyphsFontSize, fallback to 40.
       const modalFontSize = Math.max(80, Math.min(200, baseSize * 2.5));
       
       return {
@@ -202,10 +202,10 @@ function GlyphsMode({
         });
     }, []);
 
-    // --- Логика для отображения ВСЕХ глифов ---
-    // Обновляем useMemo для использования glyphsData.allGlyphs
+    // --- Display logic for all glyphs ---
+    // Use memoized allGlyphs from glyphsData.
     const displayableGlyphs = useMemo(() => {
-      // Используем allGlyphs БЕЗ дополнительной фильтрации .notdef
+      // Keep allGlyphs without extra .notdef filtering.
       return glyphsData?.allGlyphs || [];
     }, [glyphsData]);
 
@@ -229,18 +229,18 @@ function GlyphsMode({
       onDisplayableGlyphCountChange,
     ]);
 
-    // Хелперы для получения имени и Unicode
-    // Обновляем для использования glyphsData.names и glyphsData.unicodes
+    // Хелперы для имени и Unicode
+    // Helpers based on glyphsData.names and glyphsData.unicodes.
     const getGlyphName = useCallback((glyph) => {
-      // Сначала пробуем из карты names, потом из самого объекта glyph
+      // Сначала пробуем карту names, затем поле glyph
       return glyphsData?.names?.[glyph?.id] || glyph?.name || `Glyph ${glyph?.id}`;
     }, [glyphsData]);
 
     const getGlyphUnicode = useCallback((glyph) => {
-      // Сначала пробуем из карты unicodes, потом из самого объекта glyph
+      // Сначала пробуем карту unicodes, затем поле glyph
       const unicodeValue = glyphsData?.unicodes?.[glyph?.id];
       if (unicodeValue) return unicodeValue;
-      // Запасной вариант - форматируем из glyph.unicode
+      // Запасной вариант: форматируем из glyph.unicode
       if (glyph?.unicode) {
          return `U+${glyph.unicode.toString(16).toUpperCase().padStart(4, '0')}`;
       }
@@ -395,7 +395,7 @@ function GlyphsMode({
        return <div className="p-8 text-center text-gray-600">Загрузка данных глифов...</div>;
     }
       
-    // Сообщение, если шрифт - Google Font (проверяется после isLoading)
+    // Сообщение, если шрифт — Google Font (после проверки isLoading)
     if (selectedFont?.source === 'google') {
         return (
           <div className="flex min-h-full flex-col items-center justify-center px-6 py-10 text-center">
@@ -415,9 +415,9 @@ function GlyphsMode({
         );
     }
 
-    // Условие отображения ошибки или отсутствия данных (после попытки загрузки и не Google Font)
+    // Условие отображения ошибки или отсутствия данных
     if (!glyphsLoaded || !glyphsData || displayableGlyphs.length === 0) {
-      // Не показываем ошибку, если isLoadingGlyphs все еще true
+      // Не показываем ошибку, пока isLoadingGlyphs всё ещё true
       if (isLoadingGlyphs.current) return null; 
       return (
           <div className="p-8 text-center text-gray-500">
@@ -468,16 +468,16 @@ function GlyphsMode({
                   &times;
               </button>
               
-              {(() => { // Используем IIFE для получения значений один раз
+              {(() => { // IIFE to compute values once.
                   const name = getGlyphName(selectedGlyph);
                   const unicodeStr = getGlyphUnicode(selectedGlyph);
                   const advanceWidth = glyphsData?.advanceWidths?.[selectedGlyph.id];
                   
-                  // --- Обновленная логика получения символа для модального окна ---
+                  // --- Character resolution logic for modal view ---
                   let char = null;
                   let isPrintable = false;
 
-                  // 1. Пробуем основной unicode
+                  // 1. Try primary unicode.
                   if (selectedGlyph.unicode) {
                     try {
                       const potentialChar = String.fromCodePoint(selectedGlyph.unicode);
@@ -488,7 +488,7 @@ function GlyphsMode({
                     } catch (e) {}
                   }
 
-                  // 2. Если не получилось, пробуем массив unicodes
+                  // 2. Fallback to unicodes array.
                   if (!isPrintable && selectedGlyph.unicodes && selectedGlyph.unicodes.length > 0) {
                     for (const codePoint of selectedGlyph.unicodes) {
                       try {
@@ -501,7 +501,7 @@ function GlyphsMode({
                       } catch (e) {}
                     }
                   }
-                   // --- Конец обновленной логики ---
+                   // --- End character resolution logic ---
 
                   return (
                       <>

@@ -1,10 +1,10 @@
-import React, { useState, useRef, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
+﻿﻿﻿import React, { useState, useRef, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
 import Head from 'next/head';
 import Sidebar from '../components/Sidebar';
 import FontPreview from '../components/FontPreview';
 import ExportModal from '../components/ExportModal';
 import GenerateFontModal from '../components/GenerateFontModal';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { useFontContext } from '../contexts/FontContext';
 import { useSettings, getDefaultPreviewSettingsSnapshot } from '../contexts/SettingsContext';
 import GoogleFontsCatalogPanel from '../components/GoogleFontsCatalogPanel';
@@ -18,6 +18,7 @@ import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { ScopeFilterToolbar } from '../components/ui/ScopeFilterToolbar';
 import { UploadFromDiskCard } from '../components/ui/UploadFromDiskCard';
 import { EditorStatusBar } from '../components/ui/EditorStatusBar';
+import { CatalogDownloadSplitButton } from '../components/ui/CatalogDownloadSplitButton';
 import { updateFontSettings } from '../utils/db';
 import { useFontLibraries } from '../hooks/useFontLibraries';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
@@ -26,10 +27,15 @@ import {
   collectPerFontPreviewSnapshot,
   applyPerFontPreviewSnapshot,
 } from '../utils/perFontPreviewSettings';
+import { revokeObjectURL } from '../utils/localFontProcessor';
 import { preloadFontsourcePreviewSlugs } from '../utils/fontsourcePreviewRuntimeCache';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
 import { formatCatalogAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
+import {
+  notifyFontAlreadyInLibrary,
+  notifyFontMovedToLibrary,
+} from '../components/ui/FontLibraryToastNotifications';
 
 function isFontTabId(tab) {
   return typeof tab === 'string' && tab !== 'library' && !tab.startsWith(EMPTY_PREFIX);
@@ -117,8 +123,8 @@ function readSavedLibraryId(tabId) {
 }
 
 const CATALOG_SOURCE_OPTIONS = [
-  { value: 'google', label: 'Google', title: 'Каталог Google Fonts' },
-  { value: 'fontsource', label: 'Fontsource', title: 'Каталог Fontsource' },
+  { value: 'google', label: 'Google' },
+  { value: 'fontsource', label: 'Fontsource' },
 ];
 
 /** Подвкладки блока «В сессии»: все добавленные шрифты или по источнику */
@@ -280,6 +286,12 @@ export default function Home() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [plainPreviewOpen, setPlainPreviewOpen] = useState(false);
+  const [catalogSelectionActions, setCatalogSelectionActions] = useState({
+    selectedCount: 0,
+    downloadSelected: null,
+    downloadSelectedAsFormat: null,
+  });
+  const [catalogPreviewSlotsById, setCatalogPreviewSlotsById] = useState({});
   const {
     libraries: fontLibraries,
     createLibrary: createFontLibrary,
@@ -392,6 +404,8 @@ export default function Home() {
   };
 
   const lastMainTabForPreviewRef = useRef(null);
+  const catalogPreviewSlotsByIdRef = useRef(catalogPreviewSlotsById);
+  catalogPreviewSlotsByIdRef.current = catalogPreviewSlotsById;
   const initialSessionFontOrderIdsRef = useRef([]);
   const hasAppliedInitialSessionFontOrderRef = useRef(false);
   const hasStartedFontsourcePreviewPrewarmRef = useRef(false);
@@ -655,9 +669,63 @@ export default function Home() {
 
   /** Sidebar должен соответствовать активной вкладке: на «Все шрифты»/«Новый» — дефолт, на вкладке шрифта — выбранный. */
   const sidebarSelectedFont = useMemo(
-    () => (isFontTabId(mainTab) ? selectedFont : null),
-    [mainTab, selectedFont],
+    () => {
+      if (isFontTabId(mainTab)) return selectedFont;
+      if (mainTab.startsWith(EMPTY_PREFIX)) {
+        const slotId = mainTab.slice(EMPTY_PREFIX.length);
+        const slotFont = catalogPreviewSlotsById?.[slotId] || null;
+        if (!slotFont) return null;
+        // Для preview-вкладки используем «живой» selectedFont, если это тот же шрифт:
+        // иначе Roman/Italic меняется в логике, но визуально остаётся старый снимок из slot map.
+        if (selectedFont?.id && selectedFont.id === slotFont.id) return selectedFont;
+        return slotFont;
+      }
+      return null;
+    },
+    [mainTab, selectedFont, catalogPreviewSlotsById],
   );
+
+  const releaseCatalogPreviewFont = useCallback((font) => {
+    if (!font || typeof font.url !== 'string') return;
+    revokeObjectURL(font.url);
+  }, []);
+
+  const openCatalogPreviewInEditor = useCallback(
+    async (previewFont) => {
+      if (!previewFont) return;
+      const slotId = newEmptySlotId();
+      setEmptySlotIds((ids) => [...ids, slotId]);
+      setCatalogPreviewSlotsById((prev) => ({ ...prev, [slotId]: previewFont }));
+      setMainTab(`${EMPTY_PREFIX}${slotId}`);
+      safeSelectFont(previewFont);
+      setPlainPreviewOpen(false);
+    },
+    [safeSelectFont],
+  );
+
+  useEffect(() => {
+    return () => {
+      const slots = catalogPreviewSlotsByIdRef.current || {};
+      Object.values(slots).forEach((font) => releaseCatalogPreviewFont(font));
+    };
+  }, [releaseCatalogPreviewFont]);
+
+  useEffect(() => {
+    const liveSlotIds = new Set(emptySlotIds);
+    setCatalogPreviewSlotsById((prev) => {
+      const keys = Object.keys(prev);
+      if (keys.length === 0) return prev;
+      let changed = false;
+      const next = { ...prev };
+      keys.forEach((slotId) => {
+        if (liveSlotIds.has(slotId)) return;
+        changed = true;
+        releaseCatalogPreviewFont(next[slotId]);
+        delete next[slotId];
+      });
+      return changed ? next : prev;
+    });
+  }, [emptySlotIds, releaseCatalogPreviewFont]);
 
   /** После merge previewSettings в массиве fonts — обновить ссылку selectedFont */
   useEffect(() => {
@@ -731,6 +799,15 @@ export default function Home() {
     if (!tabStripPreviewFromCache.length) return null;
     return tabStripPreviewFromCache;
   }, [fonts.length, isInitialLoadComplete, tabStripPreviewFromCache]);
+
+  const emptySlotLabelsById = useMemo(() => {
+    const out = {};
+    Object.entries(catalogPreviewSlotsById || {}).forEach(([slotId, font]) => {
+      const label = font?.displayName || font?.name || '';
+      if (label) out[slotId] = String(label);
+    });
+    return out;
+  }, [catalogPreviewSlotsById]);
 
   /** Карточки «В сессии»: скелетоны по тому же кэшу, что и вкладки, пока fonts пуст. */
   const showSessionFontCardSkeletons = useMemo(
@@ -953,11 +1030,18 @@ export default function Home() {
     (slotId) => {
       const tabKey = `${EMPTY_PREFIX}${slotId}`;
       setEmptySlotIds((ids) => ids.filter((x) => x !== slotId));
+      setCatalogPreviewSlotsById((prev) => {
+        if (!prev?.[slotId]) return prev;
+        const next = { ...prev };
+        releaseCatalogPreviewFont(next[slotId]);
+        delete next[slotId];
+        return next;
+      });
       if (mainTab === tabKey) {
         setMainTab('library');
       }
     },
-    [mainTab],
+    [mainTab, releaseCatalogPreviewFont],
   );
 
   useEffect(() => {
@@ -1186,6 +1270,41 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     [fontLibraries, handleUpdateSavedLibrary],
   );
 
+  const moveFontEntryToLibrary = useCallback(
+    (libraryId, fontEntry) => {
+      const entry = sanitizeLibraryFont(fontEntry);
+      if (!entry) return;
+      const targetLibrary = fontLibraries.find((library) => library.id === libraryId);
+      if (!targetLibrary) return;
+
+      const currentlyIn = fontLibraries.filter((library) =>
+        Array.isArray(library.fonts) && library.fonts.some((item) => item.id === entry.id),
+      );
+
+      if (currentlyIn.length === 1 && currentlyIn[0].id === targetLibrary.id) {
+        toast.info(`Шрифт «${entry.label}» уже в библиотеке «${targetLibrary.name}»`);
+        return;
+      }
+
+      fontLibraries.forEach((library) => {
+        const fontsWithoutEntry = (Array.isArray(library.fonts) ? library.fonts : []).filter(
+          (item) => item.id !== entry.id,
+        );
+        const nextFonts =
+          library.id === targetLibrary.id ? [...fontsWithoutEntry, entry] : fontsWithoutEntry;
+        const hasChanged =
+          nextFonts.length !== (library.fonts?.length || 0) ||
+          nextFonts.some((item, index) => item.id !== (library.fonts?.[index]?.id || ''));
+        if (hasChanged) {
+          handleUpdateSavedLibrary(library.id, { fonts: nextFonts });
+        }
+      });
+
+      toast.success(`Шрифт «${entry.label}» перенесен в «${targetLibrary.name}»`);
+    },
+    [fontLibraries, handleUpdateSavedLibrary],
+  );
+
   const requestCreateLibraryWithFonts = useCallback((selectedFonts) => {
     setCreateLibrarySeedRequest({
       requestId:
@@ -1193,6 +1312,26 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           ? crypto.randomUUID()
           : `library-seed:${Date.now()}`,
       selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
+    });
+  }, []);
+
+  const handleCatalogSelectionActionsChange = useCallback((nextActions) => {
+    if (!nextActions || typeof nextActions !== 'object') {
+      setCatalogSelectionActions({
+        selectedCount: 0,
+        downloadSelected: null,
+        downloadSelectedAsFormat: null,
+      });
+      return;
+    }
+    setCatalogSelectionActions({
+      selectedCount: Number(nextActions.selectedCount) || 0,
+      downloadSelected:
+        typeof nextActions.downloadSelected === 'function' ? nextActions.downloadSelected : null,
+      downloadSelectedAsFormat:
+        typeof nextActions.downloadSelectedAsFormat === 'function'
+          ? nextActions.downloadSelectedAsFormat
+          : null,
     });
   }, []);
 
@@ -1242,12 +1381,83 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     }
   }, [mainTab, selectedFont]);
 
+  useEffect(() => {
+    if (mainTab === 'library' && fontsLibraryTab === 'catalog') return;
+    setCatalogSelectionActions({
+      selectedCount: 0,
+      downloadSelected: null,
+      downloadSelectedAsFormat: null,
+    });
+  }, [mainTab, fontsLibraryTab]);
+
   const tabBarEndActions = useMemo(() => {
+    const showCatalogToolbar = mainTab === 'library' && fontsLibraryTab === 'catalog';
     const showFontToolbar =
       mainTab !== EDITOR_MAIN_TAB_PENDING &&
       mainTab !== 'library' &&
-      !mainTab.startsWith(EMPTY_PREFIX) &&
       selectedFont;
+    if (showCatalogToolbar) {
+      const selectedCount = catalogSelectionActions.selectedCount || 0;
+      const canDownloadSelected =
+        selectedCount > 0 && typeof catalogSelectionActions.downloadSelected === 'function';
+      const canDownloadSelectedAsFormat =
+        selectedCount > 0 && typeof catalogSelectionActions.downloadSelectedAsFormat === 'function';
+      return (
+        <Tooltip
+          as="span"
+          content={
+            canDownloadSelected
+              ? `Скачать выделенные (${selectedCount})`
+              : 'Выделите карточки в каталоге (долгий зажим), чтобы скачать'
+          }
+          className="inline-flex"
+        >
+          <CatalogDownloadSplitButton
+            className="mr-3"
+            tone="accent"
+            disabled={!canDownloadSelected}
+            primaryLabel={`Скачать${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+            primaryAriaLabel={
+              selectedCount > 0
+                ? `Скачать выделенные шрифты (${selectedCount})`
+                : 'Скачать выделенные шрифты'
+            }
+            onPrimaryClick={() => catalogSelectionActions.downloadSelected?.()}
+            menuItems={[
+              {
+                key: 'zip',
+                label: 'ZIP (по умолчанию)',
+                onSelect: () => catalogSelectionActions.downloadSelected?.(),
+              },
+              {
+                key: 'ttf',
+                label: 'TTF',
+                disabled: !canDownloadSelectedAsFormat,
+                onSelect: () => catalogSelectionActions.downloadSelectedAsFormat?.('ttf'),
+              },
+              {
+                key: 'otf',
+                label: 'OTF',
+                disabled: !canDownloadSelectedAsFormat,
+                onSelect: () => catalogSelectionActions.downloadSelectedAsFormat?.('otf'),
+              },
+              {
+                key: 'woff',
+                label: 'WOFF',
+                disabled: !canDownloadSelectedAsFormat,
+                onSelect: () => catalogSelectionActions.downloadSelectedAsFormat?.('woff'),
+              },
+              {
+                key: 'woff2',
+                label: 'WOFF2',
+                disabled: !canDownloadSelectedAsFormat,
+                onSelect: () => catalogSelectionActions.downloadSelectedAsFormat?.('woff2'),
+              },
+            ]}
+          />
+        </Tooltip>
+      );
+    }
     if (!showFontToolbar) return null;
     const canGenerate = Boolean(selectedFont.isVariableFont);
     return (
@@ -1305,7 +1515,14 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         </div>
       </>
     );
-  }, [mainTab, selectedFont, handleExportClick, handleGenerateClick]);
+  }, [
+    mainTab,
+    fontsLibraryTab,
+    selectedFont,
+    handleExportClick,
+    handleGenerateClick,
+    catalogSelectionActions,
+  ]);
 
   const libraryStatusBar = useMemo(() => {
     if (fontsLibraryTab === 'session') {
@@ -1430,13 +1647,19 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           <EditorTabBar
             mainTab={mainTab}
             emptySlotIds={emptySlotIds}
+            emptySlotLabelsById={emptySlotLabelsById}
             fonts={fontsVisibleInTabBar}
             fontTabPlaceholders={fontTabPlaceholders}
             showNewTabSsrFallback={mainTab === EDITOR_MAIN_TAB_PENDING && emptySlotIds.length === 0}
             onLibraryClick={() => setMainTab('library')}
             onEmptyTabClick={(slotId) => {
               setMainTab(`${EMPTY_PREFIX}${slotId}`);
-              setSelectedFont(null);
+              const previewFont = catalogPreviewSlotsById?.[slotId] || null;
+              if (previewFont) {
+                safeSelectFont(previewFont);
+              } else {
+                setSelectedFont(null);
+              }
             }}
             onRemoveEmptySlot={handleRemoveEmptySlot}
             onFontClick={(font) => {
@@ -1454,7 +1677,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
           {mainTab !== EDITOR_MAIN_TAB_PENDING && mainTab !== 'library' && (
             <FontPreview
-              selectedFont={mainTab.startsWith(EMPTY_PREFIX) ? null : selectedFont}
+              selectedFont={sidebarSelectedFont}
               getFontFamily={getFontFamily}
               getVariationSettings={getVariationSettings}
               handleFontsUploaded={handleFontsUploadedWithNav}
@@ -1463,6 +1686,9 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               isVariableFontAnimating={isAnimating}
               plainPreviewOpen={plainPreviewOpen}
               onClosePlainPreview={closePlainPreview}
+              fontLibraries={fontLibraries}
+              onMoveFontToLibrary={moveFontEntryToLibrary}
+              onRequestCreateLibrary={requestCreateLibraryWithFonts}
             />
           )}
 
@@ -1472,7 +1698,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
           {mainTab === 'library' && (
             <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
-              <div className="flex shrink-0 overflow-x-auto border-b border-gray-200 px-6 pt-6">
+              <div className="flex shrink-0 border-b border-gray-200  overflow-x-auto  px-6 pt-6">
                 {libraryTabs.map((tab) => (
                   <UnderlineTab
                     key={tab.id}
@@ -1539,13 +1765,16 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
               {fontsLibraryTab === 'catalog' && (
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                  {catalogSource === 'google' ? (
+                  <div className={catalogSource === 'google' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
                     <GoogleFontsCatalogPanel
+                      isActive={catalogSource === 'google'}
                       fonts={fonts}
                       handleFontsUploaded={handleFontsUploadedWithNav}
                       fontLibraries={fontLibraries}
                       onAddFontToLibrary={addFontEntryToLibrary}
                       onRequestCreateLibrary={requestCreateLibraryWithFonts}
+                      onOpenInEditor={openCatalogPreviewInEditor}
+                      onSelectionActionsChange={handleCatalogSelectionActionsChange}
                       onTotalItemsChange={setGoogleCatalogTotalItems}
                       trailingToolbar={
                         <SegmentedControl
@@ -1553,31 +1782,33 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                           onChange={setCatalogSource}
                           options={CATALOG_SOURCE_OPTIONS}
                           variant="pairOutline"
-                          className="max-w-full"
+                          className="w-full max-w-none [&>button]:w-auto [&>button]:flex-1"
                         />
                       }
                     />
-                  ) : (
-                    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                      <FontsourceCatalogPanel
-                        fonts={fonts}
-                        selectOrAddFontsourceFont={selectOrAddFontsourceFontWithNav}
-                        fontLibraries={fontLibraries}
-                        onAddFontToLibrary={addFontEntryToLibrary}
-                        onRequestCreateLibrary={requestCreateLibraryWithFonts}
-                        onTotalItemsChange={setFontsourceCatalogTotalItems}
-                        trailingToolbar={
-                          <SegmentedControl
-                            value={catalogSource}
-                            onChange={setCatalogSource}
-                            options={CATALOG_SOURCE_OPTIONS}
-                            variant="pairOutline"
-                            className="max-w-full"
-                          />
-                        }
-                      />
-                    </div>
-                  )}
+                  </div>
+                  <div className={catalogSource === 'fontsource' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
+                    <FontsourceCatalogPanel
+                      isActive={catalogSource === 'fontsource'}
+                      fonts={fonts}
+                      selectOrAddFontsourceFont={selectOrAddFontsourceFontWithNav}
+                      fontLibraries={fontLibraries}
+                      onAddFontToLibrary={addFontEntryToLibrary}
+                      onRequestCreateLibrary={requestCreateLibraryWithFonts}
+                      onOpenInEditor={openCatalogPreviewInEditor}
+                      onSelectionActionsChange={handleCatalogSelectionActionsChange}
+                      onTotalItemsChange={setFontsourceCatalogTotalItems}
+                      trailingToolbar={
+                        <SegmentedControl
+                          value={catalogSource}
+                          onChange={setCatalogSource}
+                          options={CATALOG_SOURCE_OPTIONS}
+                          variant="pairOutline"
+                          className="w-full max-w-none [&>button]:w-auto [&>button]:flex-1"
+                        />
+                      }
+                    />
+                  </div>
                 </div>
               )}
 

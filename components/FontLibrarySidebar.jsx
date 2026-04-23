@@ -338,7 +338,7 @@ export default function FontLibrarySidebar({
                     placeholder="Например, Гротески"
                     className={nameFieldClass}
                   />
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs tabular-nums text-gray-400">
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-semibold tabular-nums text-gray-400">
                     {libraryName.length}/{LIBRARY_NAME_MAX_LENGTH}
                   </span>
                 </div>

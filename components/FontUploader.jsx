@@ -1,6 +1,6 @@
-import React, { useCallback, useState } from 'react';
+﻿import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { PlusIconGrayCircle } from './ui/PlusIconGrayCircle';
 
 export default function FontUploader({ onFontsUploaded }) {
@@ -40,7 +40,7 @@ export default function FontUploader({ onFontsUploaded }) {
           continue;
         }
         
-        // Проверка типа файла - и по MIME-типу, и по расширению
+        // Проверка типа файла: и по MIME-типу, и по расширению
         if (!ACCEPTED_FONT_TYPES.includes(file.type) && !isFontFileByExtension(file.name)) {
           invalidFiles.push({ file, reason: 'type' });
           continue;
@@ -69,7 +69,7 @@ export default function FontUploader({ onFontsUploaded }) {
         });
       }
       
-      // Если есть валидные файлы, передаем их для обработки
+      // Если есть валидные файлы, передаём их для обработки
       if (validFiles.length > 0) {
         onFontsUploaded(validFiles);
         
@@ -116,7 +116,7 @@ export default function FontUploader({ onFontsUploaded }) {
   return (
     <div
       {...getRootProps()}
-      className={`group p-4 border-2 border-dashed rounded-lg transition-all ${
+      className={`group select-none cursor-pointer p-4 border-2 border-dashed rounded-lg transition-all ${
         isDragActive 
           ? 'border-gray-500 bg-gray-100'
           : 'border-gray-300 hover:bg-gray-50'
@@ -127,7 +127,7 @@ export default function FontUploader({ onFontsUploaded }) {
         <PlusIconGrayCircle active={isDragActive} />
         <div className={`text-sm font-medium ${isDragActive ? 'text-gray-800' : 'text-gray-700'}`}>
           {isDragActive 
-            ? 'Отпустите файлы' 
+            ? 'Отпустите файлы'
             : 'Загрузить шрифт'}
         </div>
         <div className="text-xs text-gray-500">

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import {
   loadFontFaceIfNeeded,
   updateVariableFontSettings,
@@ -17,7 +17,7 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
 
     const q = (s) => String(s).replace(/"/g, '\\"');
 
-    // Используем fontFamily из объекта шрифта, если он есть (реальное имя FontFace: font-xxxxx и т.д.)
+    // Используем fontFamily из объекта шрифта, если оно есть (реальное имя FontFace: font-xxxxx и т.д.)
     if (targetFont.fontFamily) {
       return `"${q(targetFont.fontFamily)}"`;
     }
@@ -40,7 +40,7 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
 
     // Если ничего не найдено, используем ID как fallback
     if (targetFont.id) {
-      console.warn('getFontFamily: Возвращаем временное имя на основе ID, т.к. fontFamily еще не установлен.');
+      console.warn('getFontFamily: Возвращаем временное имя на основе ID, т.к. fontFamily ещё не установлен.');
       return `"Font_${targetFont.id}"`;
     }
 
@@ -211,3 +211,4 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
     fontCssProperties,
   };
 } 
+

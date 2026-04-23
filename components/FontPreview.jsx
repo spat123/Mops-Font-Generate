@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useRef, useEffect, useState, lazy, Suspens
 import FontUploader from './FontUploader';
 import { EditorStatusBar } from './ui/EditorStatusBar';
 import { Tooltip } from './ui/Tooltip';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { useSettings } from '../contexts/SettingsContext';
 import dynamic from 'next/dynamic';
 import { fetchGoogleVariableFontSlicesAll } from '../utils/googleFontLoader';
@@ -19,8 +19,11 @@ import { CatalogFontCard } from './ui/CatalogFontCard';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchIcon } from './ui/CommonIcons';
 import { IconCircleButton } from './ui/IconCircleButton';
+import { FontLibraryStatusMenu } from './ui/FontLibraryStatusMenu';
+import { createCatalogLibraryEntry } from '../utils/fontLibraryUtils';
+import { HexProgressLoader } from './ui/HexProgressLoader';
 
-// --- Ленивая загрузка компонентов режимов --- 
+// --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
 const WaterfallMode = dynamic(() => import('./WaterfallMode'), { suspense: true });
 const StylesMode = lazy(() => import('./StylesMode'));
@@ -29,6 +32,12 @@ const TextMode = lazy(() => import('./TextMode'));
 // --- Конец ленивой загрузки ---
 
 const EMPTY_STATE_GOOGLE_RESULTS_LIMIT = 8;
+
+const MODE_LOADING_FALLBACK = (
+  <div className="flex items-center justify-center p-8">
+    <HexProgressLoader size={52} className="shrink-0" />
+  </div>
+);
 
 export default function FontPreview({
   selectedFont,
@@ -41,11 +50,14 @@ export default function FontPreview({
   getFontFamily,
   getVariationSettings,
   fontCssProperties,
-  /** Во время анимации осей VF в Waterfall не делаем N× forced reflow на каждый кадр */
+  /** Во время анимации осей VF в Waterfall не делаем N x forced reflow на каждый кадр */
   isVariableFontAnimating = false,
   /** Полноэкранный plain-превью (тулбар «Превью») */
   plainPreviewOpen = false,
   onClosePlainPreview,
+  fontLibraries = [],
+  onMoveFontToLibrary,
+  onRequestCreateLibrary,
 }) {
   const { 
     text,
@@ -70,7 +82,7 @@ export default function FontPreview({
     previewBackgroundImage,
   } = useSettings();
 
-  /** Общий скролл области превью — режим Glyphs подписывается на этот узел для своей виртуализации */
+  /** Общий скролл области превью; Glyphs подписывается на этот узел для виртуализации */
   const previewBodyScrollRef = useRef(null);
   const emptyStateSearchWrapRef = useRef(null);
 
@@ -93,7 +105,7 @@ export default function FontPreview({
     const letterSpacingValue = `${(letterSpacing / 100) * 0.5}em`; 
     const lineHeightValue = lineHeight; 
     
-    // Используем fontCssProperties для получения правильных значений weight и style
+    // Используем fontCssProperties для корректных weight/style
     const fontStyleValue = fontCssProperties?.fontStyle || 'normal';
     const fontWeightValue = fontCssProperties?.fontWeight || 400;
 
@@ -107,19 +119,19 @@ export default function FontPreview({
   
   const { letterSpacingValue, lineHeightValue, fontStyleValue, fontWeightValue } = styleValues;
   
-  // Без rvrn/rclt: на части шрифтов (VF, Google сабсеты) «required variation alternates» дают
-  // рваную отрисовку — часть глифов уходит в fallback, пока выглядит как «два шрифта в одной строке».
+  // Без rvrn/rclt часть VF/Google-сабсетов может рвано рендериться и уходить в fallback.
   const featureSettingsValue = useMemo(() => {
     return '"calt", "liga", "rlig", "kern"';
   }, []);
   
-  // Должно совпадать с useFontCss.fontCssProperties (fallback-стек, вариативные оси), иначе превью обходило хук
+  // Должно совпадать с useFontCss.fontCssProperties, иначе превью обходило хук.
   const fontFamilyValue = useMemo(() => {
-    if (selectedFont && fontCssProperties?.fontFamily) {
-      return fontCssProperties.fontFamily;
+    if (selectedFont) {
+      const family = getFontFamily(selectedFont);
+      return family === 'inherit' ? 'inherit' : `${family}, ui-sans-serif, system-ui, sans-serif`;
     }
     return getFontFamily(selectedFont);
-  }, [selectedFont, getFontFamily, fontCssProperties?.fontFamily]);
+  }, [selectedFont, getFontFamily]);
   
   const variationSettingsValue = useMemo(() => {
     return getVariationSettings(selectedFont, variableSettings);
@@ -129,14 +141,13 @@ export default function FontPreview({
     return text || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   }, [text]);
 
-  /** Первое семейство из стека (без fallback) — для document.fonts.load */
+  /** Первое семейство из стека (без fallback) для document.fonts.load */
   const primaryFontFamilyForLoad = useMemo(() => {
     if (!fontFamilyValue || fontFamilyValue === 'inherit') return '';
     return fontFamilyValue.split(',')[0].trim();
   }, [fontFamilyValue]);
 
-  // Дождаться реальной подгрузки глифов под текущий текст, иначе contenteditable часто рисует
-  // смесь кастомного шрифта и ui-sans-serif до «ленивого» докрута FontFace.
+  // Ждём реальной подгрузки глифов под текущий текст, чтобы не было смеси с fallback.
   useEffect(() => {
     let cancelled = false;
     if (!selectedFont || !primaryFontFamilyForLoad || typeof document === 'undefined') return;
@@ -185,8 +196,7 @@ export default function FontPreview({
     };
     
     if (selectedFont?.isVariableFont) {
-      // Напрямую из variableSettings (через variationSettingsValue), а не только из fontCssProperties —
-      // иначе при смене осей useMemo fontCssProperties мог отставать и превью «залипало».
+      // Берём напрямую variableSettings, иначе при смене осей useMemo мог отставать.
       if (variationSettingsValue && variationSettingsValue !== 'normal') {
         styles.fontVariationSettings = variationSettingsValue;
       }
@@ -471,6 +481,28 @@ export default function FontPreview({
   const showVariableBadge = Boolean(selectedFont?.isVariableFont);
   const showItalicBadge = fontStyleValue === 'italic' || selectedFont?.currentStyle === 'italic';
 
+  const statusLibraryEntry = useMemo(() => {
+    if (!selectedFont) return null;
+    const label = selectedFont.displayName || selectedFont.fontFamily || selectedFont.name || 'Шрифт';
+    if (selectedFont.source === 'google') {
+      const family = String(label || selectedFont.name || '').replace(/\.woff2$/i, '').trim();
+      if (!family) return null;
+      return createCatalogLibraryEntry({ source: 'google', key: family, label: family });
+    }
+    if (selectedFont.source === 'fontsource') {
+      const key = String(selectedFont.name || selectedFont.displayName || selectedFont.id || '').trim();
+      if (!key) return null;
+      return createCatalogLibraryEntry({ source: 'fontsource', key, label });
+    }
+    const fallbackId = String(selectedFont.id || selectedFont.name || label).trim();
+    if (!fallbackId) return null;
+    return {
+      id: `session:${fallbackId}`,
+      label,
+      source: String(selectedFont.source || 'session'),
+    };
+  }, [selectedFont]);
+
   const clearEmptyStateSearch = useCallback(() => {
     setPresetSearchQuery('');
     setIsEmptyStateSearchExpanded(false);
@@ -516,7 +548,7 @@ export default function FontPreview({
       <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-white">
         <div
           className={`flex w-full min-h-0 flex-1 flex-col overflow-y-auto ${
-            /* flex-col: cross axis = горизонталь → items-center по центру; main = вертикаль → justify-start к верху как раньше */
+            /* flex-col: cross axis = горизонталь -> items-center по центру; main = вертикаль -> justify-start к верху как раньше */
             emptyStateSearchActive ? 'items-center justify-start pt-8' : 'items-center justify-center'
           }`}
         >
@@ -707,7 +739,7 @@ export default function FontPreview({
         style={previewAreaBgStyle}
       >
         {viewMode === 'plain' && (
-          <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
+          <Suspense fallback={MODE_LOADING_FALLBACK}>
             <PlainTextMode
               containerStyle={containerStyle}
               contentStyle={contentStyle}
@@ -717,7 +749,7 @@ export default function FontPreview({
         )}
         
         {viewMode === 'waterfall' && (
-          <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
+          <Suspense fallback={MODE_LOADING_FALLBACK}>
             <WaterfallMode
               waterfallSizes={effectiveWaterfallSizes}
               scrollParentRef={previewBodyScrollRef}
@@ -727,7 +759,7 @@ export default function FontPreview({
         )}
         
         {viewMode === 'styles' && (
-          <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
+          <Suspense fallback={MODE_LOADING_FALLBACK}>
             <StylesMode
               selectedFont={selectedFont}
               fontFamilyValue={fontFamilyValue}
@@ -736,7 +768,7 @@ export default function FontPreview({
         )}
 
         {viewMode === 'glyphs' && (
-          <Suspense fallback={<div className="p-8 text-center text-gray-600">Загрузка режима глифов…</div>}>
+          <Suspense fallback={MODE_LOADING_FALLBACK}>
             <GlyphsMode
               key={`${selectedFont?.id}-${viewMode === 'glyphs'}`}
               selectedFont={selectedFont}
@@ -750,7 +782,7 @@ export default function FontPreview({
         )}
 
         {viewMode === 'text' && (
-          <Suspense fallback={<div className="p-8">Загрузка режима...</div>}>
+          <Suspense fallback={MODE_LOADING_FALLBACK}>
             <TextMode
               contentStyle={contentStyle}
               fontFamily={fontFamilyValue}
@@ -781,6 +813,14 @@ export default function FontPreview({
             </div>
           ) : null
         }
+        beforeTrailing={
+          <FontLibraryStatusMenu
+            libraries={fontLibraries}
+            libraryEntry={statusLibraryEntry}
+            onMoveToLibrary={onMoveFontToLibrary}
+            onCreateLibrary={onRequestCreateLibrary}
+          />
+        }
       />
     </div>
 
@@ -802,7 +842,7 @@ export default function FontPreview({
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto" style={previewAreaBgStyle}>
-          <Suspense fallback={<div className="p-8 text-gray-500">Загрузка…</div>}>
+          <Suspense fallback={MODE_LOADING_FALLBACK}>
             <PlainTextMode
               containerStyle={containerStyle}
               contentStyle={contentStyle}

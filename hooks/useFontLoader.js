@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { findStyleInfoByWeightAndStyle, getFormatFromExtension, PRESET_STYLES } from '../utils/fontUtilsCommon';
 import { processLocalFont } from '../utils/localFontProcessor';
 import { saveFont } from '../utils/db';
@@ -396,3 +396,4 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     loadFontsourceStyleVariant: loadFontStyleVariant,
   };
 }
+

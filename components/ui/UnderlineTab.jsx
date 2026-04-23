@@ -19,7 +19,7 @@ export function UnderlineTab({
       className={`px-4 py-2 uppercase font-semibold text-xs transition-colors duration-200 ${
         isActive
           ? `text-accent border-b-2 border-accent${nested ? ' -mb-px' : ''}`
-          : 'text-gray-500 hover:text-accent'
+          : 'text-gray-800 hover:text-accent'
       } ${className}`.trim()}
     >
       {children}

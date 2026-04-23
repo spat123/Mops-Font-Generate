@@ -125,6 +125,7 @@ function ClosableEditorTab({
 export function EditorTabBar({
   mainTab,
   emptySlotIds,
+  emptySlotLabelsById = {},
   fonts,
   /** Пока fonts пуст: id + label из sessionStorage с прошлого визита */
   fontTabPlaceholders = null,
@@ -186,17 +187,22 @@ export function EditorTabBar({
       {(emptySlotIds || []).map((slotId) => {
         const key = `${EMPTY_PREFIX}${slotId}`;
         const active = mainTab === key;
+        const customLabel = String(emptySlotLabelsById?.[slotId] || '').trim();
+        const label = customLabel || 'Новый';
+        const title = customLabel ? customLabel : 'Новый предпросмотр — добавьте шрифт';
         return (
           <ClosableEditorTab
             key={slotId}
             active={active}
-            label="Новый"
-            title="Новый предпросмотр — добавьте шрифт"
-            ariaTabLabel="Вкладка «Новый»"
+            label={label}
+            title={title}
+            ariaTabLabel={customLabel ? `Вкладка шрифта ${customLabel}` : 'Вкладка «Новый»'}
             onSelect={() => onEmptyTabClick(slotId)}
             onRemove={typeof onRemoveEmptySlot === 'function' ? () => onRemoveEmptySlot(slotId) : undefined}
-            removeAriaLabel="Закрыть вкладку «Новый»"
-            maxWClass="max-w-[11rem]"
+            removeAriaLabel={
+              customLabel ? `Закрыть вкладку шрифта ${customLabel}` : 'Закрыть вкладку «Новый»'
+            }
+            maxWClass="max-w-[15rem] px-6"
           />
         );
       })}
@@ -209,7 +215,7 @@ export function EditorTabBar({
         <Tooltip content="Новая пустая вкладка">
           <button
             type="button"
-            className="inline-flex shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-1 text-gray-500 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="inline-flex shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-1 text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
             onClick={onAddEmptySlot}
             aria-label="Добавить вкладку «Новый»"
           >

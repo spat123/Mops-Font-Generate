@@ -1,12 +1,12 @@
-import React, {
+﻿﻿ import React, {
   useEffect,
   useState,
   useCallback,
   useMemo,
-  useLayoutEffect,
+  useRef,
 } from 'react';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import {
   fetchGoogleStaticFontSlicesAll,
   fetchGoogleVariableFontSlicesAll,
@@ -24,9 +24,17 @@ import {
 import CatalogSessionAddSpinner from './ui/CatalogSessionAddSpinner';
 import { CatalogLibraryActions } from './ui/CatalogLibraryActions';
 import { CatalogFontCard } from './ui/CatalogFontCard';
-import { SearchClearButton } from './ui/SearchClearButton';
 import { Tooltip } from './ui/Tooltip';
 import { CatalogTopToolbar } from './ui/CatalogTopToolbar';
+import { CatalogDownloadSplitButton } from './ui/CatalogDownloadSplitButton';
+import { HexProgressLoader } from './ui/HexProgressLoader';
+import { CatalogSearchField } from './ui/CatalogSearchField';
+import { CatalogSearchButton } from './ui/CatalogSearchButton';
+import { CatalogTextSortControls } from './ui/CatalogTextSortControls';
+import { CatalogGridModeToggle } from './ui/CatalogGridModeToggle';
+import { CatalogRowModeCard } from './ui/CatalogRowModeCard';
+import { CatalogCardHoverOverlay } from './ui/CatalogCardHoverOverlay';
+import { useCatalogToolbarLayout } from './ui/useCatalogToolbarLayout';
 import { matchesSearch } from '../utils/searchMatching';
 import {
   clearGoogleFontCatalogCache,
@@ -37,7 +45,9 @@ import {
   createCatalogLibraryEntry,
   isGoogleFontInSession,
 } from '../utils/fontLibraryUtils';
+import { processLocalFont } from '../utils/localFontProcessor';
 import { compareFontFamilyName } from '../utils/fontSort';
+import { createZipBlob } from '../utils/zipUtils';
 /** Подписи к кодам наборов Google Fonts (subsets) */
 const SUBSET_LABEL_RU = {
   latin: 'Латиница',
@@ -55,7 +65,7 @@ const SUBSET_LABEL_RU = {
   gujarati: 'Гуджарати',
   gurmukhi: 'Гурмукхи',
   kannada: 'Каннада',
-  malayalam: 'Малаялам',
+  malayalam: 'Малайялам',
   oriya: 'Ория',
   telugu: 'Телугу',
   sinhala: 'Сингальский',
@@ -77,6 +87,14 @@ function subsetOptionLabel(code) {
   if (!code) return '';
   const ru = SUBSET_LABEL_RU[code];
   return ru ? `${ru} (${code})` : code;
+}
+
+function GoogleCatalogEmptyLoader() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center py-8">
+      <HexProgressLoader size={64} className="shrink-0" />
+    </div>
+  );
 }
 
 function pluralRu(n, one, few, many) {
@@ -107,6 +125,54 @@ function googleFontCatalogGridCols(viewportWidth) {
 }
 
 const GRID_GAP_PX = 16;
+const CARD_LONG_PRESS_MS = 220;
+
+function saveBlobAsFile(blob, fileName) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
+
+function buildSafeFileBase(name, fallback = 'font') {
+  return String(name || fallback)
+    .trim()
+    .replace(/[^\p{L}\p{N}\-_.\s]/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || fallback;
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function isInteractiveTarget(target) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      'button, a, input, select, textarea, label, [role="button"], [data-no-card-select="true"]',
+    ),
+  );
+}
 
 export default function GoogleFontsCatalogPanel({
   fonts,
@@ -114,85 +180,57 @@ export default function GoogleFontsCatalogPanel({
   fontLibraries = [],
   onAddFontToLibrary,
   onRequestCreateLibrary,
+  onOpenInEditor,
   trailingToolbar = null,
+  isActive = true,
+  onSelectionActionsChange,
   /** Сообщить родителю актуальное число семейств в каталоге (для нижней полосы). */
   onTotalItemsChange,
 }) {
-  const [gridInnerWidth, setGridInnerWidth] = useState(null);
-  const [catalogScrollEl, setCatalogScrollEl] = useState(null);
-  const [viewportW, setViewportW] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 0,
-  );
-  const [trailingToolbarEl, setTrailingToolbarEl] = useState(null);
-  const [trailingToolbarW, setTrailingToolbarW] = useState(0);
+  const {
+    catalogScrollEl,
+    setCatalogScrollContainer,
+    setTrailingToolbarContainer,
+    setGridInnerWidth,
+    gridCols,
+    oneCardWidthPx,
+    toolbarAlignToGrid,
+  } = useCatalogToolbarLayout({
+    trailingToolbar,
+    gridGapPx: GRID_GAP_PX,
+    gridColsResolver: googleFontCatalogGridCols,
+    autoMeasureGridWidth: true,
+  });
   const [items, setItems] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
   const [addingFamily, setAddingFamily] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   /** catalog — как в каталоге Google (defaultSort) */
   const [sortMode, setSortMode] = useState('catalog');
   const [filterCategory, setFilterCategory] = useState('');
-  const [filterStroke, setFilterStroke] = useState('');
   const [filterSubset, setFilterSubset] = useState('');
   /** all | variable | static */
   const [filterVariable, setFilterVariable] = useState('all');
   const [filterItalicOnly, setFilterItalicOnly] = useState(false);
+  const [gridViewMode, setGridViewMode] = useState('grid');
+  const [selectedFamilies, setSelectedFamilies] = useState(() => new Set());
+  const longPressTimerRef = useRef(null);
+  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     onTotalItemsChange?.(items.length);
   }, [items, onTotalItemsChange]);
 
-  useLayoutEffect(() => {
-    const onResize = () => setViewportW(window.innerWidth);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const setCatalogScrollContainer = useCallback((node) => {
-    setCatalogScrollEl(node instanceof HTMLElement ? node : null);
-  }, []);
-
-  const setTrailingToolbarContainer = useCallback((node) => {
-    setTrailingToolbarEl(node instanceof HTMLElement ? node : null);
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!trailingToolbarEl) {
-      setTrailingToolbarW(0);
-      return;
-    }
-
-    const measure = () => {
-      const w = trailingToolbarEl.getBoundingClientRect().width;
-      setTrailingToolbarW(Number.isFinite(w) ? w : 0);
-    };
-
-    measure();
-
-    if (typeof ResizeObserver !== 'function') return;
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(trailingToolbarEl);
-    return () => ro.disconnect();
-  }, [trailingToolbarEl]);
-
-  const gridCols = googleFontCatalogGridCols(viewportW);
-  const oneCardWidthPx =
-    gridInnerWidth != null && gridInnerWidth > 0
-      ? (gridInnerWidth - (gridCols - 1) * GRID_GAP_PX) / gridCols
-      : null;
-
   const facetOptions = useMemo(() => {
     const categories = new Set();
-    const strokes = new Set();
     const subsets = new Set();
     items.forEach((x) => {
       if (x.category) categories.add(x.category);
-      if (x.stroke) strokes.add(x.stroke);
       (x.subsets || []).forEach((s) => subsets.add(s));
     });
     return {
       categories: [...categories].sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })),
-      strokes: [...strokes].sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })),
       subsets: [...subsets].sort((a, b) => a.localeCompare(b)),
     };
   }, [items]);
@@ -214,7 +252,6 @@ export default function GoogleFontsCatalogPanel({
       );
     }
     if (filterCategory) list = list.filter((x) => x.category === filterCategory);
-    if (filterStroke) list = list.filter((x) => x.stroke === filterStroke);
     if (filterSubset) list = list.filter((x) => (x.subsets || []).includes(filterSubset));
     if (filterVariable === 'variable') list = list.filter((x) => x.isVariable);
     if (filterVariable === 'static') list = list.filter((x) => !x.isVariable);
@@ -274,7 +311,6 @@ export default function GoogleFontsCatalogPanel({
     searchQuery,
     sortMode,
     filterCategory,
-    filterStroke,
     filterSubset,
     filterVariable,
     filterItalicOnly,
@@ -282,7 +318,6 @@ export default function GoogleFontsCatalogPanel({
 
   const hasActiveFilters =
     !!filterCategory ||
-    !!filterStroke ||
     !!filterSubset ||
     filterVariable !== 'all' ||
     filterItalicOnly;
@@ -295,17 +330,23 @@ export default function GoogleFontsCatalogPanel({
 
   const showFontGrid = filteredSortedItems.length > 0 && catalogItemsNotInSession.length > 0;
 
-  useEffect(() => {
-    if (!showFontGrid) setGridInnerWidth(null);
-  }, [showFontGrid]);
-
   const clearFilters = useCallback(() => {
     setFilterCategory('');
-    setFilterStroke('');
     setFilterSubset('');
     setFilterVariable('all');
     setFilterItalicOnly(false);
   }, []);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => clearLongPressTimer();
+  }, [clearLongPressTimer]);
 
   useEffect(() => {
     let cancelled = false;
@@ -344,7 +385,7 @@ export default function GoogleFontsCatalogPanel({
     };
   }, []);
 
-  /** Фон: по чуть-чуть подключаем CSS-превью для текущего отфильтрованного списка. */
+  /** Фон: постепенно подключаем CSS-превью для текущего отфильтрованного списка. */
   useEffect(() => {
     if (!filteredSortedItems.length) return;
     let cursor = 0;
@@ -441,6 +482,382 @@ export default function GoogleFontsCatalogPanel({
     [fonts, handleFontsUploaded],
   );
 
+  useEffect(() => {
+    const visibleFamilies = new Set(catalogItemsNotInSession.map((entry) => entry.family));
+    setSelectedFamilies((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set();
+      prev.forEach((family) => {
+        if (visibleFamilies.has(family)) next.add(family);
+      });
+      return next.size === prev.size ? prev : next;
+    });
+  }, [catalogItemsNotInSession]);
+
+  const toggleSelectedFamily = useCallback((family) => {
+    setSelectedFamilies((prev) => {
+      const next = new Set(prev);
+      if (next.has(family)) next.delete(family);
+      else next.add(family);
+      return next;
+    });
+  }, []);
+
+  const startCardLongPress = useCallback(
+    (event, family) => {
+      if (isInteractiveTarget(event.target)) return;
+      clearLongPressTimer();
+      longPressTriggeredRef.current = false;
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTriggeredRef.current = true;
+        toggleSelectedFamily(family);
+      }, CARD_LONG_PRESS_MS);
+    },
+    [clearLongPressTimer, toggleSelectedFamily],
+  );
+
+  const onCardClick = useCallback(
+    (event, family) => {
+      if (isInteractiveTarget(event.target)) return;
+      if (longPressTriggeredRef.current) {
+        longPressTriggeredRef.current = false;
+        event.preventDefault();
+        return;
+      }
+      if (selectedFamilies.size > 0) {
+        event.preventDefault();
+        toggleSelectedFamily(family);
+      }
+    },
+    [selectedFamilies.size, toggleSelectedFamily],
+  );
+
+  const openGoogleInEditor = useCallback(
+    async (entry) => {
+      if (typeof onOpenInEditor !== 'function') return;
+      const family = entry?.family;
+      if (!family) return;
+      setAddingFamily(family);
+      try {
+        const subsetList = Array.isArray(entry.subsets) ? entry.subsets : [];
+        const useVariable = entry.isVariable === true;
+        const slices = useVariable
+          ? await fetchGoogleVariableFontSlicesAll(family, {
+              subsets: subsetList,
+              ...(entry.wghtMin != null && entry.wghtMax != null
+                ? { wghtMin: entry.wghtMin, wghtMax: entry.wghtMax }
+                : {}),
+            })
+          : await fetchGoogleStaticFontSlicesAll(family, {
+              weight: 400,
+              italic: false,
+              subsets: subsetList,
+            });
+        const firstSlice = Array.isArray(slices) ? slices.find((slice) => slice?.blob?.size > 0) : null;
+        if (!firstSlice?.blob) throw new Error('Пустой файл');
+        const previewFont = await processLocalFont({
+          file: firstSlice.blob,
+          name: `${family}.woff2`,
+          source: 'google',
+          googleFontSlices: slices,
+          googleFontAxesFromCatalog:
+            Array.isArray(entry.axes) && entry.axes.length > 0 ? entry.axes : null,
+          googleFontItalicMode:
+            typeof entry.italicMode === 'string' && entry.italicMode ? entry.italicMode : 'none',
+          googleFontHasItalicStyles: entry.hasItalicStyles === true,
+        });
+        if (!previewFont) throw new Error('Не удалось подготовить превью');
+        await onOpenInEditor(previewFont);
+      } catch (error) {
+        toast.error(`Не удалось открыть ${family} в редакторе`);
+      } finally {
+        setAddingFamily(null);
+      }
+    },
+    [onOpenInEditor],
+  );
+
+  const getGoogleSlicesForDownload = useCallback(async (entry) => {
+    const family = entry?.family;
+    if (!family) return [];
+    const subsetList = Array.isArray(entry.subsets) ? entry.subsets : [];
+    const useVariable = entry.isVariable === true;
+    const slices = useVariable
+      ? await fetchGoogleVariableFontSlicesAll(family, {
+          subsets: subsetList,
+          ...(entry.wghtMin != null && entry.wghtMax != null
+            ? { wghtMin: entry.wghtMin, wghtMax: entry.wghtMax }
+            : {}),
+        })
+      : await fetchGoogleStaticFontSlicesAll(family, {
+          weight: 400,
+          italic: false,
+          subsets: subsetList,
+        });
+    return Array.isArray(slices) ? slices.filter((slice) => slice?.blob?.size > 0) : [];
+  }, []);
+
+  const fetchGoogleVariableTtfBlob = useCallback(async (family) => {
+    const response = await fetch(`/api/google-font-github-vf?family=${encodeURIComponent(family)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    if (!blob || blob.size === 0) throw new Error('Пустой файл');
+    return blob;
+  }, []);
+
+  const convertBlobToFormat = useCallback(async (blob, format) => {
+    const targetFormat = String(format || 'woff2').toLowerCase();
+    if (targetFormat === 'woff2') return blob;
+    const sourceBuffer = await blob.arrayBuffer();
+    const response = await fetch('/api/convert-font-format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fontData: arrayBufferToBase64(sourceBuffer),
+        targetFormat,
+      }),
+    });
+    if (!response.ok) {
+      let details = `HTTP ${response.status}`;
+      try {
+        const json = await response.json();
+        details = json?.details || json?.error || details;
+      } catch {
+        // ignore
+      }
+      throw new Error(details);
+    }
+    const payload = await response.json();
+    const outBase64 = payload?.data;
+    if (!outBase64) throw new Error('Пустой ответ конвертера');
+    const outBuffer = base64ToArrayBuffer(outBase64);
+    const mimeType = `font/${targetFormat === 'otf' ? 'otf' : targetFormat === 'ttf' ? 'ttf' : targetFormat === 'woff' ? 'woff' : 'woff2'}`;
+    return new Blob([outBuffer], { type: mimeType });
+  }, []);
+
+  const downloadGoogleCurrentWoff2 = useCallback(async (entry, { silent = false } = {}) => {
+    const family = entry?.family;
+    if (!family) return false;
+    try {
+      const slices = await getGoogleSlicesForDownload(entry);
+      const firstSlice = slices[0] || null;
+      if (!firstSlice?.blob) throw new Error('Пустой файл');
+      const baseName = buildSafeFileBase(family, 'google-font');
+      const fileName = `${baseName}${entry?.isVariable ? '-variable' : ''}.woff2`;
+      saveBlobAsFile(firstSlice.blob, fileName);
+      if (!silent) toast.success(`Скачан ${family}`);
+      return true;
+    } catch (error) {
+      toast.error(`Не удалось скачать ${family}`);
+      return false;
+    }
+  }, [getGoogleSlicesForDownload]);
+
+  const downloadGoogleAsFormat = useCallback(async (entry, format, { silent = false } = {}) => {
+    const family = entry?.family;
+    if (!family) return false;
+    const targetFormat = String(format || 'woff2').toLowerCase();
+    try {
+      const slices = await getGoogleSlicesForDownload(entry);
+      const firstSlice = slices[0] || null;
+      if (!firstSlice?.blob) throw new Error('Пустой файл');
+      const converted = await convertBlobToFormat(firstSlice.blob, targetFormat);
+      const baseName = buildSafeFileBase(family, 'google-font');
+      saveBlobAsFile(converted, `${baseName}.${targetFormat}`);
+      if (!silent) toast.success(`Скачан ${family} (${targetFormat.toUpperCase()})`);
+      return true;
+    } catch (error) {
+      if (!silent) toast.error(`Не удалось конвертировать ${family} в ${targetFormat.toUpperCase()}`);
+      return false;
+    }
+  }, [convertBlobToFormat, getGoogleSlicesForDownload]);
+
+  const downloadGoogleVariableVariant = useCallback(async (entry, { silent = false } = {}) => {
+    const family = entry?.family;
+    if (!family || entry?.isVariable !== true) return false;
+    try {
+      const blob = await fetchGoogleVariableTtfBlob(family);
+      const baseName = buildSafeFileBase(family, 'google-font');
+      saveBlobAsFile(blob, `${baseName}-variable.ttf`);
+      if (!silent) toast.success(`Скачан Variable ${family}`);
+      return true;
+    } catch (error) {
+      if (!silent) toast.error(`Не удалось скачать Variable ${family}`);
+      return false;
+    }
+  }, [fetchGoogleVariableTtfBlob]);
+
+  const downloadGooglePackageZip = useCallback(async (entry, { silent = false } = {}) => {
+    const family = entry?.family;
+    if (!family) return false;
+    try {
+      const baseName = buildSafeFileBase(family, 'google-font');
+      const slices = await getGoogleSlicesForDownload(entry);
+      if (slices.length === 0) throw new Error('Нет файлов для упаковки');
+      const files = slices.map((slice, index) => ({
+        name: `${baseName}/web/${baseName}-${slice.style || 'normal'}-${slice.weight || 400}-${index + 1}.woff2`,
+        data: slice.blob,
+      }));
+      if (entry?.isVariable === true) {
+        try {
+          const variableBlob = await fetchGoogleVariableTtfBlob(family);
+          files.push({ name: `${baseName}/source/${baseName}-variable.ttf`, data: variableBlob });
+        } catch {
+          // optional source file
+        }
+      }
+      const zipBlob = await createZipBlob(files);
+      saveBlobAsFile(zipBlob, `${baseName}-package.zip`);
+      if (!silent) toast.success(`Скачан пакет ${family}`);
+      return true;
+    } catch (error) {
+      if (!silent) toast.error(`Не удалось собрать пакет ${family}`);
+      return false;
+    }
+  }, [fetchGoogleVariableTtfBlob, getGoogleSlicesForDownload]);
+
+  const downloadSelectedGoogle = useCallback(async () => {
+    const selected = catalogItemsNotInSession.filter((entry) => selectedFamilies.has(entry.family));
+    if (selected.length === 0) return;
+    if (selected.length > 1) {
+      const files = [];
+      const usedNames = new Set();
+      for (const entry of selected) {
+        const family = entry?.family;
+        if (!family) continue;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const slices = await getGoogleSlicesForDownload(entry);
+          const baseName = buildSafeFileBase(family, 'google-font');
+          if (slices.length === 0) continue;
+          const packageFiles = slices.map((slice, index) => ({
+            name: `${baseName}/web/${baseName}-${slice.style || 'normal'}-${slice.weight || 400}-${index + 1}.woff2`,
+            data: slice.blob,
+          }));
+          if (entry?.isVariable === true) {
+            try {
+              // eslint-disable-next-line no-await-in-loop
+              const variableBlob = await fetchGoogleVariableTtfBlob(family);
+              packageFiles.push({ name: `${baseName}/source/${baseName}-variable.ttf`, data: variableBlob });
+            } catch {
+              // optional source file
+            }
+          }
+          // eslint-disable-next-line no-await-in-loop
+          const packageZipBlob = await createZipBlob(packageFiles);
+          let fileName = `${baseName}-package.zip`;
+          let suffix = 2;
+          while (usedNames.has(fileName)) {
+            fileName = `${baseName}-package-${suffix}.zip`;
+            suffix += 1;
+          }
+          usedNames.add(fileName);
+          files.push({ name: fileName, data: packageZipBlob });
+        } catch {
+          // skip failed item
+        }
+      }
+      if (files.length > 0) {
+        const archiveBlob = await createZipBlob(files);
+        const stamp = new Date().toISOString().slice(0, 10);
+        saveBlobAsFile(archiveBlob, `google-selected-${stamp}.zip`);
+        toast.success(
+          files.length === 1
+            ? 'Скачан 1 шрифт в архиве'
+            : `Скачано ${files.length} шрифтов в одном архиве`,
+        );
+      } else {
+        toast.error('Не удалось собрать архив выделенных шрифтов');
+      }
+      return;
+    }
+    let okCount = 0;
+    for (const entry of selected) {
+      // Последовательная загрузка снижает шанс упереться в лимиты.
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await downloadGooglePackageZip(entry, { silent: true });
+      if (ok) okCount += 1;
+    }
+    if (okCount > 0) {
+      toast.success(
+        okCount === 1 ? 'Скачан 1 шрифт из выделенных' : `Скачано ${okCount} шрифтов из выделенных`,
+      );
+    }
+  }, [catalogItemsNotInSession, downloadGooglePackageZip, selectedFamilies]);
+
+  const downloadSelectedGoogleAsFormat = useCallback(async (format) => {
+    const selected = catalogItemsNotInSession.filter((entry) => selectedFamilies.has(entry.family));
+    if (selected.length === 0) return;
+    const targetFormat = String(format || 'woff2').toLowerCase();
+    if (selected.length > 1) {
+      const files = [];
+      const usedNames = new Set();
+      for (const entry of selected) {
+        const family = entry?.family;
+        if (!family) continue;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const slices = await getGoogleSlicesForDownload(entry);
+          const firstSlice = slices[0] || null;
+          if (!firstSlice?.blob) continue;
+          const outBlob =
+            targetFormat === 'woff2'
+              ? firstSlice.blob
+              : // eslint-disable-next-line no-await-in-loop
+                await convertBlobToFormat(firstSlice.blob, targetFormat);
+          const baseName = buildSafeFileBase(family, 'google-font');
+          let fileName = `${baseName}.${targetFormat}`;
+          let suffix = 2;
+          while (usedNames.has(fileName)) {
+            fileName = `${baseName}-${suffix}.${targetFormat}`;
+            suffix += 1;
+          }
+          usedNames.add(fileName);
+          files.push({ name: fileName, data: outBlob });
+        } catch {
+          // skip failed item
+        }
+      }
+      if (files.length > 0) {
+        const archiveBlob = await createZipBlob(files);
+        const stamp = new Date().toISOString().slice(0, 10);
+        saveBlobAsFile(archiveBlob, `google-selected-${targetFormat}-${stamp}.zip`);
+        toast.success(
+          files.length === 1
+            ? `Скачан 1 шрифт (${targetFormat.toUpperCase()}) в архиве`
+            : `Скачано ${files.length} шрифтов (${targetFormat.toUpperCase()}) в одном архиве`,
+        );
+      } else {
+        toast.error(`Не удалось собрать архив ${targetFormat.toUpperCase()}`);
+      }
+      return;
+    }
+    let okCount = 0;
+    for (const entry of selected) {
+      // eslint-disable-next-line no-await-in-loop
+      const ok = await downloadGoogleAsFormat(entry, targetFormat, { silent: true });
+      if (ok) okCount += 1;
+    }
+    if (okCount > 0) {
+      toast.success(
+        okCount === 1
+          ? `Скачан 1 шрифт (${targetFormat.toUpperCase()})`
+          : `Скачано ${okCount} шрифтов (${targetFormat.toUpperCase()})`,
+      );
+    }
+  }, [catalogItemsNotInSession, convertBlobToFormat, createZipBlob, downloadGoogleAsFormat, getGoogleSlicesForDownload, selectedFamilies, fetchGoogleVariableTtfBlob]);
+
+  useEffect(() => {
+    if (typeof onSelectionActionsChange !== 'function') return;
+    if (!isActive) return;
+    onSelectionActionsChange({
+      selectedCount: selectedFamilies.size,
+      downloadSelected: downloadSelectedGoogle,
+      downloadSelectedAsFormat: downloadSelectedGoogleAsFormat,
+    });
+    return () => onSelectionActionsChange(null);
+  }, [downloadSelectedGoogle, downloadSelectedGoogleAsFormat, isActive, onSelectionActionsChange, selectedFamilies.size]);
+
   const googleLibraryEntry = useCallback(
     (entry) =>
       createCatalogLibraryEntry({
@@ -451,85 +868,45 @@ export default function GoogleFontsCatalogPanel({
     [],
   );
 
-  if (catalogError) {
-    return <p className="text-sm text-red-600 mt-2">Каталог Google: {catalogError}</p>;
-  }
-
-  if (items.length === 0 && !catalogError) {
-    return <p className="text-sm text-gray-500 mt-2">Загрузка каталога…</p>;
-  }
-
   const countSuffix =
     filteredSortedItems.length !== catalogItemsNotInSession.length
       ? ` из ${filteredSortedItems.length}`
       : ' шт.';
 
   const fieldInteractive = NATIVE_SELECT_FIELD_INTERACTIVE;
+  const halfCardWidthPx = toolbarAlignToGrid && oneCardWidthPx != null ? oneCardWidthPx / 2 : null;
 
   const selectClass = (placeholderMuted) => customSelectTriggerClass({ placeholderMuted });
-
-  const toolbarAlignToGrid = oneCardWidthPx != null && viewportW >= 640;
-  const twoCardWidthPx = toolbarAlignToGrid ? oneCardWidthPx * 2 + GRID_GAP_PX : null;
-  const searchWidthPx =
-    toolbarAlignToGrid && twoCardWidthPx != null
-      ? Math.max(
-          0,
-          twoCardWidthPx - (trailingToolbar ? trailingToolbarW + GRID_GAP_PX : 0),
-        )
-      : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden gap-4">
       <CatalogTopToolbar
-        trailingToolbar={
-          trailingToolbar ? (
-            <div ref={setTrailingToolbarContainer} className="flex shrink-0 items-center">
-              {trailingToolbar}
-            </div>
-          ) : null
-        }
-        searchSlot={
-          <Tooltip
-          as="div"
-          content={`${catalogItemsNotInSession.length}${countSuffix}`}
-          className={
-            'relative min-w-0 w-full ' +
-            (toolbarAlignToGrid ? 'sm:w-auto sm:flex-none' : 'sm:flex-1')
-          }
-          style={
-            toolbarAlignToGrid && searchWidthPx != null ? { width: searchWidthPx, maxWidth: '100%' } : undefined
-          }
-        >
-          <input
+        trailingToolbar={trailingToolbar}
+        trailingContainerRef={setTrailingToolbarContainer}
+        trailingContainerClassName="min-w-0 w-full sm:w-auto"
+        trailingContainerStyle={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
+        searchContainerClassName="relative min-w-0 w-full sm:flex-1"
+        searchActionContainerClassName="min-w-0 w-full sm:w-auto flex shrink-0 items-center"
+        searchActionContainerStyle={halfCardWidthPx != null ? { width: halfCardWidthPx, maxWidth: '100%' } : undefined}
+        searchActionControl={<CatalogSearchButton disabled={!isSearchFocused} />}
+        primaryFiltersContainerClassName="min-w-0 w-full sm:w-auto sm:min-w-[18rem]"
+        primaryFiltersContainerStyle={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
+        secondaryFiltersContainerClassName="min-w-0 w-full sm:w-auto sm:min-w-[14rem]"
+        secondaryFiltersContainerStyle={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
+        searchControl={
+          <CatalogSearchField
             id="gf-catalog-search"
-            type="search"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Имя, категория, группа, код набора…"
-            className={`box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-32 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${fieldInteractive} focus:border-black/[0.14] focus:outline-none sm:pl-3 sm:pr-36`}
-            autoComplete="off"
-            spellCheck={false}
+            onChange={setSearchQuery}
+            placeholder="Имя, категория, код набора…"
+            count={catalogItemsNotInSession.length}
+            countSuffix={countSuffix}
+            inputInteractiveClassName={fieldInteractive}
+            onFocusChange={setIsSearchFocused}
           />
-          <div className="absolute right-2 top-1/2 flex max-w-[55%] -translate-y-1/2 items-center gap-1.5">
-            {searchQuery ? <SearchClearButton onClick={() => setSearchQuery('')} /> : null}
-            <span className="pointer-events-none truncate text-right text-sm tabular-nums uppercase font-semibold text-gray-500">
-              {catalogItemsNotInSession.length}
-              <span className="text-gray-400">{countSuffix}</span>
-            </span>
-          </div>
-          </Tooltip>
         }
-        filtersSlot={
-          <>
-            <div
-          className="min-w-0 w-full sm:w-auto"
-          style={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
-        >
-          <div
-            className={
-              'grid grid-cols-1 gap-3 ' + (facetOptions.strokes.length > 0 ? 'sm:grid-cols-2' : '')
-            }
-          >
+        primaryFiltersControl={
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <CustomSelect
               id="gf-filter-category"
               value={filterCategory}
@@ -539,38 +916,6 @@ export default function GoogleFontsCatalogPanel({
               placeholder="Категория"
               emptyValue=""
               options={facetOptions.categories.map((c) => ({ value: c, label: c }))}
-            />
-            {facetOptions.strokes.length > 0 ? (
-              <CustomSelect
-                id="gf-filter-stroke"
-                value={filterStroke}
-                onChange={setFilterStroke}
-                className={selectClass(!filterStroke)}
-                aria-label="Группа"
-                placeholder="Группа"
-                emptyValue=""
-                options={facetOptions.strokes.map((s) => ({ value: s, label: s }))}
-              />
-            ) : null}
-          </div>
-        </div>
-            <div
-          className="min-w-0 w-full sm:w-auto"
-          style={toolbarAlignToGrid ? { width: oneCardWidthPx, maxWidth: '100%' } : undefined}
-        >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <CustomSelect
-              id="gf-filter-subset"
-              value={filterSubset}
-              onChange={setFilterSubset}
-              className={selectClass(!filterSubset)}
-              aria-label="Язык / набор (subset)"
-              placeholder="Язык"
-              emptyValue=""
-              options={facetOptions.subsets.map((s) => ({
-                value: s,
-                label: subsetOptionLabel(s),
-              }))}
             />
             <CustomSelect
               id="gf-filter-var"
@@ -586,54 +931,69 @@ export default function GoogleFontsCatalogPanel({
               ]}
             />
           </div>
-        </div>
-          </>
         }
-        italicSlot={
-          <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-gray-50 uppercase font-semibold px-2 text-sm text-gray-900 sm:px-3">
-          <input
-            type="checkbox"
-            checked={filterItalicOnly}
-            onChange={(e) => setFilterItalicOnly(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-400 bg-gray-50 text-accent"
+        secondaryFiltersControl={
+          <CustomSelect
+            id="gf-filter-subset"
+            value={filterSubset}
+            onChange={setFilterSubset}
+            className={selectClass(!filterSubset)}
+            aria-label="Язык / набор (subset)"
+            placeholder="Язык"
+            emptyValue=""
+            options={facetOptions.subsets.map((s) => ({
+              value: s,
+              label: subsetOptionLabel(s),
+            }))}
           />
-          <span className="whitespace-nowrap">Курсив</span>
+        }
+        italicControl={
+          <label className="flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-md border border-transparent bg-gray-50 px-2 text-sm uppercase font-semibold text-gray-900 sm:px-3">
+            <input
+              type="checkbox"
+              checked={filterItalicOnly}
+              onChange={(event) => setFilterItalicOnly(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-400 bg-gray-50 text-accent"
+            />
+            <span className="whitespace-nowrap">Курсив</span>
           </label>
         }
-        actionsSlot={
-          <div className="flex w-full shrink-0 flex-wrap items-center gap-3 sm:ml-auto sm:w-auto">
-          <div className="min-w-0 sm:max-w-[14rem]">
-            <CustomSelect
-              id="google-fonts-sort"
-              value={sortMode}
-              onChange={setSortMode}
-              className={selectClass(sortMode === 'catalog')}
-              aria-label="Сортировка"
-              options={[
-                { value: 'catalog', label: 'Популярное' },
-                { value: 'name-asc', label: 'Имя: А → Я' },
-                { value: 'name-desc', label: 'Имя: Я → А' },
-                { value: 'category', label: 'Категория → имя' },
-                { value: 'stroke', label: 'Группа начертания → имя' },
-                { value: 'styles-desc', label: 'Больше начертаний сначала' },
-                { value: 'styles-asc', label: 'Меньше начертаний сначала' },
-                { value: 'subsets-desc', label: 'Больше наборов символов' },
-              ]}
-            />
+        actionsControl={
+          <CatalogTextSortControls
+            sortValue={sortMode}
+            onSortChange={setSortMode}
+            sortOptions={[
+              { value: 'catalog', label: 'Популярное' },
+              { value: 'name-asc', label: 'А -> Я' },
+              { value: 'name-desc', label: 'Я -> А' },
+              { value: 'category', label: 'Категория -> имя' },
+              { value: 'styles-desc', label: 'Больше начертаний' },
+              { value: 'styles-asc', label: 'Меньше начертаний' },
+              { value: 'subsets-desc', label: 'Больше символов' },
+            ]}
+            showResetButton={false}
+          />
+        }
+        afterActionsControl={
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              disabled={!hasActiveFilters}
+              onClick={clearFilters}
+              className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm uppercase font-semibold text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
+            >
+              Сбросить все
+            </button>
+            <CatalogGridModeToggle value={gridViewMode} onChange={setGridViewMode} />
           </div>
-          <button
-            type="button"
-            disabled={!hasActiveFilters}
-            onClick={clearFilters}
-            className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm uppercase font-semibold text-gray-900 disabled:cursor-default disabled:opacity-40"
-          >
-            Сбросить все
-          </button>
-        </div>
         }
       />
 
-      {filteredSortedItems.length === 0 ? (
+      {catalogError && items.length === 0 ? (
+        <p className="shrink-0 py-6 text-center text-sm text-red-600">Каталог Google: {catalogError}</p>
+      ) : items.length === 0 ? (
+        <GoogleCatalogEmptyLoader />
+      ) : filteredSortedItems.length === 0 ? (
         <p className="shrink-0 py-6 text-center text-sm uppercase text-gray-500">
           Ничего не найдено — попробуйте другой запрос
         </p>
@@ -650,9 +1010,9 @@ export default function GoogleFontsCatalogPanel({
             <VirtualizedGlyphGrid
               scrollParentEl={catalogScrollEl}
               totalCount={catalogItemsNotInSession.length}
-              estimatedRowHeightPx={172}
-              columnCount={gridCols}
-              rowGapPx={GRID_GAP_PX}
+              estimatedRowHeightPx={gridViewMode === 'row' ? 176 : 172}
+              columnCount={gridViewMode === 'row' ? 1 : gridCols}
+              rowGapPx={gridViewMode === 'row' ? 0 : GRID_GAP_PX}
               overscanRows={2}
               onInnerWidth={setGridInnerWidth}
               onVisibleIndexRangeChange={({ startIndex, endIndex }) => {
@@ -667,22 +1027,131 @@ export default function GoogleFontsCatalogPanel({
                 const family = entry.family;
                 const busy = addingFamily === family;
                 const libraryEntry = googleLibraryEntry(entry);
+                const isRowMode = gridViewMode === 'row';
+                const styleCount = Number(entry?.styleCount) || 0;
+                const subsetCount = Array.isArray(entry?.subsets) ? entry.subsets.length : 0;
+                const languageCount = subsetCount;
+
+                const selectionOverlay = (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-500 text-white shadow-sm">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        className="h-5 w-5"
+                        aria-hidden
+                      >
+                        <path
+                          d="M4.5 10.5L8.25 14.25L15.5 7"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                  </div>
+                );
+
+                const hoverOverlay = (
+                  <CatalogCardHoverOverlay
+                    centered={isRowMode}
+                    onOpen={() => void openGoogleInEditor(entry)}
+                    openAriaLabel={`Открыть ${family} в редакторе`}
+                    downloadButtonProps={{
+                      primaryLabel: 'Скачать',
+                      primaryAriaLabel: `Скачать пакет ${family}`,
+                      onPrimaryClick: () => void downloadGooglePackageZip(entry),
+                      menuItems: [
+                        {
+                          key: 'zip',
+                          label: 'ZIP (по умолчанию)',
+                          onSelect: () => void downloadGooglePackageZip(entry),
+                        },
+                        {
+                          key: 'ttf',
+                          label: 'TTF',
+                          onSelect: () => void downloadGoogleAsFormat(entry, 'ttf'),
+                        },
+                        {
+                          key: 'otf',
+                          label: 'OTF',
+                          onSelect: () => void downloadGoogleAsFormat(entry, 'otf'),
+                        },
+                        {
+                          key: 'woff',
+                          label: 'WOFF',
+                          onSelect: () => void downloadGoogleAsFormat(entry, 'woff'),
+                        },
+                        {
+                          key: 'current-woff2',
+                          label: 'WOFF2',
+                          onSelect: () => void downloadGoogleAsFormat(entry, 'woff2'),
+                        },
+                        {
+                          key: 'variable',
+                          label: 'Variable вариант',
+                          hidden: entry.isVariable !== true,
+                          onSelect: () => void downloadGoogleVariableVariant(entry),
+                        },
+                      ],
+                    }}
+                  />
+                );
+
+                const actions = (
+                  <CatalogLibraryActions
+                    libraries={fontLibraries}
+                    busy={busy}
+                    busyIndicator={<CatalogSessionAddSpinner />}
+                    onAddToSession={() => addGoogleToSession(entry)}
+                    onAddFontToLibrary={onAddFontToLibrary}
+                    onRequestCreateLibrary={onRequestCreateLibrary}
+                    libraryEntry={libraryEntry}
+                  />
+                );
 
                 return (
-                  <CatalogFontCard
+                  isRowMode ? (
+                    <CatalogRowModeCard
+                      family={family}
+                      metaItems={[
+                        entry.category || 'Google',
+                        entry.isVariable ? 'vf' : null,
+                        entry.hasItalic ? 'italic' : null,
+                        `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}`,
+                        subsetCount > 0
+                          ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}`
+                          : null,
+                        `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`,
+                      ]}
+                      previewFamily={`'${family}', sans-serif`}
+                      previewText={family}
+                      selected={selectedFamilies.has(family)}
+                      busy={busy}
+                      actions={actions}
+                      selectionOverlay={selectionOverlay}
+                      hoverOverlay={hoverOverlay}
+                      onClick={(event) => onCardClick(event, family)}
+                      onPointerDown={(event) => startCardLongPress(event, family)}
+                      onPointerUp={clearLongPressTimer}
+                      onPointerLeave={clearLongPressTimer}
+                      onPointerCancel={clearLongPressTimer}
+                    />
+                  ) : (
+                    <CatalogFontCard
+                    selected={selectedFamilies.has(family)}
+                    onClick={(event) => onCardClick(event, family)}
+                    onPointerDown={(event) => startCardLongPress(event, family)}
+                    onPointerUp={clearLongPressTimer}
+                    onPointerLeave={clearLongPressTimer}
+                    onPointerCancel={clearLongPressTimer}
                     busy={busy}
                     minHeightClass="min-h-[148px] min-w-0"
-                    actions={
-                      <CatalogLibraryActions
-                        libraries={fontLibraries}
-                        busy={busy}
-                        busyIndicator={<CatalogSessionAddSpinner />}
-                        onAddToSession={() => addGoogleToSession(entry)}
-                        onAddFontToLibrary={onAddFontToLibrary}
-                        onRequestCreateLibrary={onRequestCreateLibrary}
-                        libraryEntry={libraryEntry}
-                      />
-                    }
+                    selectionOverlay={selectionOverlay}
+                    hoverOverlay={hoverOverlay}
+                    actions={actions}
                     title={family}
                     preview={
                       <div
@@ -718,16 +1187,19 @@ export default function GoogleFontsCatalogPanel({
                               : '—'}
                           </span>
                     
-                          <span className="whitespace-nowrap">
-                            {(() => {
-                              const n = (entry.subsets && entry.subsets.length) || 0;
-                              return `${n} ${pluralRu(n, 'набор', 'набора', 'наборов')}`;
-                            })()}
-                          </span>
+                          {((entry.subsets && entry.subsets.length) || 0) > 0 ? (
+                            <span className="whitespace-nowrap">
+                              {(() => {
+                                const n = (entry.subsets && entry.subsets.length) || 0;
+                                return `${n} ${pluralRu(n, 'набор', 'набора', 'наборов')}`;
+                              })()}
+                            </span>
+                          ) : null}
                         </Tooltip>
                       </div>
                     }
                   />
+                  )
                 );
               }}
             />

@@ -30,7 +30,7 @@ function DefaultTrailing() {
 /**
  * Нижняя «хром»-полоса редактора: слева краткая метрика, по центру контекст, справа действия.
  */
-export function EditorStatusBar({ leading = null, center = null, trailing, className = '' }) {
+export function EditorStatusBar({ leading = null, center = null, trailing, beforeTrailing = null, className = '' }) {
   return (
     <div className={`${EDITOR_PREVIEW_BOTTOM_BAR_CLASS} ${className}`.trim()}>
       <div className="relative z-20 flex min-w-0 max-w-[42%] shrink-0 items-center bg-white py-0.5 pl-2 pr-2 sm:max-w-[38%]">
@@ -50,6 +50,7 @@ export function EditorStatusBar({ leading = null, center = null, trailing, class
         ) : null}
       </div>
       <div className="relative z-20 ml-auto flex h-full shrink-0 items-stretch justify-end bg-white">
+        {beforeTrailing}
         {trailing === undefined ? <DefaultTrailing /> : trailing}
       </div>
     </div>

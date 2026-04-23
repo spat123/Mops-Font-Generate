@@ -130,10 +130,11 @@ export const ICON_RAIL_TRACK_CLASS =
  */
 export function iconRailSegmentClass(active, opts = {}) {
   const hasIcon = opts.hasIcon !== false;
+  const disabled = opts.disabled === true;
   return [
     'flex h-8 min-w-0 flex-1 items-center justify-center p-0 transition-colors',
     hasIcon ? 'text-xs' : '',
-    active ? 'text-accent rounded-md' : 'text-gray-800 hover:bg-black/[0.06]',
+    active ? 'text-accent rounded-md' : `text-gray-800 ${disabled ? '' : 'hover:bg-black/[0.06]'}`,
   ]
     .filter(Boolean)
     .join(' ');
@@ -153,7 +154,7 @@ export function SegmentedControl({
   disabled = false,
 }) {
   const shouldShowTooltip = (opt) =>
-    opt?.tooltip !== false && (Boolean(opt?.title) || Boolean(opt?.Icon));
+    !disabled && opt?.tooltip !== false && (Boolean(opt?.title) || Boolean(opt?.Icon));
 
   if (variant === 'iconRail') {
     return (
@@ -174,7 +175,7 @@ export function SegmentedControl({
               aria-label={opt['aria-label'] ?? tip}
               aria-pressed={active}
               aria-disabled={disabled || undefined}
-              className={`${iconRailSegmentClass(active, { hasIcon })} ${opt.className ?? ''} disabled:opacity-40`.trim()}
+              className={`${iconRailSegmentClass(active, { hasIcon, disabled })} ${opt.className ?? ''} disabled:opacity-40`.trim()}
               disabled={disabled}
               onClick={() => onChange(opt.value)}
             >
@@ -218,7 +219,7 @@ export function SegmentedControl({
               className={`relative flex min-h-8 w-full min-w-0 items-center justify-center px-1 py-2 text-center text-xs font-medium transition-colors ${
                 active
                   ? 'z-[1] bg-accent text-white'
-                  : 'bg-white text-gray-600 hover:text-accent'
+                  : `bg-white text-gray-600 ${disabled ? '' : 'hover:text-accent'}`
               } disabled:opacity-40`}
               disabled={disabled}
               onClick={() => onChange(opt.value)}
@@ -240,7 +241,7 @@ export function SegmentedControl({
 
   if (variant === 'pairOutline') {
     return (
-      <div className={`flex min-w-0 flex-wrap items-center gap-2 ${className}`.trim()} role="group">
+      <div className={`flex min-w-0 flex-wrap items-center gap-4 ${className}`.trim()} role="group">
         {options.map((opt) => {
           const Icon = opt.Icon;
           const active = value === opt.value;
@@ -252,10 +253,10 @@ export function SegmentedControl({
               aria-label={tip}
               aria-pressed={active}
               aria-disabled={disabled || undefined}
-              className={`flex min-h-10 w-32 shrink-0 items-center justify-center rounded-md border px-3 py-1.5 text-center text-sm uppercase font-semibold transition-colors ${
+              className={`flex min-h-10 w-32 shrink-0 items-center justify-center rounded-full border px-3 py-1.5 text-center text-sm uppercase font-semibold transition-colors ${
                 active
                   ? 'border-accent bg-accent text-white'
-                  : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+                  : `border-gray-200 bg-white text-gray-900 ${disabled ? '' : 'hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'}`
               } disabled:opacity-40`}
               disabled={disabled}
               onClick={() => onChange(opt.value)}
@@ -281,7 +282,7 @@ export function SegmentedControl({
     const activeIndex = activeIndexRaw >= 0 ? activeIndexRaw : 0;
     return (
       <div
-        className={`group flex min-w-0 overflow-hidden rounded-full bg-gray-50 transition-colors hover:bg-gray-100 ${className}`.trim()}
+        className={`group flex min-w-0 overflow-hidden rounded-full bg-gray-50 transition-colors ${disabled ? '' : 'hover:bg-gray-100'} ${className}`.trim()}
         role={label ? 'group' : undefined}
         aria-label={label}
       >
@@ -305,7 +306,7 @@ export function SegmentedControl({
                 aria-pressed={active}
               aria-disabled={disabled || undefined}
                 className={`relative z-10 flex min-h-8 min-w-0 flex-1 items-center justify-center rounded-full px-1 py-2 text-center text-xs uppercase font-semibold transition-colors ${
-                  active ? 'text-white' : 'text-gray-800 hover:text-gray-900'
+                  active ? 'text-white' : `text-gray-800 ${disabled ? '' : 'hover:text-gray-900'}`
               } disabled:opacity-40`}
               disabled={disabled}
               onClick={() => onChange(opt.value)}
@@ -341,7 +342,7 @@ export function SegmentedControl({
             } ${i === n - 1 ? 'rounded-r-md' : ''} ${
               value === opt.value
                 ? 'bg-accent text-white'
-                : 'bg-white text-accent bg-opacity-60 hover:bg-opacity-80'
+                : `bg-white text-accent bg-opacity-60 ${disabled ? '' : 'hover:bg-opacity-80'}`
             } disabled:opacity-40`}
             onClick={() => onChange(opt.value)}
           >
@@ -364,7 +365,7 @@ export function SegmentedControl({
             className={`px-3 text-xs transition-colors ${
               value === opt.value
                 ? 'bg-accent text-white'
-                : 'text-accent hover:bg-accent-soft'
+                : `text-accent ${disabled ? '' : 'hover:bg-accent-soft'}`
             } disabled:opacity-40`}
             onClick={() => onChange(opt.value)}
           >

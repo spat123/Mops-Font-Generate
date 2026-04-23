@@ -14,7 +14,7 @@ export function customSelectTriggerClass({ compact = false, placeholderMuted = f
     `box-border w-full rounded-md border border-transparent !bg-gray-50 py-0 pl-2 pr-8 text-left uppercase font-semibold text-gray-900 ${sizing}`,
     NATIVE_SELECT_FIELD_INTERACTIVE,
     'focus:border-black/[0.14] focus:outline-none sm:pl-3',
-    placeholderMuted ? '!text-gray-900/45' : '',
+    placeholderMuted ? '!text-gray-900/45 hover:!text-gray-900' : '',
   ]
     .filter(Boolean)
     .join(' ');

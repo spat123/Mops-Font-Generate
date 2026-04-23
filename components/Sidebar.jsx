@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import VariableFontControls from './VariableFontControls';
 import FontLibrarySidebar from './FontLibrarySidebar';
-import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../utils/colorUtils'; // Исправляем импорт утилит цвета
+import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../utils/colorUtils'; // Импорт утилит цвета
 import { useSettings } from '../contexts/SettingsContext';
 import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
 import { useFontContext } from '../contexts/FontContext';
@@ -35,18 +35,18 @@ const GLYPH_QUICK_PRESETS = [
   { key: 'macos', label: 'Mac OS' },
   { key: 'windows1252', label: 'Windows' },
   { key: 'latin_extended', label: 'Latin Ext. A' },
-  { key: 'latin_supplement', label: 'Latin‑1 доп.' },
+  { key: 'latin_supplement', label: 'Latin-1 доп.' },
 ];
 
 const WATERFALL_SCALE_PRESETS = [
-  { key: 'minor-second', ratio: 1.067, label: '1.067 — Minor Second' },
-  { key: 'major-second', ratio: 1.125, label: '1.125 — Major Second' },
-  { key: 'minor-third', ratio: 1.2, label: '1.200 — Minor Third' },
-  { key: 'major-third', ratio: 1.25, label: '1.250 — Major Third' },
-  { key: 'perfect-fourth', ratio: 1.333, label: '1.333 — Perfect Fourth' },
-  { key: 'augmented-fourth', ratio: 1.414, label: '1.414 — Augmented Fourth' },
-  { key: 'perfect-fifth', ratio: 1.5, label: '1.500 — Perfect Fifth' },
-  { key: 'golden-ratio', ratio: 1.618, label: '1.618 — Golden Ratio' },
+  { key: 'minor-second', ratio: 1.067, label: '1.067 - Minor Second' },
+  { key: 'major-second', ratio: 1.125, label: '1.125 - Major Second' },
+  { key: 'minor-third', ratio: 1.2, label: '1.200 - Minor Third' },
+  { key: 'major-third', ratio: 1.25, label: '1.250 - Major Third' },
+  { key: 'perfect-fourth', ratio: 1.333, label: '1.333 - Perfect Fourth' },
+  { key: 'augmented-fourth', ratio: 1.414, label: '1.414 - Augmented Fourth' },
+  { key: 'perfect-fifth', ratio: 1.5, label: '1.500 - Perfect Fifth' },
+  { key: 'golden-ratio', ratio: 1.618, label: '1.618 - Golden Ratio' },
 ];
 
 /** Вертикальное положение текста в превью: строки у верха / середины / низа области */
@@ -303,7 +303,7 @@ function IconTextFillExpand(props) {
   );
 }
 
-/** Опции для {@link SegmentedControl} variant="iconRail" — выравнивание и регистр */
+/** Опции для {@link SegmentedControl} variant="iconRail": выравнивание и регистр */
 const SIDEBAR_TEXT_ALIGN_OPTIONS = [
   { value: 'left', title: 'По левому краю', Icon: IconTextAlignLeft },
   { value: 'center', title: 'По центру строки', Icon: IconTextAlignCenter },
@@ -334,25 +334,25 @@ const SIDEBAR_TEXT_DECORATION_OPTIONS = [
   { value: 'line-through', label: 'S', labelClassName: 'text-[14px] font-normal line-through leading-none' },
 ];
 const SIDEBAR_VERTICAL_ALIGN_OPTIONS = [
-  { value: 'top', title: 'По верхнего краю', 'aria-label': 'Вертикально: по верху', Icon: IconVerticalTextTop },
+  { value: 'top', title: 'По верхнему краю', 'aria-label': 'Вертикально: по верху', Icon: IconVerticalTextTop },
   { value: 'middle', title: 'По центру вертикали', 'aria-label': 'Вертикально: по центру', Icon: IconVerticalTextMiddle },
-  { value: 'bottom', title: 'По нижнего краю', 'aria-label': 'Вертикально: по низу', Icon: IconVerticalTextBottom },
+  { value: 'bottom', title: 'По нижнему краю', 'aria-label': 'Вертикально: по низу', Icon: IconVerticalTextBottom },
 ];
 
 const SIDEBAR_PRESET_BTN_BASE =
   'rounded-md border px-3 py-1.5 text-center text-xs uppercase font-semibold transition-colors duration-150 disabled:opacity-40';
 const SIDEBAR_PRESET_BTN_IDLE =
-  `${SIDEBAR_PRESET_BTN_BASE} h-8 border-gray-200 bg-white text-gray-800 hover:bg-black/[0.9] hover:text-white`;
-/** Как активные чипы / сегменты: акцентный фон */
+  `${SIDEBAR_PRESET_BTN_BASE} h-8 border-gray-200 bg-white text-gray-800 hover:bg-black/[0.9] hover:text-white disabled:hover:bg-white disabled:hover:text-gray-800`;
+/** Активные чипы/сегменты: акцентный фон */
 const SIDEBAR_PRESET_BTN_ACTIVE =
-  `${SIDEBAR_PRESET_BTN_BASE} border-accent bg-accent text-white hover:bg-accent-hover`;
+  `${SIDEBAR_PRESET_BTN_BASE} border-accent bg-accent text-white hover:bg-accent-hover disabled:hover:bg-accent disabled:hover:text-white`;
 
-/** Строка: переключатель HEX/RGB + поле(я) — единая сетка */
+/** Строка: переключатель HEX/RGB + поле(я) в единой сетке */
 const COLOR_VALUE_ROW = 'flex min-w-0 w-full max-w-full items-center gap-2';
 const COLOR_FIELD_INPUT =
   'min-w-0 flex-1 h-8 rounded-md border border-gray-50 bg-gray-50 px-2 py-1.5 text-xs tabular-nums text-gray-800 placeholder:text-gray-400 focus:border-black/[0.14] focus:outline-none disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 disabled:placeholder:text-gray-400';
 
-/** Три поля R G B (0–255) */
+/** Три поля R G B (0-255) */
 function RgbTripletInputs({ hex, onChannelChange, disabled = false }) {
   const { r, g, b } = hexToRgbComponents(hex);
   return (
@@ -363,7 +363,7 @@ function RgbTripletInputs({ hex, onChannelChange, disabled = false }) {
         max={255}
         step={1}
         inputMode="numeric"
-        aria-label="R, 0–255"
+        aria-label="R, 0-255"
         value={r}
         onChange={(e) => onChannelChange('r', e.target.value)}
         disabled={disabled}
@@ -375,7 +375,7 @@ function RgbTripletInputs({ hex, onChannelChange, disabled = false }) {
         max={255}
         step={1}
         inputMode="numeric"
-        aria-label="G, 0–255"
+        aria-label="G, 0-255"
         value={g}
         onChange={(e) => onChannelChange('g', e.target.value)}
         disabled={disabled}
@@ -387,7 +387,7 @@ function RgbTripletInputs({ hex, onChannelChange, disabled = false }) {
         max={255}
         step={1}
         inputMode="numeric"
-        aria-label="B, 0–255"
+        aria-label="B, 0-255"
         value={b}
         onChange={(e) => onChannelChange('b', e.target.value)}
         disabled={disabled}
@@ -397,7 +397,7 @@ function RgbTripletInputs({ hex, onChannelChange, disabled = false }) {
   );
 }
 
-/** Иконки для слайдеров (подписи — в title у контейнера) */
+/** Иконки для слайдеров (подписи — в `title` у контейнера) */
 function SliderIconFontSize(props) {
   return (
     <svg
@@ -467,28 +467,34 @@ function SliderIconLineHeight(props) {
   );
 }
 
-// Определяем константу glyphSets с правильными наборами символов
+const charsFromCodePointRange = (start, end) =>
+  Array.from({ length: end - start + 1 }, (_, i) => String.fromCodePoint(start + i)).join('');
+
+const WINDOWS_1252_PUNCTUATION =
+  '\u20AC\u201A\u0192\u201E\u2026\u2020\u2021\u02C6\u2030\u0160\u2039\u0152\u017D\u2018\u2019\u201C\u201D\u2022\u2013\u2014\u02DC\u2122\u0161\u203A\u0153\u017E\u0178';
+
+// Наборы символов для быстрых текстовых пресетов
 const glyphSets = {
-  // Базовые ASCII символы и знаки пунктуации (совпадает с дефолтом превью)
+  // Базовые ASCII-символы и пунктуация (совпадает с дефолтом превью)
   entire: ENTIRE_PRINTABLE_ASCII_SAMPLE,
   
-  // MacOS Roman (основные символы)
+  // MacOS Roman (базовые символы)
   macos: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-={}[]|\\:;"\'<>,.?/',
   
   // Basic Latin (базовые латинские символы)
   basic: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
   
-  // Latin Extended-A (основные акцентированные символы)
-  latin_extended: 'ĀāĂăĄąĆćĈĉĊċČčĎďĐđĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĦħĨĩĪīĬĭĮįİıĲĳĴĵĶķĸĹĺĻļĽľĿ',
+  // Latin Extended-A
+  latin_extended: charsFromCodePointRange(0x0100, 0x017f),
   
   // Краткий обзор
   overview: 'ABCabc123',
   
-  // Windows 1252 (основные европейские символы)
-  windows1252: 'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜø£Ø×ƒáíóúñÑªº¿®¬½¼¡«»¦¯´±‗¾¶§÷¸°¨·¹³²■',
+  // Windows-1252 (дополнительная пунктуация + Latin-1)
+  windows1252: `${WINDOWS_1252_PUNCTUATION}${charsFromCodePointRange(0x00a0, 0x00ff)}`,
   
-  // Latin-1 Supplement (основные символы)
-  latin_supplement: '¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ'
+  // Latin-1 Supplement
+  latin_supplement: charsFromCodePointRange(0x00a1, 0x00ff),
 };
 
 export default function Sidebar({
@@ -585,7 +591,7 @@ export default function Sidebar({
     setWaterfallScaleSelectKey((prev) => (prev === 'custom' ? prev : waterfallScaleKey));
   }, [waterfallScaleKey]);
 
-  /** Выбранный быстрый пресет: `sample:*` или `glyph:*` (`glyph:entire` — полный набор по умолчанию, без отдельной кнопки). */
+  /** Выбранный быстрый пресет: `sample:*` или `glyph:*` (`glyph:entire` по умолчанию). */
   const [sidebarTextPreset, setSidebarTextPreset] = useState('glyph:entire');
   const [activeColorTab, setActiveColorTab] = useState('foreground'); // foreground или background
   // Рефы для цветовых полей
@@ -595,7 +601,7 @@ export default function Sidebar({
   const fgColorSliderRef = useRef(null);
   const bgColorSliderRef = useRef(null);
   
-  // Координаты для кружочков в цветовых полях
+  // Координаты кружков в цветовых полях
   const [fgColorPos, setFgColorPos] = useState(() => {
     if (textColor && textColor.startsWith('#')) {
       const [, s, v] = hexToHsv(textColor);
@@ -654,7 +660,7 @@ export default function Sidebar({
     [sampleTexts, setText],
   );
 
-  /** При смене шрифта — по умолчанию полный набор символов (без кнопки «Все символы» и без Google language sample). */
+  /** При смене шрифта ставим полный набор символов по умолчанию. */
   useEffect(() => {
     if (!selectedFont?.id) return;
     setSidebarTextPreset('glyph:entire');
@@ -670,7 +676,7 @@ export default function Sidebar({
   };
   */
   
-  // Получение цвета HSL для градиента поля выбора оттенка
+  // Получение HSL-цвета для градиента выбора оттенка
   const getHueColor = (hue) => {
     return `hsl(${hue}, 100%, 50%)`;
   };
@@ -694,12 +700,12 @@ export default function Sidebar({
     }
   }, [textColor, backgroundColor]);
 
-  // Обновляем положение маркеров при изменении активной вкладки или цветов
+  // Обновляем положение маркеров при смене вкладки и цветов
   useEffect(() => {
-    // Если активна вкладка фона, обновляем позицию маркера фона
+    // Если активна вкладка фона, обновляем позицию маркера фона.
     if (activeColorTab === 'background' && backgroundColor && backgroundColor.startsWith('#')) {
       const [h, s, v] = hexToHsv(backgroundColor);
-      // Убедимся, что устанавливаем корректное значение с символом % для CSS
+      // Убеждаемся, что выставляем корректные проценты для CSS
       const leftPos = `${s}%`;
       const topPos = `${100 - v}%`;
       setBgColorPos({ left: leftPos, top: topPos });
@@ -716,13 +722,13 @@ export default function Sidebar({
     }
   }, [activeColorTab, backgroundColor, textColor]);
 
-  // Создание цвета из HSV компонентов
+  // Создание цвета из HSV-компонентов
   const createColorFromHSV = (h, s, v) => {
     const rgb = hsvToRgb(h, s, v);
     return rgbToHex(rgb[0], rgb[1], rgb[2]);
   };
 
-  // Обработчик для поля выбора цвета
+  // Обработчик поля выбора цвета
   const handleColorFieldClick = (e, isBackground) => {
     const field = isBackground ? bgColorFieldRef.current : fgColorFieldRef.current;
     if (!field) return;
@@ -747,7 +753,7 @@ export default function Sidebar({
       const saturation = xPercent / 100;
       const value = 1 - (yPercent / 100);
       
-      // Создаем цвет
+      // Создаём цвет
       const newColor = createColorFromHSV(hue, saturation, value);
       setBackgroundColor(newColor);
     } else {
@@ -759,13 +765,13 @@ export default function Sidebar({
       const saturation = xPercent / 100;
       const value = 1 - (yPercent / 100);
       
-      // Создаем цвет
+      // Создаём цвет
       const newColor = createColorFromHSV(hue, saturation, value);
       setTextColor(newColor);
     }
   };
   
-  // Обработчик для слайдера выбора оттенка
+  // Обработчик слайдера выбора оттенка
   const handleColorSliderClick = (e, isBackground) => {
     const slider = isBackground ? bgColorSliderRef.current : fgColorSliderRef.current;
     if (!slider) return;
@@ -791,7 +797,7 @@ export default function Sidebar({
       // Новый оттенок (H) из позиции слайдера
       const hue = percentage * 3.6; // 0-360
       
-      // Создаем цвет, сохраняя S и V
+      // Создаём цвет, сохраняя S и V
       const newColor = createColorFromHSV(hue, saturation, value);
       setBackgroundColor(newColor);
     } else {
@@ -804,7 +810,7 @@ export default function Sidebar({
       // Новый оттенок (H) из позиции слайдера
       const hue = percentage * 3.6; // 0-360
       
-      // Создаем цвет, сохраняя S и V
+      // Создаём цвет, сохраняя S и V
       const newColor = createColorFromHSV(hue, saturation, value);
       setTextColor(newColor);
     }
@@ -858,7 +864,7 @@ export default function Sidebar({
     [backgroundColor, textColor, setBackgroundColor, setTextColor]
   );
 
-  // Функция для проверки, является ли шрифт вариативным
+  // Проверка: является ли шрифт вариативным
   const isVariableEnabled = () => {
     if (!selectedFont) return false;
     if (!selectedFont.isVariableFont) return false;
@@ -893,7 +899,7 @@ export default function Sidebar({
     }
   };
 
-  // Обработчики для управления текстом (используют сеттеры из useSettings)
+  // Обработчики управления текстом (используют сеттеры из useSettings)
   const changeTextAlignmentHandler = useCallback((alignment) => {
     setTextAlignment(alignment);
   }, [setTextAlignment]);
@@ -1054,7 +1060,7 @@ export default function Sidebar({
 
   const sidebarOverlayThumb = useMemo(() => {
     const { scrollTop, scrollHeight, clientHeight } = sidebarScrollLayout;
-    /** Совпадает с `top-2` / `bottom-2` у дорожки полосы (0.5rem ≈ 8px). */
+    /** Совпадает с `top-2` / `bottom-2` у дорожки полосы (0.5rem ~= 8px). */
     const trackInsetPx = 8;
     if (clientHeight < 1 || scrollHeight <= clientHeight + 1) return null;
     const trackH = clientHeight - 2 * trackInsetPx;
@@ -1114,7 +1120,7 @@ export default function Sidebar({
         />
       </div>
       
-      {/* Базовые настройки шрифта */}
+          {/* Базовые настройки шрифта */}
       <div className="p-4">
         <div>
           
@@ -1269,7 +1275,7 @@ export default function Sidebar({
             </div>
           </div>
           
-          {/* Текст: выравнивание + по ширине; справа регистры Аа / АА — сегменты iconRail */}
+          {/* Текст: выравнивание + заполнение; справа регистры Аа/АА */}
           <div className="mb-4 flex flex-col gap-2">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
               <SegmentedControl
@@ -1389,7 +1395,7 @@ export default function Sidebar({
                   }}
                   options={[
                     ...WATERFALL_SCALE_PRESETS.map((p) => ({ value: p.key, label: p.label })),
-                    { value: 'custom', label: 'Enter value…' },
+                    { value: 'custom', label: 'Enter value...' },
                   ]}
                   className={sidebarSelectClass}
                   aria-label="Waterfall: шкала"
@@ -1445,7 +1451,7 @@ export default function Sidebar({
           </div>
         </div>
         
-        {/* Variable Axes — только у вариативного шрифта с осями */}
+        {/* Variable Axes — только для вариативных шрифтов с осями */}
         {selectedFont && isVariableEnabled() && (
           <div
             className={`-mx-4 border-t border-gray-200 px-4 pt-4 mb-4 ${
@@ -1760,7 +1766,7 @@ export default function Sidebar({
           )}
         </div>
         
-        {/* Быстрые образцы текста и наборы символов — одна сетка */}
+        {/* Быстрые образцы текста и наборы символов */}
         <div className="-mx-4 border-t border-gray-200 px-4 pt-4 pb-4">
           <div className="mb-4 grid grid-cols-2 gap-2">
             {SAMPLE_QUICK_PRESETS.map(({ key, label }) => {

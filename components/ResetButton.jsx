@@ -1,7 +1,7 @@
 import React from 'react';
 import { useFontContext } from '../contexts/FontContext';
 import { useSettings } from '../contexts/SettingsContext';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import { Tooltip } from './ui/Tooltip';
 
 function ResetButton({ onResetSelectedFont }) {
@@ -45,3 +45,4 @@ function ResetButton({ onResetSelectedFont }) {
 }
 
 export default ResetButton; 
+

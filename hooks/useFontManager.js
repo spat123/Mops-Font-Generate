@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { toast } from 'react-toastify';
+import { toast } from '../utils/appNotify';
 import {
   findStyleInfoByWeightAndStyle,
   PRESET_STYLES,
@@ -30,7 +30,7 @@ export function useFontManager() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
   
-  // Создаем ref для safeSelectFont, чтобы использовать в колбэках
+  // Создаём ref для safeSelectFont, чтобы использовать в колбэках
   const safeSelectFontRef = useRef(null);
   
   const { handleLocalFontsUpload, loadAndSelectFontsourceFont, loadFontsourceStyleVariant } = useFontLoader(
@@ -40,10 +40,10 @@ export function useFontManager() {
     fonts
   );
   
-  // Создаем ref для saveFontSettings, чтобы использовать в колбэке до его объявления
+  // Создаём ref для saveFontSettings, чтобы использовать в колбэке до его объявления
   const saveFontSettingsRef = useRef(null);
   
-  // Создаем ref для saveLastVariableSettings, чтобы использовать до его объявления
+  // Создаём ref для saveLastVariableSettings, чтобы использовать до его объявления
   const saveLastVariableSettingsRef = useRef(null);
   
   const {
@@ -144,7 +144,7 @@ export function useFontManager() {
     // Проверяем, есть ли сохраненные настройки для этого шрифта
     let settingsApplied = false;
     
-    // Приоритет 1: Сохраненные настройки осей для вариативного шрифта
+    // Приоритет 1: Сохранённые настройки осей для вариативного шрифта
     if (font.isVariableFont && font.lastUsedVariableSettings) {
       setVariableSettings(font.lastUsedVariableSettings);
       // Применяем настройки через setTimeout для корректной работы
@@ -167,7 +167,7 @@ export function useFontManager() {
         settingsApplied = true;
       }
     }
-    // Приоритет 2: Сохраненный пресет
+    // Приоритет 2: Сохранённый пресет
     else if (font.lastUsedPresetName && applyPresetStyle) {
       // Убираем setTimeout - выполняем синхронно, чтобы currentWeight/currentStyle обновились
       applyPresetStyle(font.lastUsedPresetName, font);
@@ -214,7 +214,7 @@ export function useFontManager() {
           return presetName;
         }
         
-        // Если currentWeight/currentStyle не установлены, используем сохраненный пресет
+        // Если currentWeight/currentStyle не установлены, используем сохранённый пресет
         if (selectedFont.lastUsedPresetName) {
           return selectedFont.lastUsedPresetName;
         }
@@ -531,3 +531,4 @@ export function useFontManager() {
     resetSelectedFontState,
   };
 } 
+

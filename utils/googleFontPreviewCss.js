@@ -4,9 +4,16 @@
 
 import { buildGoogleFontPreviewText } from './googleFontCatalogSampleText';
 
+function buildGooglePreviewRequestText(entry) {
+  const base = buildGoogleFontPreviewText(entry);
+  const familyText = String(entry?.family || '').trim();
+  if (!familyText) return base;
+  return `${base} ${familyText}`;
+}
+
 function previewHref(entry) {
   const fam = encodeURIComponent(entry.family);
-  const text = encodeURIComponent(buildGoogleFontPreviewText(entry));
+  const text = encodeURIComponent(buildGooglePreviewRequestText(entry));
   if (entry.wghtMin != null && entry.wghtMax != null) {
     return `https://fonts.googleapis.com/css2?family=${fam}:wght@${entry.wghtMin}..${entry.wghtMax}&display=swap&text=${text}`;
   }
