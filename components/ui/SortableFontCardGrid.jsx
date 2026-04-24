@@ -20,11 +20,18 @@ export function SortableFontCardGrid({
           <SessionFontCard
             key={item.id}
             selected={item.selected}
+            batchSelected={item.batchSelected === true}
             title={item.title}
+            recentlyAdded={item.recentlyAdded === true}
             subtitle={item.subtitle}
             previewStyle={item.previewStyle}
             onCardClick={item.onCardClick}
+            onPointerDown={item.onPointerDown}
+            onPointerUp={item.onPointerUp}
+            onPointerLeave={item.onPointerLeave}
+            onPointerCancel={item.onPointerCancel}
             onRemove={item.onRemove}
+            cornerAction={item.cornerAction}
             menuItems={item.menuItems}
             downloadSplitButtonProps={item.downloadSplitButtonProps}
             variant={item.variant}

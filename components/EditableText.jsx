@@ -30,15 +30,22 @@ const EditableText = memo(({
   const localTextRef = useRef(text);
   const hasModificationsRef = useRef(false);
 
+  const resetHorizontalScroll = useCallback((el) => {
+    if (!el) return;
+    if (el.scrollLeft !== 0) {
+      el.scrollLeft = 0;
+    }
+  }, []);
+
   // Функция для проверки и управления прокруткой
   const adjustScroll = useCallback(() => {
     if (contentRef.current) {
       // Всегда сбрасываем горизонтальную прокрутку для режимов с nowrap
       if (isWaterfall || isStyles) {
-        contentRef.current.scrollLeft = 0;
+        resetHorizontalScroll(contentRef.current);
       }
     }
-  }, [isWaterfall, isStyles]);
+  }, [isWaterfall, isStyles, resetHorizontalScroll]);
   
   // После смены семейства / FVS / веса иногда нужен reflow, иначе contenteditable + FontFace API
   // оставляют часть глифов на fallback до следующей перерисовки.
@@ -61,11 +68,11 @@ const EditableText = memo(({
   useEffect(() => {
     if (contentRef.current && localTextRef.current !== text) {
       contentRef.current.innerText = text;
-      contentRef.current.scrollLeft = 0;
+      resetHorizontalScroll(contentRef.current);
       localTextRef.current = text;
       hasModificationsRef.current = false;
     }
-  }, [text, viewMode, syncId]);
+  }, [text, viewMode, syncId, resetHorizontalScroll]);
   
   // Функция для сохранения изменений в глобальное состояние
   const commitTextChanges = useCallback(() => {
@@ -79,7 +86,7 @@ const EditableText = memo(({
   useEffect(() => {
     const handleBlur = () => {
       if (contentRef.current) {
-        contentRef.current.scrollLeft = 0;
+        resetHorizontalScroll(contentRef.current);
       }
       commitTextChanges();
     };
@@ -95,7 +102,7 @@ const EditableText = memo(({
       }
       commitTextChanges();
     };
-  }, [commitTextChanges, viewMode]);
+  }, [commitTextChanges, viewMode, resetHorizontalScroll]);
   
   // Обработчик для локального изменения текста
   const handleInput = useCallback((e) => {
@@ -110,13 +117,13 @@ const EditableText = memo(({
       document.querySelectorAll(selector).forEach(elem => {
         if (elem !== e.target && elem.innerText !== newText) {
           elem.innerText = newText;
-          elem.scrollLeft = 0;
+          resetHorizontalScroll(elem);
         }
       });
     }
     
     adjustScroll();
-  }, [setText, syncId, adjustScroll]);
+  }, [setText, syncId, adjustScroll, resetHorizontalScroll]);
   
   // Обработчик нажатия клавиш для контроля прокрутки при навигации
   const handleKeyUp = useCallback((e) => {
@@ -126,18 +133,18 @@ const EditableText = memo(({
   // Устанавливаем начальное значение при монтировании и настраиваем обработчики событий
   useEffect(() => {
     if (contentRef.current) {
-      if (!contentRef.current.innerText && text) {
+      if (!contentRef.current.textContent && text) {
         contentRef.current.innerText = text;
         localTextRef.current = text;
       }
       
-      contentRef.current.scrollLeft = 0;
+      resetHorizontalScroll(contentRef.current);
       
       const handleScroll = () => {
         if ((isWaterfall || isStyles) && contentRef.current) {
           requestAnimationFrame(() => {
             if (contentRef.current) {
-              contentRef.current.scrollLeft = 0;
+              resetHorizontalScroll(contentRef.current);
             }
           });
         }
@@ -151,7 +158,7 @@ const EditableText = memo(({
         }
       };
     }
-  }, [text, isWaterfall, isStyles]);
+  }, [text, isWaterfall, isStyles, resetHorizontalScroll]);
   
   return (
     <div

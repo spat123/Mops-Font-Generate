@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
+import { saveBlobAsFile } from '../utils/fileDownloadUtils';
 import { slugifyFontKey } from '../utils/fontSlug';
 
 /**
@@ -41,14 +42,7 @@ export default function ExportModal({ isOpen, onClose, cssCode, fontName }) {
     const ext = exportKind === 'css' ? 'css' : 'txt';
     const mime = exportKind === 'css' ? 'text/css' : 'text/plain';
     const blob = new Blob([cssCode || ''], { type: mime });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${slugifyFontKey(fontName || 'font')}-export.${ext}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    saveBlobAsFile(blob, `${slugifyFontKey(fontName || 'font')}-export.${ext}`);
   };
 
   const handleBackdropClick = (e) => {

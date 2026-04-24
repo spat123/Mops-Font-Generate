@@ -20,6 +20,10 @@ import {
   setFontsourceVariableSettings,
   clearFontsourceVariableSettings,
 } from '../utils/fontsourceVariableSettingsCache';
+import { buildFontViewStateRestorePlan } from '../utils/fontViewStateRestore';
+import {
+  buildPersistedFontViewStatePatch,
+} from '../utils/fontViewStateWriter';
 
 /** Центральный хук: шрифты, VF, CSS, персистентность, экспорт. */
 export function useFontManager() {
@@ -141,55 +145,44 @@ export function useFontManager() {
     // Устанавливаем выбранный шрифт
     setSelectedFont(font);
     
-    // Проверяем, есть ли сохраненные настройки для этого шрифта
-    let settingsApplied = false;
-    
-    // Приоритет 1: Сохранённые настройки осей для вариативного шрифта
-    if (font.isVariableFont && font.lastUsedVariableSettings) {
-      setVariableSettings(font.lastUsedVariableSettings);
-      // Применяем настройки через setTimeout для корректной работы
+    const restorePlan = buildFontViewStateRestorePlan(font, {
+      getFontsourceCachedSettings: (fontToRestore) =>
+        fontToRestore?.source === 'fontsource'
+          ? getFontsourceVariableSettings(fontToRestore.name, fontToRestore.variableAxes)
+          : null,
+      includeFontsourceCacheForVariable: true,
+      resolveDefaultVariableSettings: (fontToRestore) => getDefaultAxisValues?.(fontToRestore) || null,
+      clearVariableSettingsForStatic: true,
+    });
+
+    if (restorePlan.mode === 'axes') {
+      setVariableSettings(restorePlan.settings);
       setTimeout(() => {
         if (applyVariableSettings) {
-          applyVariableSettings(font.lastUsedVariableSettings, true, font);
+          applyVariableSettings(restorePlan.settings, true, font);
         }
       }, 0);
-      settingsApplied = true;
+      return;
     }
-    else if (font.isVariableFont && font.source === 'fontsource') {
-      const cachedFontsourceAxes = getFontsourceVariableSettings(font.name, font.variableAxes);
-      if (cachedFontsourceAxes && Object.keys(cachedFontsourceAxes).length > 0) {
-        setVariableSettings(cachedFontsourceAxes);
-        setTimeout(() => {
-          if (applyVariableSettings) {
-            applyVariableSettings(cachedFontsourceAxes, true, font);
-          }
-        }, 0);
-        settingsApplied = true;
-      }
-    }
-    // Приоритет 2: Сохранённый пресет
-    else if (font.lastUsedPresetName && applyPresetStyle) {
-      // Убираем setTimeout - выполняем синхронно, чтобы currentWeight/currentStyle обновились
-      applyPresetStyle(font.lastUsedPresetName, font);
-      settingsApplied = true;
-    }
-    
-    // Если настройки не были восстановлены, применяем дефолтные
-    if (!settingsApplied) {
-      if (font.isVariableFont && font.variableAxes) {
-        // Получаем дефолтные значения из хука
-        const defaultAxes = getDefaultAxisValues?.(font) || {};
-        setVariableSettings(defaultAxes);
-      } else {
-        // Для статических шрифтов очищаем настройки осей
+
+    if (restorePlan.mode === 'preset') {
+      if (restorePlan.clearVariableSettings) {
         setVariableSettings({});
       }
-      
-      // Применяем базовый стиль Regular
       if (applyPresetStyle) {
-        // Убираем setTimeout - выполняем синхронно
-        applyPresetStyle('Regular', font);
+        applyPresetStyle(restorePlan.presetName, font);
       }
+      return;
+    }
+
+    if (font.isVariableFont) {
+      setVariableSettings(restorePlan.variableSettings || {});
+    } else {
+      setVariableSettings({});
+    }
+
+    if (applyPresetStyle) {
+      applyPresetStyle(restorePlan.presetName || 'Regular', font);
     }
   }, [setSelectedFont, setVariableSettings, getDefaultAxisValues, applyPresetStyle, applyVariableSettings]);
   
@@ -279,29 +272,11 @@ export function useFontManager() {
       // Сохраняем настройки предыдущего шрифта в его объект (для сессии)
       const updatedFonts = fonts.map(font => {
         if (font.id === prevFont.id) {
-          const updatedFont = { ...font };
-          let dbUpdates = {}; // Объект для обновления в IndexedDB
-          
-          // Сохраняем настройки в зависимости от типа ПРЕДЫДУЩЕГО шрифта
-          if (prevFont.isVariableFont && Object.keys(prevVariableSettings).length > 0) {
-            updatedFont.lastUsedVariableSettings = { ...prevVariableSettings };
-            updatedFont.lastUsedPresetName = null; // Очищаем пресет, если есть оси
-            dbUpdates.lastUsedVariableSettings = { ...prevVariableSettings };
-            dbUpdates.lastUsedPresetName = null;
-          } else if (prevPresetName && prevPresetName !== 'Regular') {
-            updatedFont.lastUsedPresetName = prevPresetName;
-            updatedFont.lastUsedVariableSettings = null; // Очищаем оси, если есть пресет
-            dbUpdates.lastUsedPresetName = prevPresetName;
-            dbUpdates.lastUsedVariableSettings = null;
-          }
-          
-          // Сохраняем currentWeight и currentStyle если они есть
-          if (prevFont.currentWeight !== undefined && prevFont.currentStyle !== undefined) {
-            updatedFont.currentWeight = prevFont.currentWeight;
-            updatedFont.currentStyle = prevFont.currentStyle;
-            dbUpdates.currentWeight = prevFont.currentWeight;
-            dbUpdates.currentStyle = prevFont.currentStyle;
-          }
+          const dbUpdates = buildPersistedFontViewStatePatch(prevFont, {
+            variableSettings: prevVariableSettings,
+            presetName: prevPresetName,
+          });
+          const updatedFont = { ...font, ...dbUpdates };
           
           // Сохраняем в IndexedDB если есть что сохранять
           if (Object.keys(dbUpdates).length > 0) {
@@ -444,6 +419,29 @@ export function useFontManager() {
     }
   }, [setFonts, setSelectedFont, setVariableSettings, setExportedFont, setIsLoading, resetPersistence]);
 
+  const resolveResetPresetName = useCallback((font) => {
+    const available =
+      Array.isArray(font?.availableStyles) && font.availableStyles.length > 0
+        ? font.availableStyles
+        : PRESET_STYLES;
+
+    const regular = available.find((style) => style?.name === 'Regular');
+    if (regular?.name) return regular.name;
+
+    const normalStyles = available.filter((style) => style?.style === 'normal');
+    const pool = normalStyles.length > 0 ? normalStyles : available;
+    if (pool.length === 0) return 'Regular';
+
+    const best = pool.reduce((closest, style) => {
+      if (!closest) return style;
+      return Math.abs(Number(style?.weight ?? 400) - 400) < Math.abs(Number(closest?.weight ?? 400) - 400)
+        ? style
+        : closest;
+    }, null);
+
+    return best?.name || 'Regular';
+  }, []);
+
   const resetSelectedFontState = useCallback(() => {
     if (!selectedFont) {
       toast.info('Шрифт не выбран');
@@ -451,44 +449,47 @@ export function useFontManager() {
     }
 
     const defaultSettings = getDefaultAxisValues();
+    const resetViewStatePatch = {
+      lastUsedVariableSettings: null,
+      lastUsedPresetName: null,
+    };
 
     setVariableSettings(defaultSettings);
 
     setFonts((prev) =>
       prev.map((font) =>
         font.id === selectedFont.id
-          ? {
-              ...font,
-              lastUsedVariableSettings: null,
-              lastUsedPresetName: null,
-              currentWeight: null,
-              currentStyle: null,
-            }
+          ? { ...font, ...resetViewStatePatch }
           : font
       )
     );
 
     setSelectedFont((prev) =>
       prev
-        ? {
-            ...prev,
-            lastUsedVariableSettings: null,
-            lastUsedPresetName: null,
-            currentWeight: null,
-            currentStyle: null,
-          }
+        ? { ...prev, ...resetViewStatePatch }
         : null
     );
 
-    if (applyVariableSettings) {
+    if (selectedFont?.isVariableFont && applyVariableSettings) {
       applyVariableSettings(defaultSettings, true, selectedFont);
+    } else if (!selectedFont?.isVariableFont && applyPresetStyle) {
+      applyPresetStyle(resolveResetPresetName(selectedFont), selectedFont);
     }
     if (selectedFont?.source === 'fontsource') {
       clearFontsourceVariableSettings(selectedFont.name);
     }
 
     toast.success(`Настройки шрифта "${selectedFont.name}" сброшены`);
-  }, [selectedFont, getDefaultAxisValues, applyVariableSettings, setFonts, setSelectedFont, setVariableSettings]);
+  }, [
+    selectedFont,
+    getDefaultAxisValues,
+    applyVariableSettings,
+    applyPresetStyle,
+    resolveResetPresetName,
+    setFonts,
+    setSelectedFont,
+    setVariableSettings,
+  ]);
 
   return {
     fonts,
@@ -533,4 +534,3 @@ export function useFontManager() {
     resetSelectedFontState,
   };
 } 
-

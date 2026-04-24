@@ -1,5 +1,7 @@
 import React from 'react';
 import { EDITOR_PREVIEW_BOTTOM_BAR_CLASS } from './editorChromeClasses';
+import { EditAssetIcon } from './EditAssetIcon';
+import { notificationIconUrl } from './editIconUrls';
 
 function DefaultTrailing() {
   return (
@@ -8,21 +10,7 @@ function DefaultTrailing() {
       aria-label="Уведомления"
       className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-        strokeWidth={1.6}
-        stroke="currentColor"
-        className="h-5 w-5"
-        aria-hidden
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M14.857 17.082a23.85 23.85 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9a6 6 0 1 0-12 0v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.566 1.085 5.454 1.31m5.715 0a24.253 24.253 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
-        />
-      </svg>
+      <EditAssetIcon src={notificationIconUrl} className="h-4 w-4" />
     </button>
   );
 }

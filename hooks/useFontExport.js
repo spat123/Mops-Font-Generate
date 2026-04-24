@@ -1,32 +1,14 @@
 import { useCallback } from 'react';
 import { toast } from '../utils/appNotify';
+import { saveBlobAsFile } from '../utils/fileDownloadUtils';
 import { slugifyFontFilenameStub, slugifyFontKey } from '../utils/fontSlug';
 
 /** Скачивание файлов, CSS-экспорт, псевдо/реальная генерация статики из VF. */
 export function useFontExport(exportToCSSFromHook) {
   const downloadFile = useCallback((content, filename, mimeType = 'text/plain') => {
     try {
-      let blob;
-      if (content instanceof Blob) {
-        blob = content;
-      } else {
-        blob = new Blob([content], { type: mimeType });
-      }
-      
-      const url = URL.createObjectURL(blob);
-      
-      const downloadLink = document.createElement('a');
-      downloadLink.href = url;
-      downloadLink.download = filename;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      
-      // Очищаем ресурсы
-      setTimeout(() => {
-        document.body.removeChild(downloadLink);
-        URL.revokeObjectURL(url);
-      }, 100);
-      
+      const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
+      saveBlobAsFile(blob, filename);
       return true;
     } catch (error) {
       console.error('Ошибка скачивания файла:', error);

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { SelectableChip } from './ui/SelectableChip';
 import { CardActionsMenu } from './ui/CardActionsMenu';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon } from './ui/CommonIcons';
+import { PlusIcon, TrashIcon, SearchIcon, ShareIcon } from './ui/CommonIcons';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchClearButton } from './ui/SearchClearButton';
 import { Tooltip } from './ui/Tooltip';
@@ -18,6 +18,10 @@ import {
   normalizeLibraryText,
 } from '../utils/fontLibraryUtils';
 import { readLibraryFontDragData } from '../utils/libraryDragData';
+import { EditAssetIcon } from './ui/EditAssetIcon';
+import { downloudIconUrl, editIconUrl } from './ui/editIconUrls';
+import { downloadLibraryAsZip } from '../utils/libraryArchiveDownload';
+import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
@@ -37,6 +41,29 @@ function createEmptyDraft() {
   };
 }
 
+function normalizeDraftFonts(fonts) {
+  return (Array.isArray(fonts) ? fonts : []).filter(
+    (item) => item && typeof item.label === 'string',
+  );
+}
+
+function createDraftWithFonts(selectedFonts = []) {
+  return {
+    ...createEmptyDraft(),
+    selectedFonts: normalizeDraftFonts(selectedFonts),
+  };
+}
+
+function createEditDraft(library) {
+  return {
+    mode: 'edit',
+    editingLibraryId: library?.id || null,
+    libraryName: library?.name || '',
+    searchQuery: '',
+    selectedFonts: normalizeDraftFonts(library?.fonts),
+  };
+}
+
 function sanitizeDraft(draft) {
   if (!draft || typeof draft !== 'object') return createEmptyDraft();
   return {
@@ -44,9 +71,7 @@ function sanitizeDraft(draft) {
     editingLibraryId: typeof draft.editingLibraryId === 'string' ? draft.editingLibraryId : null,
     libraryName: String(draft.libraryName || ''),
     searchQuery: String(draft.searchQuery || ''),
-    selectedFonts: (Array.isArray(draft.selectedFonts) ? draft.selectedFonts : []).filter(
-      (item) => item && typeof item.label === 'string',
-    ),
+    selectedFonts: normalizeDraftFonts(draft.selectedFonts),
   };
 }
 
@@ -105,19 +130,19 @@ export default function FontLibrarySidebar({
     setIsDialogOpen(false);
   }, []);
 
+  const clearLibraryDragState = useCallback(() => {
+    setDropTargetLibraryId(null);
+    setDraggedLibraryId(null);
+    setDragOverLibraryId(null);
+  }, []);
+
   const openCreateDialog = useCallback(() => {
     setDraft((prev) => (prev.mode === 'create' ? prev : createEmptyDraft()));
     setIsDialogOpen(true);
   }, []);
 
   const openEditDialog = useCallback((library) => {
-    setDraft({
-      mode: 'edit',
-      editingLibraryId: library.id,
-      libraryName: library.name || '',
-      searchQuery: '',
-      selectedFonts: Array.isArray(library.fonts) ? library.fonts : [],
-    });
+    setDraft(createEditDraft(library));
     setIsDialogOpen(true);
   }, []);
 
@@ -207,15 +232,7 @@ export default function FontLibrarySidebar({
   useEffect(() => {
     if (!createLibrarySeedRequest?.requestId) return;
 
-    setDraft({
-      mode: 'create',
-      editingLibraryId: null,
-      libraryName: '',
-      searchQuery: '',
-      selectedFonts: Array.isArray(createLibrarySeedRequest.selectedFonts)
-        ? createLibrarySeedRequest.selectedFonts.filter((item) => item && typeof item.label === 'string')
-        : [],
-    });
+    setDraft(createDraftWithFonts(createLibrarySeedRequest.selectedFonts));
     setIsDialogOpen(true);
     onCreateLibrarySeedHandled?.(createLibrarySeedRequest.requestId);
   }, [createLibrarySeedRequest, onCreateLibrarySeedHandled]);
@@ -299,21 +316,21 @@ export default function FontLibrarySidebar({
       event.preventDefault();
       const draggedFontEntry = readLibraryFontDragData(event.dataTransfer);
       if (draggedFontEntry) {
-        onAddFontToLibrary?.(libraryId, draggedFontEntry);
-        setDropTargetLibraryId(null);
-        setDraggedLibraryId(null);
-        setDragOverLibraryId(null);
+        void addLibraryEntryToLibrary({
+          libraryId,
+          libraryEntry: draggedFontEntry,
+          onAddFontToLibrary,
+        });
+        clearLibraryDragState();
         return;
       }
       const sourceId = event.dataTransfer.getData('text/plain') || draggedLibraryId;
       if (sourceId && sourceId !== libraryId) {
         onReorderLibraries?.(sourceId, libraryId);
       }
-      setDropTargetLibraryId(null);
-      setDraggedLibraryId(null);
-      setDragOverLibraryId(null);
+      clearLibraryDragState();
     },
-    [draggedLibraryId, onAddFontToLibrary, onReorderLibraries],
+    [clearLibraryDragState, draggedLibraryId, onAddFontToLibrary, onReorderLibraries],
   );
 
   const createDialog =
@@ -388,8 +405,8 @@ export default function FontLibrarySidebar({
                       className="absolute right-2 top-1/2 -translate-y-1/2"
                     />
                   ) : (
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                      <SearchIcon className="h-4 w-4" />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-800">
+                      <SearchIcon className="h-5 w-5" />
                     </span>
                   )}
                 </div>
@@ -449,7 +466,7 @@ export default function FontLibrarySidebar({
                 <button
                   type="button"
                   onClick={closeDialog}
-                  className="w-full rounded-md min-h-10 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
+                  className="w-full rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
                 >
                   Отмена
                 </button>
@@ -457,7 +474,7 @@ export default function FontLibrarySidebar({
                   type="button"
                   onClick={handleSubmit}
                   disabled={isSubmitDisabled}
-                  className="w-full rounded-md min-h-10 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitLabel}
                 </button>
@@ -484,21 +501,25 @@ export default function FontLibrarySidebar({
                   return (
                     <div
                       key={library.id}
-                      className={`group relative rounded-xl border p-2 transition-colors ${
+                      className={`group relative rounded-xl border p-3 transition-colors ${
                         isActive ? 'border-accent bg-accent' : 'border-gray-200 bg-white'
                       } ${draggedLibraryId === library.id ? 'opacity-55' : ''} ${
                         dragOverLibraryId === library.id && draggedLibraryId !== library.id
-                          ? 'ring-2 ring-accent ring-offset-2'
+                          ? 'ring-2 ring-inset ring-accent'
                           : ''
                       } ${
-                        dropTargetLibraryId === library.id ? 'ring-2 ring-black ring-offset-2' : ''
+                        dropTargetLibraryId === library.id ? 'ring-2 ring-inset ring-black' : ''
                       } cursor-pointer`}
                       role="button"
                       tabIndex={0}
-                      onClick={() => onOpenLibrary?.(library.id)}
+                      onClick={() => {
+                        clearLibraryDragState();
+                        onOpenLibrary?.(library.id);
+                      }}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
+                          clearLibraryDragState();
                           onOpenLibrary?.(library.id);
                         }
                       }}
@@ -531,9 +552,7 @@ export default function FontLibrarySidebar({
                       }}
                       onDrop={(event) => handleLibraryDrop(event, library.id)}
                       onDragEnd={() => {
-                        setDraggedLibraryId(null);
-                        setDragOverLibraryId(null);
-                        setDropTargetLibraryId(null);
+                        clearLibraryDragState();
                       }}
                       onDragLeave={(event) => {
                         if (!event.currentTarget.contains(event.relatedTarget)) {
@@ -552,7 +571,7 @@ export default function FontLibrarySidebar({
                             {library.name}
                           </h3>
                           <span
-                            className={`shrink-0 text-xs font-semibold uppercase ${
+                            className={`shrink-0 text-sm font-semibold uppercase ${
                               isActive ? 'text-white/90' : 'text-gray-500'
                             }`}
                           >
@@ -560,30 +579,39 @@ export default function FontLibrarySidebar({
                           </span>
                         </div>
                       </div>
-                      <div
-                        className="absolute right-2 top-2"
-                        onClick={(event) => event.stopPropagation()}
-                        onMouseDown={(event) => event.stopPropagation()}
-                      >
-                        <CardActionsMenu
-                          triggerLabel={`Действия для библиотеки ${library.name}`}
-                          items={[
-                            {
-                              key: 'edit',
-                              label: 'Редактировать',
-                              icon: <EditIcon />,
-                              onSelect: () => openEditDialog(library),
-                            },
-                            {
-                              key: 'delete',
-                              label: 'Удалить',
-                              tone: 'danger',
-                              icon: <TrashIcon />,
-                              onSelect: () => onDeleteLibrary?.(library.id),
-                            },
-                          ]}
-                        />
-                      </div>
+                      <CardActionsMenu
+                        className="right-1.5 top-1.5"
+                        triggerLabel={`Действия для библиотеки ${library.name}`}
+                        triggerVariant={isActive ? 'gray100Menu' : 'gray50Menu'}
+                        items={[
+                          {
+                            key: 'download-all',
+                            label: 'Скачать всё',
+                            icon: <EditAssetIcon src={downloudIconUrl} className="h-4 w-4" />,
+                            onSelect: () => void downloadLibraryAsZip(library),
+                          },
+                          {
+                            key: 'share',
+                            label: 'Переместить',
+                            disabled: true,
+                            icon: <ShareIcon />,
+                            onSelect: () => {},
+                          },
+                          {
+                            key: 'edit',
+                            label: 'Редактировать',
+                            icon: <EditAssetIcon src={editIconUrl} className="h-4 w-4" />,
+                            onSelect: () => openEditDialog(library),
+                          },
+                          {
+                            key: 'delete',
+                            label: 'Удалить',
+                            tone: 'danger',
+                            icon: <TrashIcon />,
+                            onSelect: () => onDeleteLibrary?.(library.id),
+                          },
+                        ]}
+                      />
 
                       {fontCount > 0 ? (
                         <div className="mt-3 flex flex-wrap gap-2">

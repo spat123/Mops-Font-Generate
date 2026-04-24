@@ -6,6 +6,7 @@ import {
   debouncedUpdateVariableFontSettings,
   buildVariableFontFaceDescriptors,
 } from '../utils/cssGenerator';
+import { formatFontVariationSettings } from '../utils/fontVariationSettings';
 import { slugifyFontKey } from '../utils/fontSlug';
 
 /** CSS для превью: font-family, variation-settings, FontFace, экспорт строки. */
@@ -60,12 +61,7 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
       return 'normal';
     }
 
-    // Генерируем строку font-variation-settings
-    const variationString = Object.entries(targetSettings)
-      .map(([tag, value]) => `"${tag}" ${value}`)
-      .join(', ');
-
-    return variationString || 'normal';
+    return formatFontVariationSettings(targetSettings, { fallback: 'normal' });
   }, [selectedFont, variableSettings]);
 
   const fontCssProperties = useMemo(() => {

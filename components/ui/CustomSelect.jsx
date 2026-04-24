@@ -11,6 +11,7 @@ import React, {
 import { createPortal } from 'react-dom';
 import { CatalogCheckboxMark } from './CatalogCheckbox';
 import { SearchClearButton } from './SearchClearButton';
+import { useDismissibleLayer } from './useDismissibleLayer';
 
 /**
  * Кастомный выпадающий список (listbox): серый фон, акцент при наведении, разделители.
@@ -122,25 +123,11 @@ export const CustomSelect = forwardRef(function CustomSelect(
     };
   }, [open, updatePos]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e) => {
-      const t = e.target;
-      if (rootRef.current?.contains(t) || listRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [open]);
+  useDismissibleLayer({
+    open,
+    refs: [rootRef, listRef],
+    onDismiss: () => setOpen(false),
+  });
 
   useEffect(() => {
     if (!open && searchQuery) {

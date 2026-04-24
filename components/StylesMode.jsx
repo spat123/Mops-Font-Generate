@@ -9,7 +9,28 @@ import {
   ITALIC_VARIATIONS,
   WEIGHT_VARIATIONS,
 } from '../utils/stylesPreviewModel';
-import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
+import alarmIconUrl from '../assets/icon/edit/Alarm.svg';
+import ideaIconUrl from '../assets/icon/edit/Idea.svg';
+
+/** Монохром из assets/icon/edit: цвет через `currentColor` (mask + background). */
+function EditToolbarIcon({ src, className = '' }) {
+  return (
+    <span
+      className={`inline-block shrink-0 bg-current ${className}`.trim()}
+      style={{
+        WebkitMaskImage: `url(${src})`,
+        WebkitMaskSize: 'contain',
+        WebkitMaskPosition: 'center',
+        WebkitMaskRepeat: 'no-repeat',
+        maskImage: `url(${src})`,
+        maskSize: 'contain',
+        maskPosition: 'center',
+        maskRepeat: 'no-repeat',
+      }}
+      aria-hidden
+    />
+  );
+}
 
 /**
  * Компонент для режима отображения стилей шрифта
@@ -42,6 +63,7 @@ function StylesMode({
   const hasStaticStyles = selectedFont.availableStyles && selectedFont.availableStyles.length > 1;
   const hasVariableAxes = selectedFont.isVariableFont && selectedFont.variableAxes && Object.keys(selectedFont.variableAxes).length > 0;
   const showStaticStyles = hasStaticStyles && (!selectedFont.isVariableFont || !hasVariableAxes);
+  const showStylesInfoTile = !hasStaticStyles && !hasVariableAxes;
   
   const safeFontFamily = fontFamilyValue || selectedFont.name || 'sans-serif';
 
@@ -49,13 +71,18 @@ function StylesMode({
 
   /** Подписи и рамки под фон превью; rgba учитывается при смешивании с белой подложкой */
   const chrome = useMemo(() => getPreviewChromeFromBackground(backgroundColor), [backgroundColor]);
+  const activeStyleName =
+    findStyleInfoByWeightAndStyle(selectedFont.currentWeight, selectedFont.currentStyle)?.name || 'Regular';
+  const hasAnyStyleContent = Boolean(showStaticStyles || hasVariableAxes);
+  const titleUnderlineClass = chrome.isDark ? 'border-white/25' : 'border-gray-900/35';
 
   return (
-    <div className="relative min-h-full min-w-0 max-w-full overflow-x-hidden px-4 pb-8 pt-4 sm:px-6">
-      {/* Статические стили шрифта */}
-      {showStaticStyles && (
-        <div className="mb-8 overflow-x-hidden">
-          <h3 className={`${chrome.sectionTitle} mb-3`}>Доступные стили</h3>
+    <div className="relative flex min-h-full min-w-0 max-w-full flex-col px-4 pb-8 pt-4 sm:px-6">
+      <div className="min-w-0 max-w-full overflow-x-hidden">
+        {/* Статические стили шрифта */}
+        {showStaticStyles && (
+          <div className="mb-8 overflow-x-hidden">
+            <h3 className={`${chrome.sectionTitle} mb-3`}>Доступные стили</h3>
 
           {/* Обычные стили */}
           {selectedFont.availableStyles.filter(s => s.style === 'normal').length > 0 && (
@@ -267,33 +294,49 @@ function StylesMode({
                 </div>
               </div>
             ))}
-        </div>
-      )}
-      
-      {/* Сообщение, если нет ни статических, ни вариативных стилей */}
-      {!showStaticStyles && !hasVariableAxes && (
-        <div className="mt-6">
-           <div className={chrome.noteBox}>
-             <p className={chrome.noteText}>
-               <span className={chrome.noteStrong}>Информация о стилях:</span>{' '}
-               Не удалось определить доступные статические стили или вариативные возможности для этого шрифта.
-               Отображается текущий активный стиль: {findStyleInfoByWeightAndStyle(selectedFont.currentWeight, selectedFont.currentStyle).name}.
-             </p>
-           </div>
-        </div>
-      )}
-      
-      <div className="mt-6 pb-2">
-        <div className={chrome.noteBox}>
-          <p className={chrome.noteText}>
-            <span className={chrome.noteStrong}>Примечание:</span>{' '}
-            Показаны только обнаруженные стили и возможности шрифта.
-            Если вы не видите некоторые стили или настройки, возможно, шрифт их не поддерживает или они не были корректно распознаны.
-          </p>
-        </div>
+          </div>
+        )}
       </div>
 
-      <PreviewEditTextHint />
+      <div className={hasAnyStyleContent ? 'mt-auto pt-6' : 'flex flex-1 items-center justify-center py-10'}>
+        <div
+          className={[
+            'mx-auto flex w-full flex-col items-stretch justify-center gap-4',
+            showStylesInfoTile ? 'max-w-5xl sm:flex-row' : 'max-w-3xl',
+          ].join(' ')}
+        >
+          {showStylesInfoTile ? (
+            <div className={`${chrome.noteBox} flex min-w-0 flex-1 items-start gap-3`}>
+                <div className={`mt-0.5 ${chrome.isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                <EditToolbarIcon src={alarmIconUrl} className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={`${chrome.noteStrong} w-full border-b ${titleUnderlineClass} pb-2 text-sm uppercase tracking-wide`}>
+                  Информация о стилях
+                </div>
+                <div className={`${chrome.noteText} mt-2`}>
+                  Показаны обнаруженные стили и/или вариативные возможности. Текущий стиль: {activeStyleName}.
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div className={`${chrome.noteBox} flex min-w-0 ${showStylesInfoTile ? 'flex-1' : ''} items-start gap-3`}>
+            <div className={`mt-0.5 ${chrome.isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+              <EditToolbarIcon src={ideaIconUrl} className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className={`${chrome.noteStrong} w-full border-b ${titleUnderlineClass} pb-2 text-sm uppercase tracking-wide`}>
+                Примечание
+              </div>
+              <div className={`${chrome.noteText} mt-2`}>
+                Показаны только обнаруженные стили и возможности шрифта. Если вы не видите некоторые стили или настройки,
+                возможно, шрифт их не поддерживает или они не были корректно распознаны.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

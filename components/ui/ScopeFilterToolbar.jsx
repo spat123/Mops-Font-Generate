@@ -2,7 +2,7 @@ import React from 'react';
 import { CustomSelect } from './CustomSelect';
 import { customSelectTriggerClass } from './nativeSelectFieldClasses';
 
-export function ScopeFilterToolbar({ id, value, onChange, options, count, ariaLabel }) {
+export function ScopeFilterToolbar({ id, value, onChange, options, count, ariaLabel, trailing = null }) {
   return (
     <div className="shrink-0 pb-3">
       <div className="grid max-w-full grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -16,7 +16,9 @@ export function ScopeFilterToolbar({ id, value, onChange, options, count, ariaLa
             options={options}
           />
         </div>
-        <div className="col-start-2 md:col-start-3 lg:col-start-4 xl:col-start-5" aria-hidden />
+        <div className="col-start-2 col-span-1 md:col-start-2 md:col-span-2 lg:col-start-2 lg:col-span-3 xl:col-start-2 xl:col-span-4 flex min-w-0 justify-end">
+          {trailing}
+        </div>
       </div>
     </div>
   );

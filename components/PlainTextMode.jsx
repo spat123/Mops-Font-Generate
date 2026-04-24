@@ -1,6 +1,5 @@
 import React from 'react';
 import EditableText from './EditableText';
-import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 
 /**
  * Компонент для режима простого текста
@@ -25,7 +24,6 @@ function PlainTextMode({ containerStyle, contentStyle, variant = 'default' }) {
         isStyles={false}
         syncId="plain"
       />
-      {!isFullscreen ? <PreviewEditTextHint /> : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /** Hover по обводке — каталог Google, сайдбар, VF-экспорт */
 export const NATIVE_SELECT_FIELD_INTERACTIVE =
-  'transition-[border-color] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] hover:border-black/[0.14]';
+  'transition-[border-color] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] hover:border-black/[0.14] disabled:hover:border-transparent';
 
 /**
  * Триггер {@link import('./CustomSelect.jsx').CustomSelect} (и бывший нативный select).

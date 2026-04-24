@@ -1,4 +1,6 @@
 import React from 'react';
+import { EditAssetIcon } from './EditAssetIcon';
+import { linkIconUrl } from './editIconUrls';
 
 export function PlusIcon({ className = 'h-4 w-4' }) {
   return (
@@ -50,19 +52,7 @@ export function TrashIcon({ className = 'h-4 w-4' }) {
 
 /** Открыть во внешнем / в редакторе — стрелка из квадрата */
 export function OpenExternalIcon({ className = 'h-4 w-4' }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      className={className}
-      aria-hidden
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H18v4.5M11 13 18 6M7.5 6.75H6A2.25 2.25 0 0 0 3.75 9v9A2.25 2.25 0 0 0 6 20.25h9A2.25 2.25 0 0 0 17.25 18v-1.5" />
-    </svg>
-  );
+  return <EditAssetIcon src={linkIconUrl} className={className} />;
 }
 
 export function ShareIcon({ className = 'h-4 w-4' }) {
@@ -96,7 +86,11 @@ export function SearchIcon({ className = 'h-4 w-4' }) {
       className={className}
       aria-hidden
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"
+      />
     </svg>
   );
 }

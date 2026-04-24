@@ -65,8 +65,7 @@ export function VirtualizedGlyphGrid({
 
   useEffect(() => {
     if (typeof onInnerWidth !== 'function' || !widthHostEl) return;
-    const w = widthHostEl.clientWidth;
-    if (w > 0) onInnerWidth(w);
+    if (width > 0) onInnerWidth(width);
   }, [onInnerWidth, widthHostEl, width]);
 
   const cols = useMemo(() => {

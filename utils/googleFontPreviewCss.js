@@ -3,9 +3,12 @@
  */
 
 import { buildGoogleFontPreviewText } from './googleFontCatalogSampleText';
+import { FULL_LATIN_ALPHANUM } from './googleFontCatalogSampleText';
 
 function buildGooglePreviewRequestText(entry) {
-  const base = buildGoogleFontPreviewText(entry);
+  // Для live-preview в ROW нужны все латинские glyphs, иначе буквы вне AaBbCcDdEe
+  // рендерятся fallback-шрифтом (например, F/S при вводе).
+  const base = `${buildGoogleFontPreviewText(entry)}${FULL_LATIN_ALPHANUM}`;
   const familyText = String(entry?.family || '').trim();
   if (!familyText) return base;
   return `${base} ${familyText}`;

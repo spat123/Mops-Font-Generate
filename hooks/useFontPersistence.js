@@ -10,6 +10,7 @@ import {
 import { buildVariationSettingsCssString } from '../utils/googleFontCatalogAxes';
 import { parseFontBuffer, normalizeFvarAxisTag } from '../utils/fontParser';
 import { filterPresetStylesForVariableAxes } from '../utils/fontUtilsCommon';
+import { buildFontViewStateRestorePlan } from '../utils/fontViewStateRestore';
 
 // Ключи localStorage для настроек шрифта
 const FONT_SETTINGS_LS_KEYS = {
@@ -273,50 +274,29 @@ export function useFontPersistence(
 
                 // Используем setTimeout, чтобы применить настройки после установки шрифта.
                 setTimeout(() => {
-                    const restoredVarSettingsRaw = localStorage.getItem(FONT_SETTINGS_LS_KEYS.LAST_VARIABLE_SETTINGS);
-                    const restoredPresetName = localStorage.getItem(FONT_SETTINGS_LS_KEYS.LAST_PRESET_NAME);
-                    let settingsApplied = false;
+                        const restoredVarSettingsRaw = localStorage.getItem(FONT_SETTINGS_LS_KEYS.LAST_VARIABLE_SETTINGS);
+                        const restoredPresetName = localStorage.getItem(FONT_SETTINGS_LS_KEYS.LAST_PRESET_NAME);
+                        const restorePlan = buildFontViewStateRestorePlan(fontToSelect, {
+                            localStorageVariableSettingsRaw: restoredVarSettingsRaw,
+                            localStoragePresetName: restoredPresetName,
+                            includeLocalStorageAxesForVariable: true,
+                            includeLocalStoragePresetForVariable: true,
+                            staticPresetPriority: 'storage-first',
+                        });
 
-                    if (fontToSelect.isVariableFont && handleVariableSettingsChange) {
-                        // Вариативный: сначала оси из IndexedDB для этого шрифта, иначе глобальные оси из LS.
-                        // Глобальный lastPresetName нельзя применять раньше осей, иначе перетирается выбранный вес.
-                        const dbAxes = fontToSelect.lastUsedVariableSettings;
-                        const hasDbAxes = dbAxes && typeof dbAxes === 'object' && Object.keys(dbAxes).length > 0;
-                        if (hasDbAxes) {
-                            handleVariableSettingsChange(dbAxes, true, fontToSelect);
-                            settingsApplied = true;
-                        } else if (restoredVarSettingsRaw) {
-                            try {
-                                const restoredVarSettings = JSON.parse(restoredVarSettingsRaw);
-                                handleVariableSettingsChange(restoredVarSettings, true, fontToSelect);
-                                settingsApplied = true;
-                            } catch (e) {
-                                console.error('[Restore] Ошибка парсинга осей из localStorage:', e);
-                                localStorage.removeItem(FONT_SETTINGS_LS_KEYS.LAST_VARIABLE_SETTINGS);
-                            }
-                        } else if (fontToSelect.lastUsedPresetName && applyPresetStyle) {
-                            applyPresetStyle(fontToSelect.lastUsedPresetName, fontToSelect);
-                            settingsApplied = true;
-                        } else if (restoredPresetName && applyPresetStyle) {
-                            applyPresetStyle(restoredPresetName, fontToSelect);
-                            settingsApplied = true;
+                        if (restorePlan.mode === 'axes' && handleVariableSettingsChange) {
+                            handleVariableSettingsChange(restorePlan.settings, true, fontToSelect);
+                            return;
                         }
-                    } else if (!fontToSelect.isVariableFont) {
-                        // Static font: first global preset from LS, then preset saved in IndexedDB.
-                        if (restoredPresetName && applyPresetStyle) {
-                            applyPresetStyle(restoredPresetName, fontToSelect);
-                            settingsApplied = true;
-                        } else if (fontToSelect.lastUsedPresetName && applyPresetStyle) {
-                            applyPresetStyle(fontToSelect.lastUsedPresetName, fontToSelect);
-                            settingsApplied = true;
-                        }
-                    }
 
-                    if (!settingsApplied) {
+                        if ((restorePlan.mode === 'preset' || restorePlan.mode === 'fallback') && applyPresetStyle) {
+                            applyPresetStyle(restorePlan.presetName || 'Regular', fontToSelect);
+                            return;
+                        }
+
                         if (applyPresetStyle) {
                             applyPresetStyle('Regular', fontToSelect);
                         }
-                    }
                 }, 0);
             }
         }

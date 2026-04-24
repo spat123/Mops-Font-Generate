@@ -4,6 +4,8 @@
  * 2) иначе псевдо-статика: тот же буфер + CSS с font-variation-settings
  */
 
+import { formatFontVariationSettings } from './fontVariationSettings';
+
 /**
  * @param {ArrayBuffer} fontBuffer
  * @param {Record<string, number>} variableSettings
@@ -36,9 +38,7 @@ const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2') =>
 };
 
 const generatePseudoStatic = (fontBuffer, variableSettings, fontName) => {
-  const cssVariations = Object.entries(variableSettings)
-    .map(([axis, value]) => `"${axis}" ${value}`)
-    .join(', ');
+  const cssVariations = formatFontVariationSettings(variableSettings, { fallback: 'normal' });
 
   const base64 = Buffer.from(fontBuffer).toString('base64');
 

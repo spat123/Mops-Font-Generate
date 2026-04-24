@@ -102,6 +102,9 @@ function titleCaseWords(text) {
 function transliterateLatinWordToRu(word) {
   const normalized = String(word || '').toLowerCase();
   if (!normalized) return '';
+  if (!transliterateLatinWordToRu._cache) transliterateLatinWordToRu._cache = new Map();
+  const cached = transliterateLatinWordToRu._cache.get(normalized);
+  if (cached) return cached;
 
   const digraphs = [
     ['shch', 'щ'],
@@ -163,6 +166,7 @@ function transliterateLatinWordToRu(word) {
     result += letters[char] || char;
     source = source.slice(1);
   }
+  transliterateLatinWordToRu._cache.set(normalized, result);
   return result;
 }
 
@@ -178,9 +182,13 @@ function formatFallbackSubsetLabel(normalized) {
 export function getFontSubsetLabelRu(code) {
   const normalized = normalizeSubsetKey(code);
   if (!normalized) return '';
+  if (!getFontSubsetLabelRu._cache) getFontSubsetLabelRu._cache = new Map();
+  const cached = getFontSubsetLabelRu._cache.get(normalized);
+  if (cached) return cached;
   const mapped = SUBSET_LABELS_RU[normalized];
-  if (mapped) return mapped;
-  return formatFallbackSubsetLabel(normalized);
+  const resolved = mapped || formatFallbackSubsetLabel(normalized);
+  getFontSubsetLabelRu._cache.set(normalized, resolved);
+  return resolved;
 }
 
 export function getFontSubsetOptionLabelRu(code) {
@@ -197,16 +205,23 @@ function compareSubsetLabelsRu(a, b) {
 
 function createSubsetOption(code) {
   const normalized = normalizeSubsetKey(code);
+  if (!normalized) return null;
+  if (!createSubsetOption._cache) createSubsetOption._cache = new Map();
+  const cached = createSubsetOption._cache.get(normalized);
+  if (cached) return cached;
   const label = getFontSubsetOptionLabelRu(normalized);
-  return {
+  const option = {
     value: normalized,
     label,
     triggerLabel: getFontSubsetLabelRu(normalized),
     searchText: `${normalized} ${label}`,
   };
+  createSubsetOption._cache.set(normalized, option);
+  return option;
 }
 
-export function buildGroupedFontSubsetOptions(values, selectedValues = []) {
+export function buildGroupedFontSubsetOptions(values, selectedValues = [], opts = {}) {
+  const includeSelectedSection = opts?.includeSelectedSection !== false;
   const normalizedValues = Array.from(
     new Set((Array.isArray(values) ? values : []).map(normalizeSubsetKey).filter(Boolean)),
   );
@@ -216,17 +231,23 @@ export function buildGroupedFontSubsetOptions(values, selectedValues = []) {
   ).filter((value) => availableSet.has(value));
   const selectedSet = new Set(selectedNormalized);
 
-  const selectedOptions = selectedNormalized.map(createSubsetOption);
+  const selectedOptions = selectedNormalized.map(createSubsetOption).filter(Boolean);
   const popularOptions = POPULAR_FONT_SUBSET_KEYS
-    .filter((value) => availableSet.has(value) && !selectedSet.has(value))
-    .map(createSubsetOption);
+    .filter((value) => availableSet.has(value) && (includeSelectedSection ? !selectedSet.has(value) : true))
+    .map(createSubsetOption)
+    .filter(Boolean);
   const otherOptions = normalizedValues
-    .filter((value) => !selectedSet.has(value) && !POPULAR_FONT_SUBSET_KEYS.includes(value))
+    .filter((value) =>
+      includeSelectedSection
+        ? !selectedSet.has(value) && !POPULAR_FONT_SUBSET_KEYS.includes(value)
+        : !POPULAR_FONT_SUBSET_KEYS.includes(value),
+    )
     .sort(compareSubsetLabelsRu)
-    .map(createSubsetOption);
+    .map(createSubsetOption)
+    .filter(Boolean);
 
   const grouped = [];
-  if (selectedOptions.length > 0) {
+  if (includeSelectedSection && selectedOptions.length > 0) {
     grouped.push({ kind: 'section', key: 'selected', label: 'Выбрано' }, ...selectedOptions);
   }
   if (popularOptions.length > 0) {

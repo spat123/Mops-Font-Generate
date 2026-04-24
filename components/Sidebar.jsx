@@ -19,6 +19,9 @@ import { EDITOR_SIDEBAR_FOOTER_BAR_CLASS } from './ui/editorChromeClasses';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
+import { EditAssetIcon } from './ui/EditAssetIcon';
+import { settingIconUrl } from './ui/editIconUrls';
+import { useDismissibleLayer } from './ui/useDismissibleLayer';
 
 const sidebarSelectClass = customSelectTriggerClass({ compact: true });
 
@@ -48,6 +51,160 @@ const WATERFALL_SCALE_PRESETS = [
   { key: 'perfect-fifth', ratio: 1.5, label: '1.500 - Perfect Fifth' },
   { key: 'golden-ratio', ratio: 1.618, label: '1.618 - Golden Ratio' },
 ];
+
+function getSidebarFontSizeControl({
+  viewMode,
+  displayedWaterfallBaseSize,
+  glyphsFontSize,
+  stylesFontSize,
+  fontSize,
+  setWaterfallBaseSize,
+  setGlyphsFontSize,
+  setStylesFontSize,
+  setFontSize,
+  onWaterfallBaseSizeLiveChange,
+  onWaterfallBaseSizeCommit,
+}) {
+  if (viewMode === 'waterfall') {
+    return {
+      value: displayedWaterfallBaseSize,
+      onChange: setWaterfallBaseSize,
+      onRangeLiveChange:
+        typeof onWaterfallBaseSizeLiveChange === 'function' ? onWaterfallBaseSizeLiveChange : undefined,
+      onRangeCommit:
+        typeof onWaterfallBaseSizeCommit === 'function' ? onWaterfallBaseSizeCommit : undefined,
+      onMarkerDrag:
+        typeof onWaterfallBaseSizeLiveChange === 'function' ? onWaterfallBaseSizeLiveChange : undefined,
+      onMarkerDragEnd:
+        typeof onWaterfallBaseSizeCommit === 'function' ? onWaterfallBaseSizeCommit : undefined,
+    };
+  }
+
+  if (viewMode === 'glyphs') {
+    return {
+      value: glyphsFontSize,
+      onChange: setGlyphsFontSize,
+      onRangeLiveChange: undefined,
+      onRangeCommit: undefined,
+      onMarkerDrag: undefined,
+      onMarkerDragEnd: undefined,
+    };
+  }
+
+  if (viewMode === 'styles') {
+    return {
+      value: stylesFontSize,
+      onChange: setStylesFontSize,
+      onRangeLiveChange: undefined,
+      onRangeCommit: undefined,
+      onMarkerDrag: undefined,
+      onMarkerDragEnd: undefined,
+    };
+  }
+
+  return {
+    value: fontSize,
+    onChange: setFontSize,
+    onRangeLiveChange: undefined,
+    onRangeCommit: undefined,
+    onMarkerDrag: undefined,
+    onMarkerDragEnd: undefined,
+  };
+}
+
+function getSidebarCountControl({
+  isWaterfallView,
+  waterfallRows,
+  textColumns,
+  clampWaterfallRows,
+  clampColumns,
+  setWaterfallRows,
+  setTextColumns,
+  incWaterfallRows,
+  incColumns,
+  decWaterfallRows,
+  decColumns,
+}) {
+  if (isWaterfallView) {
+    return {
+      value: waterfallRows,
+      ariaLabel: 'Количество рядов Waterfall',
+      incAriaLabel: 'Увеличить ряды',
+      decAriaLabel: 'Уменьшить ряды',
+      onChange: (nextValue) => setWaterfallRows(clampWaterfallRows(nextValue)),
+      onBlur: () => setWaterfallRows(clampWaterfallRows(waterfallRows)),
+      onIncrement: incWaterfallRows,
+      onDecrement: decWaterfallRows,
+    };
+  }
+
+  return {
+    value: textColumns,
+    ariaLabel: 'Количество колонок',
+    incAriaLabel: 'Увеличить колонки',
+    decAriaLabel: 'Уменьшить колонки',
+    onChange: (nextValue) => setTextColumns(clampColumns(nextValue)),
+    onBlur: () => setTextColumns(clampColumns(textColumns)),
+    onIncrement: incColumns,
+    onDecrement: decColumns,
+  };
+}
+
+function getSidebarLetterSpacingControl({
+  isWaterfallView,
+  isStylesView,
+  waterfallEditTarget,
+  waterfallBodyLetterSpacing,
+  waterfallHeadingLetterSpacing,
+  stylesLetterSpacing,
+  letterSpacing,
+  setWaterfallBodyLetterSpacing,
+  setWaterfallHeadingLetterSpacing,
+  setStylesLetterSpacing,
+  setLetterSpacing,
+}) {
+  if (isWaterfallView) {
+    return {
+      value: waterfallEditTarget === 'body' ? waterfallBodyLetterSpacing : waterfallHeadingLetterSpacing,
+      onChange: waterfallEditTarget === 'body' ? setWaterfallBodyLetterSpacing : setWaterfallHeadingLetterSpacing,
+    };
+  }
+
+  if (isStylesView) {
+    return {
+      value: stylesLetterSpacing,
+      onChange: setStylesLetterSpacing,
+    };
+  }
+
+  return {
+    value: letterSpacing,
+    onChange: setLetterSpacing,
+  };
+}
+
+function getSidebarLineHeightControl({
+  isWaterfallView,
+  waterfallEditTarget,
+  waterfallBodyLineHeight,
+  waterfallHeadingLineHeight,
+  lineHeight,
+  setWaterfallBodyLineHeight,
+  setWaterfallHeadingLineHeight,
+  setLineHeight,
+}) {
+  if (isWaterfallView) {
+    return {
+      value: waterfallEditTarget === 'body' ? waterfallBodyLineHeight : waterfallHeadingLineHeight,
+      onChange: waterfallEditTarget === 'body' ? setWaterfallBodyLineHeight : setWaterfallHeadingLineHeight,
+    };
+  }
+
+  return {
+    value: lineHeight,
+    onChange: setLineHeight,
+  };
+}
 
 /** Вертикальное положение текста в превью: строки у верха / середины / низа области */
 function IconVerticalTextTop(props) {
@@ -397,6 +554,118 @@ function RgbTripletInputs({ hex, onChannelChange, disabled = false }) {
   );
 }
 
+function SidebarColorEditor({
+  fieldRef,
+  sliderRef,
+  onFieldClick,
+  onFieldMouseDown,
+  onSliderClick,
+  onSliderMouseDown,
+  fieldBackground,
+  previewColor,
+  colorPos,
+  sliderPos,
+  sliderKnobColor,
+  colorMode,
+  onToggleMode,
+  colorValue,
+  onColorValueChange,
+  onChannelChange,
+  hexAriaLabel,
+}) {
+  return (
+    <div>
+      <div
+        ref={fieldRef}
+        className="rounded-xl h-24 mb-3 relative cursor-pointer"
+        onClick={onFieldClick}
+        onMouseDown={onFieldMouseDown}
+        style={{
+          background: fieldBackground,
+          backgroundBlendMode: 'multiply',
+        }}
+      >
+        <div className="absolute inset-0 p-3">
+          <div className="w-full h-full rounded-md relative">
+            <div
+              className="absolute w-4 h-4 rounded-full border-2 border-white shadow-md transform -translate-x-1/2 -translate-y-1/2"
+              style={{
+                backgroundColor: previewColor,
+                left: colorPos.left,
+                top: colorPos.top,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        ref={sliderRef}
+        className="h-6 rounded-xl mb-3 relative cursor-pointer"
+        onClick={onSliderClick}
+        onMouseDown={onSliderMouseDown}
+        style={{
+          background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
+          boxSizing: 'border-box',
+          padding: '0',
+        }}
+      >
+        <div className="absolute inset-0 px-3">
+          <div className="w-full h-full rounded-md relative">
+            <div
+              className="absolute w-4 h-4 rounded-full shadow-md top-1/2"
+              style={{
+                left: sliderPos,
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: sliderKnobColor,
+                border: '2px solid white',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className={COLOR_VALUE_ROW}>
+        <div className="flex shrink-0 items-center">
+          <Tooltip content="Переключить между HEX и RGB форматами цвета">
+            <button
+              type="button"
+              className="flex items-center h-8 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-800 hover:bg-gray-200"
+              onClick={onToggleMode}
+              aria-label="Переключить между HEX и RGB форматами цвета"
+            >
+              {colorMode.toUpperCase()}
+              <div className="flex flex-col ml-1 -space-y-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-2.5 h-2.5" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-2.5 h-2.5" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </div>
+            </button>
+          </Tooltip>
+        </div>
+        {colorMode === 'hex' ? (
+          <input
+            type="text"
+            value={colorValue}
+            onChange={(e) => onColorValueChange(e.target.value)}
+            spellCheck={false}
+            aria-label={hexAriaLabel}
+            className={COLOR_FIELD_INPUT}
+          />
+        ) : (
+          <RgbTripletInputs
+            hex={colorValue}
+            onChannelChange={onChannelChange}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Иконки для слайдеров (подписи — в `title` у контейнера) */
 function SliderIconFontSize(props) {
   return (
@@ -521,6 +790,9 @@ export default function Sidebar({
   handleVariableSettingsChange,
   variableSettings,
   resetVariableSettings,
+  currentWaterfallBaseSize = null,
+  onWaterfallBaseSizeLiveChange,
+  onWaterfallBaseSizeCommit,
 }) {
   // Получаем настройки из контекста
   const { 
@@ -579,6 +851,53 @@ export default function Sidebar({
   const isGlyphsView = viewMode === 'glyphs';
   const isStylesView = viewMode === 'styles';
   const isWaterfallView = viewMode === 'waterfall';
+  const displayedWaterfallBaseSize =
+    currentWaterfallBaseSize !== null &&
+    currentWaterfallBaseSize !== undefined &&
+    Number.isFinite(Number(currentWaterfallBaseSize))
+      ? Number(currentWaterfallBaseSize)
+      : waterfallBaseSize;
+  const isTextModeDisabled = isGlyphsView || isStylesView;
+  const isTextCaseDisabled = isGlyphsView;
+  const isTextFillDisabled = isWaterfallView || isTextModeDisabled;
+  const waterfallRoundEnabled = waterfallRoundPx !== false;
+  const waterfallRoundTooltip = waterfallRoundEnabled ? 'Округление: вкл.' : 'Округление: выкл.';
+  const fontSizeControl = getSidebarFontSizeControl({
+    viewMode,
+    displayedWaterfallBaseSize,
+    glyphsFontSize,
+    stylesFontSize,
+    fontSize,
+    setWaterfallBaseSize,
+    setGlyphsFontSize,
+    setStylesFontSize,
+    setFontSize,
+    onWaterfallBaseSizeLiveChange,
+    onWaterfallBaseSizeCommit,
+  });
+  const letterSpacingControl = getSidebarLetterSpacingControl({
+    isWaterfallView,
+    isStylesView,
+    waterfallEditTarget,
+    waterfallBodyLetterSpacing,
+    waterfallHeadingLetterSpacing,
+    stylesLetterSpacing,
+    letterSpacing,
+    setWaterfallBodyLetterSpacing,
+    setWaterfallHeadingLetterSpacing,
+    setStylesLetterSpacing,
+    setLetterSpacing,
+  });
+  const lineHeightControl = getSidebarLineHeightControl({
+    isWaterfallView,
+    waterfallEditTarget,
+    waterfallBodyLineHeight,
+    waterfallHeadingLineHeight,
+    lineHeight,
+    setWaterfallBodyLineHeight,
+    setWaterfallHeadingLineHeight,
+    setLineHeight,
+  });
 
   const waterfallScaleKey = useMemo(() => {
     const r = Number(waterfallScaleRatio);
@@ -587,6 +906,10 @@ export default function Sidebar({
     return hit ? hit.key : 'custom';
   }, [waterfallScaleRatio]);
   const [waterfallScaleSelectKey, setWaterfallScaleSelectKey] = useState(waterfallScaleKey);
+  const quickPresetSections = [
+    { kind: 'sample', presets: SAMPLE_QUICK_PRESETS },
+    { kind: 'glyph', presets: GLYPH_QUICK_PRESETS },
+  ];
 
   useEffect(() => {
     setWaterfallScaleSelectKey((prev) => (prev === 'custom' ? prev : waterfallScaleKey));
@@ -729,9 +1052,46 @@ export default function Sidebar({
     return rgbToHex(rgb[0], rgb[1], rgb[2]);
   };
 
+  const getColorControlState = (isBackground) => {
+    if (isBackground) {
+      return {
+        fieldRef: bgColorFieldRef,
+        sliderRef: bgColorSliderRef,
+        colorPos: bgColorPos,
+        sliderPos: bgSliderPos,
+        setColorPos: setBgColorPos,
+        setSliderPos: setBgSliderPos,
+        setColor: setBackgroundColor,
+      };
+    }
+
+    return {
+      fieldRef: fgColorFieldRef,
+      sliderRef: fgColorSliderRef,
+      colorPos: fgColorPos,
+      sliderPos: fgSliderPos,
+      setColorPos: setFgColorPos,
+      setSliderPos: setFgSliderPos,
+      setColor: setTextColor,
+    };
+  };
+
+  const getColorDragSetter = (dragTarget, isBackground) => {
+    if (dragTarget === 'field') {
+      return isBackground ? setIsDraggingBgField : setIsDraggingFgField;
+    }
+    return isBackground ? setIsDraggingBgSlider : setIsDraggingFgSlider;
+  };
+
   // Обработчик поля выбора цвета
   const handleColorFieldClick = (e, isBackground) => {
-    const field = isBackground ? bgColorFieldRef.current : fgColorFieldRef.current;
+    const {
+      fieldRef,
+      sliderPos,
+      setColorPos,
+      setColor,
+    } = getColorControlState(isBackground);
+    const field = fieldRef.current;
     if (!field) return;
     
     // Получаем координаты внутреннего контейнера
@@ -743,38 +1103,29 @@ export default function Sidebar({
     // Позиция в процентах
     const xPercent = Math.min(100, Math.max(0, (x / rect.width) * 100));
     const yPercent = Math.min(100, Math.max(0, (y / rect.height) * 100));
-    
-    // Обновляем позицию маркера
-    if (isBackground) {
-      setBgColorPos({ left: `${xPercent}%`, top: `${yPercent}%` });
-      
-      // Получаем текущий оттенок из позиции слайдера
-      const hue = parseFloat(bgSliderPos) * 3.6; // 0-360
-      // Получаем насыщенность и яркость из позиции маркера
-      const saturation = xPercent / 100;
-      const value = 1 - (yPercent / 100);
-      
-      // Создаём цвет
-      const newColor = createColorFromHSV(hue, saturation, value);
-      setBackgroundColor(newColor);
-    } else {
-      setFgColorPos({ left: `${xPercent}%`, top: `${yPercent}%` });
-      
-      // Получаем текущий оттенок из позиции слайдера
-      const hue = parseFloat(fgSliderPos) * 3.6; // 0-360
-      // Получаем насыщенность и яркость из позиции маркера
-      const saturation = xPercent / 100;
-      const value = 1 - (yPercent / 100);
-      
-      // Создаём цвет
-      const newColor = createColorFromHSV(hue, saturation, value);
-      setTextColor(newColor);
-    }
+
+    setColorPos({ left: `${xPercent}%`, top: `${yPercent}%` });
+
+    // Получаем текущий оттенок из позиции слайдера
+    const hue = parseFloat(sliderPos) * 3.6; // 0-360
+    // Получаем насыщенность и яркость из позиции маркера
+    const saturation = xPercent / 100;
+    const value = 1 - (yPercent / 100);
+
+    // Создаём цвет
+    const newColor = createColorFromHSV(hue, saturation, value);
+    setColor(newColor);
   };
   
   // Обработчик слайдера выбора оттенка
   const handleColorSliderClick = (e, isBackground) => {
-    const slider = isBackground ? bgColorSliderRef.current : fgColorSliderRef.current;
+    const {
+      sliderRef,
+      colorPos,
+      setSliderPos,
+      setColor,
+    } = getColorControlState(isBackground);
+    const slider = sliderRef.current;
     if (!slider) return;
     
     // Получаем координаты внутреннего контейнера с градиентом
@@ -787,69 +1138,71 @@ export default function Sidebar({
     
     // Ограничиваем позицию в пределах слайдера
     const percentage = Math.min(100, Math.max(0, (x / sliderWidth) * 100));
-    
-    if (isBackground) {
-      setBgSliderPos(`${percentage}%`);
-      
-      // Получаем текущую позицию маркера
-      const saturation = parseFloat(bgColorPos.left) / 100;
-      const value = 1 - (parseFloat(bgColorPos.top) / 100);
-      
-      // Новый оттенок (H) из позиции слайдера
-      const hue = percentage * 3.6; // 0-360
-      
-      // Создаём цвет, сохраняя S и V
-      const newColor = createColorFromHSV(hue, saturation, value);
-      setBackgroundColor(newColor);
-    } else {
-      setFgSliderPos(`${percentage}%`);
-      
-      // Получаем текущую позицию маркера
-      const saturation = parseFloat(fgColorPos.left) / 100;
-      const value = 1 - (parseFloat(fgColorPos.top) / 100);
-      
-      // Новый оттенок (H) из позиции слайдера
-      const hue = percentage * 3.6; // 0-360
-      
-      // Создаём цвет, сохраняя S и V
-      const newColor = createColorFromHSV(hue, saturation, value);
-      setTextColor(newColor);
-    }
+
+    setSliderPos(`${percentage}%`);
+
+    // Получаем текущую позицию маркера
+    const saturation = parseFloat(colorPos.left) / 100;
+    const value = 1 - (parseFloat(colorPos.top) / 100);
+
+    // Новый оттенок (H) из позиции слайдера
+    const hue = percentage * 3.6; // 0-360
+
+    // Создаём цвет, сохраняя S и V
+    const newColor = createColorFromHSV(hue, saturation, value);
+    setColor(newColor);
   };
+
+  const startColorDrag = useCallback(
+    (e, dragTarget, isBackground) => {
+      if (dragTarget === 'field') {
+        handleColorFieldClick(e, isBackground);
+      } else {
+        handleColorSliderClick(e, isBackground);
+      }
+      getColorDragSetter(dragTarget, isBackground)(true);
+    },
+    [handleColorFieldClick, handleColorSliderClick],
+  );
+
+  const stopAllColorDragging = useCallback(() => {
+    setIsDraggingFgField(false);
+    setIsDraggingBgField(false);
+    setIsDraggingFgSlider(false);
+    setIsDraggingBgSlider(false);
+  }, []);
 
   // Отслеживаем события мыши для перетаскивания
   useEffect(() => {
+    const activeDragAction = [
+      isDraggingFgField ? (e) => handleColorFieldClick(e, false) : null,
+      isDraggingBgField ? (e) => handleColorFieldClick(e, true) : null,
+      isDraggingFgSlider ? (e) => handleColorSliderClick(e, false) : null,
+      isDraggingBgSlider ? (e) => handleColorSliderClick(e, true) : null,
+    ].find(Boolean);
+    if (!activeDragAction) return undefined;
+
     const handleMouseMove = (e) => {
-      if (isDraggingFgField) {
-        e.preventDefault();
-        handleColorFieldClick(e, false);
-      } else if (isDraggingBgField) {
-        e.preventDefault();
-        handleColorFieldClick(e, true);
-      } else if (isDraggingFgSlider) {
-        e.preventDefault();
-        handleColorSliderClick(e, false);
-      } else if (isDraggingBgSlider) {
-        e.preventDefault();
-        handleColorSliderClick(e, true);
-      }
+      e.preventDefault();
+      activeDragAction(e);
     };
-    
-    const handleMouseUp = () => {
-      setIsDraggingFgField(false);
-      setIsDraggingBgField(false);
-      setIsDraggingFgSlider(false);
-      setIsDraggingBgSlider(false);
-    };
-    
+
     document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
+    document.addEventListener('mouseup', stopAllColorDragging);
+
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', stopAllColorDragging);
     };
-  }, [isDraggingFgField, isDraggingBgField, isDraggingFgSlider, isDraggingBgSlider]);
+  }, [
+    isDraggingFgField,
+    isDraggingBgField,
+    isDraggingFgSlider,
+    isDraggingBgSlider,
+    handleColorFieldClick,
+    handleColorSliderClick,
+    stopAllColorDragging,
+  ]);
 
   const handleRgbChannelChange = useCallback(
     (channel, raw, isBackground) => {
@@ -943,6 +1296,19 @@ export default function Sidebar({
   const incWaterfallRows = useCallback(() => {
     setWaterfallRows((c) => clampWaterfallRows((Number(c) || 20) + 1));
   }, [clampWaterfallRows, setWaterfallRows]);
+  const countControl = getSidebarCountControl({
+    isWaterfallView,
+    waterfallRows,
+    textColumns,
+    clampWaterfallRows,
+    clampColumns,
+    setWaterfallRows,
+    setTextColumns,
+    incWaterfallRows,
+    incColumns,
+    decWaterfallRows,
+    decColumns,
+  });
 
   const handlePreviewBackgroundFileChange = useCallback(
     (e) => {
@@ -998,6 +1364,9 @@ export default function Sidebar({
       sidebarScrollIdleTimerRef.current = null;
     }, 700);
   }, [syncSidebarScrollLayout]);
+  const closeAppSettingsPopover = useCallback(() => {
+    setIsAppSettingsOpen(false);
+  }, []);
 
   useLayoutEffect(() => {
     syncSidebarScrollLayout();
@@ -1038,26 +1407,11 @@ export default function Sidebar({
     };
   }, [syncSidebarScrollLayout]);
 
-  useEffect(() => {
-    if (!isAppSettingsOpen) return;
-
-    const onPointerDown = (event) => {
-      const root = settingsPopoverRef.current;
-      if (!root || root.contains(event.target)) return;
-      setIsAppSettingsOpen(false);
-    };
-
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setIsAppSettingsOpen(false);
-    };
-
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isAppSettingsOpen]);
+  useDismissibleLayer({
+    open: isAppSettingsOpen,
+    refs: [settingsPopoverRef],
+    onDismiss: closeAppSettingsPopover,
+  });
 
   const sidebarOverlayThumb = useMemo(() => {
     const { scrollTop, scrollHeight, clientHeight } = sidebarScrollLayout;
@@ -1159,6 +1513,7 @@ export default function Sidebar({
                 options={sidebarPresetOptions}
                 className={sidebarSelectClass}
                 aria-label="Начертание (пресет)"
+                disabled={isStylesView}
               />
             </div>
           )}
@@ -1178,24 +1533,12 @@ export default function Sidebar({
                 min={12}
                 max={300}
                 step={1}
-                value={
-                  viewMode === 'waterfall'
-                    ? waterfallBaseSize
-                    : viewMode === 'glyphs'
-                      ? glyphsFontSize
-                      : viewMode === 'styles'
-                        ? stylesFontSize
-                      : fontSize
-                }
-                onChange={
-                  viewMode === 'waterfall'
-                    ? setWaterfallBaseSize
-                    : viewMode === 'glyphs'
-                      ? setGlyphsFontSize
-                      : viewMode === 'styles'
-                        ? setStylesFontSize
-                      : setFontSize
-                }
+                value={fontSizeControl.value}
+                onChange={fontSizeControl.onChange}
+                onRangeLiveChange={fontSizeControl.onRangeLiveChange}
+                onRangeCommit={fontSizeControl.onRangeCommit}
+                onMarkerDrag={fontSizeControl.onMarkerDrag}
+                onMarkerDragEnd={fontSizeControl.onMarkerDragEnd}
                 formatDisplay={(v) => String(Math.round(v))}
               />
             </div>
@@ -1216,26 +1559,9 @@ export default function Sidebar({
                 min={-100}
                 max={100}
                 step={1}
-                value={
-                  isWaterfallView
-                    ? waterfallEditTarget === 'body'
-                      ? waterfallBodyLetterSpacing
-                      : waterfallHeadingLetterSpacing
-                    : isStylesView
-                      ? stylesLetterSpacing
-                    : letterSpacing
-                }
+                value={letterSpacingControl.value}
                 disabled={isGlyphsView}
-                onChange={(v) => {
-                  if (isWaterfallView) {
-                    if (waterfallEditTarget === 'body') setWaterfallBodyLetterSpacing(v);
-                    else setWaterfallHeadingLetterSpacing(v);
-                  } else if (isStylesView) {
-                    setStylesLetterSpacing(v);
-                  } else {
-                    setLetterSpacing(v);
-                  }
-                }}
+                onChange={letterSpacingControl.onChange}
                 formatDisplay={(v) => String(Math.round(v))}
               />
             </div>
@@ -1256,22 +1582,9 @@ export default function Sidebar({
                 min={0.5}
                 max={3}
                 step={0.05}
-                value={
-                  isWaterfallView
-                    ? waterfallEditTarget === 'body'
-                      ? waterfallBodyLineHeight
-                      : waterfallHeadingLineHeight
-                    : lineHeight
-                }
+                value={lineHeightControl.value}
                 disabled={isGlyphsView || isStylesView}
-                onChange={(v) => {
-                  if (isWaterfallView) {
-                    if (waterfallEditTarget === 'body') setWaterfallBodyLineHeight(v);
-                    else setWaterfallHeadingLineHeight(v);
-                  } else {
-                    setLineHeight(v);
-                  }
-                }}
+                onChange={lineHeightControl.onChange}
                 formatDisplay={(v) => Number(v).toFixed(2)}
               />
             </div>
@@ -1286,7 +1599,7 @@ export default function Sidebar({
                 onChange={changeTextAlignmentHandler}
                 options={SIDEBAR_TEXT_ALIGN_OPTIONS}
                 className="min-w-0 flex-[4]"
-                disabled={isGlyphsView}
+                disabled={isTextCaseDisabled}
               />
               <SegmentedControl
                 variant="iconRail"
@@ -1305,7 +1618,7 @@ export default function Sidebar({
                   onChange={setTextCase}
                   options={SIDEBAR_TEXT_CASE_OPTIONS}
                   className="min-w-0 flex-1"
-                  disabled={isGlyphsView}
+                disabled={isTextCaseDisabled}
                 />
                 <SegmentedControl
                   variant="iconRail"
@@ -1313,7 +1626,7 @@ export default function Sidebar({
                   onChange={(v) => setTextDecoration(v === textDecoration ? 'none' : v)}
                   options={SIDEBAR_TEXT_DECORATION_OPTIONS}
                   className="min-w-0 flex-1"
-                  disabled={isGlyphsView}
+                  disabled={isTextCaseDisabled}
                 />
               </div>
               <div className="min-w-0 flex-[3]">
@@ -1323,27 +1636,22 @@ export default function Sidebar({
                       type="text"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      value={viewMode === 'waterfall' ? waterfallRows : textColumns}
+                      value={countControl.value}
                       onChange={(e) => {
-                        const v = e.target.value;
-                        if (viewMode === 'waterfall') setWaterfallRows(clampWaterfallRows(v));
-                        else setTextColumns(clampColumns(v));
+                        countControl.onChange(e.target.value);
                       }}
-                      onBlur={() => {
-                        if (viewMode === 'waterfall') setWaterfallRows(clampWaterfallRows(waterfallRows));
-                        else setTextColumns(clampColumns(textColumns));
-                      }}
-                      disabled={isGlyphsView || isStylesView}
+                      onBlur={countControl.onBlur}
+                      disabled={isTextModeDisabled}
                       className="min-w-0 flex-1 border-0 bg-transparent px-2 text-center text-xs font-semibold tabular-nums text-gray-800 focus:outline-none disabled:text-gray-400"
-                      aria-label={viewMode === 'waterfall' ? 'Количество рядов Waterfall' : 'Количество колонок'}
+                      aria-label={countControl.ariaLabel}
                     />
                     <div className="flex w-5 flex-col border-l border-gray-200">
                       <button
                         type="button"
                         className="flex flex-1 items-end justify-center text-gray-700 hover:bg-black/[0.06] disabled:text-gray-400 disabled:hover:bg-transparent"
-                        aria-label={viewMode === 'waterfall' ? 'Увеличить ряды' : 'Увеличить колонки'}
-                        onClick={viewMode === 'waterfall' ? incWaterfallRows : incColumns}
-                        disabled={isGlyphsView || isStylesView}
+                        aria-label={countControl.incAriaLabel}
+                        onClick={countControl.onIncrement}
+                        disabled={isTextModeDisabled}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3 w-3" aria-hidden>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
@@ -1352,9 +1660,9 @@ export default function Sidebar({
                       <button
                         type="button"
                         className="flex flex-1 items-start justify-center text-gray-700 hover:bg-black/[0.06] disabled:text-gray-400 disabled:hover:bg-transparent"
-                        aria-label={viewMode === 'waterfall' ? 'Уменьшить ряды' : 'Уменьшить колонки'}
-                        onClick={viewMode === 'waterfall' ? decWaterfallRows : decColumns}
-                        disabled={isGlyphsView || isStylesView}
+                        aria-label={countControl.decAriaLabel}
+                        onClick={countControl.onDecrement}
+                        disabled={isTextModeDisabled}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-3 w-3" aria-hidden>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -1366,10 +1674,10 @@ export default function Sidebar({
                     <Tooltip content="Заполнить на весь экран">
                       <button
                         type="button"
-                        className={`${iconRailSegmentClass(textFill)} w-8 flex-none disabled:opacity-40`.trim()}
+                        className={`${iconRailSegmentClass(textFill, { disabled: isTextFillDisabled })} w-8 flex-none disabled:opacity-40`.trim()}
                         aria-label="Заполнить экран текстом"
                         aria-pressed={textFill}
-                        disabled={viewMode === 'waterfall' || isGlyphsView || isStylesView}
+                        disabled={isTextFillDisabled}
                         onClick={toggleTextFillHandler}
                       >
                         <IconTextFillExpand className="h-4 w-4 shrink-0" />
@@ -1436,11 +1744,11 @@ export default function Sidebar({
                     ]}
                     className="min-w-0 flex-1"
                   />
-                  <Tooltip content={waterfallRoundPx === false ? 'Округление: выкл.' : 'Округление: вкл.'}>
+                  <Tooltip content={waterfallRoundTooltip}>
                     <IconCircleButton
                       variant="toolbar"
-                      pressed={waterfallRoundPx !== false}
-                      aria-pressed={waterfallRoundPx !== false}
+                      pressed={waterfallRoundEnabled}
+                      aria-pressed={waterfallRoundEnabled}
                       aria-label="Переключить округление размеров Waterfall"
                       onClick={() => setWaterfallRoundPx((v) => !v)}
                     >
@@ -1554,251 +1862,67 @@ export default function Sidebar({
           </div>
           
           {activeColorTab === 'foreground' ? (
-            <div>
-              <div 
-                ref={fgColorFieldRef}
-                className="rounded-xl h-24 mb-3 relative cursor-pointer"
-                onClick={(e) => handleColorFieldClick(e, false)}
-                onMouseDown={(e) => {
-                  handleColorFieldClick(e, false);
-                  setIsDraggingFgField(true);
-                }}
-                style={{
-                  background: `linear-gradient(to right, white, ${getHueColor(parseFloat(fgSliderPos) * 3.6)}), linear-gradient(to bottom, transparent, black)`,
-                  backgroundBlendMode: 'multiply'
-                }}
-              >
-                <div className="absolute inset-0 p-3">
-                  <div 
-                    className="w-full h-full rounded-md relative"
-                    style={{
-                      
-                    }}
-                  >
-                    <div 
-                      className="absolute w-4 h-4 rounded-full border-2 border-white shadow-md transform -translate-x-1/2 -translate-y-1/2"
-                      style={{ 
-                        backgroundColor: textColor,
-                        left: fgColorPos.left, 
-                        top: fgColorPos.top 
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div 
-                ref={fgColorSliderRef}
-                className="h-6 rounded-xl mb-3 relative cursor-pointer"
-                onClick={(e) => handleColorSliderClick(e, false)}
-                onMouseDown={(e) => {
-                  handleColorSliderClick(e, false);
-                  setIsDraggingFgSlider(true);
-                }}
-                style={{
-                  background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
-                  boxSizing: 'border-box',
-                  padding: '0'
-                }}
-              >
-                <div className="absolute inset-0 px-3">
-                  <div 
-                    className="w-full h-full rounded-md relative"
-                    style={{
-                    }}
-                  >
-                    <div 
-                      className="absolute w-4 h-4 rounded-full shadow-md top-1/2" 
-                      style={{
-                        left: fgSliderPos,
-                        transform: 'translate(-50%, -50%)',
-                        backgroundColor: getHueColor(parseFloat(fgSliderPos) * 3.6),
-                        border: '2px solid white'
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className={COLOR_VALUE_ROW}>
-                <div className="flex shrink-0 items-center">
-                  <Tooltip content="Переключить между HEX и RGB">
-                    <button 
-                      type="button"
-                      className="flex items-center h-8 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-800 hover:bg-gray-200"
-                      onClick={() => setFgColorMode(fgColorMode === 'hex' ? 'rgb' : 'hex')}
-                      aria-label="Переключить между HEX и RGB форматами цвета"
-                    >
-                      {fgColorMode.toUpperCase()}
-                      <div className="flex flex-col ml-1 -space-y-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-2.5 h-2.5" aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                        </svg>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-2.5 h-2.5" aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                        </svg>
-                      </div>
-                    </button>
-                  </Tooltip>
-                </div>
-                {fgColorMode === 'hex' ? (
-                  <input
-                    type="text"
-                    value={textColor}
-                    onChange={(e) => setTextColor(e.target.value)}
-                    spellCheck={false}
-                    aria-label="Цвет текста, HEX"
-                    className={COLOR_FIELD_INPUT}
-                  />
-                ) : (
-                  <RgbTripletInputs
-                    hex={textColor}
-                    onChannelChange={(ch, val) => handleRgbChannelChange(ch, val, false)}
-                  />
-                )}
-              </div>
-            </div>
+            <SidebarColorEditor
+              fieldRef={fgColorFieldRef}
+              sliderRef={fgColorSliderRef}
+              onFieldClick={(e) => handleColorFieldClick(e, false)}
+              onFieldMouseDown={(e) => startColorDrag(e, 'field', false)}
+              onSliderClick={(e) => handleColorSliderClick(e, false)}
+              onSliderMouseDown={(e) => startColorDrag(e, 'slider', false)}
+              fieldBackground={`linear-gradient(to right, white, ${getHueColor(parseFloat(fgSliderPos) * 3.6)}), linear-gradient(to bottom, transparent, black)`}
+              previewColor={textColor}
+              colorPos={fgColorPos}
+              sliderPos={fgSliderPos}
+              sliderKnobColor={getHueColor(parseFloat(fgSliderPos) * 3.6)}
+              colorMode={fgColorMode}
+              onToggleMode={() => setFgColorMode(fgColorMode === 'hex' ? 'rgb' : 'hex')}
+              colorValue={textColor}
+              onColorValueChange={setTextColor}
+              onChannelChange={(ch, val) => handleRgbChannelChange(ch, val, false)}
+              hexAriaLabel="Цвет текста, HEX"
+            />
           ) : (
-            <div>
-              <div 
-                ref={bgColorFieldRef}
-                className="rounded-xl h-24 mb-3 relative cursor-pointer"
-                onClick={(e) => handleColorFieldClick(e, true)}
-                onMouseDown={(e) => {
-                  handleColorFieldClick(e, true);
-                  setIsDraggingBgField(true);
-                }}
-                style={{
-                  background: `linear-gradient(to right, white, ${getHueColor(parseFloat(bgSliderPos) * 3.6)}), linear-gradient(to bottom, transparent, black)`,
-                  backgroundBlendMode: 'multiply'
-                }}
-              >
-                <div className="absolute inset-0 p-3">
-                  <div 
-                    className="w-full h-full rounded-md relative"
-                    style={{
-                    
-                    }}
-                  >
-                    <div 
-                      className="absolute w-4 h-4 rounded-full border-2 border-white shadow-md transform -translate-x-1/2 -translate-y-1/2"
-                      style={{ 
-                        backgroundColor: backgroundColor,
-                        left: bgColorPos.left, 
-                        top: bgColorPos.top 
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div 
-                ref={bgColorSliderRef}
-                className="h-6 rounded-xl mb-3 relative cursor-pointer"
-                onClick={(e) => handleColorSliderClick(e, true)}
-                onMouseDown={(e) => {
-                  handleColorSliderClick(e, true);
-                  setIsDraggingBgSlider(true);
-                }}
-                style={{
-                  background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
-                  boxSizing: 'border-box',
-                  padding: '0'
-                }}
-              >
-                <div className="absolute inset-0 px-3">
-                  <div 
-                    className="w-full h-full rounded-md relative"
-                    style={{ 
-                    }}
-                  >
-                    <div 
-                      className="absolute w-4 h-4 rounded-full shadow-md top-1/2" 
-                      style={{
-                        left: bgSliderPos,
-                        transform: 'translate(-50%, -50%)',
-                        backgroundColor: isGlyphsView
-                          ? 'var(--color-gray-400)'
-                          : getHueColor(parseFloat(bgSliderPos) * 3.6),
-                        border: '2px solid white',
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className={COLOR_VALUE_ROW}>
-                <div className="flex shrink-0 items-center">
-                  <Tooltip content="Переключить между HEX и RGB форматами цвета">
-                    <button 
-                      type="button"
-                      className="flex items-center rounded-md h-8 bg-gray-50 px-2 py-1 text-xs text-gray-800 hover:bg-gray-200"
-                      onClick={() => setBgColorMode(bgColorMode === 'hex' ? 'rgb' : 'hex')}
-                      aria-label="Переключить между HEX и RGB форматами цвета"
-                    >
-                      {bgColorMode.toUpperCase()}
-                      <div className="flex flex-col ml-1 -space-y-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-2.5 h-2.5" aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
-                        </svg>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-2.5 h-2.5" aria-hidden>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                        </svg>
-                      </div>
-                    </button>
-                  </Tooltip>
-                </div>
-                {bgColorMode === 'hex' ? (
-                  <input
-                    type="text"
-                    value={backgroundColor}
-                    onChange={(e) => setBackgroundColor(e.target.value)}
-                    spellCheck={false}
-                    aria-label="Цвет фона, HEX"
-                    className={COLOR_FIELD_INPUT}
-                  />
-                ) : (
-                  <RgbTripletInputs
-                    hex={backgroundColor}
-                    onChannelChange={(ch, val) => handleRgbChannelChange(ch, val, true)}
-                  />
-                )}
-              </div>
-            </div>
+            <SidebarColorEditor
+              fieldRef={bgColorFieldRef}
+              sliderRef={bgColorSliderRef}
+              onFieldClick={(e) => handleColorFieldClick(e, true)}
+              onFieldMouseDown={(e) => startColorDrag(e, 'field', true)}
+              onSliderClick={(e) => handleColorSliderClick(e, true)}
+              onSliderMouseDown={(e) => startColorDrag(e, 'slider', true)}
+              fieldBackground={`linear-gradient(to right, white, ${getHueColor(parseFloat(bgSliderPos) * 3.6)}), linear-gradient(to bottom, transparent, black)`}
+              previewColor={backgroundColor}
+              colorPos={bgColorPos}
+              sliderPos={bgSliderPos}
+              sliderKnobColor={isGlyphsView ? 'var(--color-gray-400)' : getHueColor(parseFloat(bgSliderPos) * 3.6)}
+              colorMode={bgColorMode}
+              onToggleMode={() => setBgColorMode(bgColorMode === 'hex' ? 'rgb' : 'hex')}
+              colorValue={backgroundColor}
+              onColorValueChange={setBackgroundColor}
+              onChannelChange={(ch, val) => handleRgbChannelChange(ch, val, true)}
+              hexAriaLabel="Цвет фона, HEX"
+            />
           )}
         </div>
         
         {/* Быстрые образцы текста и наборы символов */}
         <div className="-mx-4 border-t border-gray-200 px-4 pt-4 pb-4">
           <div className="mb-4 grid grid-cols-2 gap-2">
-            {SAMPLE_QUICK_PRESETS.map(({ key, label }) => {
-              const active = sidebarTextPreset === `sample:${key}`;
-              return (
-                <button
-                  key={`sample-${key}`}
-                  type="button"
-                  disabled={isGlyphsView}
-                  className={active ? SIDEBAR_PRESET_BTN_ACTIVE : SIDEBAR_PRESET_BTN_IDLE}
-                  onClick={() => pickSidebarTextPreset('sample', key)}
-                >
-                  {label}
-                </button>
-              );
-            })}
-            {GLYPH_QUICK_PRESETS.map(({ key, label }) => {
-              const active = sidebarTextPreset === `glyph:${key}`;
-              return (
-                <button
-                  key={`glyph-${key}`}
-                  type="button"
-                  disabled={isGlyphsView}
-                  className={active ? SIDEBAR_PRESET_BTN_ACTIVE : SIDEBAR_PRESET_BTN_IDLE}
-                  onClick={() => pickSidebarTextPreset('glyph', key)}
-                >
-                  {label}
-                </button>
-              );
-            })}
+            {quickPresetSections.flatMap(({ kind, presets }) =>
+              presets.map(({ key, label }) => {
+                const active = sidebarTextPreset === `${kind}:${key}`;
+                return (
+                  <button
+                    key={`${kind}-${key}`}
+                    type="button"
+                    disabled={isGlyphsView}
+                    className={active ? SIDEBAR_PRESET_BTN_ACTIVE : SIDEBAR_PRESET_BTN_IDLE}
+                    onClick={() => pickSidebarTextPreset(kind, key)}
+                  >
+                    {label}
+                  </button>
+                );
+              }),
+            )}
           </div>
         </div>
       </div>
@@ -1877,10 +2001,7 @@ export default function Sidebar({
             aria-label="Настройки приложения"
             title="Настройки приложения"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="h-4 w-4" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317a1.724 1.724 0 0 1 3.35 0l.159.81a1.724 1.724 0 0 0 2.573 1.154l.713-.406a1.724 1.724 0 0 1 2.294.633 1.724 1.724 0 0 1-.49 2.265l-.654.495a1.724 1.724 0 0 0 0 2.764l.654.495a1.724 1.724 0 0 1 .49 2.265 1.724 1.724 0 0 1-2.294.633l-.713-.406a1.724 1.724 0 0 0-2.573 1.154l-.159.81a1.724 1.724 0 0 1-3.35 0l-.159-.81a1.724 1.724 0 0 0-2.573-1.154l-.713.406a1.724 1.724 0 0 1-2.294-.633 1.724 1.724 0 0 1 .49-2.265l.654-.495a1.724 1.724 0 0 0 0-2.764l-.654-.495a1.724 1.724 0 0 1-.49-2.265 1.724 1.724 0 0 1 2.294-.633l.713.406a1.724 1.724 0 0 0 2.573-1.154l.159-.81Z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" />
-            </svg>
+            <EditAssetIcon src={settingIconUrl} className="h-4 w-4" />
           </button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PlusIcon } from './CommonIcons';
+import { useDismissibleLayer } from './useDismissibleLayer';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
@@ -51,20 +52,20 @@ export function CatalogAddTargetMenu({
   const hasLibraries = libraries.length > 0;
   const isRowAppearance = appearance === 'row';
   const singleButtonClassName = isRowAppearance
-    ? `inline-flex max-w-full items-center gap-2 rounded-md border-0 bg-transparent py-1 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
+    ? `inline-flex max-w-full items-center gap-2 rounded-md border-0 bg-transparent py-1 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black group-hover:!text-white group-hover:hover:!text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
     : `inline-flex max-w-full items-center gap-1.5 rounded-md border-0 bg-transparent py-1 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim();
   const selectorButtonClassName = isRowAppearance
-    ? `inline-flex h-6 min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-0 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-        open ? 'text-black' : ''
+    ? `inline-flex h-6 min-w-0 items-center gap-1.5 rounded-md border-0 bg-transparent py-0 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black group-hover:!text-white group-hover:hover:!text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
+        open ? 'text-black group-hover:!text-white' : ''
       }`
     : `inline-flex h-5 min-w-0 items-center gap-1 rounded-md border-0 bg-transparent py-0 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
         open ? 'text-accent' : ''
       }`;
   const addButtonClassName = isRowAppearance
-    ? 'ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100'
+    ? 'ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-black transition-colors hover:text-black group-hover:!text-white group-hover:hover:!text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-default disabled:opacity-100'
     : 'ml-1 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100';
   const standaloneAddButtonClassName = isRowAppearance
-    ? `inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-black transition-colors hover:text-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
+    ? `inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-black transition-colors hover:text-black group-hover:!text-white group-hover:hover:!text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
     : `inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-0 bg-transparent text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim();
   const plusIconClassName = isRowAppearance ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0';
   const chevronClassName = isRowAppearance ? 'h-4.5 w-4.5 shrink-0' : 'h-4 w-4 shrink-0';
@@ -109,27 +110,11 @@ export function CatalogAddTargetMenu({
     setSelectedLibraryId(libraries[0]?.id || null);
   }, [libraries, selectedLibraryId]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-
-    const onPointerDown = (event) => {
-      if (rootRef.current?.contains(event.target)) return;
-      setOpen(false);
-    };
-
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
+  useDismissibleLayer({
+    open,
+    refs: [rootRef],
+    onDismiss: () => setOpen(false),
+  });
 
   useEffect(() => {
     return () => {

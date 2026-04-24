@@ -39,17 +39,37 @@ export function useCatalogToolbarLayout({
     if (!catalogScrollEl) {
       return undefined;
     }
-    const measure = () => {
-      const w = catalogScrollEl.clientWidth;
-      if (Number.isFinite(w) && w > 0) {
-        setGridInnerWidth(w);
+    let rafId = null;
+    const commitWidth = (nextWidth) => {
+      const w = Math.round(Number(nextWidth) || 0);
+      if (w <= 0) return;
+      setGridInnerWidth((prev) => (prev === w ? prev : w));
+    };
+    const scheduleCommit = (nextWidth) => {
+      if (typeof window === 'undefined') return;
+      if (rafId != null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        commitWidth(nextWidth);
+      });
+    };
+
+    // Первичное измерение — через contentRect если доступно, иначе clientWidth (один раз).
+    commitWidth(catalogScrollEl.clientWidth);
+
+    if (typeof ResizeObserver !== 'function') return undefined;
+    const ro = new ResizeObserver((entries) => {
+      const first = entries?.[0];
+      const w = first?.contentRect?.width;
+      scheduleCommit(w ?? catalogScrollEl.clientWidth);
+    });
+    ro.observe(catalogScrollEl);
+    return () => {
+      ro.disconnect();
+      if (rafId != null && typeof window !== 'undefined') {
+        window.cancelAnimationFrame(rafId);
       }
     };
-    measure();
-    if (typeof ResizeObserver !== 'function') return undefined;
-    const ro = new ResizeObserver(() => measure());
-    ro.observe(catalogScrollEl);
-    return () => ro.disconnect();
   }, [autoMeasureGridWidth, catalogScrollEl, enabled]);
 
   useLayoutEffect(() => {
@@ -57,15 +77,34 @@ export function useCatalogToolbarLayout({
       setTrailingToolbarW(0);
       return undefined;
     }
-    const measure = () => {
-      const w = trailingToolbarEl.getBoundingClientRect().width;
-      setTrailingToolbarW(Number.isFinite(w) ? w : 0);
+    let rafId = null;
+    const commitWidth = (nextWidth) => {
+      const w = Math.round(Number(nextWidth) || 0);
+      setTrailingToolbarW((prev) => (prev === w ? prev : w));
     };
-    measure();
+    const scheduleCommit = (nextWidth) => {
+      if (typeof window === 'undefined') return;
+      if (rafId != null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        commitWidth(nextWidth);
+      });
+    };
+
+    commitWidth(trailingToolbarEl.getBoundingClientRect().width);
     if (typeof ResizeObserver !== 'function') return undefined;
-    const ro = new ResizeObserver(() => measure());
+    const ro = new ResizeObserver((entries) => {
+      const first = entries?.[0];
+      const w = first?.contentRect?.width;
+      scheduleCommit(w ?? trailingToolbarEl.getBoundingClientRect().width);
+    });
     ro.observe(trailingToolbarEl);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      if (rafId != null && typeof window !== 'undefined') {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
   }, [enabled, trailingToolbarEl]);
 
   const gridCols = useMemo(() => {

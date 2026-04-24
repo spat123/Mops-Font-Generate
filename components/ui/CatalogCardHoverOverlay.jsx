@@ -1,21 +1,52 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
+import { EditAssetIcon } from './EditAssetIcon';
+import { linkIconUrl } from './editIconUrls';
 
 function OpenInEditorIcon() {
+  return <EditAssetIcon src={linkIconUrl} className="h-3.5 w-3.5" />;
+}
+
+function SpinnerIcon({ className = 'h-3.5 w-3.5' }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      fill="none"
       viewBox="0 0 24 24"
-      strokeWidth="1.6"
-      stroke="currentColor"
-      className="h-3.5 w-3.5"
+      fill="none"
+      className={`${className} animate-spin text-red-500`.trim()}
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity={0.2} strokeWidth={2} />
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeDasharray="14 43"
+        transform="rotate(-90 12 12)"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = 'h-3.5 w-3.5' }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="none"
+      className={`${className} text-red-500`.trim()}
       aria-hidden
     >
       <path
+        d="M4.5 10.5L8.25 14.25L15.5 7"
+        stroke="currentColor"
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"
       />
     </svg>
   );
@@ -31,6 +62,83 @@ export function CatalogCardHoverOverlay({
 }) {
   const resolvedDownloadButtonProps =
     downloadButtonProps && typeof downloadButtonProps === 'object' ? downloadButtonProps : {};
+
+  const [openState, setOpenState] = useState('idle'); // idle | loading | done
+  const [rowDownloadState, setRowDownloadState] = useState({ busyKey: null, doneKey: null });
+  const openDoneTimeoutRef = useRef(null);
+  const rowDoneTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (openDoneTimeoutRef.current != null) {
+        window.clearTimeout(openDoneTimeoutRef.current);
+        openDoneTimeoutRef.current = null;
+      }
+      if (rowDoneTimeoutRef.current != null) {
+        window.clearTimeout(rowDoneTimeoutRef.current);
+        rowDoneTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const runOpenWithFeedback = (event) => {
+    event.stopPropagation();
+    if (!onOpen) return;
+    if (openState === 'loading') return;
+    if (openDoneTimeoutRef.current != null) {
+      window.clearTimeout(openDoneTimeoutRef.current);
+      openDoneTimeoutRef.current = null;
+    }
+    setOpenState('loading');
+    void (async () => {
+      try {
+        const result = onOpen?.();
+        const ok = await Promise.resolve(result);
+        if (ok === false) {
+          setOpenState('idle');
+          return;
+        }
+        setOpenState('done');
+        openDoneTimeoutRef.current = window.setTimeout(() => {
+          setOpenState('idle');
+          openDoneTimeoutRef.current = null;
+        }, 900);
+      } catch {
+        setOpenState('idle');
+      }
+    })();
+  };
+
+  const runRowDownloadWithFeedback = (event, item) => {
+    event.stopPropagation();
+    if (!item?.onSelect) return;
+    if (rowDownloadState.busyKey) return;
+    if (rowDoneTimeoutRef.current != null) {
+      window.clearTimeout(rowDoneTimeoutRef.current);
+      rowDoneTimeoutRef.current = null;
+    }
+    setRowDownloadState({ busyKey: item.key, doneKey: null });
+    void (async () => {
+      try {
+        const result = item.onSelect?.();
+        const ok = await Promise.resolve(result);
+        if (ok === false) {
+          setRowDownloadState({ busyKey: null, doneKey: null });
+          return;
+        }
+        setRowDownloadState({ busyKey: null, doneKey: item.key });
+        rowDoneTimeoutRef.current = window.setTimeout(() => {
+          setRowDownloadState({ busyKey: null, doneKey: null });
+          rowDoneTimeoutRef.current = null;
+        }, 900);
+      } catch {
+        setRowDownloadState({ busyKey: null, doneKey: null });
+      } finally {
+        onRequestCloseHoverUi?.();
+      }
+    })();
+  };
+
   const rowDownloadItems = (
     Array.isArray(resolvedDownloadButtonProps.menuItems) ? resolvedDownloadButtonProps.menuItems : []
   )
@@ -50,18 +158,22 @@ export function CatalogCardHoverOverlay({
       disabled: item.disabled,
     }));
 
+  const openIcon = useMemo(() => {
+    if (openState === 'loading') return <SpinnerIcon />;
+    if (openState === 'done') return <CheckIcon />;
+    return <OpenInEditorIcon />;
+  }, [openState]);
+
   const openButton = (
     <button
       type="button"
       data-no-card-select="true"
-      onClick={(event) => {
-        event.stopPropagation();
-        onOpen?.();
-      }}
-      className="inline-flex h-8 items-center gap-1.5 rounded-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white"
+      onClick={runOpenWithFeedback}
+      disabled={openState === 'loading'}
+      className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
       aria-label={openAriaLabel}
     >
-      <OpenInEditorIcon />
+      {openIcon}
       {openLabel}
     </button>
   );
@@ -71,23 +183,22 @@ export function CatalogCardHoverOverlay({
       className="w-auto"
       onActionComplete={onRequestCloseHoverUi}
       {...resolvedDownloadButtonProps}
+      layout="comfortable"
     />
   );
 
   return centered ? (
     <div className="relative h-full w-full">
-      <div className="pointer-events-auto absolute bottom-4 right-4 flex max-w-[calc(100%-1rem)] flex-wrap justify-end gap-1.5">
+      <div className="pointer-events-auto absolute bottom-5 right-5 flex max-w-[calc(100%-1.25rem)] flex-wrap justify-end gap-2.5">
         <button
           type="button"
           data-no-card-select="true"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen?.();
-          }}
-          className="inline-flex h-8 items-center gap-1 rounded-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white"
+          onClick={runOpenWithFeedback}
+          disabled={openState === 'loading'}
+          className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
           aria-label={openAriaLabel}
         >
-          <OpenInEditorIcon />
+          {openIcon}
           {openLabel}
         </button>
         {rowDownloadItems.map((item) => (
@@ -95,23 +206,24 @@ export function CatalogCardHoverOverlay({
             key={item.key}
             type="button"
             data-no-card-select="true"
-            disabled={item.disabled}
-            onClick={(event) => {
-              event.stopPropagation();
-              item.onSelect?.();
-              onRequestCloseHoverUi?.();
-            }}
-            className="inline-flex h-8 items-center rounded-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-50"
+            disabled={Boolean(item.disabled) || Boolean(rowDownloadState.busyKey)}
+            onClick={(event) => runRowDownloadWithFeedback(event, item)}
+            className="inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-md bg-white px-3 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-50"
           >
-            {item.label}
+            {rowDownloadState.busyKey === item.key ? (
+              <SpinnerIcon className="h-4 w-4" />
+            ) : rowDownloadState.doneKey === item.key ? (
+              <CheckIcon className="h-4 w-4" />
+            ) : null}
+            <span className="whitespace-nowrap">{item.label}</span>
           </button>
         ))}
       </div>
     </div>
   ) : (
     <div className="relative h-full w-full">
-      <div className="pointer-events-auto absolute bottom-2 left-2">{openButton}</div>
-      <div className="pointer-events-auto absolute bottom-2 right-2">{downloadButton}</div>
+      <div className="pointer-events-auto absolute bottom-4 left-4">{openButton}</div>
+      <div className="pointer-events-auto absolute bottom-4 right-4">{downloadButton}</div>
     </div>
   );
 }

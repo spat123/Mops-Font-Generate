@@ -2,6 +2,7 @@
 import { toast } from './appNotify';
 import { parseFontBuffer, isVariableFont, mergeFvarAxesFromFontInputs, normalizeFvarAxisTag } from './fontParser';
 import { filterPresetStylesForVariableAxes, findStyleInfoByWeightAndStyle, getFormatFromExtension } from './fontUtilsCommon';
+import { buildVariationSettingsCssString } from './fontVariationSettings';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGenerator';
 
 /**
@@ -202,6 +203,7 @@ export const processLocalFont = async (incomingFontInput) => {
         name: cachedMetadata.preferredFamily || cachedMetadata.names?.fontFamily || cleanedName, // Prefer names from cache.
         originalName: name,
         source,
+        originKey: source === 'google' ? `google:${cleanedName}` : `local:${fontId}`,
         currentWeight: 400, // Refined below.
         currentStyle: 'normal', // Refined below.
         isVariableFont: cachedMetadata.isVariable || false, // Use cache flag.
@@ -222,9 +224,7 @@ export const processLocalFont = async (incomingFontInput) => {
                 return acc;
          }, {});
          fontObj.supportedAxes = Object.keys(cachedMetadata.supportedAxes);
-         fontObj.variationSettings = Object.entries(fontObj.variableAxes)
-            .map(([tag, value]) => `\"${tag}\" ${value.default || 400}`) // Fallback default for weight.
-            .join(', ');
+         fontObj.variationSettings = buildVariationSettingsCssString(fontObj.variableAxes);
          // Определяем начальные стили для вариативных шрифтов из кэша
          // Пока оставляем заглушку или берём значения из дефолтных осей
          // TODO: Уточнить логику availableStyles для вариативных шрифтов из кэша
@@ -310,6 +310,7 @@ export const processLocalFont = async (incomingFontInput) => {
       name: cleanedName, // Уточним из metadata
       originalName: name,
       source,
+      originKey: source === 'google' ? `google:${cleanedName}` : `local:${fontId}`,
       currentWeight: 400,
       currentStyle: 'normal',
       isVariableFont: false, // Уточним из metadata
@@ -357,9 +358,7 @@ export const processLocalFont = async (incomingFontInput) => {
                 return acc;
          }, {});
          fontObj.supportedAxes = Object.keys(fontObj.variableAxes);
-         fontObj.variationSettings = Object.entries(fontObj.variableAxes)
-            .map(([tag, value]) => `\"${tag}\" ${value.default || 400}`) // Запасное значение для веса
-            .join(', ');
+         fontObj.variationSettings = buildVariationSettingsCssString(fontObj.variableAxes);
          fontObj.italicMode = resolveFontItalicMode(fontObj.variableAxes, fontObj.hasItalicStyles);
          fontObj.availableStyles = filterPresetStylesForVariableAxes(fontObj.variableAxes, undefined, {
            italicMode: fontObj.italicMode,

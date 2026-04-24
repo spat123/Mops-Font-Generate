@@ -171,6 +171,7 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         name: fontFamily,
         displayName: displayName,
         source: 'fontsource',
+        originKey: `fontsource:${fontFamily}`,
         // Имя для FontFace/CSS без лишних кавычек; кавычки добавляет useFontCss.getFontFamily
         fontFamily: displayName,
         variableAxes: parsedVariableAxes,
@@ -362,11 +363,12 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     try {
       // Проверяем существующие шрифты (переданные как currentFonts)
       const existingFont = currentFonts.find(font => {
+        const sourceMatch = font?.source === 'fontsource';
         const nameMatch = font.name === fontFamilyName;
         const variableMatch = font.isVariableFont === forceVariableFont;
         // Для вариативных также проверяем displayName, чтобы отличить от статической версии с тем же familyName
         const displayNameMatch = forceVariableFont ? font.displayName?.includes('Variable') : !font.displayName?.includes('Variable');
-        return nameMatch && variableMatch && displayNameMatch;
+        return sourceMatch && nameMatch && variableMatch && displayNameMatch;
       });
 
       if (existingFont) {

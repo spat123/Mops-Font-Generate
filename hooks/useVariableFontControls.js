@@ -1,4 +1,6 @@
 import { useCallback, useRef } from 'react';
+import { formatFontVariationSettings } from '../utils/fontVariationSettings';
+import { buildVariableSettingsViewStatePatch } from '../utils/fontViewStateWriter';
 
 const fontMetadataCache = new Map();
 
@@ -38,9 +40,7 @@ export function useVariableFontControls(
       setSelectedFont(prevFont => {
         if (!prevFont || prevFont.id !== fontToApply.id) return prevFont;
 
-        const variationSettingsStr = Object.entries(updatedSettings)
-          .map(([tag, value]) => `\"${tag}\" ${value}`)
-          .join(', ');
+        const variationSettingsStr = formatFontVariationSettings(updatedSettings, { fallback: 'normal' });
 
         const updatedAxes = { ...fontToApply.variableAxes };
         Object.entries(updatedSettings).forEach(([tag, value]) => {
@@ -59,7 +59,7 @@ export function useVariableFontControls(
       // Обновляем lastUsedVariableSettings в общем массиве шрифтов
       setFonts(currentFonts => currentFonts.map(f => {
         if (f.id === fontToApply.id) {
-          return { ...f, lastUsedVariableSettings: updatedSettings, lastUsedPresetName: null };
+          return { ...f, ...buildVariableSettingsViewStatePatch(updatedSettings) };
         }
         return f;
       }));

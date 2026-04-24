@@ -1,6 +1,5 @@
 import React from 'react';
 import EditableText from './EditableText';
-import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 import { useSettings } from '../contexts/SettingsContext';
 import { useTextDisplayBuffer } from '../hooks/useTextDisplayBuffer';
 
@@ -35,7 +34,6 @@ function TextMode({
         syncId="text"
         autoFocus={true}
       />
-      <PreviewEditTextHint />
     </div>
   );
 }

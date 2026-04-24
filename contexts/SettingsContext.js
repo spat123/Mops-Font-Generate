@@ -170,6 +170,17 @@ function useSyncSettingToStorage(isClient, storageKey, value) {
   }, [isClient, storageKey, value]);
 }
 
+/** Для "горячих" контролов вроде color picker не пишем в storage на каждый тик drag. */
+function useDebouncedSyncSettingToStorage(isClient, storageKey, value, delayMs = 180) {
+  useEffect(() => {
+    if (!isClient) return;
+    const timer = setTimeout(() => {
+      setLocalStorageItem(storageKey, value);
+    }, Math.max(0, Number(delayMs) || 0));
+    return () => clearTimeout(timer);
+  }, [delayMs, isClient, storageKey, value]);
+}
+
 export const SettingsProvider = ({ children }) => {
   const [isClient, setIsClient] = useState(false);
 
@@ -298,8 +309,8 @@ export const SettingsProvider = ({ children }) => {
     setPreviewBackgroundImage(typeof img === 'string' && img.length > 0 ? img : null);
   }, []);
 
-  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.BACKGROUND_COLOR, backgroundColor);
-  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_COLOR, textColor);
+  useDebouncedSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.BACKGROUND_COLOR, backgroundColor);
+  useDebouncedSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_COLOR, textColor);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.FONT_SIZE, fontSize);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.GLYPHS_FONT_SIZE, glyphsFontSize);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.STYLES_FONT_SIZE, stylesFontSize);

@@ -37,6 +37,8 @@ export default function DraggableValueRangeSlider({
   disabled = false,
   defaultMarkerValue,
   onChange,
+  onRangeLiveChange,
+  onRangeCommit,
   onMarkerDrag,
   onMarkerDragEnd,
   formatDisplay = (v) => String(v),
@@ -60,6 +62,8 @@ export default function DraggableValueRangeSlider({
       ? valueToPercent(Number(defaultMarkerValue), min, max)
       : null;
 
+  const emitRangeMove = onRangeLiveChange ?? onChange;
+  const emitRangeCommit = onRangeCommit ?? onChange;
   const emitMarkerMove = onMarkerDrag ?? onChange;
   const emitMarkerEnd = onMarkerDragEnd;
 
@@ -67,9 +71,21 @@ export default function DraggableValueRangeSlider({
     (e) => {
       const raw = parseFloat(e.target.value);
       const v = snapValueToStep(raw, min, max, step);
-      onChange(v);
+      emitRangeMove(v);
     },
-    [min, max, step, onChange]
+    [emitRangeMove, min, max, step]
+  );
+
+  const commitRangeValue = useCallback(
+    (rawValue) => {
+      if (typeof emitRangeCommit !== 'function') return;
+      const raw = parseFloat(String(rawValue));
+      const fallback = Number(value);
+      const source = Number.isFinite(raw) ? raw : fallback;
+      const v = snapValueToStep(source, min, max, step);
+      emitRangeCommit(v);
+    },
+    [emitRangeCommit, max, min, step, value]
   );
 
   const handleMarkerMouseDown = useCallback(
@@ -270,6 +286,10 @@ export default function DraggableValueRangeSlider({
         value={value}
         disabled={disabled}
         onChange={handleRangeChange}
+        onMouseUp={(e) => commitRangeValue(e.currentTarget.value)}
+        onTouchEnd={(e) => commitRangeValue(e.currentTarget.value)}
+        onKeyUp={(e) => commitRangeValue(e.currentTarget.value)}
+        onBlur={(e) => commitRangeValue(e.currentTarget.value)}
         className={`absolute left-0 right-0 z-20 h-5 appearance-none bg-transparent ${
           disabled ? '' : 'cursor-pointer'
         }`.trim()}

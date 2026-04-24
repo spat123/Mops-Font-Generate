@@ -120,8 +120,8 @@ export function getPreviewChromeFromBackground(backgroundColor) {
     subsectionTitle: 'text-xs font-semibold uppercase tracking-wide text-gray-500',
     meta: 'text-xs text-gray-500',
     divider: 'border-gray-200',
-    noteBox: 'rounded-md bg-gray-50 p-4',
-    noteText: 'text-sm text-gray-800',
+    noteBox: 'hover:bg-gray-50 transition-colors duration-100 p-4',
+    noteText: 'text-sm text-gray-600',
     noteStrong: 'font-semibold text-gray-900',
   };
 }

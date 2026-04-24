@@ -1,6 +1,7 @@
 // Утилиты генерации CSS-правил (@font-face, font-variation-settings и т.д.).
 import { toast } from './appNotify';
 import { debounce } from './debounce';
+import { formatFontVariationSettings } from './fontVariationSettings';
 import { getFormatFromExtension } from './fontUtilsCommon';
 
 export { debounce };
@@ -250,11 +251,10 @@ export const updateVariableFontSettings = (fontObj, currentSettings, prevSetting
 
     // Формируем CSS-правило только для font-variation-settings
     let variationSettingsRule = '';
-    const settingsToApply = Object.entries(currentSettings);
-    if (settingsToApply.length > 0) {
-        const settingsArray = settingsToApply.map(([tag, value]) => `\"${tag}\" ${value}`);
+    const variationSettingsValue = formatFontVariationSettings(currentSettings, { fallback: '' });
+    if (variationSettingsValue) {
         // Use data-attribute selector; preview element must include this attribute.
-        variationSettingsRule = `[data-font-family="${fontFamilyName}"] { font-variation-settings: ${settingsArray.join(', ')}; }`;
+        variationSettingsRule = `[data-font-family="${fontFamilyName}"] { font-variation-settings: ${variationSettingsValue}; }`;
         // Alternative: CSS variables (requires component changes).
         // variationSettingsRule = `:root { ${settingsArray.map(([tag, value]) => `--${fontId}-${tag}: ${value};`).join('\n')} }`;
     }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CardActionsMenu } from './CardActionsMenu';
 import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
+import { Tooltip } from './Tooltip';
 
 const PREVIEW_SAMPLE = 'AaBbCcDdEe';
 
@@ -19,14 +20,44 @@ function CardRemoveButton({ onClick }) {
   );
 }
 
+function SelectionOverlay() {
+  return (
+    <>
+      <div className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-accent" />
+      <div className="pointer-events-none absolute inset-0 z-10 rounded-lg bg-accent/12" />
+      <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-white shadow-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-5 w-5" aria-hidden>
+            <path
+              d="M4.5 10.5L8.25 14.25L15.5 7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+    </>
+  );
+}
+
 /** Карточка шрифта в сессии. variant=tall — сетка Google (высота и крупнее превью). */
 export function SessionFontCard({
   selected,
+  batchSelected = false,
   title,
+  recentlyAdded = false,
   subtitle,
   previewStyle,
   onCardClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
+  onPointerCancel,
   onRemove,
+  /** Кастомное действие в правом верхнем углу (например «+ добавить») */
+  cornerAction,
   /** Меню «⋯» (например в сохранённой библиотеке); если задано, крестик не показывается */
   menuItems,
   /** Нижний правый угол: CatalogDownloadSplitButton (как в каталоге) */
@@ -43,12 +74,10 @@ export function SessionFontCard({
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
 
   const base =
-    `group relative rounded-lg bg-surface-card transition-all duration-200 ${
+    `group relative rounded-lg bg-surface-card transition-all min-h-32 duration-200 ${
       onCardClick ? 'cursor-pointer ' : ''
     }` +
-    (selected
-      ? 'bg-accent-soft'
-      : 'hover:bg-gray-50');
+    (batchSelected ? '' : selected ? 'bg-accent-soft' : 'hover:bg-gray-50');
 
   const shell =
     variant === 'tall'
@@ -67,26 +96,37 @@ export function SessionFontCard({
     <div
       className={`${shell} ${shellClassName}`.trim()}
       onClick={onCardClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
+      onPointerCancel={onPointerCancel}
       draggable={draggable}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
     >
-      <div className="truncate text-sm font-medium">{title}</div>
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="truncate text-sm font-medium">{title}</div>
+        {recentlyAdded ? (
+          <Tooltip content="Добавленный за последние сутки" openDelayMs={150}>
+            <span
+              className="inline-flex h-2 w-2 shrink-0 rounded-full bg-accent"
+              aria-label="Добавленный за последние сутки"
+            />
+          </Tooltip>
+        ) : null}
+      </div>
       <div className={previewCls} style={previewStyle}>
         {PREVIEW_SAMPLE}
       </div>
       <div className={subCls}>{subtitle}</div>
-      {Array.isArray(menuItems) && menuItems.length > 0 ? (
-        <div
-          className="absolute right-2 top-2 z-20"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <CardActionsMenu triggerLabel={`Действия: ${title}`} items={menuItems} />
-        </div>
-      ) : onRemove ? (
+      {batchSelected ? <SelectionOverlay /> : null}
+      {!batchSelected && cornerAction ? (
+        <div className="absolute right-2 top-2 z-[12]">{cornerAction}</div>
+      ) : !batchSelected && Array.isArray(menuItems) && menuItems.length > 0 ? (
+        <CardActionsMenu triggerLabel={`Действия: ${title}`} items={menuItems} />
+      ) : !batchSelected && onRemove ? (
         <CardRemoveButton
           onClick={(e) => {
             e.stopPropagation();
@@ -94,10 +134,10 @@ export function SessionFontCard({
           }}
         />
       ) : null}
-      {downloadSplitButtonProps ? (
+      {!batchSelected && downloadSplitButtonProps ? (
         <div
           className={[
-            'absolute bottom-2 right-2 z-[11] max-w-[calc(100%-0.75rem)] opacity-0 transition-opacity duration-200',
+            'absolute bottom-2 right-2 z-[11] max-w-[calc(100%-1rem)] opacity-0 transition-opacity duration-200',
             'pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100',
             'focus-within:pointer-events-auto focus-within:opacity-100',
             downloadMenuOpen ? '!pointer-events-auto !opacity-100' : '',

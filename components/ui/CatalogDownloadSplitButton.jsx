@@ -1,5 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { EditAssetIcon } from './EditAssetIcon';
+import { downloudIconUrl } from './editIconUrls';
+import { useDismissibleLayer } from './useDismissibleLayer';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
@@ -9,11 +12,47 @@ function ChevronDownIcon({ className = 'h-3 w-3' }) {
   );
 }
 
-function DownloadIcon({ className = 'h-3.5 w-3.5' }) {
+function SpinnerIcon({ className = 'h-4 w-4' }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <path d="M12 0C12.5523 0 13 0.447715 13 1V13.5859L17.293 9.29297C17.6834 8.90254 18.3166 8.90254 18.707 9.29297C19.0974 9.68342 19.0974 10.3166 18.707 10.707L12.707 16.707C12.3166 17.0974 11.6834 17.0974 11.293 16.707L5.29297 10.707C4.90254 10.3166 4.90254 9.68342 5.29297 9.29297C5.68342 8.90254 6.31658 8.90254 6.70703 9.29297L11 13.5859V1C11 0.447715 11.4477 0 12 0Z" fill="currentColor" />
-      <path d="M1 15C1.55228 15 2 15.4477 2 16V21C2 21.5523 2.44772 22 3 22H21C21.5523 22 22 21.5523 22 21V16C22 15.4477 22.4477 15 23 15C23.5523 15 24 15.4477 24 16V22.75C24 23.4404 23.4404 24 22.75 24H1.25C0.559644 24 0 23.4404 0 22.75V16C0 15.4477 0.447715 15 1 15Z" fill="currentColor" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={`${className} animate-spin text-red-500`.trim()}
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeOpacity={0.2} strokeWidth={2} />
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeDasharray="14 43"
+        transform="rotate(-90 12 12)"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="none"
+      className={`${className} text-red-500`.trim()}
+      aria-hidden
+    >
+      <path
+        d="M4.5 10.5L8.25 14.25L15.5 7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -27,34 +66,36 @@ export function CatalogDownloadSplitButton({
   menuItems = [],
   tone = 'light',
   className = '',
+  secondaryButtonClassName = '',
   onMenuOpenChange,
+  /** comfortable — выше кнопки и больше горизонтальные отступы (оверлей карточки каталога) */
+  layout = 'compact',
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const menuRef = useRef(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, ready: false });
+  const [actionState, setActionState] = useState('idle'); // idle | loading | done
+  const doneTimeoutRef = useRef(null);
 
   useEffect(() => {
     onMenuOpenChange?.(open);
   }, [open, onMenuOpenChange]);
 
+  useDismissibleLayer({
+    open,
+    refs: [rootRef, menuRef],
+    onDismiss: () => setOpen(false),
+  });
+
   useEffect(() => {
-    if (!open) return undefined;
-    const onPointerDown = (event) => {
-      if (rootRef.current?.contains(event.target)) return;
-      if (menuRef.current?.contains(event.target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
+      if (doneTimeoutRef.current != null) {
+        window.clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
+      }
     };
-  }, [open]);
+  }, []);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -102,17 +143,51 @@ export function CatalogDownloadSplitButton({
 
   const hasMenu = Array.isArray(menuItems) && menuItems.some((item) => !item?.hidden);
   const isAccent = tone === 'accent';
-  const rootClassName = `relative inline-flex h-8 w-40.5 items-stretch ${className}`.trim();
+  const roomy = layout === 'comfortable';
+  const rootClassName = `relative inline-flex ${roomy ? 'h-9' : 'h-8'} w-40.5 items-stretch ${className}`.trim();
   const primaryClassName = isAccent
-    ? 'inline-flex items-center gap-1.5 w-full rounded-l-sm bg-accent px-3 text-xs uppercase font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400'
-    : 'inline-flex items-center gap-1.5 rounded-l-md bg-white px-2 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70';
-  const secondaryClassName = isAccent
-    ? `inline-flex w-8 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
-        open ? 'bg-accent-hover' : ''
-      }`
-    : `inline-flex w-7 items-center justify-center rounded-r-md border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70 ${
-        open ? 'bg-white' : ''
-      }`;
+    ? `inline-flex items-center ${roomy ? 'gap-2 px-4' : 'gap-1.5 px-3'} w-full rounded-l-md bg-accent text-xs uppercase font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400`
+    : `inline-flex items-center ${roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} rounded-l-md bg-white text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default`;
+  const secondaryClassName = `${
+    isAccent
+      ? `inline-flex ${roomy ? 'w-9' : 'w-8'} items-center justify-center rounded-r-md border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
+          open ? 'bg-accent-hover' : ''
+        }`
+      : `inline-flex ${roomy ? 'w-9' : 'w-7'} items-center justify-center rounded-r-md border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default ${
+          open ? 'bg-white' : ''
+        }`
+  } ${secondaryButtonClassName}`.trim();
+
+  const busy = actionState === 'loading';
+  const showDone = actionState === 'done';
+  const primaryDisabled = disabled || busy;
+  const chevronDisabled = disabled || busy || !hasMenu;
+
+  const runActionWithFeedback = (action) => {
+    if (busy) return;
+    if (doneTimeoutRef.current != null) {
+      window.clearTimeout(doneTimeoutRef.current);
+      doneTimeoutRef.current = null;
+    }
+    setActionState('loading');
+    void (async () => {
+      try {
+        const result = action?.();
+        const ok = await Promise.resolve(result);
+        if (ok === false) {
+          setActionState('idle');
+          return;
+        }
+        setActionState('done');
+        doneTimeoutRef.current = window.setTimeout(() => {
+          setActionState('idle');
+          doneTimeoutRef.current = null;
+        }, 900);
+      } catch {
+        setActionState('idle');
+      }
+    })();
+  };
 
   const menuDropdownEl = (
     <div
@@ -135,12 +210,12 @@ export function CatalogDownloadSplitButton({
             onClick={(event) => {
               event.stopPropagation();
               setOpen(false);
-              item.onSelect?.();
+              runActionWithFeedback(item.onSelect);
               onActionComplete?.();
             }}
-            className={`flex w-full items-center px-3 py-2 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
-              index > 0 ? 'border-t border-gray-200' : ''
-            }`}
+            className={`flex w-full items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
+              roomy ? 'py-3.5' : 'py-2.5'
+            } ${index > 0 ? 'border-t border-gray-200' : ''}`}
           >
             <span className="truncate">{item.label}</span>
           </button>
@@ -153,22 +228,28 @@ export function CatalogDownloadSplitButton({
       <button
         type="button"
         data-no-card-select="true"
-        disabled={disabled}
+        disabled={primaryDisabled}
         onClick={(event) => {
           event.stopPropagation();
-          onPrimaryClick?.();
+          runActionWithFeedback(onPrimaryClick);
           onActionComplete?.();
         }}
         className={primaryClassName}
         aria-label={primaryAriaLabel}
       >
-        <DownloadIcon />
+        {busy ? (
+          <SpinnerIcon className={roomy ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
+        ) : showDone ? (
+          <CheckIcon className={roomy ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
+        ) : (
+          <EditAssetIcon src={downloudIconUrl} className="h-4 w-4" />
+        )}
         {primaryLabel}
       </button>
       <button
         type="button"
         data-no-card-select="true"
-        disabled={disabled || !hasMenu}
+        disabled={chevronDisabled}
         onClick={(event) => {
           event.stopPropagation();
           setOpen((value) => !value);

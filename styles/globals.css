@@ -220,6 +220,16 @@ input[type='search']::-ms-reveal {
   display: none;
 }
 
+/* Лента вкладок: скрываем нативный горизонтальный скролл, но сохраняем программную прокрутку. */
+.editor-tabbar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.editor-tabbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 @supports (overflow: overlay) {
   .editor-sidebar-scroll {
     overflow-y: overlay;

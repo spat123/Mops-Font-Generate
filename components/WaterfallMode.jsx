@@ -4,7 +4,6 @@ import { useFontContext } from '../contexts/FontContext';
 import EditableText from './EditableText';
 import { VirtualizedVariableList } from './ui/VirtualizedVariableList';
 import { FloatingTooltip } from './ui/Tooltip';
-import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 import { PRESET_STYLES, clampPresetNameForVariableAxes } from '../utils/fontUtilsCommon';
 
 // Fallback, если родитель не передал массив (должен совпадать с FontPreview.waterfallSizes)
@@ -83,6 +82,30 @@ function stringifyFontVariationSettings(entries) {
   return entries.map((e) => `"${e.tag}" ${e.value}`).join(', ');
 }
 
+function clampAxisScalar(value, axis) {
+  if (!axis || typeof axis.min !== 'number' || typeof axis.max !== 'number') return value;
+  const v = Number(value);
+  if (!Number.isFinite(v)) return value;
+  return Math.min(axis.max, Math.max(axis.min, Math.round(v)));
+}
+
+/**
+ * Пресеты строк Waterfall задают «ступеньку» wght; глобальный слайдер wght в сайдбаре
+ * смещает всю лестницу относительно дефолта оси (как в plain/тексте).
+ */
+function resolveWaterfallRowWght(variableAxes, presetWeight, variableSettings) {
+  const axes = variableAxes && typeof variableAxes === 'object' ? variableAxes : {};
+  const wghtAxis = axes.wght;
+  if (!wghtAxis || typeof wghtAxis.min !== 'number') {
+    return Number.isFinite(Number(presetWeight)) ? Number(presetWeight) : 400;
+  }
+  const presetW = Number.isFinite(Number(presetWeight)) ? Number(presetWeight) : 400;
+  const axisDefault = Number.isFinite(Number(wghtAxis.default)) ? Number(wghtAxis.default) : 400;
+  const userW = Number.isFinite(Number(variableSettings?.wght)) ? Number(variableSettings.wght) : axisDefault;
+  const delta = userW - axisDefault;
+  return clampAxisScalar(presetW + delta, wghtAxis);
+}
+
 /**
  * @param {object} props
  * @param {number[]=} props.waterfallSizes
@@ -93,6 +116,8 @@ const WaterfallMode = ({
   scrollParentRef,
   /** Не дергать offsetHeight в каждой строке на каждом кадре анимации VF */
   isVariableFontAnimating = false,
+  /** Во время живого drag размера Waterfall пропускаем metric reflow до commit */
+  isInteractingWithWaterfallSize = false,
 } = {}) => {
   const waterfallSizes =
     Array.isArray(sizesProp) && sizesProp.length > 0 ? sizesProp : DEFAULT_WATERFALL_SIZES;
@@ -114,7 +139,7 @@ const WaterfallMode = ({
     waterfallBodyLetterSpacing,
   } = useSettings();
 
-  const { selectedFont, getFontFamily, fontCssProperties } = useFontContext();
+  const { selectedFont, getFontFamily, fontCssProperties, variableSettings } = useFontContext();
 
   const [scrollParentEl, setScrollParentEl] = useState(null);
 
@@ -132,7 +157,6 @@ const WaterfallMode = ({
       ...fromHook,
       textAlign: textAlignment,
       textTransform: textCase === 'none' ? 'none' : textCase,
-      color: textColor,
       textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
     };
   }, [
@@ -140,7 +164,6 @@ const WaterfallMode = ({
     getFontFamily,
     textAlignment,
     textCase,
-    textColor,
     textDecoration,
   ]);
 
@@ -229,19 +252,21 @@ const WaterfallMode = ({
         textAlign: textAlignment,
       };
 
-      if (isBody && selectedFont?.isVariableFont) {
+      if (selectedFont?.isVariableFont) {
         const axes = selectedFont?.variableAxes && typeof selectedFont.variableAxes === 'object' ? selectedFont.variableAxes : {};
         let fvs = parseFontVariationSettings(baseTextStyle?.fontVariationSettings);
-        if (axes.wght !== undefined) fvs = upsertFvs(fvs, 'wght', presetInfo?.weight ?? 400);
+        if (axes.wght !== undefined) {
+          const rowWght = resolveWaterfallRowWght(selectedFont.variableAxes, presetInfo?.weight ?? 400, variableSettings);
+          fvs = upsertFvs(fvs, 'wght', rowWght);
+        }
         if (axes.ital !== undefined) fvs = upsertFvs(fvs, 'ital', presetInfo?.style === 'italic' ? 1 : 0);
-        if (axes.slnt !== undefined) fvs = upsertFvs(fvs, 'slnt', presetInfo?.style === 'italic' ? (axes.slnt?.min ?? -15) : (axes.slnt?.default ?? 0));
-        itemStyle.fontVariationSettings = stringifyFontVariationSettings(fvs);
-      } else if (selectedFont?.isVariableFont) {
-        const axes = selectedFont?.variableAxes && typeof selectedFont.variableAxes === 'object' ? selectedFont.variableAxes : {};
-        let fvs = parseFontVariationSettings(baseTextStyle?.fontVariationSettings);
-        if (axes.wght !== undefined) fvs = upsertFvs(fvs, 'wght', presetInfo?.weight ?? 400);
-        if (axes.ital !== undefined) fvs = upsertFvs(fvs, 'ital', presetInfo?.style === 'italic' ? 1 : 0);
-        if (axes.slnt !== undefined) fvs = upsertFvs(fvs, 'slnt', presetInfo?.style === 'italic' ? (axes.slnt?.min ?? -15) : (axes.slnt?.default ?? 0));
+        if (axes.slnt !== undefined) {
+          fvs = upsertFvs(
+            fvs,
+            'slnt',
+            presetInfo?.style === 'italic' ? (axes.slnt?.min ?? -15) : (axes.slnt?.default ?? 0),
+          );
+        }
         itemStyle.fontVariationSettings = stringifyFontVariationSettings(fvs);
       } else {
         itemStyle.fontWeight = presetInfo?.weight ?? 400;
@@ -258,11 +283,9 @@ const WaterfallMode = ({
               <div className="flex items-center gap-2">
                 {typeLabel ? (
                   <span
-                    className={`inline-flex h-6 w-12 items-center justify-center text-[10px] font-semibold ${
-                      typeLabel === 'Small'
-                        ? 'rounded-full bg-gray-100 text-gray-800'
-                        : 'rounded-full bg-gray-100 text-gray-800'
-                    }`.trim()}
+                    className={`inline-flex h-6 w-12 items-center justify-start text-xs uppercase font-semibold
+                      
+                    `.trim()}
                   >
                     {typeLabel}
                   </span>
@@ -290,7 +313,9 @@ const WaterfallMode = ({
                 syncId={`waterfall-${index}-${size}-${waterfallUnit}`}
                 viewMode="waterfall"
                 isWaterfall={true}
-                skipMetricReflowWhileVfAnimating={isVariableFontAnimating}
+                skipMetricReflowWhileVfAnimating={
+                  isVariableFontAnimating || isInteractingWithWaterfallSize
+                }
               />
             </div>
           </div>
@@ -302,13 +327,15 @@ const WaterfallMode = ({
       textAlignment,
       waterfallSizes,
       isVariableFontAnimating,
+      isInteractingWithWaterfallSize,
       waterfallUnit,
       remBasePx,
       computeRowLineHeight,
       computeRowLetterSpacingEm,
       copiedSizeLabel,
       waterfallPresetInfo,
-      selectedFont?.id,
+      selectedFont,
+      variableSettings,
       waterfallRoundPx,
     ],
   );
@@ -383,6 +410,7 @@ const WaterfallMode = ({
         className="relative min-h-full w-full min-w-0 pb-8 pr-8 pt-0"
         style={{
           backgroundColor: previewBackgroundImage ? 'transparent' : (backgroundColor ?? undefined),
+          color: textColor ?? undefined,
         }}
       >
         <VirtualizedVariableList
@@ -391,7 +419,6 @@ const WaterfallMode = ({
           renderItem={renderItem}
           overscanPx={96}
         />
-        <PreviewEditTextHint />
       </div>
     </>
   );

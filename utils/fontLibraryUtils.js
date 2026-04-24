@@ -2,6 +2,8 @@ export function normalizeLibraryText(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+export const RECENT_LIBRARY_ENTRY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 export function getLibrarySourceLabel(source) {
   if (source === 'google') return 'Google';
   if (source === 'fontsource') return 'Fontsource';
@@ -13,11 +15,34 @@ export function sanitizeLibraryFont(font) {
   if (!font || typeof font !== 'object') return null;
   const label = normalizeLibraryText(font.label);
   if (!label) return null;
-  return {
+  const sanitized = {
     id: String(font.id || `font:${label.toLowerCase()}`),
     label,
     source: String(font.source || 'session'),
   };
+  if (font.source === 'fontsource' && font.isVariable === true) {
+    sanitized.isVariable = true;
+  }
+  const addedAt = Number(font.addedAt);
+  if (Number.isFinite(addedAt) && addedAt > 0) {
+    sanitized.addedAt = addedAt;
+  }
+  return sanitized;
+}
+
+export function stampLibraryFontAddedNow(font) {
+  const sanitized = sanitizeLibraryFont(font);
+  if (!sanitized) return null;
+  return {
+    ...sanitized,
+    addedAt: Date.now(),
+  };
+}
+
+export function isLibraryFontRecentlyAdded(font, now = Date.now()) {
+  const addedAt = Number(font?.addedAt);
+  if (!Number.isFinite(addedAt) || addedAt <= 0) return false;
+  return now - addedAt < RECENT_LIBRARY_ENTRY_WINDOW_MS;
 }
 
 export function sanitizeLibrary(library) {
@@ -42,15 +67,19 @@ export function mapSessionFontsToLibraryEntries(sessionFonts) {
   }));
 }
 
-export function createCatalogLibraryEntry({ source, key, label }) {
+export function createCatalogLibraryEntry({ source, key, label, isVariable = false }) {
   const normalizedKey = normalizeLibraryText(key);
   const normalizedLabel = normalizeLibraryText(label || key);
   if (!source || !normalizedKey || !normalizedLabel) return null;
-  return {
+  const entry = {
     id: `${source}:${normalizedKey}`,
     label: normalizedLabel,
     source,
   };
+  if (source === 'fontsource' && isVariable) {
+    entry.isVariable = true;
+  }
+  return entry;
 }
 
 export function mapGoogleCatalogItemsToLibraryEntries(items) {
@@ -72,6 +101,7 @@ export function mapFontsourceCatalogItemsToLibraryEntries(items) {
         source: 'fontsource',
         key: item.id || item.slug,
         label: item.family || item.label || item.id || item.slug,
+        isVariable: Boolean(item?.isVariable),
       }),
     )
     .filter(Boolean);

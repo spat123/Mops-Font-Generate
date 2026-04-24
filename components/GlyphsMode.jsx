@@ -4,7 +4,6 @@ import { debounce } from '../utils/debounce';
 import { getGlyphDataForFont } from '../utils/fontParser';
 import { useSettings } from '../contexts/SettingsContext';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
-import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 
 // Глобальный кэш глифов, чтобы не загружать их повторно.
 const glyphDataCache = new Map();
@@ -450,8 +449,6 @@ function GlyphsMode({
             onInnerWidth={onGlyphGridInnerWidth}
           />
         ) : null}
-
-        <PreviewEditTextHint />
 
         {/* Детали глифа */}
         {selectedGlyph && (

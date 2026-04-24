@@ -1,5 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeLibraryText } from '../../utils/fontLibraryUtils';
+import {
+  addLibraryEntryToLibrary,
+  requestCreateLibraryFromEntry,
+} from '../../utils/libraryEntryActions';
+import { useDismissibleLayer } from './useDismissibleLayer';
 
 export function FontLibraryStatusMenu({
   libraries = [],
@@ -55,22 +60,11 @@ export function FontLibraryStatusMenu({
     );
   }, [availableLibraries, candidateIds, candidateLabels, entryId, entryLabel, entrySource]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointerDown = (event) => {
-      if (rootRef.current?.contains(event.target)) return;
-      setOpen(false);
-    };
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
+  useDismissibleLayer({
+    open,
+    refs: [rootRef],
+    onDismiss: () => setOpen(false),
+  });
 
   if (!libraryEntry?.label) return null;
 
@@ -108,13 +102,17 @@ export function FontLibraryStatusMenu({
                     key={library.id}
                     type="button"
                     role="menuitem"
-                    onClick={() => {
-                      onMoveToLibrary?.(library.id, libraryEntry);
+                    onClick={async () => {
+                      await addLibraryEntryToLibrary({
+                        libraryId: library.id,
+                        libraryEntry,
+                        onAddFontToLibrary: onMoveToLibrary,
+                      });
                       setOpen(false);
                     }}
                     className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
                       isAdded
-                        ? 'bg-red-500 text-white'
+                        ? 'bg-accent text-white'
                         : 'text-gray-900 hover:bg-accent hover:text-white'
                     } ${index > 0 ? 'border-t border-gray-200' : ''}`}
                   >
@@ -137,7 +135,10 @@ export function FontLibraryStatusMenu({
               role="menuitem"
               onClick={() => {
                 setOpen(false);
-                onCreateLibrary?.([libraryEntry]);
+                requestCreateLibraryFromEntry({
+                  libraryEntry,
+                  onRequestCreateLibrary: onCreateLibrary,
+                });
               }}
               className="relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-gray-100"
             >

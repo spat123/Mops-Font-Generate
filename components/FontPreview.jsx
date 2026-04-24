@@ -20,8 +20,9 @@ import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchIcon } from './ui/CommonIcons';
 import { IconCircleButton } from './ui/IconCircleButton';
 import { FontLibraryStatusMenu } from './ui/FontLibraryStatusMenu';
-import { createCatalogLibraryEntry, normalizeLibraryText } from '../utils/fontLibraryUtils';
+import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
 import { HexProgressLoader } from './ui/HexProgressLoader';
+import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -32,6 +33,34 @@ const TextMode = lazy(() => import('./TextMode'));
 // --- Конец ленивой загрузки ---
 
 const EMPTY_STATE_GOOGLE_RESULTS_LIMIT = 8;
+
+function resolvePreviewJustifyContent(verticalAlignment) {
+  return verticalAlignment === 'middle'
+    ? 'center'
+    : verticalAlignment === 'bottom'
+      ? 'flex-end'
+      : 'flex-start';
+}
+
+function resolvePreviewAlignItems(textAlignment) {
+  return textAlignment === 'center'
+    ? 'center'
+    : textAlignment === 'right'
+      ? 'flex-end'
+      : 'stretch';
+}
+
+function getEmptyStateSearchLayoutClasses(isActive) {
+  return {
+    viewportClassName: isActive ? 'items-center justify-start pt-8' : 'items-center justify-center',
+    widthClassName: isActive ? 'max-w-6xl py-8' : 'max-w-md py-8',
+    innerClassName: isActive ? 'max-w-5xl text-left' : 'max-w-md text-center',
+    stickyClassName: isActive ? 'sticky top-0 bg-white py-1' : '',
+    barJustifyClassName: isActive ? 'w-full justify-start' : 'justify-center',
+    searchWrapClassName: isActive ? 'min-w-0 flex-1 opacity-100' : 'max-w-0 opacity-0',
+    toggleAriaLabel: isActive ? 'Закрыть поиск' : 'Открыть поиск',
+  };
+}
 
 const MODE_LOADING_FALLBACK = (
   <div className="flex items-center justify-center p-8">
@@ -58,6 +87,7 @@ export default function FontPreview({
   fontLibraries = [],
   onMoveFontToLibrary,
   onRequestCreateLibrary,
+  currentWaterfallBaseSize = null,
 }) {
   const { 
     text,
@@ -233,23 +263,17 @@ export default function FontPreview({
         height: '100%',
       };
     }
-    const v = verticalAlignment;
-    const justifyContent = v === 'middle' ? 'center' : v === 'bottom' ? 'flex-end' : 'flex-start';
     return {
       ...base,
       display: 'flex',
       flexDirection: 'column',
       minHeight: '100%',
-      justifyContent,
+      justifyContent: resolvePreviewJustifyContent(verticalAlignment),
       alignItems: 'stretch',
     };
   }, [backgroundColor, verticalAlignment, textFill, previewBackgroundImage]);
   
   const contentStyle = useMemo(() => {
-    const alignItemsForFill =
-      textAlignment === 'center' ? 'center' : textAlignment === 'right' ? 'flex-end' : 'stretch';
-    const justifyContentForFill =
-      verticalAlignment === 'middle' ? 'center' : verticalAlignment === 'bottom' ? 'flex-end' : 'flex-start';
     return {
       ...baseTextStyle,
       wordWrap: 'break-word',
@@ -260,8 +284,8 @@ export default function FontPreview({
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            justifyContent: justifyContentForFill,
-            alignItems: alignItemsForFill,
+            justifyContent: resolvePreviewJustifyContent(verticalAlignment),
+            alignItems: resolvePreviewAlignItems(textAlignment),
           }
         : {
             maxWidth: '100%',
@@ -331,6 +355,10 @@ export default function FontPreview({
   }, [presetFonts, presetSearchQuery]);
   const emptyStateSearchQuery = presetSearchQuery.trim();
   const emptyStateSearchActive = isEmptyStateSearchExpanded || emptyStateSearchQuery.length > 0;
+  const emptyStateLayout = useMemo(
+    () => getEmptyStateSearchLayoutClasses(emptyStateSearchActive),
+    [emptyStateSearchActive],
+  );
 
   useEffect(() => {
     if (!emptyStateSearchActive || typeof window === 'undefined') return;
@@ -373,7 +401,13 @@ export default function FontPreview({
     const n = Math.max(1, Math.min(40, Math.round(Number(waterfallRows) || 20)));
     const ratioRaw = Number(waterfallScaleRatio);
     const ratio = Number.isFinite(ratioRaw) ? ratioRaw : 1.25;
-    const baseRaw = Number(waterfallBaseSize);
+    const hasLiveWaterfallBaseSize =
+      currentWaterfallBaseSize !== null &&
+      currentWaterfallBaseSize !== undefined &&
+      Number.isFinite(Number(currentWaterfallBaseSize));
+    const baseRaw = hasLiveWaterfallBaseSize
+      ? Number(currentWaterfallBaseSize)
+      : Number(waterfallBaseSize);
     const startPx = Number.isFinite(baseRaw) ? Math.max(1, Math.round(baseRaw)) : 160;
     const roundPx = waterfallRoundPx !== false;
     const roundTo3 = (x) => Math.round(x * 1000) / 1000;
@@ -396,7 +430,7 @@ export default function FontPreview({
     }
     while (out.length < n) out.push(roundPx ? 1 : 0.001);
     return out;
-  }, [waterfallRows, waterfallScaleRatio, waterfallBaseSize, waterfallRoundPx]);
+  }, [currentWaterfallBaseSize, waterfallRows, waterfallScaleRatio, waterfallBaseSize, waterfallRoundPx]);
   
   const plainCharCount = useMemo(() => [...String(text ?? '')].length, [text]);
 
@@ -468,10 +502,13 @@ export default function FontPreview({
             : 'Шрифт');
   }, [exportedFont, selectedFont]);
 
-  const previewSourceLabel = useMemo(
-    () => (selectedFont?.source === 'google' ? 'Google Font' : 'Пользовательский'),
-    [selectedFont?.source],
-  );
+  const previewSourceLabel = useMemo(() => {
+    const source = String(selectedFont?.source || '').trim();
+    if (source === 'local') return 'Локальный';
+    if (source === 'google') return 'Google';
+    if (source === 'fontsource') return 'Fontsource';
+    return getLibrarySourceLabel(source);
+  }, [selectedFont?.source]);
 
   const previewWeightValue = useMemo(() => {
     const weight = Number(selectedFont?.currentWeight);
@@ -525,7 +562,12 @@ export default function FontPreview({
         .replace(/\s+variable$/i, '')
         .trim();
       if (!key) return null;
-      const entry = createCatalogLibraryEntry({ source: 'fontsource', key, label: familyLabel || key });
+      const entry = createCatalogLibraryEntry({
+        source: 'fontsource',
+        key,
+        label: familyLabel || key,
+        isVariable: selectedFont.isVariableFont === true,
+      });
       if (!entry) return null;
       return {
         ...entry,
@@ -602,26 +644,18 @@ export default function FontPreview({
         <div
           className={`flex w-full min-h-0 flex-1 flex-col overflow-y-auto ${
             /* flex-col: cross axis = горизонталь -> items-center по центру; main = вертикаль -> justify-start к верху как раньше */
-            emptyStateSearchActive ? 'items-center justify-start pt-8' : 'items-center justify-center'
+            emptyStateLayout.viewportClassName
           }`}
         >
         <div
-          className={`w-full px-6 ${
-            emptyStateSearchActive ? 'max-w-6xl py-8' : 'max-w-md py-8'
-          }`}
+          className={`w-full px-6 ${emptyStateLayout.widthClassName}`}
         >
           <div
-            className={`mx-auto ${
-              emptyStateSearchActive ? 'max-w-5xl text-left' : 'max-w-md text-center'
-            }`}
+            className={`mx-auto ${emptyStateLayout.innerClassName}`}
           >
             <div
               ref={emptyStateSearchWrapRef}
-              className={`z-20 min-h-10 ${
-                emptyStateSearchActive ? 'sticky top-0 bg-white py-1' : ''
-              } flex items-center gap-3 ${
-                emptyStateSearchActive ? 'w-full justify-start' : 'justify-center'
-              }`}
+              className={`z-20 min-h-10 ${emptyStateLayout.stickyClassName} flex items-center gap-3 ${emptyStateLayout.barJustifyClassName}`}
             >
               <IconCircleButton
                 variant="searchToggle"
@@ -629,7 +663,7 @@ export default function FontPreview({
                 pressed={emptyStateSearchActive}
                 className="focus:outline-none"
                 onClick={emptyStateSearchActive ? clearEmptyStateSearch : openEmptyStateSearch}
-                aria-label={emptyStateSearchActive ? 'Закрыть поиск' : 'Открыть поиск'}
+                aria-label={emptyStateLayout.toggleAriaLabel}
               >
                 {emptyStateSearchActive ? (
                   <svg
@@ -648,9 +682,7 @@ export default function FontPreview({
                 )}
               </IconCircleButton>
               <div
-                className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
-                  emptyStateSearchActive ? 'min-w-0 flex-1 opacity-100' : 'max-w-0 opacity-0'
-                }`}
+                className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${emptyStateLayout.searchWrapClassName}`}
               >
                 <div className="relative">
                   <input
@@ -807,6 +839,9 @@ export default function FontPreview({
               waterfallSizes={effectiveWaterfallSizes}
               scrollParentRef={previewBodyScrollRef}
               isVariableFontAnimating={isVariableFontAnimating}
+              isInteractingWithWaterfallSize={
+                currentWaterfallBaseSize !== null && currentWaterfallBaseSize !== undefined
+              }
             />
           </Suspense>
         )}
@@ -843,6 +878,15 @@ export default function FontPreview({
             />
           </Suspense>
         )}
+
+        {/* Единая фиксированная подсказка: абсолют внутри scroll-container FontPreview */}
+        {viewMode === 'plain' ||
+        viewMode === 'waterfall' ||
+        viewMode === 'styles' ||
+        viewMode === 'glyphs' ||
+        viewMode === 'text' ? (
+          <PreviewEditTextHint />
+        ) : null}
       </div>
 
       <EditorStatusBar

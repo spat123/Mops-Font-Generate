@@ -12,8 +12,14 @@ const VARIANT_CLASSES = {
     pressed: 'bg-accent text-white hover:bg-accent-hover hover:text-white',
   },
   gray100Menu: {
-    idle: 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900',
-    pressed: 'bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900',
+    idle: 'bg-white text-gray-800 hover:text-accent',
+    pressed:
+      'bg-accent text-white hover:bg-accent hover:text-white [&_svg]:text-white',
+  },
+  gray50Menu: {
+    idle: 'bg-gray-50 text-gray-800  hover:text-accent',
+    pressed:
+      'bg-accent text-white hover:bg-accent hover:text-white [&_svg]:text-white',
   },
   gray100Close: {
     idle: 'bg-gray-100 text-gray-800 hover:bg-accent hover:text-white',

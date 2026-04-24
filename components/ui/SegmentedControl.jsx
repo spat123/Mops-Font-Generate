@@ -131,10 +131,13 @@ export const ICON_RAIL_TRACK_CLASS =
 export function iconRailSegmentClass(active, opts = {}) {
   const hasIcon = opts.hasIcon !== false;
   const disabled = opts.disabled === true;
+  const inactiveTextClass = ['text-gray-800', disabled ? '' : 'hover:text-accent']
+    .filter(Boolean)
+    .join(' ');
   return [
     'flex h-8 min-w-0 flex-1 items-center justify-center p-0 transition-colors',
     hasIcon ? 'text-xs' : '',
-    active ? 'text-accent rounded-md' : `text-gray-800 ${disabled ? '' : 'hover:bg-black/[0.06]'}`,
+    active ? 'text-accent rounded-md' : inactiveTextClass,
   ]
     .filter(Boolean)
     .join(' ');
@@ -241,7 +244,7 @@ export function SegmentedControl({
 
   if (variant === 'pairOutline') {
     return (
-      <div className={`flex min-w-0 flex-wrap items-center gap-4 ${className}`.trim()} role="group">
+      <div className={`flex min-w-0 flex-wrap items-center gap-2 ${className}`.trim()} role="group">
         {options.map((opt) => {
           const Icon = opt.Icon;
           const active = value === opt.value;

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { PRESET_STYLES } from '../utils/fontUtilsCommon';
+import { buildPresetViewStatePatch } from '../utils/fontViewStateWriter';
 
 /** Пресеты вес/курсив, VF-оси, догрузка стилей Fontsource. */
 export function useFontStyleManager(
@@ -128,14 +129,14 @@ export function useFontStyleManager(
         if (f.id === fontToApply.id) {
           // Вес/стиль должны жить и в массиве fonts: иначе эффект в pages/index.jsx
           // подменяет selectedFont объектом из fonts без currentWeight — внизу всегда 400.
-          const meta = { currentWeight: weight, currentStyle: style };
-          // Для вариативных шрифтов НЕ сбрасываем lastUsedVariableSettings,
-          // так как пресет может изменить оси, и мы хотим сохранить эти изменения
-          if (fontToApply.isVariableFont) {
-            return { ...f, lastUsedPresetName: presetName, ...meta };
-          }
-          // Для статических шрифтов сбрасываем variableSettings и сохраняем пресет
-          return { ...f, lastUsedPresetName: presetName, lastUsedVariableSettings: null, ...meta };
+          return {
+            ...f,
+            ...buildPresetViewStatePatch(presetName, {
+              clearVariableSettings: !fontToApply.isVariableFont,
+              currentWeight: weight,
+              currentStyle: style,
+            }),
+          };
         }
         return f;
       });
@@ -143,18 +144,14 @@ export function useFontStyleManager(
 
     // Сохраняем настройки в IndexedDB через колбэк
     if (onPresetApplied) {
-      const settingsToSave = {
-        lastUsedPresetName: presetName,
-        currentWeight: weight,
-        currentStyle: style
-      };
-      
-      // Для статических шрифтов очищаем lastUsedVariableSettings
-      if (!fontToApply.isVariableFont) {
-        settingsToSave.lastUsedVariableSettings = null;
-      }
-
-      onPresetApplied(fontToApply.id, settingsToSave);
+      onPresetApplied(
+        fontToApply.id,
+        buildPresetViewStatePatch(presetName, {
+          clearVariableSettings: !fontToApply.isVariableFont,
+          currentWeight: weight,
+          currentStyle: style,
+        }),
+      );
     }
 
   }, [selectedFont, setSelectedFont, setFonts, variableSettings, applyVariableSettings, loadFontsourceStyleVariant, onPresetApplied]); // Зависимости useCallback
