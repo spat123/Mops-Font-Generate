@@ -275,7 +275,7 @@ const WaterfallMode = ({
 
       return (
         <div
-          className={`${index > 0 ? 'border-t border-gray-200 overflow-hidden' : ''} pb-4 pt-4`}
+          className={`${index > 0 ? 'border-t border-gray-200' : ''} pb-4 pt-4`}
           style={{ contain: 'layout style' }}
         >
           <div className="flex items-center">

@@ -29,6 +29,7 @@ export function useCatalogEngine({
   toolbar: {
     trailingToolbar,
     trailingContainerRef,
+    viewportW,
     toolbarAlignToGrid,
     oneCardWidthPx,
     ids,
@@ -143,6 +144,7 @@ export function useCatalogEngine({
   const { toolbarProps } = useCatalogToolbarProps({
     trailingToolbar,
     trailingContainerRef,
+    viewportW,
     toolbarAlignToGrid,
     oneCardWidthPx,
     ids,
@@ -167,4 +169,3 @@ export function useCatalogEngine({
     toolbarProps,
   };
 }
-

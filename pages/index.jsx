@@ -68,6 +68,7 @@ import { IconCircleButton } from '../components/ui/IconCircleButton';
 import { SearchClearButton } from '../components/ui/SearchClearButton';
 import { matchesSearch } from '../utils/searchMatching';
 import { buildCatalogDownloadButtonProps } from '../components/ui/buildCatalogDownloadButtonProps';
+import { moveAndSwapIconUrl } from '../components/ui/editIconUrls';
 import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useDismissibleLayer } from '../components/ui/useDismissibleLayer';
 import {
@@ -133,6 +134,9 @@ function LibraryMoveMenu({
   const [open, setOpen] = useState(false);
   const [pendingTargetLibraryId, setPendingTargetLibraryId] = useState(null);
   const [progressActive, setProgressActive] = useState(false);
+  const [viewportW, setViewportW] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 0,
+  );
   const rootRef = useRef(null);
   const moveTimeoutRef = useRef(null);
   const availableLibraries = useMemo(
@@ -181,6 +185,14 @@ function LibraryMoveMenu({
 
   useEffect(() => () => clearPendingMove(), [clearPendingMove]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => setViewportW(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleStartPendingMove = useCallback(
     (targetLibraryId) => {
       if (disabled || busy || !hasSelection) return;
@@ -204,16 +216,23 @@ function LibraryMoveMenu({
   const handleCancelPendingMove = useCallback(() => {
     clearPendingMove();
   }, [clearPendingMove]);
+  const isMoveDisabled = disabled || busy || !hasSelection;
+  const hideToolbarLabel = viewportW < 1024;
+  const moveMenuWidthClass = hideToolbarLabel ? 'w-[5.5rem]' : 'w-[11.6rem]';
 
   return (
     <div
       ref={rootRef}
-      className={`relative inline-flex h-8 w-40.5 items-stretch ${
-        pendingTargetLibrary ? '' : 'overflow-hidden rounded-sm border border-gray-200'
+      className={`relative inline-flex h-8 ${moveMenuWidthClass} items-stretch ${
+        pendingTargetLibrary
+          ? ''
+          : `overflow-hidden rounded-sm border ${
+              isMoveDisabled ? 'border-gray-50' : 'border-gray-200'
+            }`
       }`}
     >
       {pendingTargetLibrary ? (
-        <div className="relative h-8 w-40.5 overflow-hidden rounded-sm border border-gray-200 bg-gray-50">
+        <div className={`relative h-8 ${moveMenuWidthClass} overflow-hidden rounded-sm border border-gray-200 bg-gray-50`}>
           <div
             className="pointer-events-none absolute inset-y-0 left-0 origin-left bg-accent transition-transform ease-linear"
             style={{
@@ -244,18 +263,30 @@ function LibraryMoveMenu({
         <>
           <button
             type="button"
-            disabled={disabled || busy || !hasSelection}
+            disabled={isMoveDisabled}
             onClick={() => setOpen((value) => !value)}
             aria-haspopup="menu"
             aria-expanded={open}
             aria-label="Переместить выделенные шрифты"
-            className="inline-flex h-8 min-w-0 flex-1 items-center rounded-l-sm bg-white px-3 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400"
+            className={`inline-flex h-8 min-w-0 flex-1 items-center rounded-l-sm bg-white text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400 ${
+              hideToolbarLabel ? 'justify-center px-3' : 'gap-2 px-4'
+            }`}
           >
-            <span className="truncate">{busy ? 'Перемещение...' : 'Переместить'}</span>
+            <img
+              src={moveAndSwapIconUrl}
+              alt=""
+              aria-hidden="true"
+              className={`h-4 w-4 shrink-0 ${isMoveDisabled ? 'opacity-40' : 'opacity-100'}`}
+            />
+            {!hideToolbarLabel ? (
+              <span className={busy ? 'truncate' : 'whitespace-nowrap'}>
+                {busy ? 'Перемещение...' : 'Переместить'}
+              </span>
+            ) : null}
           </button>
           <button
             type="button"
-            disabled={disabled || busy || !hasSelection}
+            disabled={isMoveDisabled}
             onClick={() => setOpen((value) => !value)}
             aria-label="Открыть список библиотек для переноса"
             aria-haspopup="menu"
@@ -357,6 +388,18 @@ function SelectionToolbarActions({
   const canDownloadSelected = selectedCount > 0 && typeof downloadSelected === 'function';
   const canDownloadSelectedAsFormat =
     selectedCount > 0 && typeof downloadSelectedAsFormat === 'function';
+  const [viewportW, setViewportW] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 0,
+  );
+  const hideToolbarLabel = viewportW < 1024;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => setViewportW(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
     <>
@@ -367,11 +410,14 @@ function SelectionToolbarActions({
         className="inline-flex"
       >
         <CatalogDownloadSplitButton
-          className="mr-3 w-auto"
+          className={`mr-3 ${hideToolbarLabel ? 'w-[5.5rem]' : 'w-auto'}`}
           layout="comfortable"
+          heightClass="h-8"
           tone="accent"
           disabled={!canDownloadSelected}
-          primaryLabel={`Скачать${selectedCount > 0 ? ` (${selectedCount})` : ''}`}
+          primaryLabel="Скачать"
+          primaryCount={selectedCount}
+          hidePrimaryLabel={hideToolbarLabel}
           primaryAriaLabel={
             selectedCount > 0
               ? `Скачать выделенные шрифты (${selectedCount})`
@@ -595,6 +641,9 @@ export default function Home() {
   const [savedLibrarySearchQuery, setSavedLibrarySearchQuery] = useState('');
   const [isSavedLibrarySearchExpanded, setIsSavedLibrarySearchExpanded] = useState(false);
   const [savedLibraryCatalogSearchSource, setSavedLibraryCatalogSearchSource] = useState('google'); // google | fontsource
+  const [savedLibraryToolbarViewportW, setSavedLibraryToolbarViewportW] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 0,
+  );
   const savedLibrarySearchWrapRef = useRef(null);
   const savedLibrarySearchInputRef = useRef(null);
   const [savedLibraryCatalogAddBusyId, setSavedLibraryCatalogAddBusyId] = useState(null);
@@ -1059,6 +1108,8 @@ export default function Home() {
   const savedLibrarySearchQueryTrimmed = savedLibrarySearchQuery.trim();
   const savedLibrarySearchActive =
     isSavedLibrarySearchExpanded || savedLibrarySearchQueryTrimmed.length > 0;
+  const savedLibrarySearchOverlayActive =
+    savedLibrarySearchActive && savedLibraryToolbarViewportW < 1024;
 
   const savedLibrarySourceToggleValue = savedLibraryCatalogSearchSource;
   const savedLibrarySourceToggleOptions = useMemo(
@@ -1168,6 +1219,108 @@ export default function Home() {
   const activeSavedLibraryScopeOptions = useMemo(
     () => buildScopeSelectOptions(activeSavedLibraryScopeCounts),
     [activeSavedLibraryScopeCounts],
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleResize = () => setSavedLibraryToolbarViewportW(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const savedLibrarySearchControls = (
+    <div
+      ref={savedLibrarySearchWrapRef}
+      className={
+        savedLibrarySearchOverlayActive
+          ? 'absolute inset-0 z-20 flex min-w-0 items-center gap-3 bg-white'
+          : 'flex w-full min-w-0 items-center justify-end gap-3'
+      }
+    >
+      {!savedLibrarySearchOverlayActive ? (
+        <IconCircleButton
+          variant="searchToggle"
+          size="md"
+          pressed={savedLibrarySearchActive}
+          className="focus:outline-none"
+          onClick={savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch}
+          aria-label={savedLibrarySearchActive ? 'Закрыть поиск' : 'Открыть поиск'}
+        >
+          {savedLibrarySearchActive ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              className="h-5 w-5"
+              aria-hidden
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          ) : (
+            <SearchIcon className="h-5 w-5" />
+          )}
+        </IconCircleButton>
+      ) : null}
+      {savedLibrarySearchActive ? (
+        <SegmentedControl
+          value={savedLibrarySourceToggleValue}
+          onChange={(next) => setSavedLibraryCatalogSearchSource(next)}
+          options={savedLibrarySourceToggleOptions}
+          variant="pairOutline"
+          className="shrink-0 [&>button]:h-10 [&>button]:px-3"
+        />
+      ) : null}
+      <div
+        className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
+          savedLibrarySearchActive ? 'flex-1 opacity-100' : 'max-w-0 opacity-0'
+        }`}
+      >
+        <div className="relative">
+          <input
+            ref={savedLibrarySearchInputRef}
+            type="search"
+            value={savedLibrarySearchQuery}
+            onFocus={() => setIsSavedLibrarySearchExpanded(true)}
+            onBlur={handleSavedLibrarySearchBlur}
+            onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
+            placeholder="Поиск в библиотеке"
+            className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {savedLibrarySearchQueryTrimmed ? (
+            <SearchClearButton
+              onClick={clearSavedLibrarySearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2"
+            />
+          ) : null}
+        </div>
+      </div>
+      {savedLibrarySearchOverlayActive ? (
+        <IconCircleButton
+          variant="searchToggle"
+          size="md"
+          pressed
+          className="shrink-0 focus:outline-none"
+          onClick={clearSavedLibrarySearch}
+          aria-label="Закрыть поиск"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            className="h-5 w-5"
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </IconCircleButton>
+      ) : null}
+    </div>
   );
 
   const libraryFontEntryKeys = useMemo(() => {
@@ -2721,7 +2874,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                           onChange={setCatalogSource}
                           options={CATALOG_SOURCE_OPTIONS}
                           variant="pairOutline"
-                          className="w-full max-w-none [&>button]:w-auto [&>button]:flex-1"
+                          className="w-full max-w-none gap-4 [&>button]:w-auto [&>button]:flex-1"
                         />
                       }
                     />
@@ -2742,7 +2895,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                           onChange={setCatalogSource}
                           options={CATALOG_SOURCE_OPTIONS}
                           variant="pairOutline"
-                          className="w-full max-w-none [&>button]:w-auto [&>button]:flex-1"
+                          className="w-full max-w-none gap-4 [&>button]:w-auto [&>button]:flex-1"
                         />
                       }
                     />
@@ -2759,69 +2912,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                     options={activeSavedLibraryScopeOptions}
                     count={activeSavedLibraryScopeCounts[savedLibraryFontsScope] ?? 0}
                     ariaLabel={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
-                    trailing={
-                      <div ref={savedLibrarySearchWrapRef} className="flex w-full min-w-0 items-center justify-end gap-3">
-                        <IconCircleButton
-                          variant="searchToggle"
-                          size="md"
-                          pressed={savedLibrarySearchActive}
-                          className="focus:outline-none"
-                          onClick={savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch}
-                          aria-label={savedLibrarySearchActive ? 'Закрыть поиск' : 'Открыть поиск'}
-                        >
-                          {savedLibrarySearchActive ? (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth={1.6}
-                              className="h-5 w-5"
-                              aria-hidden
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          ) : (
-                            <SearchIcon className="h-5 w-5" />
-                          )}
-                        </IconCircleButton>
-                        {savedLibrarySearchActive ? (
-                          <SegmentedControl
-                            value={savedLibrarySourceToggleValue}
-                            onChange={(next) => setSavedLibraryCatalogSearchSource(next)}
-                            options={savedLibrarySourceToggleOptions}
-                            variant="pairOutline"
-                            className="shrink-0 [&>button]:px-3 [&>button]:h-10"
-                          />
-                        ) : null}
-                        <div
-                          className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
-                            savedLibrarySearchActive ? 'flex-1 opacity-100' : 'max-w-0 opacity-0'
-                          }`}
-                        >
-                          <div className="relative">
-                            <input
-                              ref={savedLibrarySearchInputRef}
-                              type="search"
-                              value={savedLibrarySearchQuery}
-                              onFocus={() => setIsSavedLibrarySearchExpanded(true)}
-                              onBlur={handleSavedLibrarySearchBlur}
-                              onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
-                              placeholder="Поиск в библиотеке"
-                              className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
-                              autoComplete="off"
-                              spellCheck={false}
-                            />
-                            {savedLibrarySearchQueryTrimmed ? (
-                              <SearchClearButton
-                                onClick={clearSavedLibrarySearch}
-                                className="absolute right-2 top-1/2 -translate-y-1/2"
-                              />
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    }
+                    trailing={savedLibrarySearchOverlayActive ? null : savedLibrarySearchControls}
+                    trailingOverlay={savedLibrarySearchOverlayActive ? savedLibrarySearchControls : null}
                   />
                   <div className="min-h-0 flex-1 pb-10">
                   {savedLibrarySearchQueryTrimmed ? (

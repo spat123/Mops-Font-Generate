@@ -63,11 +63,14 @@ export function CatalogDownloadSplitButton({
   onActionComplete,
   primaryLabel = 'Скачать',
   primaryAriaLabel = 'Скачать',
+  primaryCount = 0,
+  hidePrimaryLabel = false,
   menuItems = [],
   tone = 'light',
   className = '',
   secondaryButtonClassName = '',
   onMenuOpenChange,
+  heightClass = '',
   /** comfortable — выше кнопки и больше горизонтальные отступы (оверлей карточки каталога) */
   layout = 'compact',
 }) {
@@ -144,16 +147,22 @@ export function CatalogDownloadSplitButton({
   const hasMenu = Array.isArray(menuItems) && menuItems.some((item) => !item?.hidden);
   const isAccent = tone === 'accent';
   const roomy = layout === 'comfortable';
-  const rootClassName = `relative inline-flex ${roomy ? 'h-9' : 'h-8'} w-40.5 items-stretch ${className}`.trim();
+  const resolvedHeightClass = heightClass || (roomy ? 'h-9' : 'h-8');
+  const primaryContentClassName = hidePrimaryLabel
+    ? 'justify-center px-3'
+    : roomy
+      ? 'gap-2 px-4'
+      : 'gap-1.5 px-3';
+  const rootClassName = `relative inline-flex ${resolvedHeightClass} w-40.5 items-stretch overflow-hidden rounded-sm ${className}`.trim();
   const primaryClassName = isAccent
-    ? `inline-flex items-center ${roomy ? 'gap-2 px-4' : 'gap-1.5 px-3'} w-full rounded-l-md bg-accent text-xs uppercase font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400`
-    : `inline-flex items-center ${roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} rounded-l-md bg-white text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default`;
+    ? `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${primaryContentClassName} rounded-l-sm bg-accent text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400`
+    : `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${hidePrimaryLabel ? 'justify-center px-3' : roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} rounded-l-sm bg-white text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400`;
   const secondaryClassName = `${
     isAccent
-      ? `inline-flex ${roomy ? 'w-9' : 'w-8'} items-center justify-center rounded-r-md border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
+      ? `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
           open ? 'bg-accent-hover' : ''
         }`
-      : `inline-flex ${roomy ? 'w-9' : 'w-7'} items-center justify-center rounded-r-md border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default ${
+      : `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
           open ? 'bg-white' : ''
         }`
   } ${secondaryButtonClassName}`.trim();
@@ -162,6 +171,10 @@ export function CatalogDownloadSplitButton({
   const showDone = actionState === 'done';
   const primaryDisabled = disabled || busy;
   const chevronDisabled = disabled || busy || !hasMenu;
+  const showCountBadge = Number.isFinite(primaryCount) && primaryCount > 0;
+  const countBadgeClassName = `inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums ${
+    isAccent ? 'bg-white text-accent' : 'bg-gray-100 text-gray-600'
+  }`.trim();
 
   const runActionWithFeedback = (action) => {
     if (busy) return;
@@ -244,7 +257,8 @@ export function CatalogDownloadSplitButton({
         ) : (
           <EditAssetIcon src={downloudIconUrl} className="h-4 w-4" />
         )}
-        {primaryLabel}
+        {!hidePrimaryLabel ? <span className="truncate">{primaryLabel}</span> : null}
+        {showCountBadge ? <span className={countBadgeClassName}>{primaryCount}</span> : null}
       </button>
       <button
         type="button"

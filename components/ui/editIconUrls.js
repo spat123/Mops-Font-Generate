@@ -8,6 +8,7 @@ import enterIconUrl from '../../assets/icon/edit/Enter.svg';
 import linkIconUrl from '../../assets/icon/edit/Link.svg';
 import settingIconUrl from '../../assets/icon/edit/Setting.svg';
 import notificationIconUrl from '../../assets/icon/edit/Notification.svg';
+import moveAndSwapIconUrl from '../../assets/icon/edit/Move and swap.svg';
 
 export {
   gridIconUrl,
@@ -20,5 +21,6 @@ export {
   linkIconUrl,
   settingIconUrl,
   notificationIconUrl,
+  moveAndSwapIconUrl,
 };
 

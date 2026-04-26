@@ -82,7 +82,7 @@ export function FontLibraryStatusMenu({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`inline-flex h-8 max-w-[11rem] items-center gap-1 px-1 text-[11px] uppercase font-semibold leading-none transition-colors ${
+        className={`inline-flex h-8 max-w-[11rem] items-center gap-1 px-1 text-xs uppercase font-semibold leading-none transition-colors ${
           open ? 'text-accent' : 'text-gray-800 hover:text-accent'
         }`}
       >

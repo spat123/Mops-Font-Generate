@@ -78,7 +78,7 @@ function StylesMode({
 
   return (
     <div className="relative flex min-h-full min-w-0 max-w-full flex-col px-4 pb-8 pt-4 sm:px-6">
-      <div className="min-w-0 max-w-full overflow-x-hidden">
+      <div className="min-w-0 max-w-full">
         {/* Статические стили шрифта */}
         {showStaticStyles && (
           <div className="mb-8 overflow-x-hidden">
@@ -113,7 +113,7 @@ function StylesMode({
                           textTransform: textCase,
                           textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
                           whiteSpace: 'nowrap',
-                          overflow: 'hidden',
+                          overflow: 'visible',
                           maxWidth: '100%',
                           scrollBehavior: 'auto',
                         }}
@@ -155,7 +155,7 @@ function StylesMode({
                           textTransform: textCase,
                           textDecorationLine: textDecoration === 'none' ? 'none' : textDecoration,
                           whiteSpace: 'nowrap',
-                          overflow: 'hidden',
+                          overflow: 'visible',
                           maxWidth: '100%',
                           scrollBehavior: 'auto',
                         }}
@@ -172,7 +172,7 @@ function StylesMode({
       
       {/* Вариативные возможности шрифта */}
       {hasVariableAxes && (
-        <div className="min-w-0 max-w-full overflow-x-hidden">
+        <div className="min-w-0 max-w-full">
 
           {/* Группа Weight стилей */}
           {selectedFont.variableAxes['wght'] !== undefined && (
@@ -197,7 +197,7 @@ function StylesMode({
                         textAlign: textAlignment,
                         textTransform: textCase,
                         whiteSpace: 'nowrap',
-                        overflow: 'hidden',
+                        overflow: 'visible',
                         maxWidth: '100%',
                         scrollBehavior: 'auto',
                       }}
@@ -237,7 +237,7 @@ function StylesMode({
                         textAlign: textAlignment,
                         textTransform: textCase,
                         whiteSpace: 'nowrap',
-                        overflow: 'hidden',
+                        overflow: 'visible',
                         maxWidth: '100%',
                         scrollBehavior: 'auto',
                       }}
@@ -281,7 +281,7 @@ function StylesMode({
                             textAlign: textAlignment,
                             textTransform: textCase,
                             whiteSpace: 'nowrap',
-                            overflow: 'hidden',
+                            overflow: 'visible',
                             maxWidth: '100%',
                             scrollBehavior: 'auto',
                           }}

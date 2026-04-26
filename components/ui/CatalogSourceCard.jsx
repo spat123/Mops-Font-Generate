@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CatalogSessionAddSpinner from './CatalogSessionAddSpinner';
 import { CatalogLibraryActions } from './CatalogLibraryActions';
 import { CatalogFontCard } from './CatalogFontCard';
@@ -75,6 +75,8 @@ function CatalogSourceCardComponent({
   dragPayload,
   onDragEnd,
 }) {
+  const footerLayoutRef = useRef(null);
+  const [stackFooterBadges, setStackFooterBadges] = useState(false);
   const handleCardClick = useCallback(
     (event) => {
       onCardClick?.(event, itemKey);
@@ -138,11 +140,35 @@ function CatalogSourceCardComponent({
     ],
   );
 
+  useEffect(() => {
+    if (isRowMode) {
+      setStackFooterBadges(false);
+      return undefined;
+    }
+    const footerEl = footerLayoutRef.current;
+    if (!footerEl || typeof ResizeObserver === 'undefined') return undefined;
+    const updateLayout = (width) => {
+      const nextStack = Number(width) > 0 && Number(width) < 230;
+      setStackFooterBadges((prev) => (prev === nextStack ? prev : nextStack));
+    };
+    updateLayout(footerEl.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => {
+      const width = entries?.[0]?.contentRect?.width ?? footerEl.getBoundingClientRect().width;
+      updateLayout(width);
+    });
+    ro.observe(footerEl);
+    return () => ro.disconnect();
+  }, [isRowMode, footerLeftBadges, footerRightBadges]);
+
   const footer = useMemo(() => {
     if (!footerLeftBadges?.length && !footerRightBadges?.length) return null;
 
     const left = (
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <div
+        className={`flex min-w-0 flex-wrap items-center gap-1.5 ${
+          stackFooterBadges ? 'w-full' : ''
+        }`}
+      >
         {footerLeftBadges.filter(Boolean).map((b) => (
           <span key={String(b)} className="truncate text-xs uppercase font-semibold text-gray-800">
             {b}
@@ -152,7 +178,13 @@ function CatalogSourceCardComponent({
     );
 
     const rightInner = (
-      <div className="shrink-0 flex items-center justify-end gap-1.5 text-right text-xs uppercase font-semibold tabular-nums leading-snug text-gray-800">
+      <div
+        className={`flex items-center gap-1.5 text-xs uppercase font-semibold tabular-nums leading-snug text-gray-800 ${
+          stackFooterBadges
+            ? 'min-w-0 w-full flex-wrap justify-start text-left'
+            : 'shrink-0 justify-end text-right'
+        }`}
+      >
         {footerRightBadges.filter(Boolean).map((b) => (
           <span key={String(b)} className="whitespace-nowrap">
             {b}
@@ -166,7 +198,11 @@ function CatalogSourceCardComponent({
         <Tooltip
           as="div"
           content={footerRightTooltipContent}
-          className="shrink-0 flex items-center justify-end gap-1.5 text-right text-xs uppercase font-semibold tabular-nums leading-snug text-gray-800"
+          className={`flex items-center gap-1.5 text-xs uppercase font-semibold tabular-nums leading-snug text-gray-800 ${
+            stackFooterBadges
+              ? 'min-w-0 w-full flex-wrap justify-start text-left'
+              : 'shrink-0 justify-end text-right'
+          }`}
         >
           {footerRightBadges.filter(Boolean).map((b) => (
             <span key={String(b)} className="whitespace-nowrap">
@@ -179,12 +215,19 @@ function CatalogSourceCardComponent({
       );
 
     return (
-      <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
+      <div
+        ref={footerLayoutRef}
+        className={`mt-auto pt-1 ${
+          stackFooterBadges
+            ? 'flex flex-col items-start gap-1.5'
+            : 'flex flex-wrap items-end justify-between gap-x-2 gap-y-1'
+        }`}
+      >
         {left}
         {right}
       </div>
     );
-  }, [footerLeftBadges, footerRightBadges, footerRightTooltipContent]);
+  }, [footerLeftBadges, footerRightBadges, footerRightTooltipContent, stackFooterBadges]);
 
   if (isRowMode) {
     return (

@@ -28,6 +28,7 @@ import { CatalogPanelToolbar } from './ui/CatalogPanelToolbar';
 import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
 import { filterCatalogItems, sortCatalogItems } from '../utils/catalogFilterSort';
 import { useCatalogEngine } from './ui/useCatalogEngine';
+import { useOverlayScrollbar } from './ui/useOverlayScrollbar';
 import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import {
   buildArchiveBlobFromEntries,
@@ -60,7 +61,6 @@ function fontsourceCatalogGridCols(viewportWidth) {
   if (viewportWidth <= 0) return 2;
   if (viewportWidth >= 1280) return 5;
   if (viewportWidth >= 1024) return 4;
-  if (viewportWidth >= 768) return 3;
   return 2;
 }
 
@@ -120,6 +120,7 @@ export default function FontsourceCatalogPanel({
   const {
     setCatalogScrollContainer,
     setTrailingToolbarContainer,
+    viewportW,
     gridCols,
     oneCardWidthPx,
     toolbarAlignToGrid,
@@ -149,6 +150,12 @@ export default function FontsourceCatalogPanel({
   const [isInitialCatalogLoading, setIsInitialCatalogLoading] = useState(true);
   const [areCardsVisible, setAreCardsVisible] = useState(false);
   const [visibleCardsCount, setVisibleCardsCount] = useState(0);
+  const {
+    overlayThumb,
+    scrollbarVisible,
+    setScrollElement,
+    syncScrollLayout,
+  } = useOverlayScrollbar();
 
   const handleDragStart = useCallback((event, item) => {
     if (isInteractiveTarget(event.target)) {
@@ -169,6 +176,14 @@ export default function FontsourceCatalogPanel({
   useEffect(() => {
     onTotalItemsChange?.(items.length);
   }, [items, onTotalItemsChange]);
+
+  const setCatalogScrollRefs = useCallback(
+    (node) => {
+      setCatalogScrollContainer(node);
+      setScrollElement(node);
+    },
+    [setCatalogScrollContainer, setScrollElement],
+  );
 
   // markSlugRecentlyAdded handled by useStickyTimedSet
   const [previewFontFamilyBySlug, setPreviewFontFamilyBySlug] = useState({});
@@ -263,6 +278,7 @@ export default function FontsourceCatalogPanel({
     toolbar: {
       trailingToolbar,
       trailingContainerRef: setTrailingToolbarContainer,
+      viewportW,
       toolbarAlignToGrid,
       oneCardWidthPx,
       ids: {
@@ -295,6 +311,16 @@ export default function FontsourceCatalogPanel({
       }),
     },
   });
+
+  useEffect(() => {
+    syncScrollLayout();
+  }, [
+    syncScrollLayout,
+    controls.gridViewMode,
+    filteredSortedItems.length,
+    catalogItemsNotInSession.length,
+    visibleCardsCount,
+  ]);
 
   // gridCols может быть 0 на первом тике (до измерений) — это ломает чанковый рендер (chunkSize=0 => вечная загрузка)
   const activeGridCols = controls.gridViewMode === 'row' ? 1 : Math.max(1, Number(gridCols) || 0);
@@ -872,54 +898,69 @@ export default function FontsourceCatalogPanel({
           Все пакеты Fontsource из этой выдачи уже в сессии. Переключайте их во вкладках над областью просмотра.
         </p>
       ) : (
-        <div
-          ref={setCatalogScrollContainer}
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto [align-content:start]"
-        >
+        <div className="relative flex min-h-0 flex-1 flex-col">
           <div
-            className={`grid max-w-full transition-all duration-300 ease-out ${
-              controls.gridViewMode === 'row'
-                ? 'grid-cols-1 gap-0'
-                : 'grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-            } ${
-              areCardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
-            }`}
+            ref={setCatalogScrollRefs}
+            className="catalog-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto [align-content:start]"
           >
-            {renderedItems.map((item) => {
-              const slug = item.id || item.slug;
-              return (
-                <FontsourceCatalogCard
-                  key={slug}
-                  item={item}
-                  previewFamily={previewFontFamilyBySlug[slug] || 'system-ui, sans-serif'}
-                  rowCatalogPreviewText={fontsourceRowGlobalSample == null ? undefined : fontsourceRowGlobalSample}
-                  onRowGlobalSampleCommit={commitFontsourceRowGlobalSample}
-                  busy={addingSlug === slug}
-                  selected={selectedSlugs.has(slug)}
-                  isRowMode={controls.gridViewMode === 'row'}
-                  fontLibraries={fontLibraries}
-                  onAddFontToLibrary={addFontToLibrary}
-                  onRequestCreateLibrary={onRequestCreateLibrary}
-                  onOpenInEditor={openFontsourceInEditor}
-                  onDownloadPackageZip={downloadFontsourcePackageZip}
-                  onDownloadAsFormat={downloadFontsourceAsFormat}
-                  onDownloadVariableVariant={downloadFontsourceVariableVariant}
-                  onCardClick={onCardClick}
-                  onStartCardLongPress={startCardLongPress}
-                  onPointerUp={clearLongPressTimer}
-                  onPointerLeave={clearLongPressTimer}
-                  onPointerCancel={clearLongPressTimer}
-                  draggable
-                  onDragStart={handleDragStart}
-                  registerPreviewNode={registerPreviewNode}
-                  previewText={PREVIEW_TEXT}
-                />
-              );
-            })}
+            <div
+              className={`grid max-w-full transition-all duration-300 ease-out ${
+                controls.gridViewMode === 'row'
+                  ? 'grid-cols-1 gap-0'
+                  : 'grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+              } ${
+                areCardsVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
+              }`}
+            >
+              {renderedItems.map((item) => {
+                const slug = item.id || item.slug;
+                return (
+                  <FontsourceCatalogCard
+                    key={slug}
+                    item={item}
+                    previewFamily={previewFontFamilyBySlug[slug] || 'system-ui, sans-serif'}
+                    rowCatalogPreviewText={fontsourceRowGlobalSample == null ? undefined : fontsourceRowGlobalSample}
+                    onRowGlobalSampleCommit={commitFontsourceRowGlobalSample}
+                    busy={addingSlug === slug}
+                    selected={selectedSlugs.has(slug)}
+                    isRowMode={controls.gridViewMode === 'row'}
+                    fontLibraries={fontLibraries}
+                    onAddFontToLibrary={addFontToLibrary}
+                    onRequestCreateLibrary={onRequestCreateLibrary}
+                    onOpenInEditor={openFontsourceInEditor}
+                    onDownloadPackageZip={downloadFontsourcePackageZip}
+                    onDownloadAsFormat={downloadFontsourceAsFormat}
+                    onDownloadVariableVariant={downloadFontsourceVariableVariant}
+                    onCardClick={onCardClick}
+                    onStartCardLongPress={startCardLongPress}
+                    onPointerUp={clearLongPressTimer}
+                    onPointerLeave={clearLongPressTimer}
+                    onPointerCancel={clearLongPressTimer}
+                    draggable
+                    onDragStart={handleDragStart}
+                    registerPreviewNode={registerPreviewNode}
+                    previewText={PREVIEW_TEXT}
+                  />
+                );
+              })}
+            </div>
+            {isChunkRendering ? (
+              <div className="flex justify-center py-3">
+                <HexProgressLoader size={40} className="shrink-0" />
+              </div>
+            ) : null}
           </div>
-          {isChunkRendering ? (
-            <div className="flex justify-center py-3">
-              <HexProgressLoader size={40} className="shrink-0" />
+          {overlayThumb ? (
+            <div className="pointer-events-none absolute right-0 top-2 bottom-2 z-20 w-2" aria-hidden>
+              <div
+                className={`absolute right-1 w-1.5 rounded-full bg-gray-400 transition-opacity duration-200 ${
+                  scrollbarVisible ? 'opacity-90' : 'opacity-0'
+                }`}
+                style={{
+                  top: `${overlayThumb.top}px`,
+                  height: `${overlayThumb.thumbHeight}px`,
+                }}
+              />
             </div>
           ) : null}
         </div>

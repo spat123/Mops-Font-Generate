@@ -217,7 +217,7 @@ export function CatalogRowModeCard({
               familyClassName={`min-w-0 max-w-full truncate text-left text-xs font-medium leading-tight text-gray-800 ${
                 selected ? '' : 'group-hover:!text-white'
               } sm:text-sm`}
-              metaClassName={`flex min-w-0 w-[min(100%,44rem)] flex-nowrap items-center justify-start gap-x-2 text-left text-sm font-semibold uppercase leading-tight text-black ${
+              metaClassName={`flex min-w-0 w-[min(100%,44rem)] flex-nowrap items-center justify-start gap-x-2 text-left text-sm font-semibold uppercase leading-tight text-black lg:w-[min(100%,32rem)] lg:justify-self-center xl:w-[min(100%,44rem)] ${
                 selected ? '' : 'group-hover:!text-white'
               } sm:gap-x-3`}
             />

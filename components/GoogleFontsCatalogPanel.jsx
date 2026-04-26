@@ -29,7 +29,6 @@ import {
 } from '../utils/fontCategoryLabels';
 import { getFontSubsetLabelRu } from '../utils/fontSubsetLabels';
 import { compareFontFamilyName } from '../utils/fontSort';
-import { pluralRu } from '../utils/pluralRu';
 import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
 import { useStickyTimedSet } from './ui/useStickyTimedSet';
@@ -37,6 +36,7 @@ import { CatalogPanelToolbar } from './ui/CatalogPanelToolbar';
 import { filterSortCatalogItems } from '../utils/catalogFilterSort';
 import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
 import { useCatalogEngine } from './ui/useCatalogEngine';
+import { useOverlayScrollbar } from './ui/useOverlayScrollbar';
 import {
   buildArchiveBlobFromEntries,
   buildGoogleFormatArchiveEntry,
@@ -70,7 +70,6 @@ function googleFontCatalogGridCols(viewportWidth) {
   if (viewportWidth <= 0) return 2;
   if (viewportWidth >= 1280) return 5;
   if (viewportWidth >= 1024) return 4;
-  if (viewportWidth >= 768) return 3;
   return 2;
 }
 
@@ -97,6 +96,7 @@ export default function GoogleFontsCatalogPanel({
     setCatalogScrollContainer,
     setTrailingToolbarContainer,
     setGridInnerWidth,
+    viewportW,
     gridCols,
     oneCardWidthPx,
     toolbarAlignToGrid,
@@ -110,6 +110,12 @@ export default function GoogleFontsCatalogPanel({
   const [items, setItems] = useState([]);
   const [catalogError, setCatalogError] = useState(null);
   const [addingFamily, setAddingFamily] = useState(null);
+  const {
+    overlayThumb,
+    scrollbarVisible,
+    setScrollElement,
+    syncScrollLayout,
+  } = useOverlayScrollbar();
   const { set: recentlyAddedFamilies, mark: markFamilyRecentlyAdded } =
     useStickyTimedSet(RECENT_ADD_VISIBLE_MS);
   const sorters = useMemo(
@@ -192,6 +198,7 @@ export default function GoogleFontsCatalogPanel({
     toolbar: {
       trailingToolbar,
       trailingContainerRef: setTrailingToolbarContainer,
+      viewportW,
       toolbarAlignToGrid,
       oneCardWidthPx,
       ids: {
@@ -240,10 +247,22 @@ export default function GoogleFontsCatalogPanel({
     onTotalItemsChange?.(items.length);
   }, [items, onTotalItemsChange]);
 
+  const setCatalogScrollRefs = useCallback(
+    (node) => {
+      setCatalogScrollContainer(node);
+      setScrollElement(node);
+    },
+    [setCatalogScrollContainer, setScrollElement],
+  );
+
   // markFamilyRecentlyAdded handled by useStickyTimedSet
 
   const { gridViewMode } = controls;
   const showFontGrid = filteredSortedItems.length > 0 && catalogItemsNotInSession.length > 0;
+
+  useEffect(() => {
+    syncScrollLayout();
+  }, [syncScrollLayout, gridViewMode, filteredSortedItems.length, catalogItemsNotInSession.length, gridCols]);
 
   // clearLongPressTimer cleanup handled inside useLongPressMultiSelect
 
@@ -515,62 +534,77 @@ export default function GoogleFontsCatalogPanel({
           Все шрифты из этой выдачи уже в сессии. Переключайте их во вкладках над областью просмотра
         </p>
       ) : (
-        <div
-          ref={setCatalogScrollContainer}
-          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto [align-content:start]"
-        >
-          {catalogScrollEl ? (
-            <VirtualizedGlyphGrid
-              scrollParentEl={catalogScrollEl}
-              totalCount={catalogItemsNotInSession.length}
-              estimatedRowHeightPx={
-                gridViewMode === 'row' ? CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX : 172
-              }
-              columnCount={gridViewMode === 'row' ? 1 : gridCols}
-              rowGapPx={gridViewMode === 'row' ? 0 : GRID_GAP_PX}
-              overscanRows={2}
-              onInnerWidth={setGridInnerWidth}
-              onVisibleIndexRangeChange={({ startIndex, endIndex }) => {
-                for (let i = startIndex; i <= endIndex; i++) {
-                  const e = catalogItemsNotInSession[i];
-                  if (e) ensureGoogleFontPreviewCss(e);
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={setCatalogScrollRefs}
+            className="catalog-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto [align-content:start]"
+          >
+            {catalogScrollEl ? (
+              <VirtualizedGlyphGrid
+                scrollParentEl={catalogScrollEl}
+                totalCount={catalogItemsNotInSession.length}
+                estimatedRowHeightPx={
+                  gridViewMode === 'row' ? CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX : 172
                 }
-              }}
-              renderItem={(index) => {
-                const entry = catalogItemsNotInSession[index];
-                if (!entry) return null;
-                const family = entry.family;
-                const busy = addingFamily === family;
-                const isRowMode = gridViewMode === 'row';
+                columnCount={gridViewMode === 'row' ? 1 : gridCols}
+                rowGapPx={gridViewMode === 'row' ? 0 : GRID_GAP_PX}
+                overscanRows={2}
+                onInnerWidth={setGridInnerWidth}
+                onVisibleIndexRangeChange={({ startIndex, endIndex }) => {
+                  for (let i = startIndex; i <= endIndex; i++) {
+                    const e = catalogItemsNotInSession[i];
+                    if (e) ensureGoogleFontPreviewCss(e);
+                  }
+                }}
+                renderItem={(index) => {
+                  const entry = catalogItemsNotInSession[index];
+                  if (!entry) return null;
+                  const family = entry.family;
+                  const busy = addingFamily === family;
+                  const isRowMode = gridViewMode === 'row';
 
-                return (
-                  <GoogleFontsCatalogCard
-                    entry={entry}
-                    busy={busy}
-                    selected={selectedFamilies.has(family)}
-                    isRowMode={isRowMode}
-                    fontLibraries={fontLibraries}
-                    onAddFontToLibrary={addGoogleToLibrary}
-                    onRequestCreateLibrary={onRequestCreateLibrary}
-                    onOpenInEditor={openGoogleInEditor}
-                    onDownloadPackageZip={downloadGooglePackageZip}
-                    onDownloadAsFormat={downloadGoogleAsFormat}
-                    onDownloadVariableVariant={downloadGoogleVariableVariant}
-                    onCardClick={onCardClick}
-                    onStartCardLongPress={startCardLongPress}
-                    onPointerUp={clearLongPressTimer}
-                    onPointerLeave={clearLongPressTimer}
-                    onPointerCancel={clearLongPressTimer}
-                    draggable
-                    onDragStart={handleDragStart}
-                    rowCatalogPreviewText={googleRowGlobalSample == null ? undefined : googleRowGlobalSample}
-                    onRowGlobalSampleCommit={commitGoogleRowGlobalSample}
-                    previewText="AaBbCcDdEe"
-                    footerRightTooltipContent="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
-                  />
-                );
-              }}
-            />
+                  return (
+                    <GoogleFontsCatalogCard
+                      entry={entry}
+                      busy={busy}
+                      selected={selectedFamilies.has(family)}
+                      isRowMode={isRowMode}
+                      fontLibraries={fontLibraries}
+                      onAddFontToLibrary={addGoogleToLibrary}
+                      onRequestCreateLibrary={onRequestCreateLibrary}
+                      onOpenInEditor={openGoogleInEditor}
+                      onDownloadPackageZip={downloadGooglePackageZip}
+                      onDownloadAsFormat={downloadGoogleAsFormat}
+                      onDownloadVariableVariant={downloadGoogleVariableVariant}
+                      onCardClick={onCardClick}
+                      onStartCardLongPress={startCardLongPress}
+                      onPointerUp={clearLongPressTimer}
+                      onPointerLeave={clearLongPressTimer}
+                      onPointerCancel={clearLongPressTimer}
+                      draggable
+                      onDragStart={handleDragStart}
+                      rowCatalogPreviewText={googleRowGlobalSample == null ? undefined : googleRowGlobalSample}
+                      onRowGlobalSampleCommit={commitGoogleRowGlobalSample}
+                      previewText="AaBbCcDdEe"
+                      footerRightTooltipContent="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
+                    />
+                  );
+                }}
+              />
+            ) : null}
+          </div>
+          {overlayThumb ? (
+            <div className="pointer-events-none absolute right-0 top-2 bottom-2 z-20 w-2" aria-hidden>
+              <div
+                className={`absolute right-1 w-1.5 rounded-full bg-gray-400 transition-opacity duration-200 ${
+                  scrollbarVisible ? 'opacity-90' : 'opacity-0'
+                }`}
+                style={{
+                  top: `${overlayThumb.top}px`,
+                  height: `${overlayThumb.thumbHeight}px`,
+                }}
+              />
+            </div>
           ) : null}
         </div>
       )}

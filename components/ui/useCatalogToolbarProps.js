@@ -5,6 +5,7 @@ import { buildCatalogFacets } from '../../utils/catalogFilterSort';
 export function useCatalogToolbarProps({
   trailingToolbar,
   trailingContainerRef,
+  viewportW,
   toolbarAlignToGrid,
   oneCardWidthPx,
 
@@ -55,6 +56,7 @@ export function useCatalogToolbarProps({
     () => ({
       trailingToolbar,
       trailingContainerRef,
+      viewportW,
       toolbarAlignToGrid,
       oneCardWidthPx,
 
@@ -98,6 +100,7 @@ export function useCatalogToolbarProps({
     [
       trailingToolbar,
       trailingContainerRef,
+      viewportW,
       toolbarAlignToGrid,
       oneCardWidthPx,
       ids.searchId,
@@ -134,4 +137,3 @@ export function useCatalogToolbarProps({
 
   return { toolbarProps, categories, subsets, subsetOptions, categoryOptions, countSuffix };
 }
-

@@ -764,22 +764,22 @@ export default function FontPreview({
                             }
                             footer={
                               <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
-                                <div className="flex min-w-0 flex-wrap items-center gap-1">
-                                  <span className="truncate text-[11px] font-semibold uppercase text-gray-500">
+                                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                  <span className="truncate text-xs font-semibold uppercase text-gray-800">
                                     {entry.category || 'Google'}
                                   </span>
                                   {entry.isVariable ? (
-                                    <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-semibold uppercase text-gray-800">
+                                    <span className="shrink-0 text-xs font-semibold uppercase text-gray-800">
                                       vf
                                     </span>
                                   ) : null}
                                   {entry.hasItalic ? (
-                                    <span className="shrink-0 rounded bg-gray-100 px-1 py-0 text-[10px] font-semibold uppercase text-gray-800">
+                                    <span className="shrink-0 text-xs font-semibold uppercase text-gray-800">
                                       italic
                                     </span>
                                   ) : null}
                                 </div>
-                                <span className="text-[11px] font-semibold uppercase text-gray-500">
+                                <span className="text-xs font-semibold uppercase text-gray-800">
                                   Google
                                 </span>
                               </div>
@@ -820,73 +820,76 @@ export default function FontPreview({
     <div className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-white">
       <div
         ref={previewBodyScrollRef}
-        className="relative min-h-0 w-full flex-1 overflow-y-auto pt-0 pb-4"
+        className="relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto pt-0 pb-4"
         style={previewAreaBgStyle}
       >
-        {viewMode === 'plain' && (
-          <Suspense fallback={MODE_LOADING_FALLBACK}>
-            <PlainTextMode
-              containerStyle={containerStyle}
-              contentStyle={contentStyle}
-              variant="default"
-            />
-          </Suspense>
-        )}
-        
-        {viewMode === 'waterfall' && (
-          <Suspense fallback={MODE_LOADING_FALLBACK}>
-            <WaterfallMode
-              waterfallSizes={effectiveWaterfallSizes}
-              scrollParentRef={previewBodyScrollRef}
-              isVariableFontAnimating={isVariableFontAnimating}
-              isInteractingWithWaterfallSize={
-                currentWaterfallBaseSize !== null && currentWaterfallBaseSize !== undefined
-              }
-            />
-          </Suspense>
-        )}
-        
-        {viewMode === 'styles' && (
-          <Suspense fallback={MODE_LOADING_FALLBACK}>
-            <StylesMode
-              selectedFont={selectedFont}
-              fontFamilyValue={fontFamilyValue}
-            />
-          </Suspense>
-        )}
+        <div className="grid min-h-full min-w-0 w-full grid-rows-[1fr_auto]">
+          <div className="min-h-0 min-w-0">
+          {viewMode === 'plain' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <PlainTextMode
+                containerStyle={containerStyle}
+                contentStyle={contentStyle}
+                variant="default"
+              />
+            </Suspense>
+          )}
+          
+          {viewMode === 'waterfall' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <WaterfallMode
+                waterfallSizes={effectiveWaterfallSizes}
+                scrollParentRef={previewBodyScrollRef}
+                isVariableFontAnimating={isVariableFontAnimating}
+                isInteractingWithWaterfallSize={
+                  currentWaterfallBaseSize !== null && currentWaterfallBaseSize !== undefined
+                }
+              />
+            </Suspense>
+          )}
+          
+          {viewMode === 'styles' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <StylesMode
+                selectedFont={selectedFont}
+                fontFamilyValue={fontFamilyValue}
+              />
+            </Suspense>
+          )}
 
-        {viewMode === 'glyphs' && (
-          <Suspense fallback={MODE_LOADING_FALLBACK}>
-            <GlyphsMode
-              key={`${selectedFont?.id}-${viewMode === 'glyphs'}`}
-              selectedFont={selectedFont}
-              fontFamily={fontFamilyValue}
-              glyphDisplayStyle={glyphDisplayStyle}
-              isActive={viewMode === 'glyphs'}
-              scrollParentRef={previewBodyScrollRef}
-              onDisplayableGlyphCountChange={handleGlyphCountForFooter}
-            />
-          </Suspense>
-        )}
+          {viewMode === 'glyphs' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <GlyphsMode
+                key={`${selectedFont?.id}-${viewMode === 'glyphs'}`}
+                selectedFont={selectedFont}
+                fontFamily={fontFamilyValue}
+                glyphDisplayStyle={glyphDisplayStyle}
+                isActive={viewMode === 'glyphs'}
+                scrollParentRef={previewBodyScrollRef}
+                onDisplayableGlyphCountChange={handleGlyphCountForFooter}
+              />
+            </Suspense>
+          )}
 
-        {viewMode === 'text' && (
-          <Suspense fallback={MODE_LOADING_FALLBACK}>
-            <TextMode
-              contentStyle={contentStyle}
-              fontFamily={fontFamilyValue}
-              variationSettingsValue={variationSettingsValue}
-            />
-          </Suspense>
-        )}
+          {viewMode === 'text' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <TextMode
+                contentStyle={contentStyle}
+                fontFamily={fontFamilyValue}
+                variationSettingsValue={variationSettingsValue}
+              />
+            </Suspense>
+          )}
+          </div>
 
-        {/* Единая фиксированная подсказка: абсолют внутри scroll-container FontPreview */}
-        {viewMode === 'plain' ||
-        viewMode === 'waterfall' ||
-        viewMode === 'styles' ||
-        viewMode === 'glyphs' ||
-        viewMode === 'text' ? (
-          <PreviewEditTextHint />
-        ) : null}
+          {viewMode === 'plain' ||
+          viewMode === 'waterfall' ||
+          viewMode === 'styles' ||
+          viewMode === 'glyphs' ||
+          viewMode === 'text' ? (
+            <PreviewEditTextHint className="pb-3" />
+          ) : null}
+        </div>
       </div>
 
       <EditorStatusBar

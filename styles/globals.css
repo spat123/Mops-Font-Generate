@@ -183,7 +183,7 @@ input[type='search']::-ms-reveal {
 
 /* Режим Styles: без системного синего у выделения, фокуса и tap-highlight у contenteditable */
 .styles-editable {
-  caret-color: var(--color-accent);
+  caret-color: currentColor;
   -webkit-tap-highlight-color: rgba(255, 65, 65, 0.14);
 }
 
@@ -193,7 +193,6 @@ input[type='search']::-ms-reveal {
 }
 
 .styles-editable:focus-visible {
-  outline: 2px solid var(--color-accent) !important;
   /* без положительного offset — кольцо не вылезает за колонку и не даёт гориз. скролл */
   outline-offset: 0;
   box-shadow: none;
@@ -230,8 +229,23 @@ input[type='search']::-ms-reveal {
   display: none;
 }
 
+/* Каталоги: скрываем нативную вертикальную полосу, кастомный индикатор рисуется отдельным слоем. */
+.catalog-scroll-area {
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.catalog-scroll-area::-webkit-scrollbar {
+  display: none;
+}
+
 @supports (overflow: overlay) {
   .editor-sidebar-scroll {
+    overflow-y: overlay;
+  }
+
+  .catalog-scroll-area {
     overflow-y: overlay;
   }
 }

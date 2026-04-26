@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { toast } from '../utils/appNotify';
 import { debounce } from '../utils/debounce';
 import { getGlyphDataForFont } from '../utils/fontParser';
