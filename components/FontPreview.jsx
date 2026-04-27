@@ -20,9 +20,24 @@ import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchIcon } from './ui/CommonIcons';
 import { IconCircleButton } from './ui/IconCircleButton';
 import { FontLibraryStatusMenu } from './ui/FontLibraryStatusMenu';
+import { CatalogLibraryActions } from './ui/CatalogLibraryActions';
+import { CatalogDownloadSplitButton } from './ui/CatalogDownloadSplitButton';
+import { buildCatalogDownloadButtonProps } from './ui/buildCatalogDownloadButtonProps';
 import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
+import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
+import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
+import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
+import {
+  buildArchiveBlobFromEntries,
+  buildGoogleFormatArchiveEntry,
+  buildGooglePackageArchiveEntry,
+  buildSelectionArchiveEntries,
+  downloadGoogleAsFormat,
+  downloadGooglePackageZip,
+  saveArchiveBlob,
+} from '../utils/catalogDownloadActions';
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -33,6 +48,43 @@ const TextMode = lazy(() => import('./TextMode'));
 // --- Конец ленивой загрузки ---
 
 const EMPTY_STATE_GOOGLE_RESULTS_LIMIT = 8;
+
+function QuickSearchCardDownloadAction({
+  family,
+  entry,
+  onDownloadZip,
+  onDownloadAsFormat,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div
+      className={[
+        'max-w-[min(100%,12rem)] opacity-0 transition-opacity duration-200',
+        'pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100',
+        'focus-within:pointer-events-auto focus-within:opacity-100',
+        menuOpen ? '!pointer-events-auto !opacity-100' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      onClick={(event) => event.stopPropagation()}
+      onMouseDown={(event) => event.stopPropagation()}
+    >
+      <CatalogDownloadSplitButton
+        tone="light"
+        layout="comfortable"
+        className="!w-auto max-w-[min(100%,12rem)]"
+        {...buildCatalogDownloadButtonProps({
+          family,
+          item: entry,
+          onDownloadZip,
+          onDownloadAsFormat,
+          showVariable: Boolean(entry?.isVariable),
+        })}
+        onMenuOpenChange={setMenuOpen}
+      />
+    </div>
+  );
+}
 
 function resolvePreviewJustifyContent(verticalAlignment) {
   return verticalAlignment === 'middle'
@@ -63,7 +115,7 @@ function getEmptyStateSearchLayoutClasses(isActive) {
 }
 
 const MODE_LOADING_FALLBACK = (
-  <div className="flex items-center justify-center p-8">
+  <div className="flex h-full min-h-full w-full items-center justify-center p-8">
     <HexProgressLoader size={52} className="shrink-0" />
   </div>
 );
@@ -87,6 +139,8 @@ export default function FontPreview({
   fontLibraries = [],
   onMoveFontToLibrary,
   onRequestCreateLibrary,
+  onSelectionActionsChange,
+  selectionActionsActive = false,
   currentWaterfallBaseSize = null,
 }) {
   const { 
@@ -396,6 +450,152 @@ export default function FontPreview({
   useEffect(() => {
     filteredGoogleCatalogResults.forEach((entry) => ensureGoogleFontPreviewCss(entry));
   }, [filteredGoogleCatalogResults]);
+  const {
+    selectedKeys: selectedQuickSearchFamilies,
+    setSelectedKeys: setSelectedQuickSearchFamilies,
+    startLongPress: startQuickSearchLongPress,
+    onCardClick: onQuickSearchCardClick,
+    clearLongPressTimer: clearQuickSearchLongPressTimer,
+    pruneSelection: pruneQuickSearchSelection,
+  } = useLongPressMultiSelect({ longPressMs: 220, isInteractiveTarget });
+
+  useEffect(() => {
+    pruneQuickSearchSelection(
+      new Set(
+        filteredGoogleCatalogResults
+          .map((entry) => String(entry?.family || '').trim())
+          .filter(Boolean),
+      ),
+    );
+  }, [filteredGoogleCatalogResults, pruneQuickSearchSelection]);
+
+  const selectedQuickSearchEntries = useMemo(
+    () =>
+      filteredGoogleCatalogResults.filter((entry) =>
+        selectedQuickSearchFamilies.has(String(entry?.family || '').trim()),
+      ),
+    [filteredGoogleCatalogResults, selectedQuickSearchFamilies],
+  );
+
+  const downloadSelectedQuickSearch = useCallback(async () => {
+    const selected = selectedQuickSearchEntries.filter((entry) => String(entry?.family || '').trim());
+    if (selected.length === 0) return false;
+    if (selected.length > 1) {
+      const files = await buildSelectionArchiveEntries(selected, (entry) =>
+        buildGooglePackageArchiveEntry(entry),
+      );
+      if (files.length === 0) {
+        toast.error('Не удалось собрать архив выделенных шрифтов');
+        return false;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      const archiveBlob = await buildArchiveBlobFromEntries(files);
+      saveArchiveBlob(archiveBlob, `quick-search-selected-${stamp}.zip`);
+      toast.success(
+        files.length === 1
+          ? 'Скачан 1 шрифт в архиве'
+          : `Скачано ${files.length} шрифтов в одном архиве`,
+      );
+      setSelectedQuickSearchFamilies(new Set());
+      return true;
+    }
+    const [entry] = selected;
+    const ok = await downloadGooglePackageZip(entry, { silent: true });
+    if (ok) {
+      toast.success(`Скачан ${entry.family}`);
+      setSelectedQuickSearchFamilies(new Set());
+    }
+    return ok;
+  }, [selectedQuickSearchEntries, setSelectedQuickSearchFamilies]);
+
+  const downloadSelectedQuickSearchAsFormat = useCallback(
+    async (format) => {
+      const selected = selectedQuickSearchEntries.filter((entry) => String(entry?.family || '').trim());
+      if (selected.length === 0) return false;
+      const targetFormat = String(format || 'woff2').toLowerCase();
+      if (selected.length > 1) {
+        const files = await buildSelectionArchiveEntries(selected, (entry) =>
+          buildGoogleFormatArchiveEntry(entry, targetFormat),
+        );
+        if (files.length === 0) {
+          toast.error(`Не удалось собрать архив ${targetFormat.toUpperCase()}`);
+          return false;
+        }
+        const stamp = new Date().toISOString().slice(0, 10);
+        const archiveBlob = await buildArchiveBlobFromEntries(files);
+        saveArchiveBlob(archiveBlob, `quick-search-selected-${targetFormat}-${stamp}.zip`);
+        toast.success(
+          files.length === 1
+            ? `Скачан 1 шрифт (${targetFormat.toUpperCase()}) в архиве`
+            : `Скачано ${files.length} шрифтов (${targetFormat.toUpperCase()}) в одном архиве`,
+        );
+        setSelectedQuickSearchFamilies(new Set());
+        return true;
+      }
+      const [entry] = selected;
+      const ok = await downloadGoogleAsFormat(entry, targetFormat, { silent: true });
+      if (ok) {
+        toast.success(`Скачан ${entry.family} (${targetFormat.toUpperCase()})`);
+        setSelectedQuickSearchFamilies(new Set());
+      }
+      return ok;
+    },
+    [selectedQuickSearchEntries, setSelectedQuickSearchFamilies],
+  );
+
+  const moveSelectedQuickSearch = useCallback(
+    async (targetLibraryId) => {
+      if (!targetLibraryId || typeof onMoveFontToLibrary !== 'function') return false;
+      const selected = selectedQuickSearchEntries.filter((entry) => String(entry?.family || '').trim());
+      if (selected.length === 0) return false;
+      let movedCount = 0;
+      for (const entry of selected) {
+        const family = String(entry?.family || '').trim();
+        if (!family) continue;
+        const libraryEntry = createCatalogLibraryEntry({
+          source: 'google',
+          key: family,
+          label: family,
+        });
+        if (!libraryEntry) continue;
+        // eslint-disable-next-line no-await-in-loop
+        await Promise.resolve(onMoveFontToLibrary(targetLibraryId, libraryEntry));
+        movedCount += 1;
+      }
+      if (movedCount > 0) {
+        setSelectedQuickSearchFamilies(new Set());
+        return true;
+      }
+      return false;
+    },
+    [onMoveFontToLibrary, selectedQuickSearchEntries, setSelectedQuickSearchFamilies],
+  );
+
+  const createLibraryFromSelectedQuickSearch = useCallback(() => {
+    if (typeof onRequestCreateLibrary !== 'function') return false;
+    const entries = selectedQuickSearchEntries
+      .map((entry) =>
+        createCatalogLibraryEntry({
+          source: 'google',
+          key: entry?.family,
+          label: entry?.family,
+        }),
+      )
+      .filter(Boolean);
+    if (entries.length === 0) return false;
+    onRequestCreateLibrary(entries);
+    return true;
+  }, [onRequestCreateLibrary, selectedQuickSearchEntries]);
+
+  useSelectionActionsEffect({
+    isActive: Boolean(selectionActionsActive) && !selectedFont,
+    onSelectionActionsChange,
+    selectedCount: selectedQuickSearchFamilies.size,
+    downloadSelected: downloadSelectedQuickSearch,
+    downloadSelectedAsFormat: downloadSelectedQuickSearchAsFormat,
+    moveSelected: moveSelectedQuickSearch,
+    createLibraryFromSelection: createLibraryFromSelectedQuickSearch,
+  });
   
   const effectiveWaterfallSizes = useMemo(() => {
     const n = Math.max(1, Math.min(40, Math.round(Number(waterfallRows) || 20)));
@@ -655,13 +855,21 @@ export default function FontPreview({
           >
             <div
               ref={emptyStateSearchWrapRef}
-              className={`z-20 min-h-10 ${emptyStateLayout.stickyClassName} flex items-center gap-3 ${emptyStateLayout.barJustifyClassName}`}
+              className={`z-20 min-h-10 ${emptyStateLayout.stickyClassName} flex items-center ${
+                emptyStateSearchActive ? 'gap-3' : 'gap-0'
+              } ${emptyStateLayout.barJustifyClassName} ${
+                emptyStateSearchActive ? 'relative pr-12' : ''
+              }`}
             >
               <IconCircleButton
                 variant="searchToggle"
                 size="md"
                 pressed={emptyStateSearchActive}
-                className="focus:outline-none"
+                className={
+                  emptyStateSearchActive
+                    ? 'absolute right-0 top-1/2 z-10 -translate-y-1/2 focus:outline-none'
+                    : 'focus:outline-none'
+                }
                 onClick={emptyStateSearchActive ? clearEmptyStateSearch : openEmptyStateSearch}
                 aria-label={emptyStateLayout.toggleAriaLabel}
               >
@@ -678,7 +886,7 @@ export default function FontPreview({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 ) : (
-                  <SearchIcon className="h-5 w-5" />
+                  <SearchIcon className="h-4 w-4" />
                 )}
               </IconCircleButton>
               <div
@@ -744,20 +952,43 @@ export default function FontPreview({
                 {emptyStateSearchQuery ? (
                   filteredGoogleCatalogResults.length > 0 ? (
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {filteredGoogleCatalogResults.map((entry) => (
-                        <button
-                          key={entry.family}
-                          type="button"
-                          onClick={() => loadPresetFont(entry.family)}
-                          className="w-full text-left"
-                        >
+                      {filteredGoogleCatalogResults.map((entry) => {
+                        const family = String(entry?.family || '').trim();
+                        if (!family) return null;
+                        const isSelected = selectedQuickSearchFamilies.has(family);
+                        return (
                           <CatalogFontCard
-                            className="min-h-[148px]"
-                            title={entry.family}
+                            key={family}
+                            className="min-h-[148px] cursor-pointer"
+                            actions={
+                              <CatalogLibraryActions
+                                libraries={fontLibraries}
+                                libraryEntry={createCatalogLibraryEntry({
+                                  source: 'google',
+                                  key: family,
+                                  label: family,
+                                })}
+                                onAddFontToLibrary={onMoveFontToLibrary}
+                                onRequestCreateLibrary={onRequestCreateLibrary}
+                                stateKey={`empty-search:${family}`}
+                              />
+                            }
+                            selected={isSelected}
+                            onClick={(event) => {
+                              if (isInteractiveTarget(event?.target)) return;
+                              onQuickSearchCardClick(event, family);
+                              if (event?.defaultPrevented || selectedQuickSearchFamilies.size > 0) return;
+                              loadPresetFont(family);
+                            }}
+                            onPointerDown={(event) => startQuickSearchLongPress(event, family)}
+                            onPointerUp={clearQuickSearchLongPressTimer}
+                            onPointerLeave={clearQuickSearchLongPressTimer}
+                            onPointerCancel={clearQuickSearchLongPressTimer}
+                            title={family}
                             preview={
                               <div
                                 className="mt-2 min-h-[1.75rem] flex-1 truncate text-[1.75rem] leading-tight text-gray-800"
-                                style={{ fontFamily: `'${entry.family}', sans-serif` }}
+                                style={{ fontFamily: `'${family}', sans-serif` }}
                               >
                                 AaBbCcDdEe
                               </div>
@@ -779,14 +1010,17 @@ export default function FontPreview({
                                     </span>
                                   ) : null}
                                 </div>
-                                <span className="text-xs font-semibold uppercase text-gray-800">
-                                  Google
-                                </span>
+                                <QuickSearchCardDownloadAction
+                                  family={family}
+                                  entry={entry}
+                                  onDownloadZip={downloadGooglePackageZip}
+                                  onDownloadAsFormat={(it, format) => downloadGoogleAsFormat(it, format)}
+                                />
                               </div>
                             }
                           />
-                        </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : googleCatalogEntries.length > 0 ? (
                     <p className="py-6 text-center text-sm uppercase text-gray-500">
@@ -887,7 +1121,7 @@ export default function FontPreview({
           viewMode === 'styles' ||
           viewMode === 'glyphs' ||
           viewMode === 'text' ? (
-            <PreviewEditTextHint className="pb-3" />
+            <PreviewEditTextHint/>
           ) : null}
         </div>
       </div>

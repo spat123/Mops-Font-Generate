@@ -16,12 +16,32 @@ import {
   buildArchiveBlobFromEntries,
   saveArchiveBlob,
 } from './catalogDownloadActions';
+import { convertBlobToFormat } from './fontFormatConvertClient';
+import { buildSafeFileBase, saveBlobAsFile } from './fileDownloadUtils';
+const LOCAL_DOWNLOAD_FORMATS = ['ttf', 'otf', 'woff', 'woff2'];
+
+function normalizeLocalFormat(fileName, fallback = 'woff2') {
+  const ext = String(fileName || '')
+    .trim()
+    .split('.')
+    .pop()
+    ?.toLowerCase();
+  return LOCAL_DOWNLOAD_FORMATS.includes(ext) ? ext : fallback;
+}
+
+async function downloadLocalAsFormat({ blob, fileBase, sourceFormat, targetFormat, label }) {
+  const outFormat = String(targetFormat || sourceFormat || 'woff2').toLowerCase();
+  const outBlob =
+    outFormat === sourceFormat ? blob : await convertBlobToFormat(blob, outFormat);
+  saveBlobAsFile(outBlob, `${fileBase}.${outFormat}`);
+  toast.success(`Скачан ${label} (${outFormat.toUpperCase()})`);
+}
 
 /**
  * Пропсы для {@link CatalogDownloadSplitButton} на карточке записи сохранённой библиотеки.
  * @returns {object | null} null — кнопку не показывать (локальный / сессия и т.п.)
  */
-export function buildSavedLibraryDownloadSplitButtonProps(fontEntry) {
+export function buildSavedLibraryDownloadSplitButtonProps(fontEntry, sessionFont = null) {
   if (!fontEntry || typeof fontEntry !== 'object') return null;
   const source = String(fontEntry.source || 'session').trim();
   const label = String(fontEntry.label || '').trim();
@@ -114,6 +134,69 @@ export function buildSavedLibraryDownloadSplitButtonProps(fontEntry) {
           hidden: item.isVariable !== true,
           onSelect: () => downloadFontsourceVariableVariant(item),
         },
+      ],
+    };
+  }
+
+  if (source === 'local') {
+    const fileBlob = sessionFont?.file instanceof Blob ? sessionFont.file : null;
+    const originalName =
+      String(sessionFont?.originalName || '').trim() ||
+      String(sessionFont?.name || '').trim() ||
+      `${label || 'font'}.woff2`;
+    const sourceFormat = normalizeLocalFormat(originalName);
+    const fileBase = buildSafeFileBase(label || originalName, 'local-font');
+
+    if (!fileBlob) {
+      return {
+        disabled: true,
+        tone: 'light',
+        layout: 'comfortable',
+        className: '!w-auto max-w-[min(100%,12rem)]',
+        primaryLabel: 'Скачать',
+        primaryAriaLabel: `Скачать ${label || 'локальный шрифт'}`,
+        onPrimaryClick: () =>
+          toast.info('Откройте локальный шрифт в редакторе, чтобы скачать исходный файл'),
+        menuItems: [],
+      };
+    }
+
+    return {
+      tone: 'light',
+      layout: 'comfortable',
+      className: '!w-auto max-w-[min(100%,12rem)]',
+      primaryLabel: 'Скачать',
+      primaryAriaLabel: `Скачать ${label || originalName}`,
+      onPrimaryClick: () => {
+        saveBlobAsFile(fileBlob, originalName);
+        toast.success(`Скачан ${label || originalName}`);
+      },
+      menuItems: [
+        {
+          key: 'original',
+          label: `Оригинал (${sourceFormat.toUpperCase()})`,
+          onSelect: () => {
+            saveBlobAsFile(fileBlob, originalName);
+            toast.success(`Скачан ${label || originalName}`);
+          },
+        },
+        ...LOCAL_DOWNLOAD_FORMATS.filter((format) => format !== sourceFormat).map((format) => ({
+          key: format,
+          label: format.toUpperCase(),
+          onSelect: async () => {
+            try {
+              await downloadLocalAsFormat({
+                blob: fileBlob,
+                fileBase,
+                sourceFormat,
+                targetFormat: format,
+                label: label || originalName,
+              });
+            } catch {
+              toast.error(`Не удалось конвертировать ${label || originalName} в ${format.toUpperCase()}`);
+            }
+          },
+        })),
       ],
     };
   }

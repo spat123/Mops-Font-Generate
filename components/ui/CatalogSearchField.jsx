@@ -21,7 +21,7 @@ export function CatalogSearchField({
         onFocus={() => onFocusChange?.(true)}
         onBlur={() => onFocusChange?.(false)}
         placeholder={placeholder}
-        className={`box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-36 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 hover:placeholder:text-gray-900 ${inputInteractiveClassName} focus:border-black/[0.14] focus:outline-none sm:pl-3 sm:pr-44`}
+        className={`box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-36 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 hover:placeholder:text-gray-900 ${inputInteractiveClassName} focus:border-black/[0.14] focus:outline-none sm:pl-3 sm:pr-33`}
         autoComplete="off"
         spellCheck={false}
       />

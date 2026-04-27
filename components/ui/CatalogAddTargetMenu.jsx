@@ -190,7 +190,7 @@ export function CatalogAddTargetMenu({
           role="menu"
         >
           <div className="max-h-64 overflow-y-auto">
-            {libraries.map((library) => (
+            {libraries.map((library, index) => (
               <button
                 key={library.id}
                 type="button"
@@ -207,7 +207,7 @@ export function CatalogAddTargetMenu({
                   selectedLibraryId === library.id
                     ? 'bg-accent text-white'
                     : 'text-gray-900 hover:bg-accent hover:text-white'
-                }`}
+                } ${index < libraries.length - 1 ? 'border-b border-gray-200' : ''}`}
               >
                 <span className="truncate">{library.name}</span>
               </button>

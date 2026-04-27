@@ -39,6 +39,7 @@ const LOCAL_STORAGE_KEYS = {
   VERTICAL_ALIGNMENT: 'verticalAlignment',
   TEXT_FILL: 'textFill',
   DARK_THEME: 'darkTheme',
+  THEME_MODE: 'themeMode',
 };
 
 const DEFAULT_SETTINGS = {
@@ -93,6 +94,7 @@ const DEFAULT_SETTINGS = {
   VERTICAL_ALIGNMENT: 'top',
   TEXT_FILL: false,
   DARK_THEME: false,
+  THEME_MODE: 'auto',
 };
 
 /** Текст превью по умолчанию (как при сбросе настроек). */
@@ -134,6 +136,7 @@ export function getDefaultPreviewSettingsSnapshot() {
     verticalAlignment: DEFAULT_SETTINGS.VERTICAL_ALIGNMENT,
     textFill: DEFAULT_SETTINGS.TEXT_FILL,
     darkTheme: DEFAULT_SETTINGS.DARK_THEME,
+    themeMode: DEFAULT_SETTINGS.THEME_MODE,
     previewBackgroundImage: null,
   };
 }
@@ -183,6 +186,7 @@ function useDebouncedSyncSettingToStorage(isClient, storageKey, value, delayMs =
 
 export const SettingsProvider = ({ children }) => {
   const [isClient, setIsClient] = useState(false);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
   const [text, setText] = useState(DEFAULT_SETTINGS.TEXT);
   const [fontSize, setFontSize] = useState(DEFAULT_SETTINGS.FONT_SIZE);
@@ -216,12 +220,37 @@ export const SettingsProvider = ({ children }) => {
   const [textCenter, setTextCenter] = useState(DEFAULT_SETTINGS.TEXT_CENTER);
   const [verticalAlignment, setVerticalAlignment] = useState(DEFAULT_SETTINGS.VERTICAL_ALIGNMENT);
   const [textFill, setTextFill] = useState(DEFAULT_SETTINGS.TEXT_FILL);
-  const [darkTheme, setDarkTheme] = useState(DEFAULT_SETTINGS.DARK_THEME);
+  const [themeMode, setThemeMode] = useState(DEFAULT_SETTINGS.THEME_MODE);
   /** Data URL изображения на фоне области превью или null */
   const [previewBackgroundImage, setPreviewBackgroundImage] = useState(null);
+  const darkTheme = themeMode === 'dark' || (themeMode === 'auto' && systemPrefersDark);
+
+  const setDarkTheme = useCallback(
+    (valueOrUpdater) => {
+      const nextValue =
+        typeof valueOrUpdater === 'function' ? valueOrUpdater(darkTheme) : valueOrUpdater;
+      setThemeMode(Boolean(nextValue) ? 'dark' : 'light');
+    },
+    [darkTheme],
+  );
 
   useEffect(() => {
     setIsClient(true);
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleMediaChange = (event) => setSystemPrefersDark(event.matches);
+      setSystemPrefersDark(mediaQuery.matches);
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', handleMediaChange);
+        return () => mediaQuery.removeEventListener('change', handleMediaChange);
+      }
+      mediaQuery.addListener(handleMediaChange);
+      return () => mediaQuery.removeListener(handleMediaChange);
+    }
+    return undefined;
+  }, []);
+
+  useEffect(() => {
     setFontSize(getLocalStorageItem(LOCAL_STORAGE_KEYS.FONT_SIZE, DEFAULT_SETTINGS.FONT_SIZE));
     setGlyphsFontSize(
       getLocalStorageItem(LOCAL_STORAGE_KEYS.GLYPHS_FONT_SIZE, DEFAULT_SETTINGS.GLYPHS_FONT_SIZE),
@@ -304,7 +333,14 @@ export const SettingsProvider = ({ children }) => {
     }
     setVerticalAlignment(va);
     setTextFill(getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_FILL, DEFAULT_SETTINGS.TEXT_FILL));
-    setDarkTheme(Boolean(getLocalStorageItem(LOCAL_STORAGE_KEYS.DARK_THEME, DEFAULT_SETTINGS.DARK_THEME)));
+    const storedThemeMode = getLocalStorageItem(LOCAL_STORAGE_KEYS.THEME_MODE, null);
+    if (storedThemeMode === 'light' || storedThemeMode === 'dark' || storedThemeMode === 'auto') {
+      setThemeMode(storedThemeMode);
+    } else {
+      setThemeMode(
+        Boolean(getLocalStorageItem(LOCAL_STORAGE_KEYS.DARK_THEME, DEFAULT_SETTINGS.DARK_THEME)) ? 'dark' : 'light',
+      );
+    }
     const img = getLocalStorageItem(LOCAL_STORAGE_KEYS.PREVIEW_BACKGROUND_IMAGE, null);
     setPreviewBackgroundImage(typeof img === 'string' && img.length > 0 ? img : null);
   }, []);
@@ -345,6 +381,7 @@ export const SettingsProvider = ({ children }) => {
   }, [verticalAlignment, setTextCenter]);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_FILL, textFill);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.DARK_THEME, darkTheme);
+  useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.THEME_MODE, themeMode);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.PREVIEW_BACKGROUND_IMAGE, previewBackgroundImage);
 
   useEffect(() => {
@@ -390,7 +427,7 @@ export const SettingsProvider = ({ children }) => {
     setTextCenter(DEFAULT_SETTINGS.TEXT_CENTER);
     setVerticalAlignment(DEFAULT_SETTINGS.VERTICAL_ALIGNMENT);
     setTextFill(DEFAULT_SETTINGS.TEXT_FILL);
-    setDarkTheme(DEFAULT_SETTINGS.DARK_THEME);
+    setThemeMode(DEFAULT_SETTINGS.THEME_MODE);
     setPreviewBackgroundImage(null);
 
     Object.values(LOCAL_STORAGE_KEYS).forEach((key) => {
@@ -467,6 +504,8 @@ export const SettingsProvider = ({ children }) => {
     setTextFill,
     darkTheme,
     setDarkTheme,
+    themeMode,
+    setThemeMode,
     previewBackgroundImage,
     setPreviewBackgroundImage,
     resetSettings,

@@ -3,6 +3,7 @@ import { toast } from '../utils/appNotify';
 import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
+import { PopupDialogHeader } from './ui/PopupDialogHeader';
 
 function slugFileBase(name) {
   const s = String(name || 'font')
@@ -127,24 +128,12 @@ export default function GenerateFontModal({
       onClick={handleBackdrop}
     >
       <div
-        className={`max-h-[90vh] w-11/12 max-w-lg overflow-y-auto rounded-lg bg-white shadow-xl transition-all duration-300 ease-in-out ${
+        className={`max-h-[90vh] w-11/12 max-w-lg overflow-y-auto rounded-none bg-white shadow-xl transition-all duration-300 ease-in-out ${
           isVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-4 scale-95 opacity-0'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h3 className="text-lg font-medium text-gray-900">Генерация шрифта</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            aria-label="Закрыть"
-          >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+        <PopupDialogHeader title="Генерация шрифта" onClose={onClose} />
 
         <div className="space-y-4 px-6 py-4">
           {!vf && (
@@ -220,7 +209,7 @@ export default function GenerateFontModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200/80"
+            className="rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
             disabled={busy}
           >
             Отмена
@@ -229,7 +218,7 @@ export default function GenerateFontModal({
             type="button"
             onClick={handleGenerate}
             disabled={!vf || busy}
-            className="rounded bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+            className="rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? 'Генерация…' : 'Сгенерировать и скачать'}
           </button>

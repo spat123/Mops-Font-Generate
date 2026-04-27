@@ -24,6 +24,9 @@ import { Tooltip } from '../components/ui/Tooltip';
 import { EditorTabBar, EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { ScopeFilterToolbar } from '../components/ui/ScopeFilterToolbar';
+import { CustomSelect } from '../components/ui/CustomSelect';
+import { customSelectTriggerClass } from '../components/ui/nativeSelectFieldClasses';
+import { CatalogCheckboxControl } from '../components/ui/CatalogCheckbox';
 import { UploadFromDiskCard } from '../components/ui/UploadFromDiskCard';
 import { EditorStatusBar } from '../components/ui/EditorStatusBar';
 import { CatalogDownloadSplitButton } from '../components/ui/CatalogDownloadSplitButton';
@@ -71,6 +74,7 @@ import { buildCatalogDownloadButtonProps } from '../components/ui/buildCatalogDo
 import { moveAndSwapIconUrl } from '../components/ui/editIconUrls';
 import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useDismissibleLayer } from '../components/ui/useDismissibleLayer';
+import { buildGroupedFontSubsetOptions } from '../utils/fontSubsetLabels';
 import {
   downloadGoogleAsFormat,
   downloadGooglePackageZip,
@@ -272,12 +276,22 @@ function LibraryMoveMenu({
               hideToolbarLabel ? 'justify-center px-3' : 'gap-2 px-4'
             }`}
           >
-            <img
-              src={moveAndSwapIconUrl}
-              alt=""
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="h-4 w-4 shrink-0"
               aria-hidden="true"
-              className={`h-4 w-4 shrink-0 ${isMoveDisabled ? 'opacity-40' : 'opacity-100'}`}
-            />
+            >
+              <path
+                d="M23 15.9999H3.41406L6.70703 12.707C7.09756 12.3164 7.09756 11.6834 6.70703 11.2929C6.31651 10.9024 5.68349 10.9024 5.29297 11.2929L0.292969 16.2929L0.224609 16.3691C-0.0957412 16.7618 -0.0731474 17.3408 0.292969 17.707L5.29297 22.707C5.68349 23.0975 6.31651 23.0975 6.70703 22.707C7.09756 22.3164 7.09756 21.6834 6.70703 21.2929L3.41406 17.9999L23 17.9999C23.5523 17.9999 24 17.5522 24 16.9999C24 16.4476 23.5523 15.9999 23 15.9999Z"
+                fill="currentColor"
+              />
+              <path
+                d="M1 5.99992H20.5859L17.293 2.70696C16.9024 2.31643 16.9024 1.68342 17.293 1.29289C17.6835 0.902369 18.3165 0.902369 18.707 1.29289L23.707 6.29289L23.7754 6.36907C24.0957 6.76184 24.0731 7.34084 23.707 7.70696L18.707 12.707C18.3165 13.0975 17.6835 13.0975 17.293 12.707C16.9024 12.3164 16.9024 11.6834 17.293 11.2929L20.5859 7.99992H1C0.447716 7.99992 2.64288e-07 7.55221 0 6.99992C-6.58593e-09 6.44764 0.447716 5.99992 1 5.99992Z"
+                fill="currentColor"
+              />
+            </svg>
             {!hideToolbarLabel ? (
               <span className={busy ? 'truncate' : 'whitespace-nowrap'}>
                 {busy ? 'Перемещение...' : 'Переместить'}
@@ -639,6 +653,9 @@ export default function Home() {
   const [closedLibraryFontIds, setClosedLibraryFontIds] = useState([]);
   const [savedLibraryFontsScope, setSavedLibraryFontsScope] = useState('all');
   const [savedLibrarySearchQuery, setSavedLibrarySearchQuery] = useState('');
+  const [savedLibraryFilterSubsets, setSavedLibraryFilterSubsets] = useState([]);
+  const [savedLibraryFilterVariable, setSavedLibraryFilterVariable] = useState('all'); // all | variable | static
+  const [savedLibraryFilterItalic, setSavedLibraryFilterItalic] = useState(false);
   const [isSavedLibrarySearchExpanded, setIsSavedLibrarySearchExpanded] = useState(false);
   const [savedLibraryCatalogSearchSource, setSavedLibraryCatalogSearchSource] = useState('google'); // google | fontsource
   const [savedLibraryToolbarViewportW, setSavedLibraryToolbarViewportW] = useState(() =>
@@ -661,7 +678,15 @@ export default function Home() {
     moveSelected: null,
     createLibraryFromSelection: null,
   });
+  const [emptyTabSelectionActions, setEmptyTabSelectionActions] = useState({
+    selectedCount: 0,
+    downloadSelected: null,
+    downloadSelectedAsFormat: null,
+    moveSelected: null,
+    createLibraryFromSelection: null,
+  });
   const [isSavedLibraryMoveBusy, setIsSavedLibraryMoveBusy] = useState(false);
+  const [savedLibrarySelectionCount, setSavedLibrarySelectionCount] = useState(0);
   const [catalogPreviewSlotsById, setCatalogPreviewSlotsById] = useState({});
   const [libraryDropTargetTabId, setLibraryDropTargetTabId] = useState(null);
   const {
@@ -1108,8 +1133,22 @@ export default function Home() {
   const savedLibrarySearchQueryTrimmed = savedLibrarySearchQuery.trim();
   const savedLibrarySearchActive =
     isSavedLibrarySearchExpanded || savedLibrarySearchQueryTrimmed.length > 0;
-  const savedLibrarySearchOverlayActive =
-    savedLibrarySearchActive && savedLibraryToolbarViewportW < 1024;
+  const savedLibraryToolbarIs2Col = savedLibraryToolbarViewportW < 768;
+  const savedLibraryToolbarIs4Col = savedLibraryToolbarViewportW >= 768 && savedLibraryToolbarViewportW < 1280;
+  const savedLibraryToolbarIs5Col = savedLibraryToolbarViewportW >= 1280 && savedLibraryToolbarViewportW <= 1440;
+  const savedLibraryToolbarIsWideRow = savedLibraryToolbarViewportW >= 1280;
+  const savedLibraryToolbarIsTightResetGap =
+    savedLibraryToolbarViewportW >= 1280 && savedLibraryToolbarViewportW <= 1500;
+  const savedLibraryHideDownloadLabel =
+    savedLibraryToolbarViewportW <= 1440 && savedLibraryToolbarViewportW >= 1024;
+  const savedLibrarySearchOverlayEnabled = savedLibraryToolbarViewportW <= 1920;
+  const savedLibraryResetLabel =
+    savedLibraryToolbarViewportW > 1440 ? 'Сбросить все' : 'Сбросить';
+  const catalogSourceToggleTightGap =
+    savedLibraryToolbarViewportW <= 1480 && savedLibraryToolbarViewportW >= 1440;
+  const catalogSourceToggleClassName = `w-full max-w-none ${
+    catalogSourceToggleTightGap ? 'gap-1' : 'gap-4'
+  } [&>button]:w-auto [&>button]:flex-1`;
 
   const savedLibrarySourceToggleValue = savedLibraryCatalogSearchSource;
   const savedLibrarySourceToggleOptions = useMemo(
@@ -1150,6 +1189,139 @@ export default function Home() {
     [savedLibrarySearchQuery],
   );
 
+  const savedLibraryCatalogLookup = useMemo(() => {
+    const googleByFamily = new Map();
+    const fontsourceBySlug = new Map();
+
+    const google = readGoogleFontCatalogCache();
+    (Array.isArray(google) ? google : []).forEach((entry) => {
+      const family = String(entry?.family || '').trim();
+      if (!family) return;
+      googleByFamily.set(family.toLowerCase(), entry);
+    });
+
+    const fontsource = readFontsourceCatalogCache();
+    (Array.isArray(fontsource) ? fontsource : []).forEach((item) => {
+      const slug = String(item?.id || item?.slug || '').trim();
+      if (!slug) return;
+      fontsourceBySlug.set(slug, item);
+    });
+
+    return { googleByFamily, fontsourceBySlug };
+  }, [
+    activeSavedLibrary,
+    savedLibraryCatalogSearchSource,
+    savedLibraryFilterItalic,
+    savedLibraryFilterSubsets,
+    savedLibraryFilterVariable,
+    savedLibrarySearchQueryTrimmed,
+  ]);
+
+  const availableSavedLibrarySubsets = useMemo(() => {
+    if (!activeSavedLibrary) return [];
+    const set = new Set();
+    (Array.isArray(activeSavedLibrary.fonts) ? activeSavedLibrary.fonts : []).forEach((font) => {
+      const id = String(font?.id || '');
+      const label = String(font?.label || '');
+      const source = String(font?.source || 'editor');
+      if (source === 'google') {
+        const family = id.startsWith('google:') ? id.slice('google:'.length) : label;
+        const meta = savedLibraryCatalogLookup.googleByFamily.get(String(family || '').toLowerCase());
+        (Array.isArray(meta?.subsets) ? meta.subsets : []).forEach((subset) => set.add(String(subset)));
+      } else if (source === 'fontsource') {
+        const slug = id.startsWith('fontsource:') ? id.slice('fontsource:'.length) : '';
+        const meta = savedLibraryCatalogLookup.fontsourceBySlug.get(slug);
+        (Array.isArray(meta?.subsets) ? meta.subsets : []).forEach((subset) => set.add(String(subset)));
+      }
+    });
+    return Array.from(set);
+  }, [activeSavedLibrary, savedLibraryCatalogLookup]);
+
+  const savedLibrarySubsetOptions = useMemo(
+    () =>
+      buildGroupedFontSubsetOptions(availableSavedLibrarySubsets, savedLibraryFilterSubsets, {
+        includeSelectedSection: false,
+      }),
+    [availableSavedLibrarySubsets, savedLibraryFilterSubsets],
+  );
+
+  const savedLibraryVariableOptions = useMemo(
+    () => [
+      { value: 'variable', label: 'Вариативные' },
+      { value: 'static', label: 'Статические' },
+    ],
+    [],
+  );
+
+  const savedLibraryHasAdvancedFilters =
+    (Array.isArray(savedLibraryFilterSubsets) && savedLibraryFilterSubsets.length > 0) ||
+    String(savedLibraryFilterVariable || 'all') !== 'all' ||
+    savedLibraryFilterItalic === true;
+
+  const resetSavedLibraryFilters = useCallback(() => {
+    setSavedLibraryFontsScope('all');
+    setSavedLibrarySearchQuery('');
+    setIsSavedLibrarySearchExpanded(false);
+    setSavedLibraryFilterSubsets([]);
+    setSavedLibraryFilterVariable('all');
+    setSavedLibraryFilterItalic(false);
+    savedLibrarySearchInputRef.current?.blur();
+  }, []);
+
+  const savedLibraryCardMetaClassName = 'mt-auto pt-1 text-xs font-semibold uppercase text-gray-800';
+
+  const buildSavedLibraryCardMetaParts = useCallback(
+    (font, sessionFont = null) => {
+      const id = String(font?.id || '');
+      const label = String(font?.label || '');
+      const source = String(font?.source || 'session');
+      const sourceLabel = String(getLibrarySourceLabel(source) || source).toUpperCase();
+
+      let isVariable = font?.isVariable === true;
+      let hasItalic = false;
+
+      if (source === 'google') {
+        const family = id.startsWith('google:') ? id.slice('google:'.length) : label;
+        const meta = savedLibraryCatalogLookup.googleByFamily.get(String(family || '').toLowerCase());
+        isVariable = isVariable || (Array.isArray(meta?.axes) && meta.axes.length > 0);
+        hasItalic =
+          meta?.hasItalicStyles === true ||
+          (typeof meta?.italicMode === 'string' && meta.italicMode && meta.italicMode !== 'none');
+      } else if (source === 'fontsource') {
+        const slug = id.startsWith('fontsource:') ? id.slice('fontsource:'.length) : '';
+        const meta = savedLibraryCatalogLookup.fontsourceBySlug.get(slug);
+        isVariable = isVariable || meta?.isVariable === true;
+        hasItalic = meta?.hasItalic === true;
+      }
+
+      if (!isVariable && sessionFont) {
+        isVariable =
+          sessionFont?.isVariable === true ||
+          (Array.isArray(sessionFont?.variableAxes) && sessionFont.variableAxes.length > 0) ||
+          (Array.isArray(sessionFont?.axes) && sessionFont.axes.length > 0);
+      }
+
+      if (!hasItalic && sessionFont) {
+        const styleToken = [
+          sessionFont?.selectedStyle,
+          sessionFont?.style,
+          sessionFont?.activeStyle?.name,
+          sessionFont?.originalName,
+          sessionFont?.name,
+        ]
+          .map((part) => String(part || ''))
+          .join(' ');
+        hasItalic = /italic/i.test(styleToken);
+      }
+
+      const parts = [sourceLabel];
+      if (isVariable) parts.push('VF');
+      if (hasItalic) parts.push('ITALIC');
+      return parts;
+    },
+    [savedLibraryCatalogLookup],
+  );
+
   const filteredActiveSavedLibraryFonts = useMemo(() => {
     if (!activeSavedLibrary) return [];
     const scoped =
@@ -1158,11 +1330,74 @@ export default function Home() {
         : activeSavedLibrary.fonts.filter(
             (font) => (font?.source || 'editor') === savedLibraryFontsScope,
           );
-    if (!savedLibrarySearchQueryTrimmed) return scoped;
-    return scoped.filter((font) =>
-      matchesSearch([String(font?.label || ''), String(font?.id || '')], savedLibrarySearchQueryTrimmed),
-    );
-  }, [activeSavedLibrary, savedLibraryFontsScope, savedLibrarySearchQueryTrimmed]);
+    const searchFiltered = !savedLibrarySearchQueryTrimmed
+      ? scoped
+      : scoped.filter((font) =>
+          matchesSearch([String(font?.label || ''), String(font?.id || '')], savedLibrarySearchQueryTrimmed),
+        );
+
+    const subsetsActive = Array.isArray(savedLibraryFilterSubsets) && savedLibraryFilterSubsets.length > 0;
+    const variableMode = String(savedLibraryFilterVariable || 'all');
+    const italicOnly = savedLibraryFilterItalic === true;
+
+    if (!subsetsActive && variableMode === 'all' && !italicOnly) return searchFiltered;
+
+    const selectedSubsetSet = subsetsActive
+      ? new Set(savedLibraryFilterSubsets.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean))
+      : null;
+
+    return searchFiltered.filter((font) => {
+      const id = String(font?.id || '');
+      const label = String(font?.label || '');
+      const source = String(font?.source || 'editor');
+
+      let subsets = [];
+      let isVariable = false;
+      let hasItalic = false;
+
+      if (source === 'google') {
+        const family = id.startsWith('google:') ? id.slice('google:'.length) : label;
+        const meta = savedLibraryCatalogLookup.googleByFamily.get(String(family || '').toLowerCase());
+        subsets = Array.isArray(meta?.subsets) ? meta.subsets : [];
+        isVariable = Array.isArray(meta?.axes) && meta.axes.length > 0;
+        hasItalic =
+          meta?.hasItalicStyles === true ||
+          (typeof meta?.italicMode === 'string' && meta.italicMode && meta.italicMode !== 'none');
+      } else if (source === 'fontsource') {
+        const slug = id.startsWith('fontsource:') ? id.slice('fontsource:'.length) : '';
+        const meta = savedLibraryCatalogLookup.fontsourceBySlug.get(slug);
+        subsets = Array.isArray(meta?.subsets) ? meta.subsets : [];
+        isVariable = meta?.isVariable === true;
+        hasItalic = meta?.hasItalic === true;
+      }
+
+      if (selectedSubsetSet) {
+        const fontSubsetSet = new Set(subsets.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean));
+        let matchesAny = false;
+        for (const subset of selectedSubsetSet) {
+          if (fontSubsetSet.has(subset)) {
+            matchesAny = true;
+            break;
+          }
+        }
+        if (!matchesAny) return false;
+      }
+
+      if (variableMode === 'variable' && !isVariable) return false;
+      if (variableMode === 'static' && isVariable) return false;
+      if (italicOnly && !hasItalic) return false;
+
+      return true;
+    });
+  }, [
+    activeSavedLibrary,
+    savedLibraryCatalogLookup,
+    savedLibraryFilterItalic,
+    savedLibraryFilterSubsets,
+    savedLibraryFilterVariable,
+    savedLibraryFontsScope,
+    savedLibrarySearchQueryTrimmed,
+  ]);
 
   const catalogSearchResults = useMemo(() => {
     if (!savedLibrarySearchQueryTrimmed) return [];
@@ -1228,85 +1463,40 @@ export default function Home() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const savedLibrarySearchControls = (
-    <div
-      ref={savedLibrarySearchWrapRef}
-      className={
-        savedLibrarySearchOverlayActive
-          ? 'absolute inset-0 z-20 flex min-w-0 items-center gap-3 bg-white'
-          : 'flex w-full min-w-0 items-center justify-end gap-3'
-      }
-    >
-      {!savedLibrarySearchOverlayActive ? (
-        <IconCircleButton
-          variant="searchToggle"
-          size="md"
-          pressed={savedLibrarySearchActive}
-          className="focus:outline-none"
-          onClick={savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch}
-          aria-label={savedLibrarySearchActive ? 'Закрыть поиск' : 'Открыть поиск'}
-        >
-          {savedLibrarySearchActive ? (
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.6}
-              className="h-5 w-5"
-              aria-hidden
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <SearchIcon className="h-5 w-5" />
-          )}
-        </IconCircleButton>
-      ) : null}
-      {savedLibrarySearchActive ? (
-        <SegmentedControl
-          value={savedLibrarySourceToggleValue}
-          onChange={(next) => setSavedLibraryCatalogSearchSource(next)}
-          options={savedLibrarySourceToggleOptions}
-          variant="pairOutline"
-          className="shrink-0 [&>button]:h-10 [&>button]:px-3"
-        />
-      ) : null}
-      <div
-        className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
-          savedLibrarySearchActive ? 'flex-1 opacity-100' : 'max-w-0 opacity-0'
+  const savedLibraryShareButton = (
+    <Tooltip content="Поделиться">
+      <IconCircleButton
+        variant="searchToggle"
+        size="md"
+        className={`focus:outline-none ${
+          savedLibrarySelectionCount > 0
+            ? '!bg-accent !text-white hover:!bg-accent-hover [&_svg]:!text-white'
+            : ''
         }`}
+        aria-label="Поделиться"
       >
-        <div className="relative">
-          <input
-            ref={savedLibrarySearchInputRef}
-            type="search"
-            value={savedLibrarySearchQuery}
-            onFocus={() => setIsSavedLibrarySearchExpanded(true)}
-            onBlur={handleSavedLibrarySearchBlur}
-            onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
-            placeholder="Поиск в библиотеке"
-            className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          {savedLibrarySearchQueryTrimmed ? (
-            <SearchClearButton
-              onClick={clearSavedLibrarySearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2"
-            />
-          ) : null}
-        </div>
-      </div>
-      {savedLibrarySearchOverlayActive ? (
-        <IconCircleButton
-          variant="searchToggle"
-          size="md"
-          pressed
-          className="shrink-0 focus:outline-none"
-          onClick={clearSavedLibrarySearch}
-          aria-label="Закрыть поиск"
-        >
+        <ShareIcon className="h-4 w-4" />
+      </IconCircleButton>
+    </Tooltip>
+  );
+
+  const savedLibrarySearchTooltipText = savedLibrarySearchActive ? 'Закрыть поиск' : 'Открыть поиск';
+  const renderSavedLibrarySearchToggleButton = (
+    triggerClassName,
+    onClick,
+    ariaLabel = savedLibrarySearchTooltipText,
+    pressed = savedLibrarySearchActive,
+  ) => (
+    <Tooltip content={savedLibrarySearchTooltipText} className={triggerClassName}>
+      <IconCircleButton
+        variant="searchToggle"
+        size="md"
+        pressed={pressed}
+        className="focus:outline-none"
+        onClick={onClick}
+        aria-label={ariaLabel}
+      >
+        {savedLibrarySearchActive ? (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -1318,8 +1508,260 @@ export default function Home() {
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
-        </IconCircleButton>
-      ) : null}
+        ) : (
+          <SearchIcon className="h-4 w-4" />
+        )}
+      </IconCircleButton>
+    </Tooltip>
+  );
+
+  const savedLibrarySearchInlineButton = (
+    <div className="flex items-center gap-2">
+      {renderSavedLibrarySearchToggleButton(
+        '',
+        savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
+      )}
+      {savedLibraryShareButton}
+    </div>
+  );
+
+  const savedLibrarySourceButtonBaseClass =
+    'flex min-h-10 w-full min-w-0 items-center justify-center rounded-full border px-3 py-1.5 text-center text-sm uppercase font-semibold transition-colors';
+
+  const savedLibrarySearchDesktopControls = savedLibraryToolbarIs5Col ? (
+    <div ref={savedLibrarySearchWrapRef} className="grid w-full min-w-0 grid-cols-4 gap-4">
+      {savedLibrarySearchActive ? (
+        <button
+          type="button"
+          aria-pressed={savedLibraryCatalogSearchSource === 'google'}
+          className={`${savedLibrarySourceButtonBaseClass} ${
+            savedLibraryCatalogSearchSource === 'google'
+              ? 'border-accent bg-accent text-white'
+              : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+          }`}
+          onClick={() => setSavedLibraryCatalogSearchSource('google')}
+        >
+          Google
+        </button>
+      ) : (
+        <div className="min-w-0" />
+      )}
+      {savedLibrarySearchActive ? (
+        <button
+          type="button"
+          aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
+          className={`${savedLibrarySourceButtonBaseClass} ${
+            savedLibraryCatalogSearchSource === 'fontsource'
+              ? 'border-accent bg-accent text-white'
+              : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+          }`}
+          onClick={() => setSavedLibraryCatalogSearchSource('fontsource')}
+        >
+          Fontsource
+        </button>
+      ) : (
+        <div className="min-w-0" />
+      )}
+      <div className="col-span-2 relative min-w-0 pr-24">
+        <div
+          className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
+            savedLibrarySearchActive ? 'opacity-100' : 'max-w-0 opacity-0'
+          }`}
+        >
+          <div className="relative">
+            <input
+              ref={savedLibrarySearchInputRef}
+              type="search"
+              value={savedLibrarySearchQuery}
+              onFocus={() => setIsSavedLibrarySearchExpanded(true)}
+              onBlur={handleSavedLibrarySearchBlur}
+              onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
+              placeholder="Поиск в библиотеке"
+              className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {savedLibrarySearchQueryTrimmed ? (
+              <SearchClearButton
+                onClick={clearSavedLibrarySearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+              />
+            ) : null}
+          </div>
+        </div>
+        {renderSavedLibrarySearchToggleButton(
+          'absolute right-12 top-1/2 z-10 -translate-y-1/2',
+          savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
+        )}
+        <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">{savedLibraryShareButton}</div>
+      </div>
+    </div>
+  ) : (
+    <div ref={savedLibrarySearchWrapRef} className="grid w-full min-w-0 grid-cols-4 gap-4">
+      <div className="min-w-0">
+        {savedLibrarySearchActive ? (
+          <SegmentedControl
+            value={savedLibrarySourceToggleValue}
+            onChange={(next) => setSavedLibraryCatalogSearchSource(next)}
+            options={savedLibrarySourceToggleOptions}
+            variant="pairOutline"
+            className="w-full max-w-none gap-0 [&>button]:h-10 [&>button]:flex-1"
+          />
+        ) : null}
+      </div>
+      <div className="col-span-3 relative min-w-0 pr-24">
+        <div
+          className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
+            savedLibrarySearchActive ? 'opacity-100' : 'max-w-0 opacity-0'
+          }`}
+        >
+          <div className="relative">
+            <input
+              ref={savedLibrarySearchInputRef}
+              type="search"
+              value={savedLibrarySearchQuery}
+              onFocus={() => setIsSavedLibrarySearchExpanded(true)}
+              onBlur={handleSavedLibrarySearchBlur}
+              onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
+              placeholder="Поиск в библиотеке"
+              className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            {savedLibrarySearchQueryTrimmed ? (
+              <SearchClearButton
+                onClick={clearSavedLibrarySearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+              />
+            ) : null}
+          </div>
+        </div>
+        {renderSavedLibrarySearchToggleButton(
+          'absolute right-12 top-1/2 z-10 -translate-y-1/2',
+          savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
+        )}
+        <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">{savedLibraryShareButton}</div>
+      </div>
+    </div>
+  );
+
+  const savedLibrarySearchMobileExpandedControls = (
+    <div
+      ref={savedLibrarySearchWrapRef}
+      className={`absolute inset-0 z-20 flex min-w-0 items-center transition-opacity duration-200 ${
+        savedLibraryToolbarIs5Col ? '' : 'bg-white'
+      } ${
+        savedLibrarySearchActive ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+    >
+      {savedLibraryToolbarIs5Col ? (
+        <div className="grid w-full max-w-full grid-cols-5 grid-rows-1 items-center gap-4">
+          <div className="col-start-1 row-start-1 min-w-0" />
+          <div className="col-start-2 col-span-4 row-start-1 h-10 rounded-md bg-white" aria-hidden />
+          <button
+            type="button"
+            aria-pressed={savedLibraryCatalogSearchSource === 'google'}
+            className={`${savedLibrarySourceButtonBaseClass} col-start-2 row-start-1 ${
+              savedLibraryCatalogSearchSource === 'google'
+                ? 'border-accent bg-accent text-white'
+                : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+            }`}
+            onClick={() => setSavedLibraryCatalogSearchSource('google')}
+          >
+            Google
+          </button>
+          <button
+            type="button"
+            aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
+            className={`${savedLibrarySourceButtonBaseClass} col-start-3 row-start-1 ${
+              savedLibraryCatalogSearchSource === 'fontsource'
+                ? 'border-accent bg-accent text-white'
+                : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+            }`}
+            onClick={() => setSavedLibraryCatalogSearchSource('fontsource')}
+          >
+            Fontsource
+          </button>
+          <div className="relative col-start-4 col-span-2 row-start-1 min-w-0 pr-24">
+            <div className="relative">
+              <input
+                ref={savedLibrarySearchInputRef}
+                type="search"
+                value={savedLibrarySearchQuery}
+                onFocus={() => setIsSavedLibrarySearchExpanded(true)}
+                onBlur={handleSavedLibrarySearchBlur}
+                onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
+                placeholder="Поиск в библиотеке"
+                className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {savedLibrarySearchQueryTrimmed ? (
+                <SearchClearButton
+                  onClick={clearSavedLibrarySearch}
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                />
+              ) : null}
+            </div>
+            {renderSavedLibrarySearchToggleButton(
+              'absolute right-12 top-1/2 z-10 -translate-y-1/2',
+              clearSavedLibrarySearch,
+              'Закрыть поиск',
+              true,
+            )}
+            <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">{savedLibraryShareButton}</div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`grid w-full max-w-full gap-4 ${savedLibraryToolbarIs4Col ? 'grid-cols-4' : 'grid-cols-2'}`}
+        >
+          <div className={savedLibraryToolbarIs4Col ? 'col-span-2 min-w-0' : 'min-w-0'}>
+            <SegmentedControl
+              value={savedLibrarySourceToggleValue}
+              onChange={(next) => setSavedLibraryCatalogSearchSource(next)}
+              options={savedLibrarySourceToggleOptions}
+              variant="pairOutline"
+              className="w-full max-w-none gap-0 [&>button]:h-10 [&>button]:flex-1"
+            />
+          </div>
+          <div className={`${savedLibraryToolbarIs4Col ? 'col-span-2' : ''} relative min-w-0 pr-24`}>
+            <div
+              className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
+                savedLibrarySearchActive ? 'flex-1 opacity-100' : 'max-w-0 opacity-0'
+              }`}
+            >
+              <div className="relative">
+                <input
+                  ref={savedLibrarySearchInputRef}
+                  type="search"
+                  value={savedLibrarySearchQuery}
+                  onFocus={() => setIsSavedLibrarySearchExpanded(true)}
+                  onBlur={handleSavedLibrarySearchBlur}
+                  onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
+                  placeholder="Поиск в библиотеке"
+                  className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {savedLibrarySearchQueryTrimmed ? (
+                  <SearchClearButton
+                    onClick={clearSavedLibrarySearch}
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                  />
+                ) : null}
+              </div>
+            </div>
+            {renderSavedLibrarySearchToggleButton(
+              'absolute right-12 top-1/2 z-10 -translate-y-1/2',
+              clearSavedLibrarySearch,
+              'Закрыть поиск',
+              true,
+            )}
+            <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">{savedLibraryShareButton}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -2166,6 +2608,33 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           : null,
     });
   }, []);
+  const handleEmptyTabSelectionActionsChange = useCallback((nextActions) => {
+    if (!nextActions || typeof nextActions !== 'object') {
+      setEmptyTabSelectionActions({
+        selectedCount: 0,
+        downloadSelected: null,
+        downloadSelectedAsFormat: null,
+        moveSelected: null,
+        createLibraryFromSelection: null,
+      });
+      return;
+    }
+    setEmptyTabSelectionActions({
+      selectedCount: Number(nextActions.selectedCount) || 0,
+      downloadSelected:
+        typeof nextActions.downloadSelected === 'function' ? nextActions.downloadSelected : null,
+      downloadSelectedAsFormat:
+        typeof nextActions.downloadSelectedAsFormat === 'function'
+          ? nextActions.downloadSelectedAsFormat
+          : null,
+      moveSelected:
+        typeof nextActions.moveSelected === 'function' ? nextActions.moveSelected : null,
+      createLibraryFromSelection:
+        typeof nextActions.createLibraryFromSelection === 'function'
+          ? nextActions.createLibraryFromSelection
+          : null,
+    });
+  }, []);
 
   const {
     selectedKeys: selectedSavedLibraryFontIds,
@@ -2175,6 +2644,10 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     clearLongPressTimer: clearSavedLibraryLongPressTimer,
     pruneSelection: pruneSavedLibrarySelection,
   } = useLongPressMultiSelect({ longPressMs: 220, isInteractiveTarget });
+
+  useEffect(() => {
+    setSavedLibrarySelectionCount(selectedSavedLibraryFontIds.size);
+  }, [selectedSavedLibraryFontIds]);
 
   useEffect(() => {
     if (!activeSavedLibrary) {
@@ -2260,6 +2733,45 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     ],
   );
 
+  const moveSingleSavedLibraryFont = useCallback(
+    async (fontEntry, targetLibraryId) => {
+      if (!activeSavedLibrary?.id || !targetLibraryId) return false;
+      if (targetLibraryId === activeSavedLibrary.id) return false;
+
+      const normalizedEntry = sanitizeLibraryFont(fontEntry);
+      const movedEntryId = String(normalizedEntry?.id || '').trim();
+      if (!normalizedEntry || !movedEntryId) return false;
+
+      setIsSavedLibraryMoveBusy(true);
+      try {
+        const targetLibrary = fontLibraries.find((library) => library.id === targetLibraryId);
+        if (!targetLibrary) return false;
+
+        const sourceFonts = (activeSavedLibrary.fonts || []).filter(
+          (item) => String(item?.id || '').trim() !== movedEntryId,
+        );
+        const targetExistingIds = new Set(
+          (targetLibrary.fonts || []).map((item) => String(item?.id || '').trim()),
+        );
+        const alreadyInTarget = targetExistingIds.has(movedEntryId);
+
+        handleUpdateSavedLibrary(activeSavedLibrary.id, { fonts: sourceFonts });
+        if (!alreadyInTarget) {
+          handleUpdateSavedLibrary(targetLibraryId, {
+            fonts: [...targetLibrary.fonts, stampLibraryFontAddedNow(normalizedEntry) || normalizedEntry],
+          });
+        }
+
+        setSelectedSavedLibraryFontIds(new Set());
+        toast.success(`Перенесен в «${targetLibrary.name}»`);
+        return true;
+      } finally {
+        setIsSavedLibraryMoveBusy(false);
+      }
+    },
+    [activeSavedLibrary, fontLibraries, handleUpdateSavedLibrary, setSelectedSavedLibraryFontIds],
+  );
+
   const activeSavedLibraryItems = useMemo(() => {
     if (!activeSavedLibrary) return [];
     const now = Date.now();
@@ -2271,9 +2783,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         batchSelected: selectedSavedLibraryFontIds.has(font.id),
         title: font.label,
         recentlyAdded: isLibraryFontRecentlyAdded(font, now),
-        subtitle: sessionFont
-          ? `${getLibrarySourceLabel(font.source)} · Загружен`
-          : getLibrarySourceLabel(font.source),
+        subtitleParts: buildSavedLibraryCardMetaParts(font, sessionFont),
+        subtitleClassName: savedLibraryCardMetaClassName,
         previewStyle: sessionFont ? sessionCardPreviewStyleFor(sessionFont) : undefined,
         onCardClick: (event) => {
           onSavedLibrarySelectionCardClick(event, font.id);
@@ -2284,7 +2795,11 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         onPointerUp: clearSavedLibraryLongPressTimer,
         onPointerLeave: clearSavedLibraryLongPressTimer,
         onPointerCancel: clearSavedLibraryLongPressTimer,
-        downloadSplitButtonProps: buildSavedLibraryDownloadSplitButtonProps(font),
+        downloadSplitButtonProps: (() => {
+          const props = buildSavedLibraryDownloadSplitButtonProps(font, sessionFont);
+          if (!props) return null;
+          return { ...props, hidePrimaryLabel: savedLibraryHideDownloadLabel };
+        })(),
         menuItems: [
           {
             key: 'open',
@@ -2295,10 +2810,36 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
             },
           },
           {
-            key: 'share',
+            key: 'move',
             label: 'Переместить',
+            icon: (
+              <img
+                src={moveAndSwapIconUrl}
+                alt=""
+                aria-hidden
+                className="h-4 w-4 object-contain transition-[filter] duration-150 group-hover/item:invert"
+              />
+            ),
+            submenuItems: (() => {
+              const targets = Array.isArray(fontLibraries)
+                ? fontLibraries.filter((library) => library.id !== activeSavedLibrary.id)
+                : [];
+              if (targets.length === 0) {
+                return [{ key: 'move-empty', label: 'Переносить пока некуда', disabled: true }];
+              }
+              return targets.map((library) => ({
+                key: `move-${library.id}`,
+                label: library.name,
+                onSelect: () => {
+                  void moveSingleSavedLibraryFont(font, library.id);
+                },
+              }));
+            })(),
+          },
+          {
+            key: 'share',
+            label: 'Поделиться',
             icon: <ShareIcon />,
-            disabled: true,
           },
           {
             key: 'remove',
@@ -2322,6 +2863,10 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     openLibraryFontEntry,
     onSavedLibrarySelectionCardClick,
     resolveSessionFontForLibraryEntry,
+    fontLibraries,
+    buildSavedLibraryCardMetaParts,
+    savedLibraryCardMetaClassName,
+    moveSingleSavedLibraryFont,
     selectedSavedLibraryFontIds,
     sessionCardPreviewStyleFor,
     startSavedLibraryCardLongPress,
@@ -2341,6 +2886,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           tone: 'light',
           layout: 'comfortable',
           className: '!w-auto max-w-[min(100%,12rem)]',
+        hidePrimaryLabel: savedLibraryHideDownloadLabel,
           ...buildCatalogDownloadButtonProps({
           family,
           item: entry,
@@ -2357,7 +2903,12 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           id: row.id,
           selected: false,
           title: family,
-          subtitle: `Google · Каталог${row.alreadyInLibrary ? ' · Уже в библиотеке' : ''}`,
+          subtitleParts: buildSavedLibraryCardMetaParts({
+            id: `google:${family}`,
+            label: family,
+            source: 'google',
+          }),
+          subtitleClassName: savedLibraryCardMetaClassName,
           previewStyle: { fontFamily: `'${family}', sans-serif` },
           onCardClick: () => openGoogleCatalogEntryInEditorTab(entry),
           downloadSplitButtonProps,
@@ -2369,7 +2920,6 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               className={cornerDone ? '!bg-accent !text-white [&_svg]:!text-white' : ''}
               disabled={row.alreadyInLibrary || cornerBusy}
               aria-label={row.alreadyInLibrary ? 'Уже в библиотеке' : 'Добавить в библиотеку'}
-              title={row.alreadyInLibrary ? 'Уже в библиотеке' : 'Добавить в библиотеку'}
               onClick={(event) => {
                 event.stopPropagation();
                 if (row.alreadyInLibrary) return;
@@ -2416,6 +2966,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         tone: 'light',
         layout: 'comfortable',
         className: '!w-auto max-w-[min(100%,12rem)]',
+        hidePrimaryLabel: savedLibraryHideDownloadLabel,
         ...buildCatalogDownloadButtonProps({
         family,
         item,
@@ -2432,7 +2983,13 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         id: row.id,
         selected: false,
         title: family,
-        subtitle: `Fontsource · Каталог${row.alreadyInLibrary ? ' · Уже в библиотеке' : ''}`,
+        subtitleParts: buildSavedLibraryCardMetaParts({
+          id: `fontsource:${slug}`,
+          label: family,
+          source: 'fontsource',
+          isVariable: Boolean(item?.isVariable),
+        }),
+        subtitleClassName: savedLibraryCardMetaClassName,
         previewStyle: { fontFamily: `'${family}', sans-serif` },
         onCardClick: () => openFontsourceSlugInEditorTab(slug, Boolean(item?.isVariable)),
         downloadSplitButtonProps,
@@ -2444,7 +3001,6 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
             className={cornerDone ? '!bg-red-600 !text-white hover:!bg-red-600 [&_svg]:!text-white' : ''}
             disabled={row.alreadyInLibrary || cornerBusy}
             aria-label={row.alreadyInLibrary ? 'Уже в библиотеке' : 'Добавить в библиотеку'}
-            title={row.alreadyInLibrary ? 'Уже в библиотеке' : 'Добавить в библиотеку'}
             onClick={(event) => {
               event.stopPropagation();
               if (row.alreadyInLibrary) return;
@@ -2484,9 +3040,12 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     markSavedLibraryCatalogRecentlyAdded,
     openFontsourceSlugInEditorTab,
     openGoogleCatalogEntryInEditorTab,
+    buildSavedLibraryCardMetaParts,
+    savedLibraryCardMetaClassName,
     savedLibrarySearchQueryTrimmed,
     savedLibraryCatalogAddBusyId,
     savedLibraryCatalogRecentlyAddedSet,
+    savedLibraryHideDownloadLabel,
   ]);
 
   useEffect(() => {
@@ -2510,14 +3069,26 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         createLibraryFromSelection: null,
     });
   }, [mainTab, fontsLibraryTab]);
+  useEffect(() => {
+    if (mainTab.startsWith(EMPTY_PREFIX)) return;
+    setEmptyTabSelectionActions({
+      selectedCount: 0,
+      downloadSelected: null,
+      downloadSelectedAsFormat: null,
+      moveSelected: null,
+      createLibraryFromSelection: null,
+    });
+  }, [mainTab]);
 
 
   const tabBarEndActions = useMemo(() => {
     const showCatalogToolbar = mainTab === 'library' && fontsLibraryTab === 'catalog';
     const showSavedLibraryToolbar = mainTab === 'library' && Boolean(activeSavedLibrary);
+    const showEmptyTabToolbar = mainTab.startsWith(EMPTY_PREFIX);
     const showFontToolbar =
       mainTab !== EDITOR_MAIN_TAB_PENDING &&
       mainTab !== 'library' &&
+      !showEmptyTabToolbar &&
       selectedFont;
     if (showCatalogToolbar) {
       return (
@@ -2557,6 +3128,25 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
             selectedSavedLibraryDownloadableCount > 0 ? downloadSelectedSavedLibraryAsFormat : null
           }
           emptyTooltip="Выделите карточки в библиотеке (долгий зажим), чтобы скачать"
+        />
+      );
+    }
+    if (showEmptyTabToolbar) {
+      return (
+        <SelectionToolbarActions
+          selectedCount={emptyTabSelectionActions.selectedCount || 0}
+          moveControl={
+            <LibraryMoveMenu
+              hasSelection={(emptyTabSelectionActions.selectedCount || 0) > 0}
+              libraries={fontLibraries}
+              currentLibraryId={null}
+              onMoveToLibrary={emptyTabSelectionActions.moveSelected}
+              onCreateLibrary={emptyTabSelectionActions.createLibraryFromSelection}
+            />
+          }
+          downloadSelected={emptyTabSelectionActions.downloadSelected}
+          downloadSelectedAsFormat={emptyTabSelectionActions.downloadSelectedAsFormat}
+          emptyTooltip="Выделите карточки в быстром поиске (долгий зажим), чтобы скачать"
         />
       );
     }
@@ -2628,6 +3218,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     handleExportClick,
     handleGenerateClick,
     catalogSelectionActions,
+    emptyTabSelectionActions,
     isSavedLibraryMoveBusy,
     moveSelectedSavedLibraryFonts,
     requestCreateLibraryWithFonts,
@@ -2708,6 +3299,10 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         onClose={() => setIsExportModalOpen(false)}
         cssCode={cssString}
         fontName={selectedFont?.name}
+        selectedFont={selectedFont}
+        variableSettings={variableSettings}
+        generateStaticFontFile={generateStaticFontFile}
+        downloadFile={downloadFile}
       />
       <GenerateFontModal
         isOpen={isGenerateModalOpen}
@@ -2814,6 +3409,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               fontLibraries={fontLibraries}
               onMoveFontToLibrary={moveFontEntryToLibrary}
               onRequestCreateLibrary={requestCreateLibraryWithFonts}
+              onSelectionActionsChange={handleEmptyTabSelectionActionsChange}
+              selectionActionsActive={mainTab.startsWith(EMPTY_PREFIX)}
               currentWaterfallBaseSize={liveWaterfallBaseSize}
             />
           )}
@@ -2874,7 +3471,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                           onChange={setCatalogSource}
                           options={CATALOG_SOURCE_OPTIONS}
                           variant="pairOutline"
-                          className="w-full max-w-none gap-4 [&>button]:w-auto [&>button]:flex-1"
+                          className={catalogSourceToggleClassName}
                         />
                       }
                     />
@@ -2895,7 +3492,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                           onChange={setCatalogSource}
                           options={CATALOG_SOURCE_OPTIONS}
                           variant="pairOutline"
-                          className="w-full max-w-none gap-4 [&>button]:w-auto [&>button]:flex-1"
+                          className={catalogSourceToggleClassName}
                         />
                       }
                     />
@@ -2905,16 +3502,312 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
               {activeSavedLibrary && (
                 <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-7">
-                  <ScopeFilterToolbar
-                    id="saved-library-fonts-scope"
-                    value={savedLibraryFontsScope}
-                    onChange={setSavedLibraryFontsScope}
-                    options={activeSavedLibraryScopeOptions}
-                    count={activeSavedLibraryScopeCounts[savedLibraryFontsScope] ?? 0}
-                    ariaLabel={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
-                    trailing={savedLibrarySearchOverlayActive ? null : savedLibrarySearchControls}
-                    trailingOverlay={savedLibrarySearchOverlayActive ? savedLibrarySearchControls : null}
-                  />
+                  {savedLibraryToolbarIsWideRow ? (
+                    <div className="shrink-0 pb-4" ref={savedLibrarySearchWrapRef}>
+                      <div className="relative">
+                        <div className="grid max-w-full grid-cols-5 items-center gap-4">
+                          <div className="min-w-0">
+                            <CustomSelect
+                              id="saved-library-fonts-scope"
+                              value={savedLibraryFontsScope}
+                              onChange={setSavedLibraryFontsScope}
+                              className={customSelectTriggerClass()}
+                              aria-label={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
+                              options={activeSavedLibraryScopeOptions}
+                            />
+                          </div>
+                          {savedLibrarySearchActive ? (
+                            savedLibrarySearchOverlayEnabled ? (
+                              <>
+                                <button
+                                  type="button"
+                                  aria-pressed={savedLibraryCatalogSearchSource === 'google'}
+                                  className={`${savedLibrarySourceButtonBaseClass} col-start-2 ${
+                                    savedLibraryCatalogSearchSource === 'google'
+                                      ? 'border-accent bg-accent text-white'
+                                      : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+                                  }`}
+                                  onClick={() => setSavedLibraryCatalogSearchSource('google')}
+                                >
+                                  Google
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
+                                  className={`${savedLibrarySourceButtonBaseClass} col-start-3 ${
+                                    savedLibraryCatalogSearchSource === 'fontsource'
+                                      ? 'border-accent bg-accent text-white'
+                                      : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+                                  }`}
+                                  onClick={() => setSavedLibraryCatalogSearchSource('fontsource')}
+                                >
+                                  Fontsource
+                                </button>
+                                <div className="relative col-start-4 col-span-2 min-w-0 pr-24">
+                                  <div className="relative">
+                                    <input
+                                      ref={savedLibrarySearchInputRef}
+                                      type="search"
+                                      value={savedLibrarySearchQuery}
+                                      onFocus={() => setIsSavedLibrarySearchExpanded(true)}
+                                      onBlur={handleSavedLibrarySearchBlur}
+                                      onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
+                                      placeholder="Поиск в библиотеке"
+                                      className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+                                      autoComplete="off"
+                                      spellCheck={false}
+                                    />
+                                    {savedLibrarySearchQueryTrimmed ? (
+                                      <SearchClearButton
+                                        onClick={clearSavedLibrarySearch}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2"
+                                      />
+                                    ) : null}
+                                  </div>
+                                  <IconCircleButton
+                                    variant="searchToggle"
+                                    size="md"
+                                    pressed
+                                    className="absolute right-12 top-1/2 z-10 -translate-y-1/2 focus:outline-none"
+                                    onClick={clearSavedLibrarySearch}
+                                    aria-label="Закрыть поиск"
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth={1.6}
+                                      className="h-5 w-5"
+                                      aria-hidden
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </IconCircleButton>
+                                  <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">
+                                    {savedLibraryShareButton}
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="col-start-2 col-span-4 min-w-0">{savedLibrarySearchDesktopControls}</div>
+                            )
+                          ) : (
+                            <>
+                              <div className="min-w-0">
+                                <CustomSelect
+                                  id="saved-library-filter-variable"
+                                  value={savedLibraryFilterVariable}
+                                  onChange={setSavedLibraryFilterVariable}
+                                  className={customSelectTriggerClass({
+                                    placeholderMuted: String(savedLibraryFilterVariable || 'all') === 'all',
+                                  })}
+                                  aria-label="Вариативность"
+                                  placeholder="Вариативность"
+                                  emptyValue="all"
+                                  clearable
+                                  clearAriaLabel="Очистить фильтр вариативности"
+                                  options={savedLibraryVariableOptions}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <CustomSelect
+                                  id="saved-library-filter-subsets"
+                                  value={savedLibraryFilterSubsets}
+                                  onChange={setSavedLibraryFilterSubsets}
+                                  className={customSelectTriggerClass({
+                                    placeholderMuted:
+                                      !Array.isArray(savedLibraryFilterSubsets) ||
+                                      savedLibraryFilterSubsets.length === 0,
+                                  })}
+                                  aria-label="Языки"
+                                  placeholder="Языки"
+                                  multiple
+                                  searchable
+                                  clearable
+                                  clearAriaLabel="Очистить фильтр языков"
+                                  searchPlaceholder="Поиск языка"
+                                  options={savedLibrarySubsetOptions}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <CatalogCheckboxControl
+                                  checked={savedLibraryFilterItalic}
+                                  onChange={(next) => setSavedLibraryFilterItalic(next)}
+                                  label="Курсив"
+                                  inline={savedLibraryToolbarViewportW > 1440}
+                                />
+                              </div>
+                              <div
+                                className={`flex min-w-0 items-center justify-between ${
+                                  savedLibraryToolbarIsTightResetGap ? 'gap-0' : 'gap-3'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={resetSavedLibraryFilters}
+                                  disabled={
+                                    !savedLibraryHasAdvancedFilters &&
+                                    String(savedLibraryFontsScope || 'all') === 'all' &&
+                                    !savedLibrarySearchQueryTrimmed
+                                  }
+                                  className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
+                                >
+                                  {savedLibraryResetLabel}
+                                </button>
+                                <div className="flex items-center gap-2">
+                                  {renderSavedLibrarySearchToggleButton(
+                                    '',
+                                    savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
+                                  )}
+                                  {savedLibraryShareButton}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <ScopeFilterToolbar
+                        id="saved-library-fonts-scope"
+                        value={savedLibraryFontsScope}
+                        onChange={setSavedLibraryFontsScope}
+                        options={activeSavedLibraryScopeOptions}
+                        count={activeSavedLibraryScopeCounts[savedLibraryFontsScope] ?? 0}
+                        ariaLabel={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
+                        gridClassName={
+                          savedLibraryToolbarIs4Col
+                            ? 'grid max-w-full grid-cols-4 gap-4'
+                            : savedLibraryToolbarIs2Col
+                              ? 'grid max-w-full grid-cols-2 gap-4'
+                              : 'grid max-w-full grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+                        }
+                        selectCellClassName={savedLibraryToolbarIs4Col ? 'col-span-2 min-w-0' : 'min-w-0'}
+                        trailingCellClassName={
+                          savedLibraryToolbarIs4Col
+                            ? 'col-start-3 col-span-2 flex min-w-0 justify-end'
+                            : savedLibraryToolbarIs2Col
+                              ? 'col-start-2 col-span-1 flex min-w-0 justify-end'
+                              : 'col-start-2 col-span-1 md:col-start-2 md:col-span-2 lg:col-start-2 lg:col-span-3 xl:col-start-2 xl:col-span-4 flex min-w-0 justify-end'
+                        }
+                        trailing={
+                          savedLibrarySearchOverlayEnabled
+                            ? savedLibrarySearchActive
+                              ? null
+                              : savedLibraryToolbarIs4Col
+                                ? (
+                                    <div className="flex min-w-0 flex-1 items-center gap-4">
+                                      <div className="min-w-0 flex-1">
+                                        <CustomSelect
+                                          id="saved-library-filter-subsets-top"
+                                          value={savedLibraryFilterSubsets}
+                                          onChange={setSavedLibraryFilterSubsets}
+                                          className={customSelectTriggerClass({
+                                            placeholderMuted:
+                                              !Array.isArray(savedLibraryFilterSubsets) ||
+                                              savedLibraryFilterSubsets.length === 0,
+                                          })}
+                                          aria-label="Языки"
+                                          placeholder="Языки"
+                                          multiple
+                                          searchable
+                                          clearable
+                                          clearAriaLabel="Очистить фильтр языков"
+                                          searchPlaceholder="Поиск языка"
+                                          options={savedLibrarySubsetOptions}
+                                        />
+                                      </div>
+                                      <div className="shrink-0">{savedLibrarySearchInlineButton}</div>
+                                    </div>
+                                  )
+                                : savedLibrarySearchInlineButton
+                            : savedLibrarySearchDesktopControls
+                        }
+                        trailingOverlay={
+                          savedLibrarySearchOverlayEnabled ? savedLibrarySearchMobileExpandedControls : null
+                        }
+                      />
+                      <div className="shrink-0 pb-4">
+                        <div
+                          className={`grid max-w-full gap-4 ${
+                            savedLibraryToolbarIs5Col
+                              ? 'grid-cols-5'
+                              : savedLibraryToolbarIs4Col
+                                ? 'grid-cols-4'
+                                : savedLibraryToolbarIs2Col
+                                  ? 'grid-cols-2'
+                                  : 'grid-cols-5'
+                          }`}
+                        >
+                          {!savedLibraryToolbarIs4Col ? (
+                            <div className="col-span-2 min-w-0">
+                              <CustomSelect
+                                id="saved-library-filter-subsets"
+                                value={savedLibraryFilterSubsets}
+                                onChange={setSavedLibraryFilterSubsets}
+                                className={customSelectTriggerClass({
+                                  placeholderMuted:
+                                    !Array.isArray(savedLibraryFilterSubsets) ||
+                                    savedLibraryFilterSubsets.length === 0,
+                                })}
+                                aria-label="Языки"
+                                placeholder="Языки"
+                                multiple
+                                searchable
+                                clearable
+                                clearAriaLabel="Очистить фильтр языков"
+                                searchPlaceholder="Поиск языка"
+                                options={savedLibrarySubsetOptions}
+                              />
+                            </div>
+                          ) : null}
+                          <div className={savedLibraryToolbarIs4Col ? 'col-span-2 min-w-0' : 'min-w-0'}>
+                            <CustomSelect
+                              id="saved-library-filter-variable"
+                              value={savedLibraryFilterVariable}
+                              onChange={setSavedLibraryFilterVariable}
+                              className={customSelectTriggerClass({
+                                placeholderMuted: String(savedLibraryFilterVariable || 'all') === 'all',
+                              })}
+                              aria-label="Вариативность"
+                              placeholder="Вариативность"
+                              emptyValue="all"
+                              clearable
+                              clearAriaLabel="Очистить фильтр вариативности"
+                              options={savedLibraryVariableOptions}
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <CatalogCheckboxControl
+                              checked={savedLibraryFilterItalic}
+                              onChange={(next) => setSavedLibraryFilterItalic(next)}
+                              label="Курсив"
+                            />
+                          </div>
+                          <div className={savedLibraryToolbarIs4Col ? 'flex min-w-0 items-center justify-end' : 'min-w-0'}>
+                            <button
+                              type="button"
+                              onClick={resetSavedLibraryFilters}
+                              disabled={
+                                !savedLibraryHasAdvancedFilters &&
+                                String(savedLibraryFontsScope || 'all') === 'all' &&
+                                !savedLibrarySearchQueryTrimmed
+                              }
+                              className={
+                                savedLibraryToolbarIs4Col
+                                  ? 'box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900'
+                                  : 'box-border h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm font-semibold uppercase text-gray-900 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white disabled:cursor-default disabled:opacity-40'
+                              }
+                            >
+                              {savedLibraryToolbarIs4Col ? 'Сбросить все' : savedLibraryResetLabel}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <div className="min-h-0 flex-1 pb-10">
                   {savedLibrarySearchQueryTrimmed ? (
                     activeSavedLibraryItems.length === 0 && activeSavedLibraryCatalogItems.length === 0 ? (

@@ -45,6 +45,7 @@ export function CatalogCheckboxControl({
   onChange,
   label,
   disabled = false,
+  inline = false,
   className = '',
   labelClassName = '',
   inputClassName = '',
@@ -52,7 +53,7 @@ export function CatalogCheckboxControl({
   return (
     <label
       className={[
-        'flex h-10 shrink-0 items-center gap-2 rounded-md border border-transparent bg-gray-50 px-2 text-sm font-semibold uppercase text-gray-900 sm:px-3',
+        `${inline ? 'inline-flex' : 'flex'} h-10 shrink-0 items-center gap-2 rounded-md border border-transparent bg-gray-50 px-2 text-sm font-semibold uppercase text-gray-900 sm:px-3`,
         disabled ? 'cursor-default opacity-60' : 'cursor-pointer',
         className,
       ]

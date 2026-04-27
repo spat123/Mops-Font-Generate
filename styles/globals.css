@@ -249,3 +249,42 @@ input[type='search']::-ms-reveal {
     overflow-y: overlay;
   }
 }
+
+/* Код в попапах: отдельный скролл внутри блока с аккуратным кастомным видом. */
+.code-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.code-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.code-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 9999px;
+}
+
+.code-scrollbar::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+}
+
+.code-scrollbar-visible {
+  scrollbar-color: #9ca3af #f0f0f0;
+}
+
+.code-scrollbar-visible::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+
+.code-scrollbar-visible::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border: 2px solid #f0f0f0;
+}
+
+.code-scrollbar-visible:hover::-webkit-scrollbar-thumb {
+  background: #6b7280;
+}

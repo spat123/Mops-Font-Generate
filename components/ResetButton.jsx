@@ -53,7 +53,7 @@ function CloseIcon(props) {
   );
 }
 
-function ResetButton({ onResetSelectedFont }) {
+function ResetButton({ onResetSelectedFont, compact = false }) {
   const { resetApplicationState, selectedFont, variableSettings, getDefaultAxisValues } = useFontContext();
   const {
     resetSettings,
@@ -400,10 +400,12 @@ function ResetButton({ onResetSelectedFont }) {
           aria-hidden
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px" aria-hidden />
-        <div className="relative flex min-h-8 w-full items-center justify-center px-2">
-          <span className="absolute left-2 text-xs font-semibold uppercase tracking-wide text-white">
-            Сброс...
-          </span>
+        <div className={`relative flex min-h-8 w-full items-center justify-center ${compact ? '' : 'px-2'}`}>
+          {!compact ? (
+            <span className="absolute left-2 text-xs font-semibold uppercase tracking-wide text-white">
+              Сброс...
+            </span>
+          ) : null}
           <Tooltip content={title}>
             <button
               type="button"
@@ -427,18 +429,43 @@ function ResetButton({ onResetSelectedFont }) {
         onClick={handleResetClick}
         disabled={Boolean(onResetSelectedFont) && !hasResettableChanges}
         className={[
-          'w-full min-h-8 rounded-md px-3 text-center text-xs font-semibold uppercase transition-colors',
-          onResetSelectedFont
-            ? hasResettableChanges
-              ? 'text-accent hover:text-accent-hover'
-              : 'cursor-default text-gray-300'
-            : 'text-gray-400 hover:text-gray-800',
+          compact
+            ? 'inline-flex w-full min-h-8 items-center justify-center rounded-md border transition-colors'
+            : 'w-full min-h-8 rounded-md px-3 text-center text-xs font-semibold uppercase transition-colors',
+          compact
+            ? onResetSelectedFont
+              ? hasResettableChanges
+                ? 'border-gray-200 bg-white text-gray-900 hover:border-black hover:bg-black hover:text-white'
+                : 'cursor-default border-gray-200 bg-white text-gray-300'
+              : 'border-gray-200 bg-white text-gray-400 hover:text-gray-800'
+            : onResetSelectedFont
+              ? hasResettableChanges
+                ? 'text-accent hover:text-accent-hover'
+                : 'cursor-default text-gray-300'
+              : 'text-gray-400 hover:text-gray-800',
         ]
           .filter(Boolean)
           .join(' ')}
         aria-label={title}
       >
-        {buttonText}
+        {compact ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+            aria-hidden
+          >
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+        ) : (
+          buttonText
+        )}
       </button>
     </Tooltip>
   );

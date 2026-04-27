@@ -309,7 +309,7 @@ export function SegmentedControl({
                 aria-pressed={active}
               aria-disabled={disabled || undefined}
                 className={`relative z-10 flex min-h-8 min-w-0 flex-1 items-center justify-center rounded-full px-1 py-2 text-center text-xs uppercase font-semibold transition-colors ${
-                  active ? 'text-white' : `text-gray-800 ${disabled ? '' : 'hover:text-gray-900'}`
+                  active ? 'text-white' : `text-gray-800 ${disabled ? '' : 'hover:text-accent'}`
               } disabled:opacity-40`}
               disabled={disabled}
               onClick={() => onChange(opt.value)}

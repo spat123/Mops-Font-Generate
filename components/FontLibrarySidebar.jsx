@@ -22,6 +22,7 @@ import { EditAssetIcon } from './ui/EditAssetIcon';
 import { downloudIconUrl, editIconUrl } from './ui/editIconUrls';
 import { downloadLibraryAsZip } from '../utils/libraryArchiveDownload';
 import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
+import { PopupDialogHeader } from './ui/PopupDialogHeader';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
@@ -344,31 +345,12 @@ export default function FontLibrarySidebar({
             onClick={closeDialog}
           >
             <div
-              className="w-full max-w-xl rounded-2xl bg-white p-4 shadow-xl"
+              className="w-full max-w-xl overflow-hidden rounded-none bg-white shadow-xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-4">
-                <h3 className="text-lg font-semibold uppercase text-gray-900">{dialogTitle}</h3>
-                <IconCircleButton
-                  variant="gray100Close"
-                  onClick={closeDialog}
-                  aria-label="Закрыть окно"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.6}
-                    className="h-6 w-6"
-                    aria-hidden
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </IconCircleButton>
-              </div>
+              <PopupDialogHeader title={dialogTitle} onClose={closeDialog} closeAriaLabel="Закрыть окно" />
 
-              <div className="mt-4">
+              <div className="p-6">
                 <div className="relative">
                   <input
                     id="font-library-name"
@@ -384,10 +366,7 @@ export default function FontLibrarySidebar({
                     {libraryName.length}/{LIBRARY_NAME_MAX_LENGTH}
                   </span>
                 </div>
-              </div>
-
-              <div className="mt-4">
-                <div className="relative">
+                <div className="relative mt-4">
                   <input
                     id="font-library-search"
                     ref={searchInputRef}
@@ -405,79 +384,77 @@ export default function FontLibrarySidebar({
                       className="absolute right-2 top-1/2 -translate-y-1/2"
                     />
                   ) : (
-                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-800">
-                      <SearchIcon className="h-5 w-5" />
+                    <span className="pointer-events-none absolute inset-y-0 right-2 inline-flex items-center text-gray-800">
+                      <SearchIcon className="h-[18px] w-[18px]" />
                     </span>
                   )}
                 </div>
-              </div>
 
-              {selectedFonts.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {selectedFonts.map((font) => (
-                    <SelectableChip
-                      key={font.id}
-                      type="button"
-                      active
-                      onClick={() => removeFontFromDraft(font.id)}
-                      className="max-w-full"
-                      title="Убрать шрифт"
-                    >
-                      <span className="truncate">{font.label} ×</span>
-                    </SelectableChip>
-                  ))}
+                {selectedFonts.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedFonts.map((font) => (
+                      <SelectableChip
+                        key={font.id}
+                        type="button"
+                        active
+                        onClick={() => removeFontFromDraft(font.id)}
+                        className="max-w-full"
+                      >
+                        <span className="truncate">{font.label} ×</span>
+                      </SelectableChip>
+                    ))}
+                  </div>
+                ) : null}
+
+                {hasSearchInput ? (
+                  <div className="mt-3 max-h-48 overflow-y-auto">
+                    {catalogError ? (
+                      <p className="text-sm text-red-600">{catalogError}</p>
+                    ) : filteredEntries.length > 0 ? (
+                      <>
+                        {isCatalogLoading ? (
+                          <p className="mb-2 text-xs text-gray-400">Догружаю полный список шрифтов...</p>
+                        ) : null}
+                        <div className="flex flex-wrap gap-2">
+                          {filteredEntries.map((entry) => (
+                            <SelectableChip
+                              key={entry.id}
+                              type="button"
+                              active={false}
+                              onClick={() => addFontToDraft(entry)}
+                            >
+                              <span className="truncate">{entry.label}</span>
+                            </SelectableChip>
+                          ))}
+                        </div>
+                      </>
+                    ) : availableEntries.length === 0 ? (
+                      <p className="text-sm text-gray-500">
+                        {isCatalogLoading ? 'Загружаю список шрифтов...' : 'Список шрифтов пока пуст.'}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500">По запросу ничего не найдено.</p>
+                    )}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={closeDialog}
+                    className="w-full rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={isSubmitDisabled}
+                    className="w-full rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {submitLabel}
+                  </button>
                 </div>
-              ) : null}
-
-              {hasSearchInput ? (
-                <div className="mt-3 max-h-48 overflow-y-auto">
-                  {catalogError ? (
-                    <p className="text-sm text-red-600">{catalogError}</p>
-                  ) : filteredEntries.length > 0 ? (
-                    <>
-                      {isCatalogLoading ? (
-                        <p className="mb-2 text-xs text-gray-400">Догружаю полный список шрифтов...</p>
-                      ) : null}
-                      <div className="flex flex-wrap gap-2">
-                        {filteredEntries.map((entry) => (
-                          <SelectableChip
-                            key={entry.id}
-                            type="button"
-                            active={false}
-                            onClick={() => addFontToDraft(entry)}
-                            title={getLibrarySourceLabel(entry.source)}
-                          >
-                            <span className="truncate">{entry.label}</span>
-                          </SelectableChip>
-                        ))}
-                      </div>
-                    </>
-                  ) : availableEntries.length === 0 ? (
-                    <p className="text-sm text-gray-500">
-                      {isCatalogLoading ? 'Загружаю список шрифтов...' : 'Список шрифтов пока пуст.'}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-gray-500">По запросу ничего не найдено.</p>
-                  )}
-                </div>
-              ) : null}
-
-              <div className="mt-4 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={closeDialog}
-                  className="w-full rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isSubmitDisabled}
-                  className="w-full rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {submitLabel}
-                </button>
               </div>
             </div>
           </div>,
@@ -592,8 +569,7 @@ export default function FontLibrarySidebar({
                           },
                           {
                             key: 'share',
-                            label: 'Переместить',
-                            disabled: true,
+                            label: 'Поделиться',
                             icon: <ShareIcon />,
                             onSelect: () => {},
                           },

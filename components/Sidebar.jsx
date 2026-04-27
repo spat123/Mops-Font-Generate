@@ -2,6 +2,8 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMe
 import { toast } from '../utils/appNotify';
 import VariableFontControls from './VariableFontControls';
 import FontLibrarySidebar from './FontLibrarySidebar';
+import CollapsedSidebarControls from './sidebar/CollapsedSidebarControls';
+import SidebarFooterControls from './sidebar/SidebarFooterControls';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../utils/colorUtils'; // Импорт утилит цвета
 import { useSettings } from '../contexts/SettingsContext';
 import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
@@ -19,9 +21,6 @@ import { EDITOR_SIDEBAR_FOOTER_BAR_CLASS } from './ui/editorChromeClasses';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
-import { EditAssetIcon } from './ui/EditAssetIcon';
-import { settingIconUrl } from './ui/editIconUrls';
-import { useDismissibleLayer } from './ui/useDismissibleLayer';
 
 const sidebarSelectClass = customSelectTriggerClass({ compact: true });
 
@@ -840,7 +839,8 @@ export default function Sidebar({
     setVerticalAlignment,
     textFill, setTextFill,
     darkTheme,
-    setDarkTheme,
+    themeMode,
+    setThemeMode,
     previewBackgroundImage,
     setPreviewBackgroundImage,
     viewMode,
@@ -1237,6 +1237,8 @@ export default function Sidebar({
       (availableStyles || []).map((preset) => ({
         value: preset.name,
         label: preset.name,
+        triggerLabel: preset.name,
+        rightLabel: Number.isFinite(Number(preset?.weight)) ? String(Math.round(Number(preset.weight))) : '',
         style: { fontWeight: preset.weight, fontStyle: preset.style },
       })),
     [availableStyles],
@@ -1333,9 +1335,7 @@ export default function Sidebar({
 
   const sidebarScrollRef = useRef(null);
   const sidebarScrollIdleTimerRef = useRef(null);
-  const settingsPopoverRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [sidebarScrollbarVisible, setSidebarScrollbarVisible] = useState(false);
   const [sidebarScrollLayout, setSidebarScrollLayout] = useState({
     scrollTop: 0,
@@ -1364,10 +1364,6 @@ export default function Sidebar({
       sidebarScrollIdleTimerRef.current = null;
     }, 700);
   }, [syncSidebarScrollLayout]);
-  const closeAppSettingsPopover = useCallback(() => {
-    setIsAppSettingsOpen(false);
-  }, []);
-
   useLayoutEffect(() => {
     syncSidebarScrollLayout();
   }, [syncSidebarScrollLayout]);
@@ -1407,11 +1403,47 @@ export default function Sidebar({
     };
   }, [syncSidebarScrollLayout]);
 
-  useDismissibleLayer({
-    open: isAppSettingsOpen,
-    refs: [settingsPopoverRef],
-    onDismiss: closeAppSettingsPopover,
-  });
+  const activeViewModeOption = useMemo(
+    () => VIEW_MODE_OPTIONS.find((option) => option.value === viewMode) || VIEW_MODE_OPTIONS[0],
+    [viewMode],
+  );
+  const activeTextAlignOption = useMemo(
+    () =>
+      SIDEBAR_TEXT_ALIGN_OPTIONS.find((option) => option.value === textAlignment) ||
+      SIDEBAR_TEXT_ALIGN_OPTIONS[0],
+    [textAlignment],
+  );
+  const activeVerticalAlignOption = useMemo(
+    () =>
+      SIDEBAR_VERTICAL_ALIGN_OPTIONS.find((option) => option.value === verticalAlignment) ||
+      SIDEBAR_VERTICAL_ALIGN_OPTIONS[0],
+    [verticalAlignment],
+  );
+  const collapsedStylePresetName = useMemo(
+    () => (isWaterfallView ? activeWaterfallPresetName : selectedPresetName),
+    [activeWaterfallPresetName, isWaterfallView, selectedPresetName],
+  );
+  const collapsedStylePresetLetter = useMemo(() => {
+    const normalized = String(collapsedStylePresetName || '').trim();
+    if (!normalized) return 'R';
+    return normalized.slice(0, 1).toUpperCase();
+  }, [collapsedStylePresetName]);
+  const collapsedStylePresetStyle = useMemo(() => {
+    const hit = sidebarPresetOptions.find(
+      (option) => String(option?.value || '') === String(collapsedStylePresetName || ''),
+    );
+    return hit?.style || undefined;
+  }, [collapsedStylePresetName, sidebarPresetOptions]);
+  const activeWaterfallScalePreset = useMemo(
+    () =>
+      WATERFALL_SCALE_PRESETS.find((preset) => preset.key === waterfallScaleSelectKey) ||
+      WATERFALL_SCALE_PRESETS.find((preset) => preset.key === waterfallScaleKey) ||
+      null,
+    [waterfallScaleKey, waterfallScaleSelectKey],
+  );
+  const ActiveViewModeIcon = activeViewModeOption?.Icon;
+  const ActiveTextAlignIcon = activeTextAlignOption?.Icon;
+  const ActiveVerticalAlignIcon = activeVerticalAlignOption?.Icon;
 
   const sidebarOverlayThumb = useMemo(() => {
     const { scrollTop, scrollHeight, clientHeight } = sidebarScrollLayout;
@@ -1433,11 +1465,22 @@ export default function Sidebar({
       }`}
     >
       <div className="flex h-12 min-h-12 shrink-0 items-center justify-center border-b border-gray-200 px-4">
-        {isSidebarCollapsed ? (
-          <span className="text-xs font-semibold uppercase text-gray-700">DF</span>
-        ) : (
-          <img src="/logo/Logo%20Dinamic.svg" alt="Dynamic font" className="w-auto select-none" />
-        )}
+        <div className="inline-flex items-center gap-3">
+          <img
+            src="/logo/Logo%20Mark.svg"
+            alt="Dynamic font mark"
+            className="h-8 w-8 select-none"
+            draggable={false}
+          />
+          {!isSidebarCollapsed ? (
+            <img
+              src="/logo/Logo%20Text.svg"
+              alt="Dynamic font"
+              className="h-[1.8rem] w-auto select-none"
+              draggable={false}
+            />
+          ) : null}
+        </div>
       </div>
 
       {!isSidebarCollapsed ? (
@@ -1952,59 +1995,111 @@ export default function Sidebar({
         ) : null}
       </div>
       ) : (
-        <div className="flex min-h-0 flex-1" />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="editor-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-3">
+          <CollapsedSidebarControls
+            isLibraryTab={isLibraryTab}
+            library={{
+              libraries: fontLibraries,
+              activeLibraryId,
+              onOpenLibrary: onOpenFontLibrary,
+            }}
+            options={{
+              viewModeOptions: VIEW_MODE_OPTIONS,
+              textAlignOptions: SIDEBAR_TEXT_ALIGN_OPTIONS,
+              verticalAlignOptions: SIDEBAR_VERTICAL_ALIGN_OPTIONS,
+              textCaseOptions: SIDEBAR_TEXT_CASE_OPTIONS,
+              textDecorationOptions: SIDEBAR_TEXT_DECORATION_OPTIONS,
+              sidebarPresetOptions,
+              waterfallScalePresets: WATERFALL_SCALE_PRESETS,
+              quickPresetSections,
+            }}
+            ui={{
+              activeViewModeOption,
+              activeTextAlignOption,
+              activeVerticalAlignOption,
+              activeWaterfallScalePreset,
+              collapsedStylePresetName,
+              collapsedStylePresetStyle,
+              collapsedStylePresetLetter,
+            }}
+            state={{
+              viewMode,
+              isWaterfallView,
+              waterfallEditTarget,
+              selectedFont,
+              availableStyles,
+              isStylesView,
+              fontSizeControl,
+              letterSpacingControl,
+              lineHeightControl,
+              isGlyphsView,
+              textAlignment,
+              verticalAlignment,
+              textCase,
+              textDecoration,
+              isTextCaseDisabled,
+              countControl,
+              isTextModeDisabled,
+              textFill,
+              isTextFillDisabled,
+              waterfallScaleRatio,
+              waterfallUnit,
+              waterfallRoundTooltip,
+              waterfallRoundEnabled,
+              isAnimating,
+              textColor,
+              backgroundColor,
+              previewBackgroundImage,
+              sidebarTextPreset,
+            }}
+            actions={{
+              setViewMode,
+              setWaterfallEditTarget,
+              applyPresetStyle,
+              setWaterfallBodyPresetName,
+              setWaterfallHeadingPresetName,
+              setTextAlignment,
+              setVerticalAlignment,
+              setTextCase,
+              setTextDecoration,
+              toggleTextFillHandler,
+              setWaterfallScaleSelectKey,
+              setWaterfallScaleRatio,
+              setWaterfallUnit,
+              setWaterfallRoundPx,
+              isVariableEnabled,
+              toggleAnimation,
+              resetVariableSettings,
+              setTextColor,
+              setBackgroundColor,
+              setPreviewBackgroundImage,
+              pickSidebarTextPreset,
+            }}
+            icons={{
+              ActiveViewModeIcon,
+              ActiveTextAlignIcon,
+              ActiveVerticalAlignIcon,
+              TextFillIcon: IconTextFillExpand,
+              RoundingIcon: IconRoundingUp,
+            }}
+          />
+          </div>
+          {!isLibraryTab ? (
+            <div className="border-t border-gray-200 bg-white px-2 py-2">
+              <ResetButton onResetSelectedFont={resetSelectedFontState} compact />
+            </div>
+          ) : null}
+        </div>
       )}
 
-      <div className="relative border-t min-h-[52px] border-gray-200 bg-white p-2" ref={settingsPopoverRef}>
-        {isAppSettingsOpen ? (
-          <div className="absolute bottom-[calc(100%+8px)] left-2 right-2 z-30 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-            <p className="mb-2 text-xs font-semibold uppercase text-gray-700">Настройки</p>
-            <label className="flex items-center justify-between gap-3 rounded-md bg-gray-50 px-3 py-2 text-xs font-semibold uppercase text-gray-800">
-              <span className="truncate">Темная тема</span>
-              <button
-                type="button"
-                aria-pressed={darkTheme}
-                onClick={() => setDarkTheme((prev) => !prev)}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  darkTheme ? 'bg-accent' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-5 w-5 rounded-full bg-white transition-transform ${
-                    darkTheme ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </label>
-          </div>
-        ) : null}
-        <div className={`grid ${isSidebarCollapsed ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-2 h-full'}`}>
-          <button
-            type="button"
-            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-            className="inline-flex items-center justify-center rounded-md bg-gray-50 text-gray-800 transition-colors hover:text-accent"
-            aria-label={isSidebarCollapsed ? 'Развернуть левую панель' : 'Свернуть левую панель'}
-            title={isSidebarCollapsed ? 'Развернуть левую панель' : 'Свернуть левую панель'}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden>
-              {isSidebarCollapsed ? (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 18l-6-6 6-6" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
-              )}
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsAppSettingsOpen((prev) => !prev)}
-            className="inline-flex items-center justify-center rounded-md bg-gray-50 text-gray-800 transition-colors hover:text-accent"
-            aria-label="Настройки приложения"
-            title="Настройки приложения"
-          >
-            <EditAssetIcon src={settingIconUrl} className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      <SidebarFooterControls
+        isSidebarCollapsed={isSidebarCollapsed}
+        setIsSidebarCollapsed={setIsSidebarCollapsed}
+        darkTheme={darkTheme}
+        themeMode={themeMode}
+        setThemeMode={setThemeMode}
+      />
     </div>
   );
 }

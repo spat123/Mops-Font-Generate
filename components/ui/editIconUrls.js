@@ -9,6 +9,9 @@ import linkIconUrl from '../../assets/icon/edit/Link.svg';
 import settingIconUrl from '../../assets/icon/edit/Setting.svg';
 import notificationIconUrl from '../../assets/icon/edit/Notification.svg';
 import moveAndSwapIconUrl from '../../assets/icon/edit/Move and swap.svg';
+import delIconUrl from '../../assets/icon/edit/Del.svg';
+import shareIconUrl from '../../assets/icon/edit/Share.svg';
+import searchIconUrl from '../../assets/icon/edit/Search.svg';
 
 export {
   gridIconUrl,
@@ -22,5 +25,7 @@ export {
   settingIconUrl,
   notificationIconUrl,
   moveAndSwapIconUrl,
+  delIconUrl,
+  shareIconUrl,
+  searchIconUrl,
 };
-

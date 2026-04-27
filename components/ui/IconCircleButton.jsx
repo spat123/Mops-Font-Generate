@@ -8,7 +8,7 @@ const SIZE_CLASSES = {
 
 const VARIANT_CLASSES = {
   toolbar: {
-    idle: 'bg-gray-50 text-gray-800 hover:text-accent',
+    idle: 'bg-gray-50 text-gray-800 hover:text-white hover:bg-accent',
     pressed: 'bg-accent text-white hover:bg-accent-hover hover:text-white',
   },
   gray100Menu: {

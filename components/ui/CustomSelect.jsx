@@ -294,6 +294,9 @@ export const CustomSelect = forwardRef(function CustomSelect(
                     <CatalogCheckboxMark checked={isSelected} inverted={isSelected} />
                   ) : null}
                   <span className="min-w-0 flex-1 break-words">{opt.label}</span>
+                  {opt?.rightLabel ? (
+                    <span className="shrink-0 tabular-nums opacity-80">{String(opt.rightLabel)}</span>
+                  ) : null}
                 </div>
               </li>
             );

@@ -337,10 +337,33 @@ export function EditorTabBar({
     node.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' });
   }, []);
 
+  const addNewTabButton = (
+    <Tooltip content="Новая пустая вкладка">
+      <button
+        type="button"
+        className="inline-flex shrink-0 items-center w-8 justify-center rounded-md border-0 bg-transparent p-1 text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        onClick={onAddEmptySlot}
+        aria-label="Добавить вкладку «Новый»"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          className="h-4 w-4 shrink-0"
+          aria-hidden
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      </button>
+    </Tooltip>
+  );
+
   return (
     <div className={`flex w-full min-w-0 items-stretch bg-white ${TAB_ROW}`}>
       {scrollState.left && (
-        <div className={`flex shrink-0 items-center bg-white pl-2 ${TAB_ROW} ${INACTIVE_TAB_BOTTOM}`}>
+        <div className={`flex shrink-0 items-center bg-white ${TAB_ROW} ${INACTIVE_TAB_BOTTOM}`}>
           <button
             type="button"
             className={scrollArrowButtonClass(false)}
@@ -431,30 +454,13 @@ export function EditorTabBar({
 
           {showNewTabSsrFallback && <NewTabSsrFallback />}
 
-          <div
-            className={`box-border flex ${TAB_ROW} w-12 shrink-0 items-center justify-center ${INACTIVE_TAB_BOTTOM} border-r-0 bg-white`}
-          >
-            <Tooltip content="Новая пустая вкладка">
-              <button
-                type="button"
-                className="inline-flex shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-1 text-gray-800 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                onClick={onAddEmptySlot}
-                aria-label="Добавить вкладку «Новый»"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                  className="h-4 w-4 shrink-0"
-                  aria-hidden
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </button>
-            </Tooltip>
-          </div>
+          {!hasHorizontalOverflow ? (
+            <div
+              className={`box-border flex ${TAB_ROW} w-12 shrink-0 items-center justify-center ${INACTIVE_TAB_BOTTOM} border-r-0 bg-white`}
+            >
+              {addNewTabButton}
+            </div>
+          ) : null}
 
           <div
             className={`pointer-events-none flex ${TAB_ROW} min-w-0 flex-1 ${INACTIVE_TAB_BOTTOM} bg-white`}
@@ -463,18 +469,21 @@ export function EditorTabBar({
         </div>
       </div>
 
-      {scrollState.right && (
-        <div className={`flex shrink-0 items-center bg-white pr-2 ${TAB_ROW} ${INACTIVE_TAB_BOTTOM}`}>
-          <button
-            type="button"
-            className={scrollArrowButtonClass(false)}
-            onClick={() => scrollTabsBy('right')}
-            aria-label="Прокрутить вкладки вправо"
-          >
-            <ScrollArrowIcon direction="right" />
-          </button>
+      {hasHorizontalOverflow ? (
+        <div className={`flex shrink-0 items-center bg-white ${TAB_ROW} ${INACTIVE_TAB_BOTTOM}`}>
+          {scrollState.right ? (
+            <button
+              type="button"
+              className={scrollArrowButtonClass(false)}
+              onClick={() => scrollTabsBy('right')}
+              aria-label="Прокрутить вкладки вправо"
+            >
+              <ScrollArrowIcon direction="right" />
+            </button>
+          ) : null}
+          {addNewTabButton}
         </div>
-      )}
+      ) : null}
 
       {endActions != null && endActions !== false && (
         <div

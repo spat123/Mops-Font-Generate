@@ -49,6 +49,8 @@ export function SessionFontCard({
   title,
   recentlyAdded = false,
   subtitle,
+  subtitleParts,
+  subtitleClassName,
   previewStyle,
   onCardClick,
   onPointerDown,
@@ -90,7 +92,7 @@ export function SessionFontCard({
       ? 'mt-2 min-h-[1.75rem] truncate text-xl leading-tight'
       : 'mt-2 truncate');
 
-  const subCls = 'mt-auto pt-1 text-xs text-gray-500';
+  const subCls = subtitleClassName || 'mt-auto pt-1 text-xs text-gray-500';
 
   return (
     <div
@@ -120,7 +122,15 @@ export function SessionFontCard({
       <div className={previewCls} style={previewStyle}>
         {PREVIEW_SAMPLE}
       </div>
-      <div className={subCls}>{subtitle}</div>
+      {Array.isArray(subtitleParts) && subtitleParts.length > 0 ? (
+        <div className={`${subCls} flex flex-wrap items-center gap-2`}>
+          {subtitleParts.map((part, index) => (
+            <span key={`${String(part)}-${index}`}>{part}</span>
+          ))}
+        </div>
+      ) : (
+        <div className={subCls}>{subtitle}</div>
+      )}
       {batchSelected ? <SelectionOverlay /> : null}
       {!batchSelected && cornerAction ? (
         <div className="absolute right-2 top-2 z-[12]">{cornerAction}</div>
