@@ -1,4 +1,4 @@
-const FONTSOURCE_VARIABLE_SETTINGS_CACHE_KEY = 'mops-fontsource-variable-settings-v1';
+const FONTSOURCE_VARIABLE_SETTINGS_CACHE_KEY = 'dinamic-fontsource-variable-settings-v1';
 const FONTSOURCE_VARIABLE_SETTINGS_CACHE_LIMIT = 120;
 
 function normalizeSlug(value) {

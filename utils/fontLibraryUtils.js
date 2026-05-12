@@ -45,6 +45,16 @@ export function isLibraryFontRecentlyAdded(font, now = Date.now()) {
   return now - addedAt < RECENT_LIBRARY_ENTRY_WINDOW_MS;
 }
 
+/** Сколько записей в библиотеке помечены как недавно добавленные (см. {@link isLibraryFontRecentlyAdded}). */
+export function countRecentlyAddedLibraryFonts(fonts, now = Date.now()) {
+  if (!Array.isArray(fonts)) return 0;
+  let n = 0;
+  for (const font of fonts) {
+    if (isLibraryFontRecentlyAdded(font, now)) n += 1;
+  }
+  return n;
+}
+
 export function sanitizeLibrary(library) {
   if (!library || typeof library !== 'object') return null;
   const name = normalizeLibraryText(library.name);

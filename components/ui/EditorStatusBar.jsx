@@ -1,19 +1,6 @@
 import React from 'react';
 import { EDITOR_PREVIEW_BOTTOM_BAR_CLASS } from './editorChromeClasses';
-import { EditAssetIcon } from './EditAssetIcon';
-import { notificationIconUrl } from './editIconUrls';
-
-function DefaultTrailing() {
-  return (
-    <button
-      type="button"
-      aria-label="Уведомления"
-      className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent"
-    >
-      <EditAssetIcon src={notificationIconUrl} className="h-4 w-4" />
-    </button>
-  );
-}
+import { NewsNotificationsDock } from './NewsNotificationsDock';
 
 /**
  * Нижняя «хром»-полоса редактора: слева краткая метрика, по центру контекст, справа действия.
@@ -39,7 +26,7 @@ export function EditorStatusBar({ leading = null, center = null, trailing, befor
       </div>
       <div className="relative z-20 ml-auto flex h-full shrink-0 items-stretch justify-end bg-white">
         {beforeTrailing}
-        {trailing === undefined ? <DefaultTrailing /> : trailing}
+        {trailing === undefined ? <NewsNotificationsDock /> : trailing}
       </div>
     </div>
   );

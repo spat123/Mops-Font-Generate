@@ -28,6 +28,11 @@ function FontsourceCatalogCardComponent({
   /** ROW: глобальный образец (одна строка на весь список); undefined — показывать имя семейства */
   rowCatalogPreviewText,
   onRowGlobalSampleCommit,
+  rowPreviewFallback,
+  rowPreviewAlign = 'end',
+  rowSampleTooltip,
+  rowPreviewEditorAriaLabel,
+  pinPreviewColumnClassName = '',
   draggable = false,
   onDragStart,
   onDragEnd,
@@ -92,8 +97,12 @@ function FontsourceCatalogCardComponent({
       metaItems={metaItems}
       previewFamily={previewFamily}
       previewText={previewText}
-      rowPreviewText={rowCatalogPreviewText ?? family}
-      defaultPreviewText={family}
+      rowPreviewText={rowCatalogPreviewText ?? rowPreviewFallback ?? family}
+      defaultPreviewText={rowPreviewFallback ?? family}
+      rowPreviewAlign={rowPreviewAlign}
+      rowSampleTooltip={rowSampleTooltip}
+      rowPreviewEditorAriaLabel={rowPreviewEditorAriaLabel}
+      pinPreviewColumnClassName={pinPreviewColumnClassName}
       onGlobalRowSampleCommit={onRowGlobalSampleCommit}
       previewProps={{
         ref: handlePreviewRef,

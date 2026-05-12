@@ -10,7 +10,9 @@ import { IconCircleButton } from './ui/IconCircleButton';
 import { matchesSearch } from '../utils/searchMatching';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 import {
+  countRecentlyAddedLibraryFonts,
   getLibrarySourceLabel,
+  isLibraryFontRecentlyAdded,
   mapFontsourceCatalogItemsToLibraryEntries,
   mapGoogleCatalogItemsToLibraryEntries,
   mapSessionFontsToLibraryEntries,
@@ -98,6 +100,7 @@ export default function FontLibrarySidebar({
   createLibrarySeedRequest = null,
   onCreateLibrarySeedHandled,
   onAddFontToLibrary,
+  onShareLibrary,
 }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [draft, setDraft] = useState(() => readStoredDraft());
@@ -345,12 +348,12 @@ export default function FontLibrarySidebar({
             onClick={closeDialog}
           >
             <div
-              className="w-full max-w-xl overflow-hidden rounded-none bg-white shadow-xl"
+              className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-none bg-white shadow-xl"
               onClick={(event) => event.stopPropagation()}
             >
               <PopupDialogHeader title={dialogTitle} onClose={closeDialog} closeAriaLabel="Закрыть окно" />
 
-              <div className="p-6">
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 <div className="relative">
                   <input
                     id="font-library-name"
@@ -437,24 +440,24 @@ export default function FontLibrarySidebar({
                     )}
                   </div>
                 ) : null}
+              </div>
 
-                <div className="mt-4 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={closeDialog}
-                    className="w-full rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={isSubmitDisabled}
-                    className="w-full rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {submitLabel}
-                  </button>
-                </div>
+              <div className="flex shrink-0 items-stretch gap-3 border-t border-gray-200 bg-white px-6 py-4">
+                <button
+                  type="button"
+                  onClick={closeDialog}
+                  className="w-full min-h-10 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitDisabled}
+                  className="w-full min-h-10 rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submitLabel}
+                </button>
               </div>
             </div>
           </div>,
@@ -473,8 +476,11 @@ export default function FontLibrarySidebar({
                 {libraries.map((library) => {
                   const isActive = activeLibraryId === library.id;
                   const fontCount = Array.isArray(library.fonts) ? library.fonts.length : 0;
+                  const recentAddedCount = countRecentlyAddedLibraryFonts(library.fonts);
                   const previewFonts = fontCount > 4 ? library.fonts.slice(0, 1) : library.fonts;
                   const remainingFontCount = fontCount > 4 ? fontCount - 1 : 0;
+                  const showRecentBadgeInHeader =
+                    recentAddedCount > 0 && remainingFontCount === 0 && fontCount > 1;
                   return (
                     <div
                       key={library.id}
@@ -548,11 +554,23 @@ export default function FontLibrarySidebar({
                             {library.name}
                           </h3>
                           <span
-                            className={`shrink-0 text-sm font-semibold uppercase ${
+                            className={`flex shrink-0 items-center gap-1.5 text-sm font-semibold uppercase ${
                               isActive ? 'text-white/90' : 'text-gray-500'
                             }`}
                           >
-                            {fontCount} ШТ.
+                            <span>{fontCount} ШТ.</span>
+                            {showRecentBadgeInHeader ? (
+                              <Tooltip content="Добавлены за последние 24 ч" openDelayMs={150}>
+                                <span
+                                  className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none tabular-nums ${
+                                    isActive ? 'bg-white text-accent' : 'bg-accent text-white'
+                                  }`}
+                                  aria-label={`Новых за сутки: ${recentAddedCount}`}
+                                >
+                                  +{recentAddedCount}
+                                </span>
+                              </Tooltip>
+                            ) : null}
                           </span>
                         </div>
                       </div>
@@ -571,7 +589,9 @@ export default function FontLibrarySidebar({
                             key: 'share',
                             label: 'Поделиться',
                             icon: <ShareIcon />,
-                            onSelect: () => {},
+                            onSelect: () => {
+                              onShareLibrary?.(library.id);
+                            },
                           },
                           {
                             key: 'edit',
@@ -594,12 +614,18 @@ export default function FontLibrarySidebar({
                           {previewFonts.map((font) => (
                             <span
                               key={font.id}
-                              className={`inline-flex max-w-full items-center rounded-sm px-2.5 py-1 text-xs font-medium ${
+                              className={`inline-flex max-w-full items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-medium ${
                                 isActive ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-700'
                               }`}
                               title={`${font.label} · ${getLibrarySourceLabel(font.source)}`}
                             >
                               <span className="truncate">{font.label}</span>
+                              {isLibraryFontRecentlyAdded(font) ? (
+                                <span
+                                  className="inline-flex h-2 w-2 shrink-0 rounded-full bg-accent"
+                                  aria-label="Добавлен за последние 24 ч"
+                                />
+                              ) : null}
                             </span>
                           ))}
                           {remainingFontCount > 0 ? (
@@ -611,6 +637,34 @@ export default function FontLibrarySidebar({
                             >
                               +{remainingFontCount}
                             </span>
+                          ) : null}
+                          {recentAddedCount > 0 && remainingFontCount === 0 && fontCount === 1 ? (
+                            <Tooltip content="Добавлены за последние 24 ч" openDelayMs={150}>
+                              <span
+                                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums shadow-sm ring-2 ${
+                                  isActive
+                                    ? 'bg-white text-accent ring-white/80'
+                                    : 'bg-accent text-white ring-white/90'
+                                }`}
+                                aria-label={`Новых за сутки: ${recentAddedCount}`}
+                              >
+                                +{recentAddedCount}
+                              </span>
+                            </Tooltip>
+                          ) : null}
+                          {recentAddedCount > 0 && remainingFontCount > 0 ? (
+                            <Tooltip content="Добавлены за последние 24 ч" openDelayMs={150}>
+                              <span
+                                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums shadow-sm ring-2 ${
+                                  isActive
+                                    ? 'bg-white text-accent ring-white/80'
+                                    : 'bg-accent text-white ring-white/90'
+                                }`}
+                                aria-label={`Новых за сутки: ${recentAddedCount}`}
+                              >
+                                +{recentAddedCount}
+                              </span>
+                            </Tooltip>
                           ) : null}
                         </div>
                       ) : null}

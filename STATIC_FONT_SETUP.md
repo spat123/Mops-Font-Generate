@@ -155,4 +155,3 @@ TEMP_FONT_DIR=/tmp/font-processing
 - [HarfBuzz WASM](https://github.com/harfbuzz/harfbuzzjs)
 - [Python fonttools](https://github.com/fonttools/fonttools)
 - [Variable Fonts Guide](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Fonts/Variable_fonts_guide)
-- [Font Gauntlet](https://fontgauntlet.com/) - вдохновение для проекта 

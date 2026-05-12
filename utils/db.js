@@ -1,6 +1,6 @@
 // utils/db.js
 
-const DB_NAME = 'FontGauntletDB';
+const DB_NAME = 'DinamicFontDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'fonts';
 

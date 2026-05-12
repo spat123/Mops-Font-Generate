@@ -4,6 +4,10 @@ import { findStyleInfoByWeightAndStyle, getFormatFromExtension, PRESET_STYLES } 
 import { processLocalFont } from '../utils/localFontProcessor';
 import { saveFont } from '../utils/db';
 import { base64ToArrayBuffer } from '../utils/fontManagerUtils';
+import {
+  FONTSOURCE_UNICODE_RANGE_CYRILLIC,
+  FONTSOURCE_UNICODE_RANGE_LATIN,
+} from '../utils/fontsourceSubsetUnicodeRange';
 
 // Кэш для хранения загруженных файлов шрифтов (статических Fontsource)
 const fontFaceCache = new Map();
@@ -31,69 +35,129 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
     }
 
     let blob = null;
-    let fontDataUrl = null;
+    const blobUrls = [];
+
+    const formatCssFromFileName = (fn) => {
+      const ext = String(fn || '.woff2').split('.').pop()?.toLowerCase() || 'woff2';
+      if (ext === 'woff2') return 'woff2';
+      if (ext === 'woff') return 'woff';
+      if (ext === 'ttf') return 'truetype';
+      if (ext === 'otf') return 'opentype';
+      return 'woff2';
+    };
+
+    const fetchFontsourceSubset = async (subset) => {
+      const apiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?weight=${weight}&style=${style}&subset=${encodeURIComponent(subset)}`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) return null;
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        return null;
+      }
+      const responseText = await response.text();
+      if (!responseText || responseText === 'undefined') {
+        return null;
+      }
+      const parsed = JSON.parse(responseText);
+      const fontBufferBase64 = parsed.fontBufferBase64 ?? parsed.fontData;
+      const fileName = parsed.fileName ?? parsed.actualFileName;
+      if (!fontBufferBase64) return null;
+      return { fontBufferBase64, fileName: String(fileName || '') };
+    };
 
     try {
       const fontFamilyName = fontObj.fontFamily || fontFamily;
-      const apiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?weight=${weight}&style=${style}&subset=latin`;
 
-      const response = await fetch(apiUrl);
-      if (!response.ok) throw new Error(`Ошибка HTTP: ${response.status}`);
-      
-      // Проверяем, что ответ содержит JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error(`Неожиданный тип ответа: ${contentType}`);
+      const latinRow = await fetchFontsourceSubset('latin');
+      if (!latinRow) {
+        throw new Error('Ошибка HTTP или пустой ответ для subset=latin');
       }
-      
-      const responseText = await response.text();
-      if (!responseText || responseText === 'undefined') {
-        throw new Error('API вернул пустой или undefined ответ');
+
+      const cyrillicRow = await fetchFontsourceSubset('cyrillic');
+
+      const makeBlobUrl = (row) => {
+        const fontBuffer = base64ToArrayBuffer(row.fontBufferBase64);
+        const mimeType = `font/${getFormatFromExtension(row.fileName || '.woff2')}`;
+        const b = new Blob([fontBuffer], { type: mimeType });
+        const u = URL.createObjectURL(b);
+        blobUrls.push(u);
+        return { url: u, fileName: row.fileName, fmt: formatCssFromFileName(row.fileName) };
+      };
+
+      const latin = makeBlobUrl(latinRow);
+      let cyrillic = null;
+      if (cyrillicRow) {
+        try {
+          cyrillic = makeBlobUrl(cyrillicRow);
+        } catch (e) {
+          console.warn(`[FontLoader] Cyrillic subset пропущен для ${fontFamily} ${weight} ${style}:`, e?.message || e);
+        }
       }
-      
-      const parsed = JSON.parse(responseText);
-      // Статический API ([fontFamily].js) отдаёт fontData / actualFileName; variable — fontBufferBase64 / fileName
-      const fontBufferBase64 = parsed.fontBufferBase64 ?? parsed.fontData;
-      const fileName = parsed.fileName ?? parsed.actualFileName;
-      if (!fontBufferBase64) throw new Error("Пустой буфер шрифта");
 
-      const fontBuffer = base64ToArrayBuffer(fontBufferBase64);
-      const mimeType = `font/${getFormatFromExtension(fileName || '.woff2')}`;
-      blob = new Blob([fontBuffer], { type: mimeType });
-      fontDataUrl = URL.createObjectURL(blob);
+      blob = new Blob([base64ToArrayBuffer(latinRow.fontBufferBase64)], {
+        type: `font/${getFormatFromExtension(latinRow.fileName || '.woff2')}`,
+      });
 
-      const fontFaceRule = `
-        @font-face {
-          font-family: '${fontFamilyName}';
-          src: url('${fontDataUrl}') format('woff2');
+      const ffName = JSON.stringify(fontFamilyName);
+      const rules = [
+        `@font-face {
+          font-family: ${ffName};
+          src: url('${latin.url}') format('${latin.fmt}');
           font-weight: ${weight};
           font-style: ${style};
-          unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-        }
-      `;
+          unicode-range: ${FONTSOURCE_UNICODE_RANGE_LATIN};
+        }`,
+      ];
+      if (cyrillic) {
+        rules.push(`@font-face {
+          font-family: ${ffName};
+          src: url('${cyrillic.url}') format('${cyrillic.fmt}');
+          font-weight: ${weight};
+          font-style: ${style};
+          unicode-range: ${FONTSOURCE_UNICODE_RANGE_CYRILLIC};
+        }`);
+      }
+
       const styleElement = document.createElement('style');
-      styleElement.textContent = fontFaceRule;
+      styleElement.textContent = rules.join('\n');
       document.head.appendChild(styleElement);
 
-      fontFaceCache.set(cacheKey, { url: fontDataUrl, styleElement, weight, style });
+      fontFaceCache.set(cacheKey, { blobUrls, styleElement, weight, style });
 
-      const fontFace = new FontFace(fontFamilyName, `url(${fontDataUrl})`, { weight: String(weight), style });
-
+      const fontStyleToken = style === 'italic' ? 'italic' : 'normal';
+      const loadSpec = `${fontStyleToken} ${weight} 16px ${ffName}`;
       try {
-        await fontFace.load();
-        document.fonts.add(fontFace);
-        if (fontObj.loadedStyles && !fontObj.loadedStyles.some(s => s.weight === weight && s.style === style)) {
+        await document.fonts.load(loadSpec);
+        if (fontObj.loadedStyles && !fontObj.loadedStyles.some((s) => s.weight === weight && s.style === style)) {
           fontObj.loadedStyles.push({ weight, style, cached: false });
         }
         return returnBlob ? blob : undefined;
       } catch (loadError) {
-        console.warn(`Не удалось загрузить FontFace для ${fontFamily} ${weight} ${style}:`, loadError);
-        if (fontDataUrl) URL.revokeObjectURL(fontDataUrl);
+        console.warn(`Не удалось дождаться загрузки шрифта для ${fontFamily} ${weight} ${style}:`, loadError);
+        for (const u of blobUrls) {
+          try {
+            URL.revokeObjectURL(u);
+          } catch {
+            // noop
+          }
+        }
+        try {
+          styleElement.remove();
+        } catch {
+          // noop
+        }
+        fontFaceCache.delete(cacheKey);
         return returnBlob ? null : undefined;
       }
     } catch (error) {
       console.error(`Ошибка при загрузке стиля ${fontFamily} ${weight} ${style}:`, error);
-      if (fontDataUrl) URL.revokeObjectURL(fontDataUrl);
+      for (const u of blobUrls) {
+        try {
+          URL.revokeObjectURL(u);
+        } catch {
+          // noop
+        }
+      }
       if (returnBlob) return null;
       else throw error;
     }
@@ -186,14 +250,22 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
 
       if (actualIsVariableFont) {
         try {
-          const loadVariableStylePayload = async (targetStyle = 'normal') => {
-            const variableApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}/variable?subset=latin&style=${encodeURIComponent(targetStyle)}&forceVariable=true`;
+          const cssFmt = (ext) => (ext === 'ttf' ? 'truetype' : ext === 'otf' ? 'opentype' : ext);
+
+          const loadVariableStylePayload = async (targetStyle = 'normal', subset = 'latin', softFail = false) => {
+            const variableApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}/variable?subset=${encodeURIComponent(subset)}&style=${encodeURIComponent(targetStyle)}&forceVariable=true`;
             const fontFileResponse = await fetch(variableApiUrl);
-            if (!fontFileResponse.ok) throw new Error(`Не удалось загрузить файл вариативного шрифта (статус ${fontFileResponse.status})`);
+            if (!fontFileResponse.ok) {
+              if (softFail) return null;
+              throw new Error(`Не удалось загрузить файл вариативного шрифта (статус ${fontFileResponse.status})`);
+            }
             const variablePayload = await fontFileResponse.json();
             const fontBufferBase64 = variablePayload?.fontBufferBase64;
             const fileName = String(variablePayload?.fileName || '');
-            if (!fontBufferBase64) throw new Error('Пустой буфер вариативного шрифта');
+            if (!fontBufferBase64) {
+              if (softFail) return null;
+              throw new Error('Пустой буфер вариативного шрифта');
+            }
             const fontBuffer = base64ToArrayBuffer(fontBufferBase64);
             const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'woff2';
             const mimeType = `font/${fileExtension === 'ttf' ? 'ttf' : fileExtension === 'otf' ? 'otf' : fileExtension === 'woff' ? 'woff' : 'woff2'}`;
@@ -202,35 +274,60 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
             return { blob, fileExtension, blobUrl };
           };
 
-          const normalFace = await loadVariableStylePayload('normal');
-          fontObj.file = normalFace.blob;
-          fontObj.url = normalFace.blobUrl;
+          const normalLatin = await loadVariableStylePayload('normal', 'latin', false);
+          const normalCyrillic = await loadVariableStylePayload('normal', 'cyrillic', true);
 
-          const fontFaceRule = `
-              @font-face {
-                  font-family: ${JSON.stringify(displayName)};
-                  src: url('${normalFace.blobUrl}') format('${normalFace.fileExtension === 'ttf' ? 'truetype' : normalFace.fileExtension === 'otf' ? 'opentype' : normalFace.fileExtension}');
+          fontObj.file = normalLatin.blob;
+          fontObj.url = normalLatin.blobUrl;
+
+          const ff = JSON.stringify(displayName);
+          const normalRules = [
+            `@font-face {
+                  font-family: ${ff};
+                  src: url('${normalLatin.blobUrl}') format('${cssFmt(normalLatin.fileExtension)}');
                   font-style: normal;
                   font-display: swap;
-              }
-            `;
+                  unicode-range: ${FONTSOURCE_UNICODE_RANGE_LATIN};
+              }`,
+          ];
+          if (normalCyrillic) {
+            normalRules.push(`@font-face {
+                  font-family: ${ff};
+                  src: url('${normalCyrillic.blobUrl}') format('${cssFmt(normalCyrillic.fileExtension)}');
+                  font-style: normal;
+                  font-display: swap;
+                  unicode-range: ${FONTSOURCE_UNICODE_RANGE_CYRILLIC};
+              }`);
+          }
+
           const styleElement = document.createElement('style');
-          styleElement.textContent = fontFaceRule;
+          styleElement.textContent = normalRules.join('\n');
           document.head.appendChild(styleElement);
 
           if (italicMode === 'separate-style' && hasItalicStyles) {
             try {
-              const italicFace = await loadVariableStylePayload('italic');
-              const italicRule = `
-                @font-face {
-                    font-family: ${JSON.stringify(displayName)};
-                    src: url('${italicFace.blobUrl}') format('${italicFace.fileExtension === 'ttf' ? 'truetype' : italicFace.fileExtension === 'otf' ? 'opentype' : italicFace.fileExtension}');
+              const italicLatin = await loadVariableStylePayload('italic', 'latin', false);
+              const italicCyrillic = await loadVariableStylePayload('italic', 'cyrillic', true);
+              const italicRules = [
+                `@font-face {
+                    font-family: ${ff};
+                    src: url('${italicLatin.blobUrl}') format('${cssFmt(italicLatin.fileExtension)}');
                     font-style: italic;
                     font-display: swap;
-                }
-              `;
+                    unicode-range: ${FONTSOURCE_UNICODE_RANGE_LATIN};
+                }`,
+              ];
+              if (italicCyrillic) {
+                italicRules.push(`@font-face {
+                    font-family: ${ff};
+                    src: url('${italicCyrillic.blobUrl}') format('${cssFmt(italicCyrillic.fileExtension)}');
+                    font-style: italic;
+                    font-display: swap;
+                    unicode-range: ${FONTSOURCE_UNICODE_RANGE_CYRILLIC};
+                }`);
+              }
               const italicStyleElement = document.createElement('style');
-              italicStyleElement.textContent = italicRule;
+              italicStyleElement.textContent = italicRules.join('\n');
               document.head.appendChild(italicStyleElement);
             } catch (italicLoadError) {
               console.warn(`[FontLoader] Не удалось догрузить italic-face для ${displayName}:`, italicLoadError);

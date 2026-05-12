@@ -11,7 +11,7 @@ const unlink = promisify(fs.unlink);
 const ALLOWED_FORMATS = new Set(['ttf', 'otf', 'woff', 'woff2']);
 
 function getTempDir() {
-  return path.join(os.tmpdir(), 'mops-convert-font-format');
+  return path.join(os.tmpdir(), 'dinamic-convert-font-format');
 }
 
 function resolveFontToolsPython() {

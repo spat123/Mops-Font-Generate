@@ -28,6 +28,13 @@ function GoogleFontsCatalogCardComponent({
   /** ROW: глобальный образец (одна строка на весь список); undefined — показывать имя семейства */
   rowCatalogPreviewText,
   onRowGlobalSampleCommit,
+  /** ROW: если задан и нет `rowCatalogPreviewText`, показывать этот текст вместо имени семейства (страница «Поделиться») */
+  rowPreviewFallback,
+  /** ROW: выравнивание крупного образца; по умолчанию как в каталоге */
+  rowPreviewAlign = 'end',
+  rowSampleTooltip,
+  rowPreviewEditorAriaLabel,
+  pinPreviewColumnClassName = '',
   previewText = 'AaBbCcDdEe',
   footerRightTooltipContent,
 }) {
@@ -104,8 +111,12 @@ function GoogleFontsCatalogCardComponent({
       metaItems={metaItems}
       previewFamily={`'${family}', sans-serif`}
       previewText={previewText}
-      rowPreviewText={rowCatalogPreviewText ?? family}
-      defaultPreviewText={family}
+      rowPreviewText={rowCatalogPreviewText ?? rowPreviewFallback ?? family}
+      defaultPreviewText={rowPreviewFallback ?? family}
+      rowPreviewAlign={rowPreviewAlign}
+      rowSampleTooltip={rowSampleTooltip}
+      rowPreviewEditorAriaLabel={rowPreviewEditorAriaLabel}
+      pinPreviewColumnClassName={pinPreviewColumnClassName}
       onGlobalRowSampleCommit={onRowGlobalSampleCommit}
       footerLeftBadges={footerLeftBadges}
       footerRightBadges={footerRightBadges}

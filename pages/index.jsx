@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import Sidebar from '../components/Sidebar';
 import FontPreview from '../components/FontPreview';
 import ExportModal from '../components/ExportModal';
@@ -34,6 +35,7 @@ import { updateFontSettings } from '../utils/db';
 import { useFontLibraries } from '../hooks/useFontLibraries';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
 import {
+  countRecentlyAddedLibraryFonts,
   getLibrarySourceLabel,
   isLibraryFontRecentlyAdded,
   normalizeLibraryText,
@@ -68,6 +70,7 @@ import {
 import { formatFontVariationSettings } from '../utils/fontVariationSettings';
 import { OpenExternalIcon, ShareIcon, TrashIcon, SearchIcon, PlusIcon } from '../components/ui/CommonIcons';
 import { IconCircleButton } from '../components/ui/IconCircleButton';
+import { LibraryShareDialog } from '../components/ui/LibraryShareDialog';
 import { SearchClearButton } from '../components/ui/SearchClearButton';
 import { matchesSearch } from '../utils/searchMatching';
 import { buildCatalogDownloadButtonProps } from '../components/ui/buildCatalogDownloadButtonProps';
@@ -103,10 +106,10 @@ const EDITOR_CLOSED_LIBRARY_FONT_IDS_LS_KEY = 'editorClosedLibraryFontTabIds';
 /** Внутри экрана «Все шрифты»: активная внутренняя вкладка каталога или библиотеки. */
 const FONTS_LIBRARY_INNER_TAB_LS_KEY = 'fontsLibraryInnerTab';
 const SAVED_LIBRARY_TAB_PREFIX = 'saved-library:';
-const SESSION_FONT_ORDER_LS_KEY = 'mopsSessionFontOrder';
+const SESSION_FONT_ORDER_LS_KEY = 'dinamicSessionFontOrder';
 
 /** Лёгкий снимок вкладок шрифтов для первого кадра после F5 (пока IndexedDB не отдал blobs). */
-const SESSION_FONT_TABS_PREVIEW_KEY = 'mopsSessionFontTabsPreview';
+const SESSION_FONT_TABS_PREVIEW_KEY = 'dinamicSessionFontTabsPreview';
 
 /** До useLayoutEffect не подсвечиваем «Все шрифты» / не показываем контент — убирает мигание для новых пользователей. */
 const EDITOR_MAIN_TAB_PENDING = '__editorShellPending__';
@@ -537,6 +540,7 @@ const CATALOG_SOURCE_OPTIONS = [
 
 const LIBRARY_FONT_SCOPE_TABS = [
   { id: 'all', label: 'Все' },
+  { id: 'recent', label: 'Новые' },
   { id: 'local', label: 'С диска' },
   { id: 'google', label: 'Google' },
   { id: 'fontsource', label: 'Fontsource' },
@@ -550,6 +554,7 @@ function countFontsByScope(fonts) {
   const list = Array.isArray(fonts) ? fonts : [];
   return {
     all: list.length,
+    recent: countRecentlyAddedLibraryFonts(list),
     local: list.filter((font) => (font?.source || 'local') === 'local').length,
     google: list.filter((font) => font?.source === 'google').length,
     fontsource: list.filter((font) => font?.source === 'fontsource').length,
@@ -578,6 +583,17 @@ function newEmptySlotId() {
 }
 
 export default function Home() {
+  const router = useRouter();
+
+  /** Старые ссылки `/?share=` ведём на отдельную страницу предпросмотра. */
+  useEffect(() => {
+    if (!router.isReady) return;
+    const raw = router.query.share;
+    const share = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+    if (!share) return;
+    void router.replace({ pathname: '/share', query: { share } });
+  }, [router.isReady, router.query.share, router]);
+
   // Получаем настройки из контекста
   const { 
     text, setText, 
@@ -663,6 +679,7 @@ export default function Home() {
   );
   const savedLibrarySearchWrapRef = useRef(null);
   const savedLibrarySearchInputRef = useRef(null);
+  const openLibraryShareDialogRef = useRef(() => {});
   const [savedLibraryCatalogAddBusyId, setSavedLibraryCatalogAddBusyId] = useState(null);
   const { set: savedLibraryCatalogRecentlyAddedSet, mark: markSavedLibraryCatalogRecentlyAdded } =
     useStickyTimedSet(900);
@@ -671,6 +688,9 @@ export default function Home() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [plainPreviewOpen, setPlainPreviewOpen] = useState(false);
+  const [libraryShareDialogOpen, setLibraryShareDialogOpen] = useState(false);
+  const [libraryShareSnapshot, setLibraryShareSnapshot] = useState(null);
+  const [libraryShareSeedIds, setLibraryShareSeedIds] = useState([]);
   const [catalogSelectionActions, setCatalogSelectionActions] = useState({
     selectedCount: 0,
     downloadSelected: null,
@@ -993,7 +1013,6 @@ export default function Home() {
           concurrency: FONTSOURCE_PREWARM_CONCURRENCY,
           weight: 400,
           style: 'normal',
-          subset: 'latin',
         });
       } catch (e) {
         // Игнорируем: prewarm необязателен
@@ -1165,6 +1184,11 @@ export default function Home() {
     savedLibrarySearchInputRef.current?.blur();
   }, []);
 
+  /** Только строка поиска; панель поиска остаётся открытой (крестик внутри поля). */
+  const clearSavedLibrarySearchTextOnly = useCallback(() => {
+    setSavedLibrarySearchQuery('');
+  }, []);
+
   const openSavedLibrarySearch = useCallback(() => {
     setIsSavedLibrarySearchExpanded(true);
     requestAnimationFrame(() => {
@@ -1327,9 +1351,11 @@ export default function Home() {
     const scoped =
       savedLibraryFontsScope === 'all'
         ? activeSavedLibrary.fonts
-        : activeSavedLibrary.fonts.filter(
-            (font) => (font?.source || 'editor') === savedLibraryFontsScope,
-          );
+        : savedLibraryFontsScope === 'recent'
+          ? activeSavedLibrary.fonts.filter((font) => isLibraryFontRecentlyAdded(font))
+          : activeSavedLibrary.fonts.filter(
+              (font) => (font?.source || 'editor') === savedLibraryFontsScope,
+            );
     const searchFiltered = !savedLibrarySearchQueryTrimmed
       ? scoped
       : scoped.filter((font) =>
@@ -1474,6 +1500,7 @@ export default function Home() {
             : ''
         }`}
         aria-label="Поделиться"
+        onClick={() => openLibraryShareDialogRef.current?.()}
       >
         <ShareIcon className="h-4 w-4" />
       </IconCircleButton>
@@ -1583,7 +1610,8 @@ export default function Home() {
             />
             {savedLibrarySearchQueryTrimmed ? (
               <SearchClearButton
-                onClick={clearSavedLibrarySearch}
+                onClick={clearSavedLibrarySearchTextOnly}
+                ariaLabel="Очистить текст поиска"
                 className="absolute right-2 top-1/2 -translate-y-1/2"
               />
             ) : null}
@@ -1630,7 +1658,8 @@ export default function Home() {
             />
             {savedLibrarySearchQueryTrimmed ? (
               <SearchClearButton
-                onClick={clearSavedLibrarySearch}
+                onClick={clearSavedLibrarySearchTextOnly}
+                ariaLabel="Очистить текст поиска"
                 className="absolute right-2 top-1/2 -translate-y-1/2"
               />
             ) : null}
@@ -1698,7 +1727,8 @@ export default function Home() {
               />
               {savedLibrarySearchQueryTrimmed ? (
                 <SearchClearButton
-                  onClick={clearSavedLibrarySearch}
+                  onClick={clearSavedLibrarySearchTextOnly}
+                  ariaLabel="Очистить текст поиска"
                   className="absolute right-2 top-1/2 -translate-y-1/2"
                 />
               ) : null}
@@ -1746,7 +1776,8 @@ export default function Home() {
                 />
                 {savedLibrarySearchQueryTrimmed ? (
                   <SearchClearButton
-                    onClick={clearSavedLibrarySearch}
+                    onClick={clearSavedLibrarySearchTextOnly}
+                    ariaLabel="Очистить текст поиска"
                     className="absolute right-2 top-1/2 -translate-y-1/2"
                   />
                 ) : null}
@@ -2011,6 +2042,82 @@ export default function Home() {
     (slug, isVariable) => selectOrAddFontsourceFontWithNav(slug, Boolean(isVariable), { silent: true }),
     [selectOrAddFontsourceFontWithNav],
   );
+
+  /** Открытие шрифта из страницы `/share` (query после перехода снимаем). */
+  useEffect(() => {
+    if (!router.isReady) return;
+    const rawG = router.query.openGoogle;
+    const rawFs = router.query.openFontsource;
+    const family = typeof rawG === 'string' ? rawG.trim() : '';
+    const slug = typeof rawFs === 'string' ? rawFs.trim() : '';
+    const googleVar =
+      router.query.openGoogleVar === '1' ||
+      router.query.openGoogleVar === 'true' ||
+      router.query.openGoogleVar === true;
+    const fsVar =
+      router.query.fontsourceVar === '1' ||
+      router.query.fontsourceVar === 'true' ||
+      router.query.fontsourceVar === true;
+
+    if (!family && !slug) return;
+
+    let cancelled = false;
+
+    const stripOpenQuery = async () => {
+      const nextQuery = { ...router.query };
+      delete nextQuery.openGoogle;
+      delete nextQuery.openGoogleVar;
+      delete nextQuery.openFontsource;
+      delete nextQuery.fontsourceVar;
+      const clean = {};
+      Object.keys(nextQuery).forEach((k) => {
+        const v = nextQuery[k];
+        if (v === undefined || v === null) return;
+        clean[k] = v;
+      });
+      await router.replace(
+        { pathname: '/', query: Object.keys(clean).length ? clean : {} },
+        undefined,
+        { shallow: true },
+      );
+    };
+
+    (async () => {
+      try {
+        if (family) {
+          const list = readGoogleFontCatalogCache();
+          const cached = Array.isArray(list)
+            ? list.find(
+                (item) => String(item?.family || '').trim().toLowerCase() === family.toLowerCase(),
+              )
+            : null;
+          const entry = cached
+            ? { ...cached, isVariable: googleVar && cached.isVariable === true ? true : cached.isVariable }
+            : { family, subsets: [], isVariable: Boolean(googleVar), styleCount: 0 };
+          await openGoogleCatalogEntryInEditorTab(entry);
+        } else if (slug) {
+          await openFontsourceSlugInEditorTab(slug, fsVar);
+        }
+      } finally {
+        if (!cancelled) {
+          await stripOpenQuery();
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    router,
+    router.isReady,
+    router.query.openGoogle,
+    router.query.openGoogleVar,
+    router.query.openFontsource,
+    router.query.fontsourceVar,
+    openGoogleCatalogEntryInEditorTab,
+    openFontsourceSlugInEditorTab,
+  ]);
 
   const openLibraryFontEntry = useCallback(
     async (fontEntry) => {
@@ -2666,6 +2773,50 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     () => filteredActiveSavedLibraryFonts.filter((font) => selectedSavedLibraryFontIds.has(font.id)),
     [filteredActiveSavedLibraryFonts, selectedSavedLibraryFontIds],
   );
+
+  const openLibraryShareDialog = useCallback(
+    (libraryId = null, options = {}) => {
+      const id = libraryId || activeSavedLibrary?.id;
+      const library = fontLibraries.find((l) => l.id === id);
+      if (!library?.fonts?.length) {
+        toast.info('В этой библиотеке пока нет шрифтов');
+        return;
+      }
+      const onlyFontIds = Array.isArray(options.onlyFontIds)
+        ? options.onlyFontIds.map(String).filter(Boolean)
+        : null;
+      const isActiveContext = id === activeSavedLibrary?.id;
+      let seeds;
+      if (onlyFontIds && onlyFontIds.length > 0) {
+        seeds = onlyFontIds.filter((fid) => library.fonts.some((f) => String(f.id) === String(fid)));
+        if (seeds.length === 0) {
+          seeds = library.fonts.map((f) => f.id);
+        }
+      } else if (isActiveContext && selectedSavedLibraryFontIds.size > 0) {
+        seeds = [...selectedSavedLibraryFontIds].filter((fid) =>
+          library.fonts.some((f) => String(f.id) === String(fid)),
+        );
+      } else {
+        seeds = library.fonts.map((f) => f.id);
+      }
+      setLibraryShareSnapshot({
+        id: library.id,
+        name: library.name,
+        fonts: Array.isArray(library.fonts) ? [...library.fonts] : [],
+      });
+      setLibraryShareSeedIds(seeds.map(String));
+      setLibraryShareDialogOpen(true);
+    },
+    [activeSavedLibrary?.id, fontLibraries, selectedSavedLibraryFontIds],
+  );
+  openLibraryShareDialogRef.current = openLibraryShareDialog;
+
+  const closeLibraryShareDialog = useCallback(() => {
+    setLibraryShareDialogOpen(false);
+    setLibraryShareSnapshot(null);
+    setLibraryShareSeedIds([]);
+  }, []);
+
   const selectedSavedLibraryDownloadableCount = useMemo(
     () => countDownloadableSavedLibraryFonts(selectedSavedLibraryFonts),
     [selectedSavedLibraryFonts],
@@ -2840,6 +2991,9 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
             key: 'share',
             label: 'Поделиться',
             icon: <ShareIcon />,
+            onSelect: () => {
+              openLibraryShareDialog(activeSavedLibrary.id, { onlyFontIds: [font.id] });
+            },
           },
           {
             key: 'remove',
@@ -2868,6 +3022,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     savedLibraryCardMetaClassName,
     moveSingleSavedLibraryFont,
     selectedSavedLibraryFontIds,
+    openLibraryShareDialog,
     sessionCardPreviewStyleFor,
     startSavedLibraryCardLongPress,
     clearSavedLibraryLongPressTimer,
@@ -3288,8 +3443,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
   return (
     <div className="flex h-screen min-h-0 flex-row overflow-hidden bg-gray-50">
       <Head>
-        <title>Dynamic font — тестирование и сравнение шрифтов</title>
-        <meta name="description" content="Профессиональный инструмент для тестирования и сравнения шрифтов" />
+        <title>DINAMIC FONT — тестирование и сравнение шрифтов</title>
+        <meta name="description" content="DINAMIC FONT — тестирование, сравнение и работа со шрифтами" />
         <link rel="icon" href="/favicon.ico" />
         {cssString && <style>{cssString}</style>}
       </Head>
@@ -3311,6 +3466,13 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         variableSettings={variableSettings}
         generateStaticFontFile={generateStaticFontFile}
         downloadFile={downloadFile}
+      />
+      <LibraryShareDialog
+        open={libraryShareDialogOpen}
+        onClose={closeLibraryShareDialog}
+        library={libraryShareSnapshot}
+        initialSelectedFontIds={libraryShareSeedIds}
+        resolveSessionFont={resolveSessionFontForLibraryEntry}
       />
 
       {/* Скрытый input для загрузки файлов */}
@@ -3343,6 +3505,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               prev?.requestId === requestId ? null : prev,
             )
           }
+          onShareLibrary={openLibraryShareDialog}
           setSelectedFont={pickFont}
           handleVariableSettingsChange={handleVariableSettingsChange}
           availableStyles={availableStyles}
@@ -3559,7 +3722,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                                     />
                                     {savedLibrarySearchQueryTrimmed ? (
                                       <SearchClearButton
-                                        onClick={clearSavedLibrarySearch}
+                                        onClick={clearSavedLibrarySearchTextOnly}
+                                        ariaLabel="Очистить текст поиска"
                                         className="absolute right-2 top-1/2 -translate-y-1/2"
                                       />
                                     ) : null}

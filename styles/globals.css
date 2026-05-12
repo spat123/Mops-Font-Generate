@@ -288,3 +288,96 @@ input[type='search']::-ms-reveal {
 .code-scrollbar-visible:hover::-webkit-scrollbar-thumb {
   background: #6b7280;
 }
+
+/* Пульс на всей кнопке уведомлений: заливка, волны, иконка */
+@keyframes editor-notify-btn-fill {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  50% {
+    opacity: 0.52;
+  }
+}
+
+.editor-notify-btn-fill {
+  background: radial-gradient(
+    ellipse 95% 110% at 50% 42%,
+    rgb(255 65 65 / 0.32),
+    rgb(255 65 65 / 0.08) 52%,
+    rgb(255 65 65 / 0.02) 72%,
+    transparent 88%
+  );
+  animation: editor-notify-btn-fill 1.55s ease-in-out infinite;
+}
+
+@keyframes editor-notify-ripple {
+  0% {
+    transform: scale(0.58);
+    opacity: 0.55;
+  }
+  70% {
+    opacity: 0.12;
+  }
+  100% {
+    transform: scale(1.42);
+    opacity: 0;
+  }
+}
+
+.editor-notify-ripple {
+  position: absolute;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 0.4rem;
+  border: 2px solid rgb(255 65 65 / 0.42);
+  animation: editor-notify-ripple 1.85s ease-out infinite;
+  box-shadow: 0 0 0 1px rgb(255 65 65 / 0.08);
+}
+
+.editor-notify-ripple--delay {
+  animation-delay: 0.92s;
+}
+
+@keyframes editor-notify-icon {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 0 rgb(255 65 65 / 0));
+  }
+  50% {
+    transform: scale(1.07);
+    opacity: 0.94;
+    filter: drop-shadow(0 0 5px rgb(255 65 65 / 0.35));
+  }
+}
+
+.editor-notify-icon {
+  animation: editor-notify-icon 1.55s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-notify-btn-fill,
+  .editor-notify-ripple,
+  .editor-notify-icon {
+    animation: none;
+  }
+
+  .editor-notify-btn-fill {
+    opacity: 0.35;
+  }
+
+  .editor-notify-ripple {
+    display: none;
+  }
+
+  .editor-notify-icon {
+    opacity: 0.92;
+  }
+
+  .plain-preview-fs-close-btn {
+    opacity: 1 !important;
+    transition-property: none;
+  }
+}

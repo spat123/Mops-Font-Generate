@@ -354,7 +354,6 @@ export default function FontsourceCatalogPanel({
     const loadedFamily = await loadFontsourcePreviewFamily(slug, {
       weight: 400,
       style: 'normal',
-      subset: 'latin',
     });
     if (!loadedFamily) return;
     previewPendingFamiliesRef.current.set(slug, loadedFamily);

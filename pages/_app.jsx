@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { ToastContainer, toast } from 'react-toastify';
-import '../styles/globals.css'; 
+import { ToastContainer } from 'react-toastify';
+import '../styles/globals.css';
 import 'react-toastify/dist/ReactToastify.css';
+import '../styles/appToastify.css';
 import { SettingsProvider } from '../contexts/SettingsContext';
 import { FontProvider } from '../contexts/FontContext';
 import Head from 'next/head';
@@ -34,14 +35,15 @@ export default function MyApp({ Component, pageProps }) {
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Dynamic font — инструмент для работы со шрифтами</title>
+        <title>DINAMIC FONT — инструмент для работы со шрифтами</title>
       </Head>
       
       <SettingsProvider>
         <FontProvider>
           <Component {...pageProps} />
-          <ToastContainer 
+          <ToastContainer
             position="bottom-right"
+            theme="light"
             autoClose={3000}
             hideProgressBar={false}
             newestOnTop
@@ -50,6 +52,10 @@ export default function MyApp({ Component, pageProps }) {
             pauseOnFocusLoss
             draggable
             pauseOnHover
+            limit={4}
+            toastClassName="app-toast"
+            bodyClassName="app-toast__body"
+            className="app-toast-container"
           />
         </FontProvider>
       </SettingsProvider>

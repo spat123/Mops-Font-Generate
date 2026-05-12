@@ -128,14 +128,14 @@ export default function GenerateFontModal({
       onClick={handleBackdrop}
     >
       <div
-        className={`max-h-[90vh] w-11/12 max-w-lg overflow-y-auto rounded-none bg-white shadow-xl transition-all duration-300 ease-in-out ${
+        className={`flex max-h-[90vh] w-11/12 max-w-lg flex-col overflow-hidden rounded-none bg-white shadow-xl transition-all duration-300 ease-in-out ${
           isVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-4 scale-95 opacity-0'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <PopupDialogHeader title="Генерация шрифта" onClose={onClose} />
 
-        <div className="space-y-4 px-6 py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
           {!vf && (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
               Статический файл из осей сейчас строится для <strong>вариативных</strong> шрифтов. Выберите VF в
@@ -205,22 +205,22 @@ export default function GenerateFontModal({
           </p>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-6 py-4">
+        <div className="flex shrink-0 items-stretch gap-3 border-t border-gray-200 bg-white px-6 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
+            className="w-full min-h-10 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
             disabled={busy}
           >
-            Отмена
+            Отменить
           </button>
           <button
             type="button"
             onClick={handleGenerate}
             disabled={!vf || busy}
-            className="rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex w-full min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {busy ? 'Генерация…' : 'Сгенерировать и скачать'}
+            {busy ? 'Генерация…' : 'Сгенерировать'}
           </button>
         </div>
       </div>

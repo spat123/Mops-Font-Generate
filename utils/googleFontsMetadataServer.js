@@ -4,7 +4,7 @@
  */
 
 const SOURCE = 'https://fonts.google.com/metadata/fonts';
-const UA = 'Mozilla/5.0 (compatible; MopsFontGenerate/1.0)';
+const UA = 'Mozilla/5.0 (compatible; DinamicFont/1.0)';
 const CACHE_MS = 60 * 60 * 1000;
 
 let cache = { json: null, loadedAt: 0 };

@@ -7,7 +7,7 @@ import { slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
 import { buildGithubVariableTtfCandidateUrls } from '../../utils/googleGithubVariableFontUrl';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
-const UA = 'Mozilla/5.0 (compatible; MopsFontGenerate/1.0)';
+const UA = 'Mozilla/5.0 (compatible; DinamicFont/1.0)';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

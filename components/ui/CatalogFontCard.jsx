@@ -15,6 +15,8 @@ export function CatalogFontCard({
   fadeFooterWithHoverUi = false,
   /** Превью внизу оставшейся высоты карточки (режим ROW) */
   pinPreviewToBottom = false,
+  /** Доп. классы для колонки превью при `pinPreviewToBottom` (например `items-start` для выравнивания влево) */
+  pinPreviewColumnClassName = '',
   titleClassName = 'truncate text-sm font-medium text-gray-800',
   onClick,
   onPointerDown,
@@ -139,7 +141,11 @@ export function CatalogFontCard({
       ) : null}
       <div className={titleClassName}>{title}</div>
       {pinPreviewToBottom ? (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col justify-end">{preview}</div>
+        <div
+          className={`flex min-h-0 min-w-0 flex-1 flex-col justify-end ${pinPreviewColumnClassName}`.trim()}
+        >
+          {preview}
+        </div>
       ) : (
         preview
       )}

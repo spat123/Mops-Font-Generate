@@ -1,4 +1,4 @@
-const LIBRARY_FONT_DRAG_MIME = 'application/x-mops-library-font';
+const LIBRARY_FONT_DRAG_MIME = 'application/x-dinamic-font-library-font';
 
 export function writeLibraryFontDragData(dataTransfer, fontEntry) {
   if (!dataTransfer || !fontEntry) return false;

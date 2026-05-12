@@ -25,6 +25,13 @@ export function CatalogRowModeCard({
   defaultPreviewText,
   /** Сохранить глобальный образец для всех ROW-карточек; пустая строка — сброс (у каждой строки снова имя семейства) */
   onGlobalRowSampleCommit,
+  /** Выравнивание крупного образца в ROW: `end` — как в каталоге (справа внизу), `start` — слева внизу */
+  previewAlign = 'end',
+  /** Подсказка при редактируемом образце (двойной клик) */
+  rowSampleTooltip,
+  /** `aria-label` для поля правки образца */
+  rowPreviewEditorAriaLabel,
+  pinPreviewColumnClassName = '',
   previewProps = undefined,
   selected = false,
   busy = false,
@@ -55,6 +62,10 @@ export function CatalogRowModeCard({
   const snapshotAtEditStartRef = useRef('');
 
   const canEditPreview = typeof onGlobalRowSampleCommit === 'function';
+  const isStart = previewAlign === 'start';
+  const alignRowClass = isStart ? 'items-start justify-end' : 'items-end justify-end';
+  const tooltipContent = rowSampleTooltip ?? ROW_TOOLTIP;
+  const editorAria = rowPreviewEditorAriaLabel ?? 'Образец текста для всех строк каталога';
   const resolvedDefault = (defaultPreviewText ?? previewText ?? family ?? '').trim() || family;
   const previewStyle = {
     ...(previewInlineStyle && typeof previewInlineStyle === 'object' ? previewInlineStyle : {}),
@@ -153,21 +164,29 @@ export function CatalogRowModeCard({
   );
 
   const previewReadOnly = canEditPreview ? (
-    <Tooltip content={ROW_TOOLTIP} as="div" className="inline-flex w-fit min-w-0 max-w-full">
-      {previewInner}
-    </Tooltip>
+    isStart ? (
+      <div className={`flex min-h-0 w-full min-w-0 flex-1 flex-col ${alignRowClass}`}>
+        <Tooltip content={tooltipContent} as="div" className="inline-flex w-fit min-w-0 max-w-full">
+          {previewInner}
+        </Tooltip>
+      </div>
+    ) : (
+      <Tooltip content={tooltipContent} as="div" className="inline-flex w-fit min-w-0 max-w-full">
+        {previewInner}
+      </Tooltip>
+    )
   ) : (
-    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col items-end justify-end">{previewInner}</div>
+    <div className={`flex min-h-0 w-full min-w-0 flex-1 flex-col ${alignRowClass}`}>{previewInner}</div>
   );
 
-  const previewEditingInline = (
+  const previewEditingBlock = (
     <div
       {...restPreviewProps}
       ref={editorRef}
       contentEditable
       suppressContentEditableWarning
       role="textbox"
-      aria-label="Образец текста для всех строк каталога"
+      aria-label={editorAria}
       spellCheck={false}
       className={[
         'mt-1 inline-block min-h-0 min-w-0 w-fit max-w-full overflow-visible whitespace-nowrap pb-1 text-[clamp(3.5rem,6vw,5rem)] leading-[0.95] text-gray-900 caret-current outline-none border-none ring-0 bg-transparent',
@@ -181,6 +200,12 @@ export function CatalogRowModeCard({
       onBlur={handlePreviewBlur}
       onKeyDown={handlePreviewKeyDown}
     />
+  );
+
+  const previewEditingInline = isStart ? (
+    <div className={`flex min-h-0 w-full min-w-0 flex-1 flex-col ${alignRowClass}`}>{previewEditingBlock}</div>
+  ) : (
+    previewEditingBlock
   );
 
   const previewContent = editingPreview ? previewEditingInline : previewReadOnly;
@@ -197,6 +222,7 @@ export function CatalogRowModeCard({
           }`}
           minHeightClass=""
           pinPreviewToBottom
+          pinPreviewColumnClassName={pinPreviewColumnClassName}
           selected={selected}
           busy={busy}
           actions={actions}

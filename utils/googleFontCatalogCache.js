@@ -1,6 +1,6 @@
 import { createSessionJsonCache } from './sessionJsonCache';
 
-export const GOOGLE_FONT_CATALOG_CACHE_KEY = 'mops-google-fonts-catalog-v6';
+export const GOOGLE_FONT_CATALOG_CACHE_KEY = 'dinamic-google-fonts-catalog-v6';
 
 export function isGoogleFontCatalogCacheValid(value) {
   return (

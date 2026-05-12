@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import dynamicAnimationData from '../../assets/icon/Anim/Dinamic.json';
 
 /**
- * @typedef {import('lottie-web').AnimationItem & { __mopsCompleteHandler?: () => void }} MopsAnimationItem
+ * @typedef {import('lottie-web').AnimationItem} DinamicAnimationItem
  */
 
 function cloneAndRetintAnimation(source) {
@@ -56,7 +56,7 @@ export const HexProgressLoader = React.memo(function HexProgressLoader({
 
   useEffect(() => {
     let destroyed = false;
-    /** @type {MopsAnimationItem | null} */
+    /** @type {DinamicAnimationItem | null} */
     let anim = null;
 
     const mount = async () => {

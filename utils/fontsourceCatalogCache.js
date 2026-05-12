@@ -1,6 +1,6 @@
 import { createSessionJsonCache } from './sessionJsonCache';
 
-export const FONTSOURCE_CATALOG_CACHE_KEY = 'mops-fontsource-catalog-v1';
+export const FONTSOURCE_CATALOG_CACHE_KEY = 'dinamic-fontsource-catalog-v1';
 
 export function isFontsourceCatalogCacheValid(value) {
   return (

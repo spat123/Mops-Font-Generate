@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Tooltip } from '../ui/Tooltip';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
+import { countRecentlyAddedLibraryFonts } from '../../utils/fontLibraryUtils';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../../utils/colorUtils';
 
 function getNextCycleValue(options, currentValue) {
@@ -240,21 +241,34 @@ function CollapsedLibraryRail({
         {(Array.isArray(libraries) ? libraries : []).map((library) => {
           const isActive = activeLibraryId === library?.id;
           const fontCount = Array.isArray(library?.fonts) ? library.fonts.length : 0;
+          const recentAddedCount = countRecentlyAddedLibraryFonts(library?.fonts);
           return (
             <Tooltip key={library?.id || library?.name || 'library'} content={library?.name || 'Библиотека'}>
-              <button
-                type="button"
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
-                  isActive
-                    ? 'border-accent bg-accent text-white'
-                    : 'border-gray-300 bg-white text-gray-900 hover:border-black hover:bg-black hover:text-white'
-                }`}
-                aria-label={`${library?.name || 'Библиотека'}: ${fontCount}`}
-                aria-pressed={isActive}
-                onClick={() => onOpenLibrary?.(library?.id || null)}
-              >
-                {fontCount}
-              </button>
+              <span className="relative inline-flex">
+                <button
+                  type="button"
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
+                    isActive
+                      ? 'border-accent bg-accent text-white'
+                      : 'border-gray-300 bg-white text-gray-900 hover:border-black hover:bg-black hover:text-white'
+                  }`}
+                  aria-label={`${library?.name || 'Библиотека'}: ${fontCount} шт.${recentAddedCount > 0 ? `, новых ${recentAddedCount}` : ''}`}
+                  aria-pressed={isActive}
+                  onClick={() => onOpenLibrary?.(library?.id || null)}
+                >
+                  {fontCount}
+                </button>
+                {recentAddedCount > 0 ? (
+                  <span
+                    className={`pointer-events-none absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none shadow-sm ring-2 ring-white ${
+                      isActive ? 'bg-white text-accent' : 'bg-accent text-white'
+                    }`}
+                    aria-hidden
+                  >
+                    +{recentAddedCount}
+                  </span>
+                ) : null}
+              </span>
             </Tooltip>
           );
         })}

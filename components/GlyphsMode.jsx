@@ -4,6 +4,7 @@ import { debounce } from '../utils/debounce';
 import { getGlyphDataForFont } from '../utils/fontParser';
 import { useSettings } from '../contexts/SettingsContext';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
+import { PopupDialogHeader } from './ui/PopupDialogHeader';
 
 // Глобальный кэш глифов, чтобы не загружать их повторно.
 const glyphDataCache = new Map();
@@ -248,6 +249,60 @@ function GlyphsMode({
     }, [glyphsData]);
 
     const [selectedGlyph, setSelectedGlyph] = useState(null);
+
+    const selectedGlyphDetails = useMemo(() => {
+      if (!selectedGlyph) return null;
+      const name = getGlyphName(selectedGlyph);
+      const unicodeStr = getGlyphUnicode(selectedGlyph);
+      const advanceWidth = glyphsData?.advanceWidths?.[selectedGlyph.id];
+
+      let char = null;
+      let isPrintable = false;
+      if (selectedGlyph.unicode) {
+        try {
+          const potentialChar = String.fromCodePoint(selectedGlyph.unicode);
+          if (potentialChar && potentialChar.trim() !== '' && !/[\p{C}]/u.test(potentialChar)) {
+            char = potentialChar;
+            isPrintable = true;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!isPrintable && selectedGlyph.unicodes && selectedGlyph.unicodes.length > 0) {
+        for (const codePoint of selectedGlyph.unicodes) {
+          try {
+            const potentialChar = String.fromCodePoint(codePoint);
+            if (potentialChar && potentialChar.trim() !== '' && !/[\p{C}]/u.test(potentialChar)) {
+              char = potentialChar;
+              isPrintable = true;
+              break;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+
+      const otherUnicodes =
+        selectedGlyph.unicodes && selectedGlyph.unicodes.length > 1
+          ? selectedGlyph.unicodes
+              .filter((u) => u !== selectedGlyph.unicode)
+              .map((u) => `U+${u.toString(16).toUpperCase().padStart(4, '0')}`)
+              .join(', ')
+          : '';
+
+      return { name, unicodeStr, advanceWidth, char, isPrintable, otherUnicodes };
+    }, [selectedGlyph, glyphsData, getGlyphName, getGlyphUnicode]);
+
+    useEffect(() => {
+      if (!selectedGlyph) return undefined;
+      const onKey = (e) => {
+        if (e.key === 'Escape') setSelectedGlyph(null);
+      };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }, [selectedGlyph]);
     const [glyphGridInnerWidth, setGlyphGridInnerWidth] = useState(null);
 
     const onGlyphGridInnerWidth = useCallback((w) => {
@@ -306,6 +361,19 @@ function GlyphsMode({
 
         const glyphName = getGlyphName(glyph);
         const glyphUnicodeStr = getGlyphUnicode(glyph);
+        const rowH = glyphSquareGrid.rowHeightPx;
+        /** Узкая/низкая ячейка: подсказка не должна вылезать по ширине. */
+        const hideGlyphName = rowH < 72;
+        const hoverCompact = rowH < 100;
+        /** Одна буква на кнопке — влезает в ряд на более узких ячейках. */
+        const shortBtnLabels = rowH < 100;
+        /** Кнопки столбиком по центру — когда в ряд не помещаются. */
+        const nanoLayout = rowH < 76;
+        const btnPad = nanoLayout
+          ? 'self-center min-w-[1.35rem] rounded-sm bg-gray-100 px-1 py-px text-center text-[8px] font-semibold tabular-nums'
+          : hoverCompact
+            ? 'rounded bg-gray-100 px-1 py-0.5 text-[9px] font-medium'
+            : 'rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium';
 
         return (
           <div
@@ -329,14 +397,28 @@ function GlyphsMode({
               )}
             </div>
 
-            <div className="pointer-events-none absolute inset-0 z-[1] flex flex-col items-center justify-center gap-1 px-1 py-1 opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100">
-              <span className="w-full max-w-full truncate text-center font-mono text-sm font-medium leading-tight text-gray-900">
-                {glyphName}
-              </span>
-              <span className="max-w-full truncate text-center font-mono text-xs leading-tight text-gray-600">
+            <div
+              className={`pointer-events-none absolute inset-0 z-[1] flex min-h-0 flex-col items-stretch justify-center overflow-hidden opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:opacity-100 ${nanoLayout ? 'gap-px px-0 py-0' : hoverCompact ? 'gap-0 px-0.5 py-0.5' : 'gap-1 px-0.5 py-0.5'}`}
+            >
+              {!hideGlyphName ? (
+                <span
+                  className={`w-full min-h-0 max-w-full truncate text-center font-mono font-medium text-gray-900 ${hoverCompact ? 'text-[10px] leading-none' : 'text-sm leading-tight'}`}
+                >
+                  {glyphName}
+                </span>
+              ) : null}
+              <span
+                className={`max-w-full min-w-0 shrink-0 truncate text-center font-mono text-gray-600 ${nanoLayout ? 'text-[8px] leading-none' : hoverCompact ? 'text-[10px] leading-none' : 'text-xs leading-tight'}`}
+              >
                 {glyphUnicodeStr || '—'}
               </span>
-              <div className="mt-0.5 flex flex-wrap items-center justify-center gap-1">
+              <div
+                className={
+                  nanoLayout
+                    ? 'mt-px flex min-h-0 flex-col items-center gap-px overflow-y-auto overflow-x-hidden'
+                    : `mt-0.5 flex shrink-0 flex-nowrap items-center justify-center overflow-x-hidden ${hoverCompact ? 'gap-px' : 'gap-1'}`
+                }
+              >
                 {isPrintable && (
                   <button
                     type="button"
@@ -344,10 +426,10 @@ function GlyphsMode({
                       e.stopPropagation();
                       copyToClipboard(char, 'Символ');
                     }}
-                    className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-800 hover:bg-gray-200"
+                    className={`leading-none text-gray-800 hover:bg-gray-200 ${btnPad}`}
                     aria-label="Копировать символ"
                   >
-                    Ch
+                    {shortBtnLabels ? 'C' : 'Ch'}
                   </button>
                 )}
                 <button
@@ -356,10 +438,10 @@ function GlyphsMode({
                     e.stopPropagation();
                     copyToClipboard(glyphName, 'Имя');
                   }}
-                  className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-700 hover:bg-gray-200"
+                  className={`leading-none text-gray-700 hover:bg-gray-200 ${btnPad}`}
                   aria-label="Копировать имя (PostScript)"
                 >
-                  Nm
+                  {shortBtnLabels ? 'N' : 'Nm'}
                 </button>
                 {glyphUnicodeStr ? (
                   <button
@@ -368,10 +450,10 @@ function GlyphsMode({
                       e.stopPropagation();
                       copyToClipboard(glyphUnicodeStr, 'Unicode');
                     }}
-                    className="rounded bg-gray-100 px-1.5 py-1 text-[10px] font-medium leading-none text-gray-700 hover:bg-gray-200"
+                    className={`leading-none text-gray-700 hover:bg-gray-200 ${btnPad}`}
                     aria-label="Копировать Unicode"
                   >
-                    U+
+                    {shortBtnLabels ? 'U' : 'U+'}
                   </button>
                 ) : null}
               </div>
@@ -382,6 +464,7 @@ function GlyphsMode({
       [
         displayableGlyphs,
         glyphCellFontPx,
+        glyphSquareGrid.rowHeightPx,
         fontFamily,
         glyphDisplayStyle,
         getGlyphName,
@@ -451,91 +534,99 @@ function GlyphsMode({
         ) : null}
 
         {/* Детали глифа */}
-        {selectedGlyph && (
-          <div 
-              className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4" 
-              onClick={() => setSelectedGlyph(null)}
+        {selectedGlyph && selectedGlyphDetails && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Детали глифа: ${selectedGlyphDetails.name}`}
+            onClick={() => setSelectedGlyph(null)}
           >
-            <div 
-              className="bg-white p-6 sm:p-8 rounded-lg shadow-xl max-w-md w-full relative" 
-              onClick={e => e.stopPropagation()}
+            <div
+              className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-none bg-white shadow-xl"
+              onClick={(e) => e.stopPropagation()}
             >
-              <button 
-                  onClick={() => setSelectedGlyph(null)} 
-                  className="absolute top-2 right-3 text-gray-400 hover:text-gray-700 text-3xl font-light leading-none"
-                  aria-label="Закрыть"
+              <PopupDialogHeader
+                title="Детали глифа"
+                onClose={() => setSelectedGlyph(null)}
+                titleClassName="max-w-[calc(100%-3rem)] truncate"
+                closeAriaLabel="Закрыть"
+              />
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                <div
+                  className="flex min-h-[7rem] max-w-full items-center justify-center overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200 bg-gray-50 px-4 py-6"
+                  style={largeGlyphStyle}
+                >
+                  {selectedGlyphDetails.isPrintable ? (
+                    selectedGlyphDetails.char
+                  ) : (
+                    <span className="text-base text-gray-400">Нет отображаемого символа</span>
+                  )}
+                </div>
+                <div className="mt-4 border-t border-gray-200 text-sm text-gray-700 divide-y divide-gray-200">
+                  <div className="flex w-full items-baseline justify-between gap-3 py-2.5">
+                    <span className="shrink-0 font-medium text-gray-900">Unicode</span>
+                    <span className="min-w-0 text-right font-mono tabular-nums text-gray-800">
+                      {selectedGlyphDetails.unicodeStr || '—'}
+                    </span>
+                  </div>
+                  <div className="flex w-full items-baseline justify-between gap-3 py-2.5">
+                    <span className="shrink-0 font-medium text-gray-900">ID (индекс)</span>
+                    <span className="tabular-nums text-gray-800">{selectedGlyph.id}</span>
+                  </div>
+                  {selectedGlyphDetails.advanceWidth !== undefined ? (
+                    <div className="flex w-full items-baseline justify-between gap-3 py-2.5">
+                      <span className="shrink-0 font-medium text-gray-900">Ширина (advance)</span>
+                      <span className="tabular-nums text-gray-800">{selectedGlyphDetails.advanceWidth}</span>
+                    </div>
+                  ) : null}
+                  {selectedGlyphDetails.otherUnicodes ? (
+                    <div className="flex w-full items-start justify-between gap-3 py-2.5">
+                      <span className="shrink-0 font-medium text-gray-900">Другие коды</span>
+                      <span className="max-w-[65%] break-all text-right font-mono text-xs text-gray-800">
+                        {selectedGlyphDetails.otherUnicodes}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div
+                className={`grid w-full shrink-0 gap-2 border-t border-gray-200 bg-white px-6 py-4 ${
+                  selectedGlyphDetails.unicodeStr && selectedGlyphDetails.isPrintable
+                    ? 'grid-cols-1 sm:grid-cols-3 sm:gap-3'
+                    : selectedGlyphDetails.unicodeStr || selectedGlyphDetails.isPrintable
+                      ? 'grid-cols-1 sm:grid-cols-2 sm:gap-3'
+                      : 'grid-cols-1'
+                }`}
               >
-                  &times;
-              </button>
-              
-              {(() => { // IIFE to compute values once.
-                  const name = getGlyphName(selectedGlyph);
-                  const unicodeStr = getGlyphUnicode(selectedGlyph);
-                  const advanceWidth = glyphsData?.advanceWidths?.[selectedGlyph.id];
-                  
-                  // --- Character resolution logic for modal view ---
-                  let char = null;
-                  let isPrintable = false;
-
-                  // 1. Try primary unicode.
-                  if (selectedGlyph.unicode) {
-                    try {
-                      const potentialChar = String.fromCodePoint(selectedGlyph.unicode);
-                      if (potentialChar && potentialChar.trim() !== '' && !/[\p{C}]/u.test(potentialChar)) {
-                        char = potentialChar;
-                        isPrintable = true;
-                      }
-                    } catch (e) {}
-                  }
-
-                  // 2. Fallback to unicodes array.
-                  if (!isPrintable && selectedGlyph.unicodes && selectedGlyph.unicodes.length > 0) {
-                    for (const codePoint of selectedGlyph.unicodes) {
-                      try {
-                        const potentialChar = String.fromCodePoint(codePoint);
-                         if (potentialChar && potentialChar.trim() !== '' && !/[\p{C}]/u.test(potentialChar)) {
-                          char = potentialChar;
-                          isPrintable = true;
-                          break; 
-                        }
-                      } catch (e) {}
-                    }
-                  }
-                   // --- End character resolution logic ---
-
-                  return (
-                      <>
-                          <h3 className="text-xl font-semibold mb-4 text-gray-800 truncate">
-                              Детали глифа: {name}
-                          </h3>
-                          <div className="text-center mb-6 p-4 bg-gray-50 rounded" style={largeGlyphStyle}>
-                              {isPrintable ? char : <span className="text-gray-400 text-xl">(no char)</span>}
-                          </div>
-                          <div className="space-y-2 text-sm text-gray-700">
-                              <p><strong>Имя:</strong> {name}</p>
-                              <p><strong>Unicode:</strong> {unicodeStr || 'N/A'}</p>
-                              <p><strong>ID (индекс):</strong> {selectedGlyph.id}</p>
-                              {advanceWidth !== undefined && (
-                                  <p><strong>Ширина (advanceWidth):</strong> {advanceWidth}</p>
-                              )}
-                              {selectedGlyph.unicodes && selectedGlyph.unicodes.length > 1 && (
-                                  <p><strong>Другие Unicode:</strong> {selectedGlyph.unicodes.filter(u => u !== selectedGlyph.unicode).map(u => `U+${u.toString(16).toUpperCase().padStart(4,'0')}`).join(', ')}</p>
-                              )}
-                          </div>
-                          <div className="mt-6 flex flex-wrap justify-end gap-2">
-                              {isPrintable && (
-                                  <button onClick={() => copyToClipboard(char, 'Символ')} className="px-3 py-1.5 bg-accent text-white rounded hover:bg-accent-hover text-sm">Копировать символ</button>
-                              )}
-                              <button onClick={() => copyToClipboard(name, 'Имя')} className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">Копировать имя</button>
-                              {unicodeStr && (
-                                  <button onClick={() => copyToClipboard(unicodeStr, 'Unicode')} className="px-3 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm">Копировать Unicode</button>
-                              )}
-                          </div>
-                      </>
-                  );
-              })()}
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(selectedGlyphDetails.name, 'Имя')}
+                  className="min-h-10 w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
+                >
+                  Имя
+                </button>
+                {selectedGlyphDetails.unicodeStr ? (
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedGlyphDetails.unicodeStr, 'Unicode')}
+                    className="min-h-10 w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
+                  >
+                    Unicode
+                  </button>
+                ) : null}
+                {selectedGlyphDetails.isPrintable ? (
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(selectedGlyphDetails.char, 'Символ')}
+                    className="min-h-10 w-full rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover"
+                  >
+                    Символ
+                  </button>
+                ) : null}
+              </div>
             </div>
-        </div>
+          </div>
         )}
       </div>
     );

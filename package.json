@@ -1,7 +1,7 @@
 {
-  "name": "font-gauntlet-clone",
+  "name": "dinamic-font",
   "version": "1.0.2",
-  "description": "A font testing and comparison tool with fontsource support",
+  "description": "DINAMIC FONT — веб-приложение для тестирования, сравнения и работы со шрифтами",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

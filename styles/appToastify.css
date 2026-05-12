@@ -1,0 +1,148 @@
+/* Поверх react-toastify/dist/ReactToastify.css — внешний вид как у карточек редактора */
+
+:root {
+  --toastify-toast-width: min(22rem, calc(100vw - 2rem));
+  --toastify-toast-min-height: 3.25rem;
+  --toastify-toast-bd-radius: 0.5rem;
+  --toastify-toast-padding: 0.65rem 3rem 0.65rem 0.75rem;
+  --toastify-toast-shadow: 0 14px 40px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  --toastify-font-family: var(--font-family-sans);
+  --toastify-z-index: 10050;
+  /* Нижний отступ: чуть выше края, чем дефолт библиотеки (~16px) */
+  --toastify-toast-bottom: max(1.75rem, env(safe-area-inset-bottom));
+  --toastify-text-color-light: var(--color-ink);
+  --toastify-color-light: #ffffff;
+  --toastify-icon-color-success: var(--color-accent);
+  --toastify-icon-color-error: #dc2626;
+  --toastify-icon-color-warning: #ca8a04;
+  --toastify-icon-color-info: var(--color-gray-600);
+}
+
+.Toastify__toast-container.app-toast-container {
+  width: min(22rem, calc(100vw - 1.25rem));
+  padding: 0.75rem;
+}
+
+.Toastify__toast.app-toast {
+  border: 1px solid var(--color-gray-200);
+  box-shadow: var(--toastify-toast-shadow);
+  margin-bottom: 0.5rem;
+}
+
+.Toastify__toast-body.app-toast__body {
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.Toastify__toast-icon {
+  margin-inline-end: 0.5rem;
+  width: 1.25rem;
+}
+
+/* Закрытие — зона 3rem с border-l; крестик компактнее и светлее, hover — accent */
+.Toastify__close-button--light {
+  top: 0;
+  right: 0;
+  bottom: 5px;
+  left: auto;
+  display: inline-flex;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid var(--color-gray-200);
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--color-gray-500);
+  background: transparent;
+  opacity: 1;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.Toastify__close-button--light:hover,
+.Toastify__close-button--light:focus {
+  color: var(--color-accent);
+  opacity: 1;
+  background: transparent;
+}
+
+.Toastify__close-button--light > svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  fill: currentColor;
+  transform: scale(0.92);
+  transform-origin: center;
+}
+
+.Toastify__toast--rtl .Toastify__close-button--light {
+  right: auto;
+  left: 0;
+  border-left: none;
+  border-right: 1px solid var(--color-gray-200);
+}
+
+html.theme-dark .Toastify__toast--rtl .Toastify__close-button--light {
+  border-right-color: var(--color-gray-200);
+}
+
+.Toastify__progress-bar--wrp {
+  height: 4px;
+}
+
+/* Убираем дефолтный «радужный» трек light-темы — цвет задаём по типу */
+.Toastify__progress-bar-theme--light {
+  background: transparent !important;
+}
+
+.Toastify__progress-bar-theme--light.Toastify__progress-bar--success,
+.Toastify__progress-bar--success {
+  background: var(--color-accent) !important;
+  opacity: 0.45;
+}
+
+.Toastify__progress-bar-theme--light.Toastify__progress-bar--error,
+.Toastify__progress-bar--error {
+  background: #dc2626 !important;
+  opacity: 0.45;
+}
+
+.Toastify__progress-bar-theme--light.Toastify__progress-bar--warning,
+.Toastify__progress-bar--warning {
+  background: #ca8a04 !important;
+  opacity: 0.45;
+}
+
+.Toastify__progress-bar-theme--light.Toastify__progress-bar--info,
+.Toastify__progress-bar--info {
+  background: var(--color-gray-500) !important;
+  opacity: 0.4;
+}
+
+html.theme-dark {
+  --toastify-text-color-light: var(--color-gray-900);
+  --toastify-color-light: var(--color-gray-100);
+  --toastify-toast-shadow: 0 14px 40px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+html.theme-dark .Toastify__toast.app-toast {
+  border-color: var(--color-gray-200);
+}
+
+html.theme-dark .Toastify__toast-body.app-toast__body {
+  color: var(--color-gray-900);
+}
+
+html.theme-dark .Toastify__close-button--light {
+  border-left-color: var(--color-gray-200);
+  color: var(--color-gray-500);
+}
+
+html.theme-dark .Toastify__close-button--light:hover,
+html.theme-dark .Toastify__close-button--light:focus {
+  color: var(--color-accent);
+}

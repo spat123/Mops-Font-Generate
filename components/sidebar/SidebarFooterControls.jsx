@@ -337,10 +337,10 @@ function HeroCard() {
           </div>
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-accent">
-              Mops Font Generate
+              DINAMIC FONT
             </p>
             <p className="mt-0.5 text-base font-semibold text-gray-950">
-              Тестовая станция для шрифтов
+              Тестирование, сравнение и работа со шрифтами
             </p>
           </div>
         </div>
@@ -715,45 +715,31 @@ export default function SidebarFooterControls({
           >
             <div
               ref={settingsDialogRef}
-              className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-black/5"
+              className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-black/5"
               onClick={(event) => event.stopPropagation()}
             >
-              {/* Header */}
-              <div className="shrink-0 border-b border-gray-100 bg-gradient-to-b from-white to-gray-50/50 px-6 py-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-accent">
-                      Панель приложения
-                    </p>
-                    <h2 className="mt-1.5 text-lg font-semibold text-gray-950">
-                      Настройки и информация
-                    </h2>
-                    <p className="mt-1 max-w-md text-sm leading-relaxed text-gray-500">
-                      Управляйте темой интерфейса, узнавайте о возможностях и
-                      связывайтесь с командой.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsAppSettingsOpen(false)}
-                    className="group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-gray-200/50 transition-all hover:shadow-md hover:ring-gray-300"
-                    aria-label="Закрыть окно настроек"
-                  >
-                    <svg
-                      className="h-4 w-4 text-gray-500 transition-colors group-hover:text-gray-900"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
+              {/* Шапка в стиле PopupDialogHeader: нижняя граница, заголовок uppercase, закрытие с border-l */}
+              <div className="shrink-0 flex min-h-[3rem] items-stretch border-b border-gray-200 bg-white">
+                <div className="flex min-h-12 min-w-0 flex-1 items-center px-6 py-3">
+                  <h2 className="text-lg font-semibold uppercase leading-snug tracking-tight text-gray-900">
+                    Настройки и информация
+                  </h2>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAppSettingsOpen(false)}
+                  className="inline-flex w-12 shrink-0 items-center justify-center border-l border-gray-200 text-gray-800 transition-colors hover:bg-transparent hover:text-accent"
+                  aria-label="Закрыть окно настроек"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-                {/* Tab Navigation */}
-                <div className="mt-5 flex gap-1.5 rounded-xl bg-gray-100/80 p-1.5">
+              {/* Tab Navigation */}
+              <div className="shrink-0 border-b border-gray-100 bg-gray-50/40 px-6 py-4">
+                <div className="flex gap-1.5 rounded-xl bg-gray-100/80 p-1.5">
                   {SETTINGS_TABS.map((tab) => {
                     const isActive = tab.id === activeTab;
                     const Icon = tab.icon;

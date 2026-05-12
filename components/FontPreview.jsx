@@ -174,6 +174,8 @@ export default function FontPreview({
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [isEmptyStateSearchExpanded, setIsEmptyStateSearchExpanded] = useState(false);
   const [googleCatalogEntries, setGoogleCatalogEntries] = useState([]);
+  /** После входа в plain fullscreen крестик слегка гаснет; по hover/focus снова виден */
+  const [plainFullscreenCloseDimmed, setPlainFullscreenCloseDimmed] = useState(false);
   const emptyStateSearchInputRef = useRef(null);
 
   useEffect(() => {
@@ -692,6 +694,16 @@ export default function FontPreview({
     return () => window.removeEventListener('keydown', onKey);
   }, [plainPreviewOpen, onClosePlainPreview]);
 
+  useEffect(() => {
+    if (!plainPreviewOpen) {
+      setPlainFullscreenCloseDimmed(false);
+      return undefined;
+    }
+    setPlainFullscreenCloseDimmed(false);
+    const id = window.setTimeout(() => setPlainFullscreenCloseDimmed(true), 1600);
+    return () => window.clearTimeout(id);
+  }, [plainPreviewOpen]);
+
   const previewFontLabel = useMemo(() => {
     return exportedFont
       ? exportedFont.name.replace(/-static$/, '')
@@ -804,6 +816,11 @@ export default function FontPreview({
     emptyStateSearchInputRef.current?.blur();
   }, []);
 
+  /** Только текст; режим поиска остаётся открытым (крестик внутри поля). */
+  const clearEmptyStateSearchTextOnly = useCallback(() => {
+    setPresetSearchQuery('');
+  }, []);
+
   const openEmptyStateSearch = useCallback(() => {
     setIsEmptyStateSearchExpanded(true);
     requestAnimationFrame(() => {
@@ -907,7 +924,8 @@ export default function FontPreview({
                   />
                   {presetSearchQuery ? (
                     <SearchClearButton
-                      onClick={clearEmptyStateSearch}
+                      onClick={clearEmptyStateSearchTextOnly}
+                      ariaLabel="Очистить текст поиска"
                       className="absolute right-2 top-1/2 -translate-y-1/2"
                     />
                   ) : null}
@@ -1166,15 +1184,18 @@ export default function FontPreview({
         className="fixed inset-0 z-[220] flex flex-col"
         style={previewAreaBgStyle}
       >
-        <div className="flex shrink-0 items-center justify-end bg-white/95 px-3 py-2 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={onClosePlainPreview}
-            className="rounded-sm border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-100"
-          >
-            Закрыть
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onClosePlainPreview}
+          aria-label="Закрыть полноэкранное превью"
+          className={`plain-preview-fs-close-btn fixed right-0 top-0 z-[221] flex h-12 min-h-12 w-12 shrink-0 items-center justify-center border-b border-l border-gray-200 bg-white/95 px-2 text-gray-800 backdrop-blur-sm transition-opacity duration-500 ease-out hover:text-accent focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black/25 ${
+            plainFullscreenCloseDimmed ? 'opacity-0 hover:opacity-100' : 'opacity-100'
+          }`}
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto" style={previewAreaBgStyle}>
           <Suspense fallback={MODE_LOADING_FALLBACK}>
             <PlainTextMode

@@ -48,6 +48,12 @@ function CatalogSourceCardComponent({
   footerRightBadges = [],
   footerRightTooltipContent,
 
+  /** ROW: выравнивание крупного образца (`end` по умолчанию — как в каталоге) */
+  rowPreviewAlign = 'end',
+  rowSampleTooltip,
+  rowPreviewEditorAriaLabel,
+  pinPreviewColumnClassName = '',
+
   // actions / overlays
   onOpen,
   openAriaLabel,
@@ -238,6 +244,10 @@ function CatalogSourceCardComponent({
         previewText={rowPreviewText ?? previewText}
         defaultPreviewText={defaultPreviewText}
         onGlobalRowSampleCommit={onGlobalRowSampleCommit}
+        previewAlign={rowPreviewAlign}
+        rowSampleTooltip={rowSampleTooltip}
+        rowPreviewEditorAriaLabel={rowPreviewEditorAriaLabel}
+        pinPreviewColumnClassName={pinPreviewColumnClassName}
         previewProps={previewProps}
         selected={selected}
         busy={busy}

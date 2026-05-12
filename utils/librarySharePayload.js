@@ -45,6 +45,17 @@ function resolveCatalogRefForEntry(fontEntry) {
   return null;
 }
 
+/** Проброс каскада размеров в ссылку (редактор сможет применить при открытии — в разработке). */
+function withOptionalCascadeSizes(base, fontEntry) {
+  const raw = fontEntry?.cascadeSizes ?? fontEntry?.cascadePx;
+  if (!Array.isArray(raw) || raw.length === 0) return base;
+  const cascadeSizes = raw
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (cascadeSizes.length === 0) return base;
+  return { ...base, cascadeSizes };
+}
+
 function detectCatalogMatchForLocal(fontEntry) {
   const label = String(fontEntry?.label || '').trim();
   if (!label) return null;
@@ -93,13 +104,16 @@ export async function buildLibrarySharePayload(library, { resolveSessionFont } =
     entries.map(async (fontEntry) => {
       const catalogRef = resolveCatalogRefForEntry(fontEntry);
       if (catalogRef) {
-        return {
-          kind: 'catalog-ref',
-          source: catalogRef.source,
-          key: catalogRef.key,
-          family: catalogRef.family,
-          actions: ['download', 'add-to-library'],
-        };
+        return withOptionalCascadeSizes(
+          {
+            kind: 'catalog-ref',
+            source: catalogRef.source,
+            key: catalogRef.key,
+            family: catalogRef.family,
+            actions: ['download', 'add-to-library'],
+          },
+          fontEntry,
+        );
       }
 
       const sessionFont =
@@ -114,32 +128,38 @@ export async function buildLibrarySharePayload(library, { resolveSessionFont } =
       const catalogMatch = detectCatalogMatchForLocal(fontEntry);
 
       if (catalogMatch) {
-        return {
-          kind: 'catalog-ref',
-          source: catalogMatch.source,
-          key: catalogMatch.key,
-          family: catalogMatch.family,
-          confidence: catalogMatch.confidence,
-          needsFingerprintVerification: catalogMatch.needsFingerprintVerification,
-          fingerprint,
-          actions: ['download', 'add-to-library'],
-        };
+        return withOptionalCascadeSizes(
+          {
+            kind: 'catalog-ref',
+            source: catalogMatch.source,
+            key: catalogMatch.key,
+            family: catalogMatch.family,
+            confidence: catalogMatch.confidence,
+            needsFingerprintVerification: catalogMatch.needsFingerprintVerification,
+            fingerprint,
+            actions: ['download', 'add-to-library'],
+          },
+          fontEntry,
+        );
       }
 
-      return {
-        kind: 'cloud-upload-ref',
-        key: String(fontEntry?.id || family || `local-${Math.random().toString(36).slice(2)}`),
-        family,
-        fingerprint,
-        fileMeta: sessionFont?.file
-          ? {
-              originalName: String(sessionFont?.originalName || ''),
-              mimeType: String(sessionFont?.file?.type || 'application/octet-stream'),
-              size: Number(sessionFont?.file?.size || 0),
-            }
-          : null,
-        actions: ['download', 'add-to-library'],
-      };
+      return withOptionalCascadeSizes(
+        {
+          kind: 'cloud-upload-ref',
+          key: String(fontEntry?.id || family || `local-${Math.random().toString(36).slice(2)}`),
+          family,
+          fingerprint,
+          fileMeta: sessionFont?.file
+            ? {
+                originalName: String(sessionFont?.originalName || ''),
+                mimeType: String(sessionFont?.file?.type || 'application/octet-stream'),
+                size: Number(sessionFont?.file?.size || 0),
+              }
+            : null,
+          actions: ['download', 'add-to-library'],
+        },
+        fontEntry,
+      );
     }),
   );
 

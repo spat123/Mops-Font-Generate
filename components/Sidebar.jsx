@@ -778,6 +778,7 @@ export default function Sidebar({
   onAddFontToLibrary,
   createLibrarySeedRequest = null,
   onCreateLibrarySeedHandled,
+  onShareLibrary,
   setSelectedFont,
   isAnimating,
   toggleAnimation,
@@ -1468,14 +1469,14 @@ export default function Sidebar({
         <div className="inline-flex items-center gap-3">
           <img
             src="/logo/Logo%20Mark.svg"
-            alt="Dynamic font mark"
+            alt="DINAMIC FONT — знак"
             className="h-8 w-8 select-none"
             draggable={false}
           />
           {!isSidebarCollapsed ? (
             <img
               src="/logo/Logo%20Text.svg"
-              alt="Dynamic font"
+              alt="DINAMIC FONT"
               className="h-[1.8rem] w-auto select-none"
               draggable={false}
             />
@@ -1502,6 +1503,7 @@ export default function Sidebar({
           onAddFontToLibrary={onAddFontToLibrary}
           createLibrarySeedRequest={createLibrarySeedRequest}
           onCreateLibrarySeedHandled={onCreateLibrarySeedHandled}
+          onShareLibrary={onShareLibrary}
         />
       ) : (
         <>

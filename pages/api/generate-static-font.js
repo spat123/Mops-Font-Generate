@@ -10,7 +10,7 @@ const unlink = promisify(fs.unlink);
 
 /** Временные файлы только под /tmp — на Vercel serverless в корень проекта писать нельзя. */
 function getTempDir() {
-  return path.join(os.tmpdir(), 'mops-generate-static-font');
+  return path.join(os.tmpdir(), 'dinamic-generate-static-font');
 }
 
 /**

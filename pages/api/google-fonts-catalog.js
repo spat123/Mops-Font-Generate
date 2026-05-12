@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 
   try {
     const r = await fetch(SOURCE, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MopsFontGenerate/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DinamicFont/1.0)' },
     });
     if (!r.ok) {
       console.error('[google-fonts-catalog]', r.status);

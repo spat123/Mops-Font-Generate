@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+/** На сервере `useLayoutEffect` не выполняется и даёт предупреждение SSR; в браузере оставляем layout-effect для позиции до отрисовки. */
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 export function FloatingTooltip({
   content,
   anchorRect,
@@ -18,7 +22,7 @@ export function FloatingTooltip({
     arrowLeft: 0,
   }));
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!content) return;
     const bEl = bubbleRef.current;
     if (!(bEl instanceof HTMLElement)) return;
@@ -186,7 +190,7 @@ export function Tooltip({
     }, delay);
   }, [clearTimers, closeDelayMs]);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!open) return;
     const id = requestAnimationFrame(() => updatePos());
     return () => cancelAnimationFrame(id);
