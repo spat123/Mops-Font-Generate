@@ -25,6 +25,7 @@ import { downloudIconUrl, editIconUrl } from './ui/editIconUrls';
 import { downloadLibraryAsZip } from '../utils/libraryArchiveDownload';
 import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
+import { useLibraryAuth } from '../contexts/LibraryAuthContext';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
@@ -102,6 +103,7 @@ export default function FontLibrarySidebar({
   onAddFontToLibrary,
   onShareLibrary,
 }) {
+  const { assertCanCreateNewLibrary, isAuthenticated, requestSignIn, authLoading } = useLibraryAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [draft, setDraft] = useState(() => readStoredDraft());
   const [catalogEntries, setCatalogEntries] = useState(() => readCachedGoogleCatalog());
@@ -141,9 +143,10 @@ export default function FontLibrarySidebar({
   }, []);
 
   const openCreateDialog = useCallback(() => {
+    if (!assertCanCreateNewLibrary()) return;
     setDraft((prev) => (prev.mode === 'create' ? prev : createEmptyDraft()));
     setIsDialogOpen(true);
-  }, []);
+  }, [assertCanCreateNewLibrary]);
 
   const openEditDialog = useCallback((library) => {
     setDraft(createEditDraft(library));
@@ -689,19 +692,41 @@ export default function FontLibrarySidebar({
         ) : (
           <div className="flex min-h-0 flex-1 items-center justify-center">
             <div className="flex max-w-[16rem] flex-col items-center gap-4 text-center">
-              <button
-                type="button"
-                onClick={openCreateDialog}
-                className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
-              >
-                <IconCircleButton as="span" variant="accent" size="lg">
-                  <PlusIcon className="h-5 w-5" />
-                </IconCircleButton>
-                <span className="leading-5">Добавить библиотеку</span>
-              </button>
-              <p className="text-xs font-normal leading-5 text-gray-300 transition-colors hover:text-gray-600">
-                На данный момент у вас нет библиотек. Создайте библиотеку, чтобы собирать шрифты отдельно от каталога.
-              </p>
+              {authLoading ? (
+                <p className="text-xs uppercase text-gray-400">Загрузка…</p>
+              ) : !isAuthenticated ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => requestSignIn()}
+                    className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
+                  >
+                    <IconCircleButton as="span" variant="accent" size="lg">
+                      <PlusIcon className="h-5 w-5" />
+                    </IconCircleButton>
+                    <span className="leading-5">Войти, чтобы начать</span>
+                  </button>
+                  <p className="text-xs font-normal leading-5 text-gray-400">
+                    Войдите через Google или Яндекс — затем можно создать до трёх библиотек.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={openCreateDialog}
+                    className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
+                  >
+                    <IconCircleButton as="span" variant="accent" size="lg">
+                      <PlusIcon className="h-5 w-5" />
+                    </IconCircleButton>
+                    <span className="leading-5">Добавить библиотеку</span>
+                  </button>
+                  <p className="text-xs font-normal leading-5 text-gray-300 transition-colors hover:text-gray-600">
+                    На данный момент у вас нет библиотек. Создайте библиотеку, чтобы собирать шрифты отдельно от каталога.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}

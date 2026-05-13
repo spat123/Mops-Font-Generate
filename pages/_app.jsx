@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { SessionProvider } from 'next-auth/react';
 import { ToastContainer } from 'react-toastify';
 import '../styles/globals.css';
 import 'react-toastify/dist/ReactToastify.css';
@@ -7,7 +8,7 @@ import { SettingsProvider } from '../contexts/SettingsContext';
 import { FontProvider } from '../contexts/FontContext';
 import Head from 'next/head';
 
-export default function MyApp({ Component, pageProps }) {
+export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   // Очищаем все шрифты при загрузке страницы
   useEffect(() => {
     // Создаем стиль, который очистит все шрифты перед загрузкой
@@ -38,10 +39,11 @@ export default function MyApp({ Component, pageProps }) {
         <title>DINAMIC FONT — инструмент для работы со шрифтами</title>
       </Head>
       
-      <SettingsProvider>
-        <FontProvider>
-          <Component {...pageProps} />
-          <ToastContainer
+      <SessionProvider session={session}>
+        <SettingsProvider>
+          <FontProvider>
+            <Component {...pageProps} />
+            <ToastContainer
             position="bottom-right"
             theme="light"
             autoClose={3000}
@@ -56,9 +58,10 @@ export default function MyApp({ Component, pageProps }) {
             toastClassName="app-toast"
             bodyClassName="app-toast__body"
             className="app-toast-container"
-          />
-        </FontProvider>
-      </SettingsProvider>
+            />
+          </FontProvider>
+        </SettingsProvider>
+      </SessionProvider>
     </>
   );
 } 

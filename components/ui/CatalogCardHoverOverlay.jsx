@@ -60,6 +60,7 @@ export function CatalogCardHoverOverlay({
   openLabel = 'Открыть',
   downloadButtonProps,
 }) {
+  const showOpenButton = typeof onOpen === 'function';
   const resolvedDownloadButtonProps =
     downloadButtonProps && typeof downloadButtonProps === 'object' ? downloadButtonProps : {};
   const rootRef = useRef(null);
@@ -116,7 +117,7 @@ export function CatalogCardHoverOverlay({
 
   const runOpenWithFeedback = (event) => {
     event.stopPropagation();
-    if (!onOpen) return;
+    if (!showOpenButton) return;
     if (openState === 'loading') return;
     if (openDoneTimeoutRef.current != null) {
       window.clearTimeout(openDoneTimeoutRef.current);
@@ -239,19 +240,23 @@ export function CatalogCardHoverOverlay({
   return centered ? (
     <div ref={rootRef} className="relative h-full w-full">
       <div className="pointer-events-auto absolute bottom-5 right-5 flex max-w-[calc(100%-1.25rem)] flex-wrap justify-end gap-2.5">
-        {useRowIconOnlyActions ? compactOpenButton : (
-          <button
-            type="button"
-            data-no-card-select="true"
-            onClick={runOpenWithFeedback}
-            disabled={openState === 'loading'}
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
-            aria-label={openAriaLabel}
-          >
-            {openIcon}
-            {openLabel}
-          </button>
-        )}
+        {showOpenButton ? (
+          useRowIconOnlyActions ? (
+            compactOpenButton
+          ) : (
+            <button
+              type="button"
+              data-no-card-select="true"
+              onClick={runOpenWithFeedback}
+              disabled={openState === 'loading'}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
+              aria-label={openAriaLabel}
+            >
+              {openIcon}
+              {openLabel}
+            </button>
+          )
+        ) : null}
         {useRowSplitDownload
           ? downloadButton
           : rowDownloadItems.map((item) => (
@@ -275,10 +280,16 @@ export function CatalogCardHoverOverlay({
     </div>
   ) : (
     <div ref={rootRef} className="relative h-full w-full">
-      <div className="pointer-events-auto absolute bottom-4 left-4">
-        {useCompactButtons ? compactOpenButton : openButton}
+      {showOpenButton ? (
+        <div className="pointer-events-auto absolute bottom-4 left-4">
+          {useCompactButtons ? compactOpenButton : openButton}
+        </div>
+      ) : null}
+      <div
+        className={`pointer-events-auto absolute bottom-4 ${showOpenButton ? 'right-4' : 'left-4 right-4 flex justify-end'}`.trim()}
+      >
+        {downloadButton}
       </div>
-      <div className="pointer-events-auto absolute bottom-4 right-4">{downloadButton}</div>
     </div>
   );
 }

@@ -46,6 +46,8 @@ export function CatalogRowModeCard({
   draggable = false,
   onDragStart,
   onDragEnd,
+  /** Страница «Поделиться»: мета справа, без accent-hover на строке */
+  shareSurface = false,
 }) {
   const resolvedRowHeightPx = Math.max(24, Number(rowHeightPx) || CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX);
   const resolvedPreviewProps = previewProps && typeof previewProps === 'object' ? previewProps : {};
@@ -94,14 +96,24 @@ export function CatalogRowModeCard({
     }
   }, [editingPreview]);
 
+  const normalizeRowEditorText = useCallback((value) => {
+    return String(value ?? '')
+      .replace(/\u00a0/g, ' ')
+      .trim();
+  }, []);
+
   const finishPreviewEdit = useCallback(() => {
     if (!canEditPreview) return;
     const raw = editorRef.current?.textContent ?? '';
-    const normalized = raw.replace(/\u00a0/g, ' ');
-    const trimmed = normalized.trim();
+    const trimmed = normalizeRowEditorText(raw);
+    const snapshotNorm = normalizeRowEditorText(snapshotAtEditStartRef.current);
+    if (trimmed === snapshotNorm) {
+      setEditingPreview(false);
+      return;
+    }
     onGlobalRowSampleCommit(trimmed);
     setEditingPreview(false);
-  }, [canEditPreview, onGlobalRowSampleCommit]);
+  }, [canEditPreview, normalizeRowEditorText, onGlobalRowSampleCommit]);
 
   const handlePreviewBlur = useCallback(() => {
     if (skipCommitOnBlurRef.current) {
@@ -210,6 +222,20 @@ export function CatalogRowModeCard({
 
   const previewContent = editingPreview ? previewEditingInline : previewReadOnly;
 
+  const rowCardClassName = `rounded-none h-full min-h-0 border-b border-gray-300 bg-white ${
+    selected ? '' : 'hover:!bg-accent hover:border-accent'
+  }`;
+
+  const headerFamilyClassName = `min-w-0 max-w-full truncate text-left text-xs font-medium leading-tight text-gray-800 ${
+    selected ? '' : 'group-hover:!text-white'
+  } sm:text-sm`;
+
+  const headerMetaClassName = shareSurface
+    ? `text-sm font-semibold uppercase leading-tight text-gray-900 ${selected ? '' : 'group-hover:!text-white'}`
+    : `flex min-w-0 w-[min(100%,44rem)] flex-nowrap items-center justify-start gap-x-2 text-left text-sm font-semibold uppercase leading-tight text-black lg:w-[min(100%,32rem)] lg:justify-self-center xl:w-[min(100%,44rem)] ${
+        selected ? '' : 'group-hover:!text-white'
+      } sm:gap-x-3`;
+
   return (
     <div
       className={`relative w-full min-w-0 ${minHeightClass}`.trim()}
@@ -217,9 +243,7 @@ export function CatalogRowModeCard({
     >
       <div className="h-full min-h-0">
         <CatalogFontCard
-          className={`rounded-none h-full min-h-0 border-b border-gray-300 bg-white ${
-            selected ? '' : 'hover:!bg-accent hover:border-accent'
-          }`}
+          className={rowCardClassName}
           minHeightClass=""
           pinPreviewToBottom
           pinPreviewColumnClassName={pinPreviewColumnClassName}
@@ -240,12 +264,9 @@ export function CatalogRowModeCard({
             <CatalogRowHeader
               family={family}
               metaItems={metaItems}
-              familyClassName={`min-w-0 max-w-full truncate text-left text-xs font-medium leading-tight text-gray-800 ${
-                selected ? '' : 'group-hover:!text-white'
-              } sm:text-sm`}
-              metaClassName={`flex min-w-0 w-[min(100%,44rem)] flex-nowrap items-center justify-start gap-x-2 text-left text-sm font-semibold uppercase leading-tight text-black lg:w-[min(100%,32rem)] lg:justify-self-center xl:w-[min(100%,44rem)] ${
-                selected ? '' : 'group-hover:!text-white'
-              } sm:gap-x-3`}
+              familyClassName={headerFamilyClassName}
+              metaClassName={headerMetaClassName}
+              metaTrailingEdge={Boolean(shareSurface)}
             />
           }
           titleClassName="w-full"

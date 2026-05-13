@@ -207,7 +207,7 @@ export default function GoogleFontsCatalogPanel({
         variableFilterId: 'gf-filter-var',
         subsetFilterId: 'gf-filter-subset',
       },
-      searchPlaceholder: 'Имя, категория, код набора…',
+      searchPlaceholder: 'Имя, категория, наборы…',
       sortOptions: [
         { value: 'catalog', label: 'Популярное' },
         { value: 'name-asc', label: 'А -> Я' },

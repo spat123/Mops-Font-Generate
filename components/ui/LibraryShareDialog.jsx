@@ -2,18 +2,34 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PopupDialogHeader } from './PopupDialogHeader';
 import { SelectableChip } from './SelectableChip';
-import { EditAssetIcon } from './EditAssetIcon';
-import { linkIconUrl } from './editIconUrls';
+import {
+  ShareFacebookBrandIcon,
+  ShareLinkChainIcon,
+  ShareTelegramBrandIcon,
+  ShareWhatsappBrandIcon,
+  ShareXBrandIcon,
+} from './ShareSocialBrandIcons';
 import { toast } from '../../utils/appNotify';
 import { buildLibrarySharePayload } from '../../utils/librarySharePayload';
 import { buildAbsoluteLibraryShareUrl } from '../../utils/libraryShareLink';
 import { getLibrarySourceLabel } from '../../utils/fontLibraryUtils';
 
-const SHARE_ICON_BTN =
-  'group flex flex-col items-center gap-1.5 border-0 bg-transparent p-0 text-gray-800 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-40';
+const SHARE_ACTIONS_GRID =
+  'grid w-full grid-cols-5 items-stretch gap-1.5 sm:gap-2';
+
+const SHARE_SOCIAL_BTN =
+  'group flex w-full min-w-0 flex-col items-center justify-center gap-2 border-0 bg-transparent px-0.5 py-0 text-gray-800 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-40';
+
+const SHARE_COPY_BTN =
+  'group flex w-full min-w-0 flex-col items-center justify-center gap-2 rounded-lg bg-gray-50 px-1 py-2 text-gray-800 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40';
+
+/** Иконка «копировать ссылку» (цепочка), отдельно от соц. брендов */
+const SHARE_LINK_ICON = 'h-8 w-8 shrink-0 text-gray-900';
+
+const SHARE_ICON = 'h-10 w-10 shrink-0 text-gray-900';
 
 /**
- * Модалка «Общий доступ»: ссылка + соцсети, выбор шрифтов как чипы в диалоге библиотеки (SelectableChip).
+ * Модалка «Поделиться»: копирование ссылки (плитка) + соцсети, выбор шрифтов чипами.
  */
 export function LibraryShareDialog({
   open,
@@ -136,29 +152,29 @@ export function LibraryShareDialog({
             <div
               role="dialog"
               aria-modal="true"
-              aria-label={`Общий доступ: ${library.name}`}
-              className="flex max-h-[min(90vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-none border border-gray-200 bg-white"
+              aria-label={`Поделиться: ${library.name}`}
+              className="flex max-h-[min(90vh,720px)] w-full max-w-xl flex-col overflow-hidden rounded-none bg-white"
               onClick={(e) => e.stopPropagation()}
             >
-              <PopupDialogHeader title="Общий доступ" onClose={onClose} closeAriaLabel="Закрыть" />
+              <PopupDialogHeader title="Поделиться" onClose={onClose} closeAriaLabel="Закрыть" />
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
-                <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+                <div className={SHARE_ACTIONS_GRID}>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={handleCopyLink}
-                    className={SHARE_ICON_BTN}
+                    className={SHARE_COPY_BTN}
                     aria-label="Копировать ссылку"
                   >
-                    <EditAssetIcon src={linkIconUrl} className="h-6 w-6 shrink-0" />
-                    <span className="max-w-[5.5rem] text-center text-[10px] font-semibold uppercase leading-tight">
+                    <ShareLinkChainIcon className={SHARE_LINK_ICON} />
+                    <span className="max-w-full text-balance text-center text-[9px] font-semibold uppercase leading-tight tracking-wide sm:text-[10px]">
                       Копировать ссылку
                     </span>
                   </button>
                   <button
                     type="button"
                     disabled={busy}
-                    className={SHARE_ICON_BTN}
+                    className={SHARE_SOCIAL_BTN}
                     aria-label="WhatsApp"
                     onClick={() =>
                       openShareTarget((url, text) =>
@@ -166,19 +182,15 @@ export function LibraryShareDialog({
                       )
                     }
                   >
-                    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0" aria-hidden>
-                      <circle cx="12" cy="12" r="11" fill="#25D366" />
-                      <path
-                        fill="#fff"
-                        d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982 1-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"
-                      />
-                    </svg>
-                    <span className="text-[10px] font-semibold uppercase leading-tight">WhatsApp</span>
+                    <ShareWhatsappBrandIcon className={SHARE_ICON} />
+                    <span className="max-w-full text-center text-[9px] font-semibold uppercase leading-tight tracking-wide sm:text-[10px]">
+                      WhatsApp
+                    </span>
                   </button>
                   <button
                     type="button"
                     disabled={busy}
-                    className={SHARE_ICON_BTN}
+                    className={SHARE_SOCIAL_BTN}
                     aria-label="Telegram"
                     onClick={() =>
                       openShareTarget(
@@ -187,19 +199,15 @@ export function LibraryShareDialog({
                       )
                     }
                   >
-                    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0" aria-hidden>
-                      <circle cx="12" cy="12" r="11" fill="#2AABEE" />
-                      <path
-                        fill="#fff"
-                        d="M17.2 7.7 9.5 12.4c-.5.3-.9.9-.9 1.5l-.3 2.8c0 .2.2.3.3.1l2.5-2.4c.1-.1.3-.1.4 0l4.4 3.2c.1.1.3 0 .3-.2l-1.8-8.7c0-.2-.2-.3-.3-.2z"
-                      />
-                    </svg>
-                    <span className="text-[10px] font-semibold uppercase leading-tight">Telegram</span>
+                    <ShareTelegramBrandIcon className={SHARE_ICON} />
+                    <span className="max-w-full text-center text-[9px] font-semibold uppercase leading-tight tracking-wide sm:text-[10px]">
+                      Telegram
+                    </span>
                   </button>
                   <button
                     type="button"
                     disabled={busy}
-                    className={SHARE_ICON_BTN}
+                    className={SHARE_SOCIAL_BTN}
                     aria-label="Facebook"
                     onClick={() =>
                       openShareTarget(
@@ -207,31 +215,27 @@ export function LibraryShareDialog({
                       )
                     }
                   >
-                    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0" aria-hidden>
-                      <circle cx="12" cy="12" r="11" fill="#1877F2" />
-                      <path
-                        fill="#fff"
-                        d="M13.5 19v-6h2l.3-2.5H13.5V9.3c0-.7.2-1.2 1.2-1.2H16V5.7c-.3 0-1.1-.1-2.1-.1-2.1 0-3.5 1.3-3.5 3.7V10.5H8V13h2.4V19h3.1z"
-                      />
-                    </svg>
-                    <span className="text-[10px] font-semibold uppercase leading-tight">Facebook</span>
+                    <ShareFacebookBrandIcon className={SHARE_ICON} />
+                    <span className="max-w-full text-center text-[9px] font-semibold uppercase leading-tight tracking-wide sm:text-[10px]">
+                      Facebook
+                    </span>
                   </button>
                   <button
                     type="button"
                     disabled={busy}
-                    className={SHARE_ICON_BTN}
+                    className={SHARE_SOCIAL_BTN}
                     aria-label="X"
                     onClick={() =>
                       openShareTarget(
                         (url, text) =>
-                          `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
+                          `https://x.com/intent/post?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
                       )
                     }
                   >
-                    <svg viewBox="0 0 24 24" className="h-7 w-7 shrink-0 text-gray-900" fill="currentColor" aria-hidden>
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                    </svg>
-                    <span className="text-[10px] font-semibold uppercase leading-tight">X</span>
+                    <ShareXBrandIcon className={SHARE_ICON} />
+                    <span className="max-w-full text-center text-[9px] font-semibold uppercase leading-tight tracking-wide sm:text-[10px]">
+                      X
+                    </span>
                   </button>
                 </div>
 

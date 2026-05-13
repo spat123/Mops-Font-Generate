@@ -36,10 +36,14 @@ function FontsourceCatalogCardComponent({
   draggable = false,
   onDragStart,
   onDragEnd,
+  shareSurface = false,
 }) {
   const slug = item?.id || item?.slug;
   const family = item?.family || item?.label || slug;
-  const styleCount = Number(item?.styleCount) || 1;
+  const styleCountRaw = item?.styleCount;
+  const styleCountNum = styleCountRaw == null || styleCountRaw === '' ? NaN : Number(styleCountRaw);
+  const hasStyleCount = Number.isFinite(styleCountNum) && styleCountNum > 0;
+  const styleCount = hasStyleCount ? styleCountNum : null;
   const subsetCount = Array.isArray(item?.subsets) ? item.subsets.length : 0;
   const isVariable = Boolean(item?.isVariable);
   const hasItalic = Boolean(item?.hasItalic);
@@ -73,10 +77,9 @@ function FontsourceCatalogCardComponent({
     getFontCategoryLabelRu(item?.category) || 'Fontsource',
     isVariable ? 'vf' : null,
     hasItalic ? 'italic' : null,
-    subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'язык', 'языка', 'языков')}` : null,
     subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
-    `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`,
-  ]), [hasItalic, isVariable, item?.category, styleCount, subsetCount]);
+    hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
+  ]), [hasItalic, hasStyleCount, isVariable, item?.category, styleCount, subsetCount]);
 
   const footerLeftBadges = useMemo(() => ([
     getFontCategoryLabelRu(item?.category) || 'Fontsource',
@@ -85,9 +88,9 @@ function FontsourceCatalogCardComponent({
   ]), [hasItalic, isVariable, item?.category]);
 
   const footerRightBadges = useMemo(() => ([
-    `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`,
+    hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
     subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
-  ]), [styleCount, subsetCount]);
+  ]), [hasStyleCount, styleCount, subsetCount]);
 
   return (
     <CatalogSourceCard
@@ -110,7 +113,7 @@ function FontsourceCatalogCardComponent({
       }}
       footerLeftBadges={footerLeftBadges}
       footerRightBadges={footerRightBadges}
-      onOpen={() => onOpenInEditor?.(slug, isVariable)}
+      onOpen={shareSurface ? undefined : () => onOpenInEditor?.(slug, isVariable)}
       openAriaLabel={openAriaLabel}
       downloadButtonProps={downloadButtonProps}
       fontLibraries={fontLibraries}
@@ -118,9 +121,11 @@ function FontsourceCatalogCardComponent({
       onAddFontToLibrary={onAddFontToLibrary}
       onRequestCreateLibrary={onRequestCreateLibrary}
       libraryEntry={libraryEntry}
-      selected={selected}
-      onCardClick={onCardClick}
-      onStartCardLongPress={onStartCardLongPress}
+      showLibraryActions={!shareSurface}
+      showSelectionChrome={!shareSurface}
+      selected={shareSurface ? false : selected}
+      onCardClick={shareSurface ? undefined : onCardClick}
+      onStartCardLongPress={shareSurface ? undefined : onStartCardLongPress}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
       onPointerCancel={onPointerCancel}
@@ -128,6 +133,7 @@ function FontsourceCatalogCardComponent({
       onDragStart={onDragStart}
       dragPayload={item}
       onDragEnd={onDragEnd}
+      shareSurface={shareSurface}
     />
   );
 }

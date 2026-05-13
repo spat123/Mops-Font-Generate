@@ -1,0 +1,20 @@
+import React, { createContext, useContext, useMemo } from 'react';
+
+const defaultValue = {
+  authLoading: false,
+  isAuthenticated: false,
+  canCreateNewLibrary: false,
+  requestSignIn: () => {},
+  assertCanCreateNewLibrary: () => false,
+};
+
+const LibraryAuthContext = createContext(defaultValue);
+
+export function LibraryAuthProvider({ value, children }) {
+  const merged = useMemo(() => ({ ...defaultValue, ...value }), [value]);
+  return <LibraryAuthContext.Provider value={merged}>{children}</LibraryAuthContext.Provider>;
+}
+
+export function useLibraryAuth() {
+  return useContext(LibraryAuthContext);
+}

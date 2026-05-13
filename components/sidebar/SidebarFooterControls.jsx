@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDismissibleLayer } from "../ui/useDismissibleLayer";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { AuthAccountPopover } from "../auth/AuthAccountPopover";
 
 function IconSettings(props) {
   return (
@@ -782,8 +783,8 @@ export default function SidebarFooterControls({
         <div
           className={
             isSidebarCollapsed
-              ? "flex h-full items-center justify-center"
-              : "grid h-full grid-cols-2 gap-2"
+              ? "flex h-full flex-col items-center justify-center gap-2 py-1"
+              : "grid h-full grid-cols-3 gap-2"
           }
         >
           <button
@@ -796,7 +797,7 @@ export default function SidebarFooterControls({
               })
             }
             className={`group inline-flex items-center justify-center rounded-md bg-gray-50 text-gray-600 transition-all hover:bg-gray-100 hover:text-accent ${
-              isSidebarCollapsed ? "h-full w-full" : ""
+              isSidebarCollapsed ? "h-9 w-9 shrink-0" : ""
             }`}
             aria-label={
               isSidebarCollapsed
@@ -842,6 +843,25 @@ export default function SidebarFooterControls({
             >
               <IconSettings className="h-4 w-4 transition-transform group-hover:rotate-90" />
             </button>
+          ) : null}
+          {!isSidebarCollapsed ? <AuthAccountPopover isSidebarCollapsed={isSidebarCollapsed} /> : null}
+          {isSidebarCollapsed ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsAppSettingsOpen((prev) => !prev)}
+                className={`group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-all ${
+                  isAppSettingsOpen
+                    ? "bg-accent text-white shadow-sm"
+                    : "bg-gray-50 text-gray-600 hover:bg-accent/10 hover:text-accent"
+                }`}
+                aria-label="Настройки приложения"
+                aria-pressed={isAppSettingsOpen}
+              >
+                <IconSettings className="h-4 w-4 transition-transform group-hover:rotate-90" />
+              </button>
+              <AuthAccountPopover isSidebarCollapsed={isSidebarCollapsed} />
+            </>
           ) : null}
         </div>
       </div>

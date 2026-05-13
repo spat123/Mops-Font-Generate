@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useSession, signIn } from 'next-auth/react';
 import { decodeLibrarySharePayloadFromQueryParam } from '../../utils/libraryShareLink';
 import {
   buildShareViewRows,
@@ -14,15 +15,22 @@ import {
 } from '../../utils/libraryShareCatalogResolve';
 import { downloadLibraryAsZip } from '../../utils/libraryArchiveDownload';
 import { useFontLibraries } from '../../hooks/useFontLibraries';
-import { stampLibraryFontAddedNow } from '../../utils/fontLibraryUtils';
+import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../../utils/authLibraryLimits';
 import { toast } from '../../utils/appNotify';
 import { Tooltip } from '../ui/Tooltip';
 import { CatalogGridModeToggle } from '../ui/CatalogGridModeToggle';
-import { IconCircleButton } from '../ui/IconCircleButton';
-import { OpenExternalIcon, PlusIcon } from '../ui/CommonIcons';
+import { PlusIcon } from '../ui/CommonIcons';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
-import { downloudIconUrl } from '../ui/editIconUrls';
+import { downloudIconUrl, linkIconUrl } from '../ui/editIconUrls';
 import { ensureGoogleFontPreviewCss } from '../../utils/googleFontPreviewCss';
+import {
+  readFontsourceCatalogCache,
+  writeFontsourceCatalogCache,
+} from '../../utils/fontsourceCatalogCache';
+import {
+  readGoogleFontCatalogCache,
+  writeGoogleFontCatalogCache,
+} from '../../utils/googleFontCatalogCache';
 import { loadFontsourcePreviewFamily } from '../../utils/fontsourcePreviewRuntimeCache';
 import { GoogleFontsCatalogCard } from '../ui/GoogleFontsCatalogCard';
 import { FontsourceCatalogCard } from '../ui/FontsourceCatalogCard';
@@ -41,7 +49,6 @@ const btnPrimary =
 const btnSecondary =
   'inline-flex items-center justify-center gap-2 rounded-sm border border-gray-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50';
 
-const SHARE_ROW_PREVIEW_FALLBACK = 'AaBbCcDdEe';
 const SHARE_ROW_SAMPLE_TOOLTIP =
   'Дважды щёлкните, чтобы изменить образец в этой строке (только на этой странице)';
 const SHARE_ROW_EDITOR_ARIA = 'Редактировать образец превью для этой строки';
@@ -112,15 +119,16 @@ function ShareCloudRow({ row, isRowMode }) {
 
 export function LibrarySharePage() {
   const router = useRouter();
-  const { libraries: fontLibraries, createLibrary, updateLibrary } = useFontLibraries();
+  const { status } = useSession();
+  const { createLibrary, libraries: savedLibraries } = useFontLibraries();
   const [layout, setLayout] = useState('list');
   const [zipBusy, setZipBusy] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
-  const [selectedKey, setSelectedKey] = useState(null);
-  const [addingKey, setAddingKey] = useState(null);
   const [fontsourcePreviewFamilyBySlug, setFontsourcePreviewFamilyBySlug] = useState({});
   /** Локальный образец ROW на странице share (по ключу строки), не влияет на каталог */
   const [rowSampleByKey, setRowSampleByKey] = useState({});
+  /** После записи каталога в session-кэш — перерисовать карточки с полными метаданными */
+  const [shareCatalogHydratedTick, setShareCatalogHydratedTick] = useState(0);
 
   const rawShare =
     typeof router.query.share === 'string'
@@ -135,6 +143,66 @@ export function LibrarySharePage() {
   }, [router.isReady, rawShare]);
 
   const rows = useMemo(() => (payload ? buildShareViewRows(payload) : []), [payload]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !payload || !Array.isArray(payload.items)) return undefined;
+
+    const items = payload.items;
+    const needsGoogle = items.some(
+      (it) => it?.kind === 'catalog-ref' && String(it.source || '').toLowerCase() === 'google',
+    );
+    const needsFontsource = items.some(
+      (it) => it?.kind === 'catalog-ref' && String(it.source || '').toLowerCase() === 'fontsource',
+    );
+
+    let cancelled = false;
+
+    const run = async () => {
+      let wrote = false;
+
+      if (needsGoogle && readGoogleFontCatalogCache().length === 0) {
+        try {
+          const res = await fetch('/api/google-fonts-catalog');
+          if (!cancelled && res.ok) {
+            const data = await res.json();
+            const list = Array.isArray(data?.items) ? data.items : [];
+            if (list.length > 0) {
+              writeGoogleFontCatalogCache(list);
+              wrote = true;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (needsFontsource && readFontsourceCatalogCache().length === 0) {
+        try {
+          const res = await fetch('/api/fontsource-catalog');
+          if (!cancelled && res.ok) {
+            const data = await res.json();
+            const list = Array.isArray(data?.items) ? data.items : [];
+            if (list.length > 0) {
+              writeFontsourceCatalogCache(list);
+              wrote = true;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (!cancelled && wrote) {
+        setShareCatalogHydratedTick((n) => n + 1);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [payload]);
+
   const draft = useMemo(
     () => (payload ? libraryDraftFromSharePayload(payload) : { name: '', fonts: [] }),
     [payload],
@@ -153,7 +221,7 @@ export function LibrarySharePage() {
       .filter((r) => r.kind === 'catalog-ref' && r.catalogSource === 'google' && r.shareItem)
       .map((r) => resolveGoogleCatalogEntryFromShareItem(r.shareItem))
       .filter(Boolean);
-  }, [rows]);
+  }, [rows, shareCatalogHydratedTick]);
 
   useEffect(() => {
     googleEntries.forEach((entry) => {
@@ -209,6 +277,23 @@ export function LibrarySharePage() {
       toast.info('При сохранении в редактор попадают только шрифты из каталога (Google / Fontsource)');
       return;
     }
+    if (status === 'loading') {
+      toast.info('Проверка входа…');
+      return;
+    }
+    if (status !== 'authenticated') {
+      toast.info('Войдите, чтобы сохранить список в редакторе');
+      const callbackUrl =
+        typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search || ''}` : '/';
+      void signIn(undefined, { callbackUrl });
+      return;
+    }
+    if (savedLibraries.length >= MAX_SAVED_LIBRARIES_PER_ACCOUNT) {
+      toast.info(
+        `В редакторе уже ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} библиотеки — удалите одну на главной, чтобы импортировать ещё одну.`,
+      );
+      return;
+    }
     setImportBusy(true);
     try {
       const created = createLibrary({ name: draft.name, fonts: draft.fonts });
@@ -220,74 +305,7 @@ export function LibrarySharePage() {
     } finally {
       setImportBusy(false);
     }
-  }, [createLibrary, draft]);
-
-  const onAddFontToLibrary = useCallback(
-    async (libraryId, libraryEntry) => {
-      const lib = fontLibraries.find((l) => l.id === libraryId);
-      if (!lib || !libraryEntry) return false;
-      setAddingKey(String(libraryEntry.id || ''));
-      try {
-        if (lib.fonts.some((f) => String(f.id) === String(libraryEntry.id))) {
-          toast.info('Этот шрифт уже есть в выбранном списке');
-          return false;
-        }
-        const stamped = stampLibraryFontAddedNow(libraryEntry);
-        const nextFonts = [...lib.fonts, stamped];
-        const updated = updateLibrary(libraryId, { fonts: nextFonts });
-        if (updated) toast.success('Шрифт добавлен в сохранённый список');
-        return Boolean(updated);
-      } finally {
-        setAddingKey(null);
-      }
-    },
-    [fontLibraries, updateLibrary],
-  );
-
-  const onRequestCreateLibrary = useCallback(
-    (entries) => {
-      const stamped = (Array.isArray(entries) ? entries : [])
-        .map((e) => stampLibraryFontAddedNow(e))
-        .filter(Boolean);
-      if (!stamped.length) return;
-      createLibrary({
-        name: stamped[0].label || 'Библиотека',
-        fonts: stamped,
-      });
-      toast.success('Список создан — откройте редактор');
-    },
-    [createLibrary],
-  );
-
-  const handleOpenGoogleInEditor = useCallback(
-    (entry) => {
-      const family = String(entry?.family || '').trim();
-      if (!family) return;
-      const q = {
-        openGoogle: family,
-        ...(entry?.isVariable === true ? { openGoogleVar: '1' } : {}),
-      };
-      void router.push({ pathname: '/', query: q });
-    },
-    [router],
-  );
-
-  const handleOpenFontsourceInEditor = useCallback(
-    (slug, isVariable) => {
-      const s = String(slug || '').trim();
-      if (!s) return;
-      void router.push({
-        pathname: '/',
-        query: { openFontsource: s, fontsourceVar: isVariable ? '1' : '0' },
-      });
-    },
-    [router],
-  );
-
-  const onCardClick = useCallback((event, key) => {
-    event?.preventDefault?.();
-    setSelectedKey((prev) => (prev === key ? null : key));
-  }, []);
+  }, [createLibrary, draft, savedLibraries.length, status]);
 
   const commitRowSample = useCallback((rowKey, text) => {
     const t = String(text ?? '').trim();
@@ -321,7 +339,6 @@ export function LibrarySharePage() {
     if (row.catalogSource === 'google') {
       const entry = resolveGoogleCatalogEntryFromShareItem(row.shareItem);
       if (!entry?.family) return null;
-      const selectionKey = entry.family;
       return (
         <>
           {row.cascadeSizes?.length ? (
@@ -331,21 +348,16 @@ export function LibrarySharePage() {
           ) : null}
           <GoogleFontsCatalogCard
             entry={entry}
-            busy={Boolean(row.libraryFont?.id && addingKey === row.libraryFont.id)}
-            selected={selectedKey === selectionKey}
+            busy={false}
+            selected={false}
             isRowMode={isRowMode}
-            fontLibraries={fontLibraries}
-            onAddFontToLibrary={onAddFontToLibrary}
-            onRequestCreateLibrary={onRequestCreateLibrary}
-            onOpenInEditor={handleOpenGoogleInEditor}
+            shareSurface
             onDownloadPackageZip={downloadGooglePackageZip}
             onDownloadAsFormat={downloadGoogleAsFormat}
             onDownloadVariableVariant={downloadGoogleVariableVariant}
-            onCardClick={onCardClick}
             draggable={false}
             previewText="AaBbCcDdEe"
             rowCatalogPreviewText={rowSampleByKey[row.rowKey]}
-            rowPreviewFallback={SHARE_ROW_PREVIEW_FALLBACK}
             rowPreviewAlign="start"
             rowSampleTooltip={SHARE_ROW_SAMPLE_TOOLTIP}
             rowPreviewEditorAriaLabel={SHARE_ROW_EDITOR_ARIA}
@@ -361,7 +373,6 @@ export function LibrarySharePage() {
       const item = resolveFontsourceCatalogItemFromShareItem(row.shareItem);
       if (!item) return null;
       const slug = String(item.id || item.slug || '').trim();
-      const selectionKey = slug;
       const previewFamily = fontsourcePreviewFamilyBySlug[slug] || 'system-ui, sans-serif';
       return (
         <>
@@ -373,21 +384,16 @@ export function LibrarySharePage() {
           <FontsourceCatalogCard
             item={item}
             previewFamily={previewFamily}
-            busy={Boolean(row.libraryFont?.id && addingKey === row.libraryFont.id)}
-            selected={selectedKey === selectionKey}
+            busy={false}
+            selected={false}
             isRowMode={isRowMode}
-            fontLibraries={fontLibraries}
-            onAddFontToLibrary={onAddFontToLibrary}
-            onRequestCreateLibrary={onRequestCreateLibrary}
-            onOpenInEditor={handleOpenFontsourceInEditor}
+            shareSurface
             onDownloadPackageZip={downloadFontsourcePackageZip}
             onDownloadAsFormat={downloadFontsourceAsFormat}
             onDownloadVariableVariant={downloadFontsourceVariableVariant}
-            onCardClick={onCardClick}
             draggable={false}
             previewText="AaBbCcDdEe"
             rowCatalogPreviewText={rowSampleByKey[row.rowKey]}
-            rowPreviewFallback={SHARE_ROW_PREVIEW_FALLBACK}
             rowPreviewAlign="start"
             rowSampleTooltip={SHARE_ROW_SAMPLE_TOOLTIP}
             rowPreviewEditorAriaLabel={SHARE_ROW_EDITOR_ARIA}
@@ -414,11 +420,14 @@ export function LibrarySharePage() {
         <header className="border-b border-gray-200 bg-white">
           <div className="mx-auto flex h-12 min-h-12 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
             <ShareLogoLink />
-            <Tooltip content="Открыть редактор" openDelayMs={100}>
-              <Link href="/" aria-label="Открыть редактор">
-                <IconCircleButton as="span" variant="toolbar" size="md">
-                  <OpenExternalIcon className="h-5 w-5" />
-                </IconCircleButton>
+            <Tooltip content="Полный редактор шрифтов на главной" openDelayMs={120}>
+              <Link
+                href="/"
+                className={`${btnSecondary} inline-flex shrink-0 items-center gap-2 py-2`}
+                aria-label="Открыть редактор"
+              >
+                <EditAssetIcon src={linkIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
+                <span>Открыть редактор</span>
               </Link>
             </Tooltip>
           </div>
@@ -450,34 +459,49 @@ export function LibrarySharePage() {
             </div>
           ) : (
             <>
-              <div className="bg-white py-3 px-4 sm:px-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <h1 className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 text-sm font-semibold uppercase tracking-wide text-gray-900">
-                      <span className="min-w-0 truncate">{libraryTitle}</span>
-                      <span className="shrink-0 whitespace-nowrap text-sm font-semibold uppercase tabular-nums text-gray-500">
-                        {rows.length} ШТ.
+              <div
+                className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 sm:bottom-8"
+                aria-live="polite"
+              >
+                <div className="pointer-events-auto flex w-full max-w-xl flex-col gap-2 rounded-lg bg-white p-2 shadow-lg sm:max-w-2xl sm:flex-row sm:items-stretch">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-1">
+                    <button
+                      type="button"
+                      className={`${btnSecondary} w-full min-w-0`}
+                      disabled={importBusy}
+                      onClick={handleImport}
+                    >
+                      <span className="flex w-full min-w-0 items-center justify-center gap-2">
+                        <PlusIcon className="h-4 w-4 shrink-0" aria-hidden />
+                        <span className="min-w-0 truncate">{importBusy ? 'Сохранение…' : 'Сохранить в редактор'}</span>
                       </span>
-                    </h1>
-                    {draft.fonts.length < rows.length ? (
-                      <p className="mt-2 text-sm font-semibold uppercase leading-snug text-gray-500">
-                        В архив и при сохранении в редактор: {draft.fonts.length} из каталога (Google / Fontsource)
-                      </p>
+                    </button>
+                    {status !== 'authenticated' ? (
+                      <button
+                        type="button"
+                        className="w-full py-1 text-center text-[10px] font-semibold uppercase text-gray-500 underline-offset-2 transition-colors hover:text-accent hover:underline"
+                        onClick={() => {
+                          const callbackUrl =
+                            typeof window !== 'undefined'
+                              ? `${window.location.pathname}${window.location.search || ''}`
+                              : '/';
+                          void signIn(undefined, { callbackUrl });
+                        }}
+                      >
+                        Войти, чтобы начать
+                      </button>
                     ) : null}
                   </div>
-                  <div className="flex flex-wrap gap-2 sm:shrink-0 sm:justify-end">
-                    <button type="button" className={btnPrimary} disabled={zipBusy} onClick={handleZipAll}>
-                      <EditAssetIcon src={downloudIconUrl} className="h-4 w-4 shrink-0" />
-                      {zipBusy ? 'Сборка…' : 'Скачать всё (ZIP)'}
-                    </button>
-                    <button type="button" className={btnSecondary} disabled={importBusy} onClick={handleImport}>
-                      <PlusIcon className="h-4 w-4 shrink-0" />
-                      {importBusy ? 'Сохранение…' : 'Сохранить в редактор'}
-                    </button>
-                  </div>
+                  <button type="button" className={`${btnPrimary} min-w-0 flex-1 sm:flex-1`} disabled={zipBusy} onClick={handleZipAll}>
+                    <span className="flex w-full min-w-0 items-center justify-center gap-2">
+                      <EditAssetIcon src={downloudIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="min-w-0 truncate">{zipBusy ? 'Сборка…' : 'Скачать всё (ZIP)'}</span>
+                    </span>
+                  </button>
                 </div>
               </div>
 
+              <div className="pb-28 sm:pb-24">
               {hasCascadeHint ? (
                 <div
                   className="mt-4 border-l-4 border-accent bg-accent-soft px-4 py-3 text-sm leading-relaxed text-gray-800"
@@ -488,10 +512,20 @@ export function LibrarySharePage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap border-y border-gray-200 items-center justify-between gap-3 bg-white px-4 py-3 sm:px-5">
-                <span className="text-sm font-semibold uppercase tracking-wide text-gray-900">Шрифты</span>
-                <div className="ml-auto flex items-center gap-3">
-                  
+              {draft.fonts.length < rows.length ? (
+                <p className="mt-4 text-sm font-semibold uppercase leading-snug text-gray-500">
+                  В архив и при сохранении в редактор: {draft.fonts.length} из каталога (Google / Fontsource)
+                </p>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 sm:px-5">
+                <h2 className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold uppercase tracking-wide text-gray-900">
+                  <span className="min-w-0 truncate">{libraryTitle}</span>
+                  <span className="shrink-0 whitespace-nowrap text-sm font-semibold uppercase tabular-nums text-gray-500">
+                    {rows.length} шт.
+                  </span>
+                </h2>
+                <div className="flex shrink-0 items-center gap-3">
                   <CatalogGridModeToggle value={gridToggleValue} onChange={handleGridToggleChange} />
                 </div>
               </div>
@@ -501,13 +535,13 @@ export function LibrarySharePage() {
                   В ссылке нет шрифтов.
                 </p>
               ) : isRowMode ? (
-                <div className="overflow-hidden bg-white">
+                <div className="mt-4 overflow-hidden bg-white">
                   {rows.map((row) => (
                     <React.Fragment key={row.rowKey}>{renderCatalogRow(row)}</React.Fragment>
                   ))}
                 </div>
               ) : (
-                <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+                <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {rows.map((row) => (
                     <li key={row.rowKey} className="min-w-0">
                       {renderCatalogRow(row)}
@@ -515,6 +549,7 @@ export function LibrarySharePage() {
                   ))}
                 </ul>
               )}
+              </div>
             </>
           )}
         </main>

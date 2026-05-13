@@ -5,6 +5,7 @@ import {
   requestCreateLibraryFromEntry,
 } from '../../utils/libraryEntryActions';
 import { useDismissibleLayer } from './useDismissibleLayer';
+import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 
 export function FontLibraryStatusMenu({
   libraries = [],
@@ -12,6 +13,7 @@ export function FontLibraryStatusMenu({
   onMoveToLibrary,
   onCreateLibrary,
 }) {
+  const { assertCanCreateNewLibrary, isAuthenticated, requestSignIn } = useLibraryAuth();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -135,6 +137,11 @@ export function FontLibraryStatusMenu({
               role="menuitem"
               onClick={() => {
                 setOpen(false);
+                if (!isAuthenticated) {
+                  requestSignIn();
+                  return;
+                }
+                if (!assertCanCreateNewLibrary()) return;
                 requestCreateLibraryFromEntry({
                   libraryEntry,
                   onRequestCreateLibrary: onCreateLibrary,

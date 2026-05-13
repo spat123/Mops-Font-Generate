@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { PlusIcon } from './CommonIcons';
 import { useDismissibleLayer } from './useDismissibleLayer';
+import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
@@ -49,6 +50,8 @@ export function CatalogAddTargetMenu({
   const [completed, setCompleted] = useState(false);
   const rootRef = useRef(null);
   const completedTimerRef = useRef(null);
+  const { authLoading, isAuthenticated, canCreateNewLibrary, requestSignIn, assertCanCreateNewLibrary } =
+    useLibraryAuth();
   const hasLibraries = libraries.length > 0;
   const isRowAppearance = appearance === 'row';
   const singleButtonClassName = isRowAppearance
@@ -134,13 +137,45 @@ export function CatalogAddTargetMenu({
   }, [stateKey]);
 
   if (!hasLibraries) {
+    if (authLoading) {
+      return (
+        <span
+          className={`inline-flex h-5 min-w-[1.25rem] items-center justify-center text-gray-400 ${className}`.trim()}
+          aria-hidden
+        >
+          <span className="h-3 w-3 animate-pulse rounded-full bg-gray-300" />
+        </span>
+      );
+    }
+    if (!isAuthenticated) {
+      return (
+        <div className={`flex flex-col items-stretch gap-1 ${className}`.trim()}>
+          <button
+            type="button"
+            disabled={busy}
+            aria-label="Сначала войдите в аккаунт"
+            className={`${standaloneAddButtonClassName} opacity-40`}
+          >
+            <PlusIcon className={plusIconClassName} />
+          </button>
+          <button
+            type="button"
+            onClick={() => requestSignIn()}
+            className="text-center text-[10px] font-semibold uppercase leading-tight text-gray-500 underline-offset-2 transition-colors hover:text-accent hover:underline"
+          >
+            Войти, чтобы начать
+          </button>
+        </div>
+      );
+    }
     return (
       <button
         type="button"
-        disabled={busy}
+        disabled={busy || !canCreateNewLibrary}
         aria-busy={busy}
         aria-label="Создать библиотеку"
         onClick={() => {
+          if (!assertCanCreateNewLibrary()) return;
           void runAction(onCreateLibrary);
         }}
         className={standaloneAddButtonClassName}
@@ -218,6 +253,14 @@ export function CatalogAddTargetMenu({
               type="button"
               onClick={() => {
                 setOpen(false);
+                if (!isAuthenticated) {
+                  requestSignIn();
+                  return;
+                }
+                if (!canCreateNewLibrary) {
+                  void assertCanCreateNewLibrary();
+                  return;
+                }
                 onCreateLibrary?.();
               }}
               className="relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-gray-100"

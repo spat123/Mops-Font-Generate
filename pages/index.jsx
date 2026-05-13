@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { useSession, signIn } from 'next-auth/react';
 import Sidebar from '../components/Sidebar';
 import FontPreview from '../components/FontPreview';
 import ExportModal from '../components/ExportModal';
@@ -33,6 +34,8 @@ import { EditorStatusBar } from '../components/ui/EditorStatusBar';
 import { CatalogDownloadSplitButton } from '../components/ui/CatalogDownloadSplitButton';
 import { updateFontSettings } from '../utils/db';
 import { useFontLibraries } from '../hooks/useFontLibraries';
+import { LibraryAuthProvider, useLibraryAuth } from '../contexts/LibraryAuthContext';
+import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../utils/authLibraryLimits';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
 import {
   countRecentlyAddedLibraryFonts,
@@ -138,6 +141,7 @@ function LibraryMoveMenu({
   onMoveToLibrary,
   onCreateLibrary,
 }) {
+  const { assertCanCreateNewLibrary } = useLibraryAuth();
   const [open, setOpen] = useState(false);
   const [pendingTargetLibraryId, setPendingTargetLibraryId] = useState(null);
   const [progressActive, setProgressActive] = useState(false);
@@ -375,6 +379,7 @@ function LibraryMoveMenu({
               onClick={() => {
                 if (busy || !hasSelection) return;
                 setOpen(false);
+                if (!assertCanCreateNewLibrary()) return;
                 onCreateLibrary?.();
               }}
               className={`relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors disabled:cursor-default disabled:opacity-50 ${
@@ -717,6 +722,43 @@ export default function Home() {
     reorderLibraries: reorderFontLibraries,
     reorderLibraryFonts,
   } = useFontLibraries();
+
+  const { status: authStatus } = useSession();
+
+  const requestSignIn = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const callbackUrl = `${window.location.pathname}${window.location.search || ''}`;
+    void signIn(undefined, { callbackUrl });
+  }, []);
+
+  const assertCanCreateNewLibrary = useCallback(() => {
+    if (authStatus === 'loading') {
+      toast.info('Проверка входа…');
+      return false;
+    }
+    if (authStatus !== 'authenticated') {
+      toast.info('Войдите, чтобы создавать библиотеки');
+      requestSignIn();
+      return false;
+    }
+    if (fontLibraries.length >= MAX_SAVED_LIBRARIES_PER_ACCOUNT) {
+      toast.info(`Доступно не более ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} библиотек на аккаунт`);
+      return false;
+    }
+    return true;
+  }, [authStatus, fontLibraries.length, requestSignIn]);
+
+  const libraryAuthValue = useMemo(
+    () => ({
+      authLoading: authStatus === 'loading',
+      isAuthenticated: authStatus === 'authenticated',
+      canCreateNewLibrary:
+        authStatus === 'authenticated' && fontLibraries.length < MAX_SAVED_LIBRARIES_PER_ACCOUNT,
+      requestSignIn,
+      assertCanCreateNewLibrary,
+    }),
+    [authStatus, fontLibraries.length, requestSignIn, assertCanCreateNewLibrary],
+  );
 
   // Используем хук useFontContext вместо useFontManager
   const {
@@ -2533,6 +2575,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
   const handleCreateSavedLibrary = useCallback(
     (draft) => {
+      if (!assertCanCreateNewLibrary()) return null;
       const created = createFontLibrary(draft);
       if (created?.id) {
         setMainTab('library');
@@ -2540,7 +2583,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       }
       return created;
     },
-    [createFontLibrary],
+    [assertCanCreateNewLibrary, createFontLibrary],
   );
 
   const handleUpdateSavedLibrary = useCallback(
@@ -2678,15 +2721,19 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     [fontLibraries, handleUpdateSavedLibrary],
   );
 
-  const requestCreateLibraryWithFonts = useCallback((selectedFonts) => {
-    setCreateLibrarySeedRequest({
-      requestId:
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `library-seed:${Date.now()}`,
-      selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
-    });
-  }, []);
+  const requestCreateLibraryWithFonts = useCallback(
+    (selectedFonts) => {
+      if (!assertCanCreateNewLibrary()) return;
+      setCreateLibrarySeedRequest({
+        requestId:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `library-seed:${Date.now()}`,
+        selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
+      });
+    },
+    [assertCanCreateNewLibrary],
+  );
 
   const handleCatalogSelectionActionsChange = useCallback((nextActions) => {
     if (!nextActions || typeof nextActions !== 'object') {
@@ -3441,6 +3488,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
   ]);
 
   return (
+    <LibraryAuthProvider value={libraryAuthValue}>
     <div className="flex h-screen min-h-0 flex-row overflow-hidden bg-gray-50">
       <Head>
         <title>DINAMIC FONT — тестирование и сравнение шрифтов</title>
@@ -4043,5 +4091,6 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         </div>
       </div>
     </div>
+    </LibraryAuthProvider>
   );
 } 

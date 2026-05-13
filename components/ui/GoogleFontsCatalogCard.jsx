@@ -25,6 +25,8 @@ function GoogleFontsCatalogCardComponent({
   draggable = false,
   onDragStart,
   onDragEnd,
+  /** Страница «Поделиться»: без «Открыть», без библиотек и без выделения */
+  shareSurface = false,
   /** ROW: глобальный образец (одна строка на весь список); undefined — показывать имя семейства */
   rowCatalogPreviewText,
   onRowGlobalSampleCommit,
@@ -39,7 +41,8 @@ function GoogleFontsCatalogCardComponent({
   footerRightTooltipContent,
 }) {
   const family = entry?.family;
-  const styleCount = Number(entry?.styleCount) || 0;
+  const styleCount = Number(entry?.styleCount);
+  const hasStyleCount = Number.isFinite(styleCount) && styleCount > 0;
   const subsetCount = Array.isArray(entry?.subsets) ? entry.subsets.length : 0;
   const languageCount = subsetCount;
   const isVariable = entry?.isVariable === true;
@@ -77,9 +80,9 @@ function GoogleFontsCatalogCardComponent({
       hasItalic ? 'italic' : null,
       languageCount > 0 ? `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}` : null,
       subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
-      `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`,
+      hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
     ],
-    [entry?.category, hasItalic, isVariable, languageCount, styleCount, subsetCount],
+    [entry?.category, hasItalic, isVariable, languageCount, hasStyleCount, styleCount, subsetCount],
   );
 
   const footerLeftBadges = useMemo(
@@ -93,12 +96,10 @@ function GoogleFontsCatalogCardComponent({
 
   const footerRightBadges = useMemo(
     () => [
-      entry?.styleCount != null
-        ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}`
-        : '—',
+      hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
       subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
     ],
-    [entry?.styleCount, styleCount, subsetCount],
+    [hasStyleCount, styleCount, subsetCount],
   );
 
   if (!family) return null;
@@ -121,7 +122,7 @@ function GoogleFontsCatalogCardComponent({
       footerLeftBadges={footerLeftBadges}
       footerRightBadges={footerRightBadges}
       footerRightTooltipContent={footerRightTooltipContent}
-      onOpen={() => onOpenInEditor?.(entry)}
+      onOpen={shareSurface ? undefined : () => onOpenInEditor?.(entry)}
       openAriaLabel={openAriaLabel}
       downloadButtonProps={downloadButtonProps}
       fontLibraries={fontLibraries}
@@ -129,9 +130,11 @@ function GoogleFontsCatalogCardComponent({
       onAddFontToLibrary={onAddFontToLibrary}
       onRequestCreateLibrary={onRequestCreateLibrary}
       libraryEntry={libraryEntry}
-      selected={selected}
-      onCardClick={onCardClick}
-      onStartCardLongPress={onStartCardLongPress}
+      showLibraryActions={!shareSurface}
+      showSelectionChrome={!shareSurface}
+      selected={shareSurface ? false : selected}
+      onCardClick={shareSurface ? undefined : onCardClick}
+      onStartCardLongPress={shareSurface ? undefined : onStartCardLongPress}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
       onPointerCancel={onPointerCancel}
@@ -139,6 +142,7 @@ function GoogleFontsCatalogCardComponent({
       onDragStart={onDragStart}
       dragPayload={libraryEntry}
       onDragEnd={onDragEnd}
+      shareSurface={shareSurface}
     />
   );
 }

@@ -66,6 +66,10 @@ function CatalogSourceCardComponent({
   onAddFontToLibrary,
   onRequestCreateLibrary,
   libraryEntry,
+  /** Показывать блок «в библиотеку» / плюс (в режиме share — скрыть) */
+  showLibraryActions = true,
+  /** Оверлей выделения при multi-select (в режиме share — скрыть) */
+  showSelectionChrome = true,
 
   // selection + interactions
   selected,
@@ -80,6 +84,8 @@ function CatalogSourceCardComponent({
   onDragStart,
   dragPayload,
   onDragEnd,
+  /** Страница «Поделиться»: стили строки/плитки */
+  shareSurface = false,
 }) {
   const footerLayoutRef = useRef(null);
   const [stackFooterBadges, setStackFooterBadges] = useState(false);
@@ -104,9 +110,9 @@ function CatalogSourceCardComponent({
     [dragPayload, onDragStart],
   );
 
-  const selectionOverlay = useMemo(
-    () => <DefaultSelectionOverlay />,
-    [],
+  const selectionOverlayResolved = useMemo(
+    () => (showSelectionChrome ? <DefaultSelectionOverlay /> : null),
+    [showSelectionChrome],
   );
 
   const hoverOverlay = useMemo(
@@ -122,8 +128,9 @@ function CatalogSourceCardComponent({
     [downloadButtonProps, isRowMode, onOpen, openAriaLabel, openLabel],
   );
 
-  const actions = useMemo(
-    () => (
+  const actions = useMemo(() => {
+    if (!showLibraryActions) return null;
+    return (
       <CatalogLibraryActions
         libraries={fontLibraries}
         busy={busy}
@@ -134,17 +141,17 @@ function CatalogSourceCardComponent({
         onRequestCreateLibrary={onRequestCreateLibrary}
         libraryEntry={libraryEntry}
       />
-    ),
-    [
-      busy,
-      fontLibraries,
-      isRowMode,
-      itemKey,
-      libraryEntry,
-      onAddFontToLibrary,
-      onRequestCreateLibrary,
-    ],
-  );
+    );
+  }, [
+    busy,
+    fontLibraries,
+    isRowMode,
+    itemKey,
+    libraryEntry,
+    onAddFontToLibrary,
+    onRequestCreateLibrary,
+    showLibraryActions,
+  ]);
 
   useEffect(() => {
     if (isRowMode) {
@@ -252,7 +259,7 @@ function CatalogSourceCardComponent({
         selected={selected}
         busy={busy}
         actions={actions}
-        selectionOverlay={selectionOverlay}
+        selectionOverlay={selectionOverlayResolved}
         hoverOverlay={hoverOverlay}
         onClick={handleCardClick}
         onPointerDown={handlePointerDown}
@@ -262,6 +269,7 @@ function CatalogSourceCardComponent({
         draggable={draggable}
         onDragStart={handleDragStart}
         onDragEnd={onDragEnd}
+        shareSurface={shareSurface}
       />
     );
   }
@@ -280,7 +288,8 @@ function CatalogSourceCardComponent({
       onDragEnd={onDragEnd}
       busy={busy}
       minHeightClass="min-h-32 h-[10.5rem] min-w-0"
-      selectionOverlay={selectionOverlay}
+      className={shareSurface ? '!bg-white hover:!bg-white/30' : ''}
+      selectionOverlay={selectionOverlayResolved}
       hoverOverlay={hoverOverlay}
       actions={actions}
       title={family}
