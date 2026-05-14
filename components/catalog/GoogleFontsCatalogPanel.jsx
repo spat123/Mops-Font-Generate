@@ -5,38 +5,38 @@
   useMemo,
   useRef,
 } from 'react';
-import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
-import { toast } from '../utils/appNotify';
-import { ensureGoogleFontPreviewCss, removeAllGoogleFontPreviewCss } from '../utils/googleFontPreviewCss';
-import { HexProgressLoader } from './ui/HexProgressLoader';
-import { CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX } from './ui/CatalogRowModeCard';
-import { GoogleFontsCatalogCard } from './ui/GoogleFontsCatalogCard';
-import { useCatalogToolbarLayout } from './ui/useCatalogToolbarLayout';
-import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
+import { VirtualizedGlyphGrid } from '../ui/VirtualizedGlyphGrid';
+import { toast } from '../../utils/appNotify';
+import { ensureGoogleFontPreviewCss, removeAllGoogleFontPreviewCss } from '../../utils/googleFontPreviewCss';
+import { HexProgressLoader } from '../ui/HexProgressLoader';
+import { CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX } from './CatalogRowModeCard';
+import { GoogleFontsCatalogCard } from './GoogleFontsCatalogCard';
+import { useCatalogToolbarLayout } from './useCatalogToolbarLayout';
+import { addLibraryEntryToLibrary } from '../../utils/libraryEntryActions';
 import {
   clearGoogleFontCatalogCache,
   readGoogleFontCatalogCache,
   writeGoogleFontCatalogCache,
-} from '../utils/googleFontCatalogCache';
+} from '../../utils/googleFontCatalogCache';
 import {
   createCatalogLibraryEntry,
   isGoogleFontInSession,
-} from '../utils/fontLibraryUtils';
-import { writeLibraryFontDragData } from '../utils/libraryDragData';
+} from '../../utils/fontLibraryUtils';
+import { writeLibraryFontDragData } from '../../utils/libraryDragData';
 import {
   compareFontCategoryLabelsRu,
   getFontCategoryLabelRu,
-} from '../utils/fontCategoryLabels';
-import { getFontSubsetLabelRu } from '../utils/fontSubsetLabels';
-import { compareFontFamilyName } from '../utils/fontSort';
-import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
-import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
-import { useStickyTimedSet } from './ui/useStickyTimedSet';
-import { CatalogPanelToolbar } from './ui/CatalogPanelToolbar';
-import { filterSortCatalogItems } from '../utils/catalogFilterSort';
-import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
-import { useCatalogEngine } from './ui/useCatalogEngine';
-import { useOverlayScrollbar } from './ui/useOverlayScrollbar';
+} from '../../utils/fontCategoryLabels';
+import { getFontSubsetLabelRu } from '../../utils/fontSubsetLabels';
+import { compareFontFamilyName } from '../../utils/fontSort';
+import { isInteractiveTarget } from '../../utils/dom/isInteractiveTarget';
+import { useLongPressMultiSelect } from '../ui/useLongPressMultiSelect';
+import { useStickyTimedSet } from '../ui/useStickyTimedSet';
+import { CatalogPanelToolbar } from './CatalogPanelToolbar';
+import { filterSortCatalogItems } from '../../utils/catalogFilterSort';
+import { useSelectionActionsEffect } from '../ui/useSelectionActionsEffect';
+import { useCatalogEngine } from './useCatalogEngine';
+import { useOverlayScrollbar } from '../ui/useOverlayScrollbar';
 import {
   buildArchiveBlobFromEntries,
   buildGoogleFormatArchiveEntry,
@@ -46,7 +46,7 @@ import {
   downloadGooglePackageZip,
   downloadGoogleVariableVariant,
   saveArchiveBlob,
-} from '../utils/catalogDownloadActions';
+} from '../../utils/catalogDownloadActions';
 
 function GoogleCatalogEmptyLoader() {
   return (

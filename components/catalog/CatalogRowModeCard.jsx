@@ -1,7 +1,7 @@
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { CatalogFontCard } from './CatalogFontCard';
 import { CatalogRowHeader } from './CatalogRowHeader';
-import { Tooltip } from './Tooltip';
+import { Tooltip } from '../ui/Tooltip';
 
 const ROW_TOOLTIP = 'Дважды нажмите, чтобы изменить образец для всех строк в этом режиме';
 

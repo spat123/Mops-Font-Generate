@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PlusIcon } from './CommonIcons';
-import { useDismissibleLayer } from './useDismissibleLayer';
+import { PlusIcon } from '../ui/CommonIcons';
+import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
@@ -148,25 +148,7 @@ export function CatalogAddTargetMenu({
       );
     }
     if (!isAuthenticated) {
-      return (
-        <div className={`flex flex-col items-stretch gap-1 ${className}`.trim()}>
-          <button
-            type="button"
-            disabled={busy}
-            aria-label="Сначала войдите в аккаунт"
-            className={`${standaloneAddButtonClassName} opacity-40`}
-          >
-            <PlusIcon className={plusIconClassName} />
-          </button>
-          <button
-            type="button"
-            onClick={() => requestSignIn()}
-            className="text-center text-[10px] font-semibold uppercase leading-tight text-gray-500 underline-offset-2 transition-colors hover:text-accent hover:underline"
-          >
-            Войти, чтобы начать
-          </button>
-        </div>
-      );
+      return null;
     }
     return (
       <button

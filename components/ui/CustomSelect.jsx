@@ -9,7 +9,7 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { CatalogCheckboxMark } from './CatalogCheckbox';
+import { CatalogCheckboxMark } from '../catalog/CatalogCheckbox';
 import { SearchClearButton } from './SearchClearButton';
 import { useDismissibleLayer } from './useDismissibleLayer';
 

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useDismissibleLayer } from "../ui/useDismissibleLayer";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { AuthAccountPopover } from "../auth/AuthAccountPopover";
+import { AppButton } from "../ui/AppButton";
 
 function IconSettings(props) {
   return (
@@ -779,16 +780,19 @@ export default function SidebarFooterControls({
   return (
     <>
       {settingsDialog}
-      <div className="relative min-h-[52px] border-t border-gray-200 bg-white p-2">
+      <div className="relative h-[52px] box-border border-t border-gray-200 bg-white p-2">
         <div
           className={
             isSidebarCollapsed
-              ? "flex h-full flex-col items-center justify-center gap-2 py-1"
-              : "grid h-full grid-cols-3 gap-2"
+              ? "flex h-full min-h-0 w-full flex-col items-stretch justify-center gap-2 py-1"
+              : "grid h-full min-h-0 grid-cols-3 gap-2"
           }
         >
-          <button
+          <AppButton
             type="button"
+            variant="toolbarIcon"
+            size="rail"
+            className="group"
             onClick={() =>
               setIsSidebarCollapsed((prev) => {
                 const next = !prev;
@@ -796,9 +800,6 @@ export default function SidebarFooterControls({
                 return next;
               })
             }
-            className={`group inline-flex items-center justify-center rounded-md bg-gray-50 text-gray-600 transition-all hover:bg-gray-100 hover:text-accent ${
-              isSidebarCollapsed ? "h-9 w-9 shrink-0" : ""
-            }`}
             aria-label={
               isSidebarCollapsed
                 ? "Развернуть левую панель"
@@ -828,41 +829,23 @@ export default function SidebarFooterControls({
                 />
               )}
             </svg>
-          </button>
+          </AppButton>
           {!isSidebarCollapsed ? (
-            <button
+            <AppButton
               type="button"
+              variant="toolbarIcon"
+              pressed={isAppSettingsOpen}
+              size="rail"
+              fullWidth
+              className="group"
               onClick={() => setIsAppSettingsOpen((prev) => !prev)}
-              className={`group inline-flex items-center justify-center rounded-md transition-all ${
-                isAppSettingsOpen
-                  ? "bg-accent text-white shadow-sm"
-                  : "bg-gray-50 text-gray-600 hover:bg-accent/10 hover:text-accent"
-              }`}
               aria-label="Настройки приложения"
               aria-pressed={isAppSettingsOpen}
             >
               <IconSettings className="h-4 w-4 transition-transform group-hover:rotate-90" />
-            </button>
+            </AppButton>
           ) : null}
           {!isSidebarCollapsed ? <AuthAccountPopover isSidebarCollapsed={isSidebarCollapsed} /> : null}
-          {isSidebarCollapsed ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setIsAppSettingsOpen((prev) => !prev)}
-                className={`group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md transition-all ${
-                  isAppSettingsOpen
-                    ? "bg-accent text-white shadow-sm"
-                    : "bg-gray-50 text-gray-600 hover:bg-accent/10 hover:text-accent"
-                }`}
-                aria-label="Настройки приложения"
-                aria-pressed={isAppSettingsOpen}
-              >
-                <IconSettings className="h-4 w-4 transition-transform group-hover:rotate-90" />
-              </button>
-              <AuthAccountPopover isSidebarCollapsed={isSidebarCollapsed} />
-            </>
-          ) : null}
         </div>
       </div>
     </>

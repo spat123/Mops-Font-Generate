@@ -1,6 +1,6 @@
 import React from 'react';
-import { EditAssetIcon } from './EditAssetIcon';
-import { enterIconUrl } from './editIconUrls';
+import { EditAssetIcon } from '../ui/EditAssetIcon';
+import { enterIconUrl } from '../ui/editIconUrls';
 
 export function CatalogSearchButton({ disabled = false, onClick, iconOnly = false }) {
   return (

@@ -19,13 +19,15 @@ function normalizeAxisSettings(settings) {
   );
 }
 
+// Только оси текущего шрифта; лишние ключи из прошлого VF не считаем изменением.
 function hasVariableSettingsChanges(currentSettings, defaultSettings) {
   const current = normalizeAxisSettings(currentSettings);
   const defaults = normalizeAxisSettings(defaultSettings);
-  const keys = new Set([...Object.keys(current), ...Object.keys(defaults)]);
 
-  for (const key of keys) {
-    if (Number(current[key] ?? 0) !== Number(defaults[key] ?? 0)) {
+  for (const key of Object.keys(defaults)) {
+    const def = Number(defaults[key]);
+    const cur = Number(current[key] ?? def);
+    if (cur !== def) {
       return true;
     }
   }
@@ -54,7 +56,14 @@ function CloseIcon(props) {
 }
 
 function ResetButton({ onResetSelectedFont, compact = false }) {
-  const { resetApplicationState, selectedFont, variableSettings, getDefaultAxisValues } = useFontContext();
+  const {
+    resetApplicationState,
+    selectedFont,
+    variableSettings,
+    getDefaultAxisValues,
+    selectedPresetName,
+    getResetTargetPresetName,
+  } = useFontContext();
   const {
     resetSettings,
     text,
@@ -236,20 +245,24 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
   const hasFontSpecificChanges = useMemo(() => {
     if (!onResetSelectedFont || !selectedFont) return false;
 
-    const hasPresetChanges =
-      typeof selectedFont.lastUsedPresetName === 'string' &&
-      selectedFont.lastUsedPresetName !== '' &&
-      selectedFont.lastUsedPresetName !== 'Regular';
+    if (selectedFont.isVariableFont) {
+      return hasVariableSettingsChanges(
+        variableSettings,
+        typeof getDefaultAxisValues === 'function' ? getDefaultAxisValues() : {},
+      );
+    }
 
-    const hasAxisChanges = selectedFont.isVariableFont
-      ? hasVariableSettingsChanges(
-          variableSettings,
-          typeof getDefaultAxisValues === 'function' ? getDefaultAxisValues() : {},
-        )
-      : false;
-
-    return hasPresetChanges || hasAxisChanges;
-  }, [getDefaultAxisValues, onResetSelectedFont, selectedFont, variableSettings]);
+    if (typeof getResetTargetPresetName !== 'function') return false;
+    const resetTarget = getResetTargetPresetName(selectedFont);
+    return typeof selectedPresetName === 'string' && selectedPresetName !== resetTarget;
+  }, [
+    getDefaultAxisValues,
+    getResetTargetPresetName,
+    onResetSelectedFont,
+    selectedFont,
+    selectedPresetName,
+    variableSettings,
+  ]);
 
   const hasResettableChanges = useMemo(() => {
     if (!onResetSelectedFont) return true;

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
-import { EditAssetIcon } from './EditAssetIcon';
-import { linkIconUrl } from './editIconUrls';
+import { EditAssetIcon } from '../ui/EditAssetIcon';
+import { linkIconUrl } from '../ui/editIconUrls';
 
 function OpenInEditorIcon() {
   return <EditAssetIcon src={linkIconUrl} className="h-3.5 w-3.5" />;

@@ -1,10 +1,10 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import CatalogSessionAddSpinner from './CatalogSessionAddSpinner';
+import CatalogSessionAddSpinner from '../ui/CatalogSessionAddSpinner';
 import { CatalogLibraryActions } from './CatalogLibraryActions';
 import { CatalogFontCard } from './CatalogFontCard';
 import { CatalogRowModeCard } from './CatalogRowModeCard';
 import { CatalogCardHoverOverlay } from './CatalogCardHoverOverlay';
-import { Tooltip } from './Tooltip';
+import { Tooltip } from '../ui/Tooltip';
 
 function DefaultSelectionOverlay() {
   return (

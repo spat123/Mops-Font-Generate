@@ -26,6 +26,7 @@ import { downloadLibraryAsZip } from '../utils/libraryArchiveDownload';
 import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
 import { useLibraryAuth } from '../contexts/LibraryAuthContext';
+import { AppButton } from './ui/AppButton';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
@@ -446,21 +447,18 @@ export default function FontLibrarySidebar({
               </div>
 
               <div className="flex shrink-0 items-stretch gap-3 border-t border-gray-200 bg-white px-6 py-4">
-                <button
-                  type="button"
-                  onClick={closeDialog}
-                  className="w-full min-h-10 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
-                >
+                <AppButton type="button" fullWidth onClick={closeDialog}>
                   Отмена
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   type="button"
+                  variant="accent"
+                  fullWidth
                   onClick={handleSubmit}
                   disabled={isSubmitDisabled}
-                  className="w-full min-h-10 rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitLabel}
-                </button>
+                </AppButton>
               </div>
             </div>
           </div>,
@@ -696,18 +694,13 @@ export default function FontLibrarySidebar({
                 <p className="text-xs uppercase text-gray-400">Загрузка…</p>
               ) : !isAuthenticated ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => requestSignIn()}
-                    className="inline-flex flex-col items-center justify-center gap-3 text-center text-sm font-semibold uppercase text-gray-900 transition-colors hover:text-accent"
-                  >
-                    <IconCircleButton as="span" variant="accent" size="lg">
-                      <PlusIcon className="h-5 w-5" />
-                    </IconCircleButton>
-                    <span className="leading-5">Войти, чтобы начать</span>
-                  </button>
-                  <p className="text-xs font-normal leading-5 text-gray-400">
-                    Войдите через Google или Яндекс — затем можно создать до трёх библиотек.
+                  <div className="w-full max-w-[14rem]">
+                    <AppButton type="button" fullWidth onClick={() => requestSignIn()}>
+                      Войти
+                    </AppButton>
+                  </div>
+                  <p className="text-xs font-normal leading-5 text-gray-500">
+                    Войдите, чтобы создавать библиотеки.
                   </p>
                 </>
               ) : (

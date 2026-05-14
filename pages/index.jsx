@@ -9,8 +9,6 @@ import GenerateFontModal from '../components/GenerateFontModal';
 import { toast } from '../utils/appNotify';
 import { useFontContext } from '../contexts/FontContext';
 import { useSettings, getDefaultPreviewSettingsSnapshot } from '../contexts/SettingsContext';
-import GoogleFontsCatalogPanel from '../components/GoogleFontsCatalogPanel';
-import FontsourceCatalogPanel from '../components/FontsourceCatalogPanel';
 import { getFormatFromExtension, sessionFontCardPreviewStyle } from '../utils/fontUtilsCommon';
 import {
   fetchGoogleStaticFontSlicesAll,
@@ -20,25 +18,16 @@ import {
   buildGoogleFontGlyphSampleText,
   hasGoogleScriptGlyphSample,
 } from '../utils/googleFontCatalogSampleText';
-import { UnderlineTab } from '../components/ui/UnderlineTab';
-import { SortableFontCardGrid } from '../components/ui/SortableFontCardGrid';
 import { Tooltip } from '../components/ui/Tooltip';
 import { EditorTabBar, EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
-import { ScopeFilterToolbar } from '../components/ui/ScopeFilterToolbar';
-import { CustomSelect } from '../components/ui/CustomSelect';
-import { customSelectTriggerClass } from '../components/ui/nativeSelectFieldClasses';
-import { CatalogCheckboxControl } from '../components/ui/CatalogCheckbox';
-import { UploadFromDiskCard } from '../components/ui/UploadFromDiskCard';
-import { EditorStatusBar } from '../components/ui/EditorStatusBar';
-import { CatalogDownloadSplitButton } from '../components/ui/CatalogDownloadSplitButton';
 import { updateFontSettings } from '../utils/db';
 import { useFontLibraries } from '../hooks/useFontLibraries';
-import { LibraryAuthProvider, useLibraryAuth } from '../contexts/LibraryAuthContext';
+import { LibraryAuthProvider } from '../contexts/LibraryAuthContext';
 import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../utils/authLibraryLimits';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
 import {
-  countRecentlyAddedLibraryFonts,
+  getFontIdsToRemoveWhenLibraryDeleted,
   getLibrarySourceLabel,
   isLibraryFontRecentlyAdded,
   normalizeLibraryText,
@@ -59,7 +48,6 @@ import {
   notifyFontMovedToLibrary,
 } from '../components/ui/FontLibraryToastNotifications';
 import { readLibraryFontDragData } from '../utils/libraryDragData';
-import { LibraryReorderHint } from '../components/ui/LibraryReorderHint';
 import {
   prefetchFontsourceLibraryFontEntry,
   prefetchGoogleLibraryFontEntry,
@@ -76,10 +64,11 @@ import { IconCircleButton } from '../components/ui/IconCircleButton';
 import { LibraryShareDialog } from '../components/ui/LibraryShareDialog';
 import { SearchClearButton } from '../components/ui/SearchClearButton';
 import { matchesSearch } from '../utils/searchMatching';
-import { buildCatalogDownloadButtonProps } from '../components/ui/buildCatalogDownloadButtonProps';
+import { buildCatalogDownloadButtonProps } from '../components/catalog/buildCatalogDownloadButtonProps';
 import { moveAndSwapIconUrl } from '../components/ui/editIconUrls';
 import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
-import { useDismissibleLayer } from '../components/ui/useDismissibleLayer';
+import { LibraryMoveMenu } from '../components/library/LibraryMoveMenu';
+import { FontsLibraryHomeScreen } from '../components/library/FontsLibraryHomeScreen';
 import { buildGroupedFontSubsetOptions } from '../utils/fontSubsetLabels';
 import {
   downloadGoogleAsFormat,
@@ -92,500 +81,27 @@ import {
 import CatalogSessionAddSpinner from '../components/ui/CatalogSessionAddSpinner';
 import { useStickyTimedSet } from '../components/ui/useStickyTimedSet';
 import { useLongPressMultiSelect } from '../components/ui/useLongPressMultiSelect';
-
-function isFontTabId(tab) {
-  return typeof tab === 'string' && tab !== 'library' && !tab.startsWith(EMPTY_PREFIX);
-}
-
-/** После F5 восстанавливаем активную вкладку редактора (иначе остаётся «Новый» и сбрасывается выбор). */
-const EDITOR_MAIN_TAB_LS_KEY = 'editorMainTab';
-
-/** Список id слотов «Новый» (пустой массив = все закрыты, не создаём фиктивную вкладку). */
-const EDITOR_EMPTY_SLOTS_LS_KEY = 'editorEmptySlots';
-
-/** Вкладки шрифтов из библиотеки, закрытые крестиком (остаются в сессии, но скрыты в полосе) — восстановление после F5. */
-const EDITOR_CLOSED_LIBRARY_FONT_IDS_LS_KEY = 'editorClosedLibraryFontTabIds';
-
-/** Внутри экрана «Все шрифты»: активная внутренняя вкладка каталога или библиотеки. */
-const FONTS_LIBRARY_INNER_TAB_LS_KEY = 'fontsLibraryInnerTab';
-const SAVED_LIBRARY_TAB_PREFIX = 'saved-library:';
-const SESSION_FONT_ORDER_LS_KEY = 'dinamicSessionFontOrder';
-
-/** Лёгкий снимок вкладок шрифтов для первого кадра после F5 (пока IndexedDB не отдал blobs). */
-const SESSION_FONT_TABS_PREVIEW_KEY = 'dinamicSessionFontTabsPreview';
-
-/** До useLayoutEffect не подсвечиваем «Все шрифты» / не показываем контент — убирает мигание для новых пользователей. */
-const EDITOR_MAIN_TAB_PENDING = '__editorShellPending__';
-
-function CloseIcon(props) {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden {...props}>
-      <path
-        d="M5 5L15 15M15 5L5 15"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-const LIBRARY_MOVE_DELAY_MS = 1400;
-
-function LibraryMoveMenu({
-  disabled = false,
-  hasSelection = false,
-  busy = false,
-  libraries = [],
-  currentLibraryId = null,
-  onMoveToLibrary,
-  onCreateLibrary,
-}) {
-  const { assertCanCreateNewLibrary } = useLibraryAuth();
-  const [open, setOpen] = useState(false);
-  const [pendingTargetLibraryId, setPendingTargetLibraryId] = useState(null);
-  const [progressActive, setProgressActive] = useState(false);
-  const [viewportW, setViewportW] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 0,
-  );
-  const rootRef = useRef(null);
-  const moveTimeoutRef = useRef(null);
-  const availableLibraries = useMemo(
-    () => libraries.filter((library) => library.id !== currentLibraryId),
-    [currentLibraryId, libraries],
-  );
-  const pendingTargetLibrary = useMemo(
-    () => libraries.find((library) => library.id === pendingTargetLibraryId) || null,
-    [libraries, pendingTargetLibraryId],
-  );
-  const clearPendingMove = useCallback(() => {
-    if (moveTimeoutRef.current != null) {
-      clearTimeout(moveTimeoutRef.current);
-      moveTimeoutRef.current = null;
-    }
-    setPendingTargetLibraryId(null);
-    setProgressActive(false);
-  }, []);
-
-  useDismissibleLayer({
-    open,
-    refs: [rootRef],
-    onDismiss: () => setOpen(false),
-  });
-
-  useEffect(() => {
-    if (busy) {
-      setOpen(false);
-    }
-  }, [busy]);
-
-  useEffect(() => {
-    if (!pendingTargetLibraryId) return undefined;
-    const frameId = requestAnimationFrame(() => {
-      setProgressActive(true);
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [pendingTargetLibraryId]);
-
-  useEffect(() => {
-    if (disabled || !hasSelection) {
-      setOpen(false);
-      clearPendingMove();
-    }
-  }, [clearPendingMove, disabled, hasSelection]);
-
-  useEffect(() => () => clearPendingMove(), [clearPendingMove]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const handleResize = () => setViewportW(window.innerWidth);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const handleStartPendingMove = useCallback(
-    (targetLibraryId) => {
-      if (disabled || busy || !hasSelection) return;
-      if (!targetLibraryId || targetLibraryId === currentLibraryId) return;
-      setOpen(false);
-      setPendingTargetLibraryId(targetLibraryId);
-      setProgressActive(false);
-      moveTimeoutRef.current = window.setTimeout(async () => {
-        moveTimeoutRef.current = null;
-        try {
-          await onMoveToLibrary?.(targetLibraryId);
-        } finally {
-          setPendingTargetLibraryId(null);
-          setProgressActive(false);
-        }
-      }, LIBRARY_MOVE_DELAY_MS);
-    },
-    [busy, currentLibraryId, disabled, hasSelection, onMoveToLibrary],
-  );
-
-  const handleCancelPendingMove = useCallback(() => {
-    clearPendingMove();
-  }, [clearPendingMove]);
-  const isMoveDisabled = disabled || busy || !hasSelection;
-  const hideToolbarLabel = viewportW < 1024;
-  const moveMenuWidthClass = hideToolbarLabel ? 'w-[5.5rem]' : 'w-[11.6rem]';
-
-  return (
-    <div
-      ref={rootRef}
-      className={`relative inline-flex h-8 ${moveMenuWidthClass} items-stretch ${
-        pendingTargetLibrary
-          ? ''
-          : `overflow-hidden rounded-sm border ${
-              isMoveDisabled ? 'border-gray-50' : 'border-gray-200'
-            }`
-      }`}
-    >
-      {pendingTargetLibrary ? (
-        <div className={`relative h-8 ${moveMenuWidthClass} overflow-hidden rounded-sm border border-gray-200 bg-gray-50`}>
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 origin-left bg-accent transition-transform ease-linear"
-            style={{
-              width: '100%',
-              transform: progressActive ? 'scaleX(1)' : 'scaleX(0)',
-              transitionDuration: `${LIBRARY_MOVE_DELAY_MS}ms`,
-            }}
-            aria-hidden
-          />
-          <div className="relative flex h-full items-center justify-center px-2">
-            <span className="absolute left-2 right-9 truncate text-left text-[10px] font-semibold uppercase tracking-wide text-white">
-              {pendingTargetLibrary.name}
-            </span>
-            <Tooltip content={`Отменить перенос в «${pendingTargetLibrary.name}»`}>
-              <button
-                type="button"
-                onClick={handleCancelPendingMove}
-                className="relative flex h-6 w-6 items-center justify-center rounded-full text-accent transition-colors hover:text-accent"
-                aria-label={`Отменить перенос в библиотеку ${pendingTargetLibrary.name}`}
-              >
-                <CatalogSessionAddSpinner className="h-6 w-6 text-accent" />
-                <CloseIcon className="absolute h-3 w-3 text-white" />
-              </button>
-            </Tooltip>
-          </div>
-        </div>
-      ) : (
-        <>
-          <button
-            type="button"
-            disabled={isMoveDisabled}
-            onClick={() => setOpen((value) => !value)}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            aria-label="Переместить выделенные шрифты"
-            className={`inline-flex h-8 min-w-0 flex-1 items-center rounded-l-sm bg-white text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400 ${
-              hideToolbarLabel ? 'justify-center px-3' : 'gap-2 px-4'
-            }`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="h-4 w-4 shrink-0"
-              aria-hidden="true"
-            >
-              <path
-                d="M23 15.9999H3.41406L6.70703 12.707C7.09756 12.3164 7.09756 11.6834 6.70703 11.2929C6.31651 10.9024 5.68349 10.9024 5.29297 11.2929L0.292969 16.2929L0.224609 16.3691C-0.0957412 16.7618 -0.0731474 17.3408 0.292969 17.707L5.29297 22.707C5.68349 23.0975 6.31651 23.0975 6.70703 22.707C7.09756 22.3164 7.09756 21.6834 6.70703 21.2929L3.41406 17.9999L23 17.9999C23.5523 17.9999 24 17.5522 24 16.9999C24 16.4476 23.5523 15.9999 23 15.9999Z"
-                fill="currentColor"
-              />
-              <path
-                d="M1 5.99992H20.5859L17.293 2.70696C16.9024 2.31643 16.9024 1.68342 17.293 1.29289C17.6835 0.902369 18.3165 0.902369 18.707 1.29289L23.707 6.29289L23.7754 6.36907C24.0957 6.76184 24.0731 7.34084 23.707 7.70696L18.707 12.707C18.3165 13.0975 17.6835 13.0975 17.293 12.707C16.9024 12.3164 16.9024 11.6834 17.293 11.2929L20.5859 7.99992H1C0.447716 7.99992 2.64288e-07 7.55221 0 6.99992C-6.58593e-09 6.44764 0.447716 5.99992 1 5.99992Z"
-                fill="currentColor"
-              />
-            </svg>
-            {!hideToolbarLabel ? (
-              <span className={busy ? 'truncate' : 'whitespace-nowrap'}>
-                {busy ? 'Перемещение...' : 'Переместить'}
-              </span>
-            ) : null}
-          </button>
-          <button
-            type="button"
-            disabled={isMoveDisabled}
-            onClick={() => setOpen((value) => !value)}
-            aria-label="Открыть список библиотек для переноса"
-            aria-haspopup="menu"
-            aria-expanded={open}
-            className={`inline-flex h-8 w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
-              open ? 'bg-white' : ''
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 shrink-0" aria-hidden>
-              <path d="M5 7h10l-5 6-5-6z" />
-            </svg>
-          </button>
-        </>
-      )}
-      {open ? (
-        <div className="absolute right-0 top-full z-40 mt-2 min-w-[14rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg" role="menu">
-          {libraries.length > 0 ? (
-            <div className="max-h-64 overflow-y-auto">
-              {libraries.map((library, index) => {
-                const isCurrent = library.id === currentLibraryId;
-                const itemDisabled = busy || !hasSelection || isCurrent;
-                return (
-                  <button
-                    key={library.id}
-                    type="button"
-                    role="menuitem"
-                    disabled={itemDisabled}
-                    onClick={() => {
-                      if (itemDisabled) return;
-                      handleStartPendingMove(library.id);
-                    }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
-                      isCurrent
-                        ? 'bg-accent text-white'
-                        : 'text-gray-900 hover:bg-accent hover:text-white disabled:hover:bg-white disabled:hover:text-gray-900'
-                    } ${index > 0 ? 'border-t border-gray-200' : ''} disabled:cursor-default`}
-                  >
-                    <span className="truncate">{library.name}</span>
-                    {isCurrent ? (
-                      <span className="ml-2 shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] uppercase text-gray-900">
-                        здесь
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="px-3 py-3 text-center">
-              <div className="text-xs font-semibold uppercase text-gray-900">Переносить пока некуда</div>
-              <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.04em] text-gray-400">
-                Создайте еще одну библиотеку
-              </div>
-            </div>
-          )}
-          {availableLibraries.length === 0 ? (
-            <div className="border-t border-gray-200 px-3 py-3 text-center">
-              <div className="text-xs font-semibold uppercase text-gray-900">Переносить пока некуда</div>
-              <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.04em] text-gray-400">
-                Создайте еще одну библиотеку
-              </div>
-            </div>
-          ) : null}
-          <div className={`${libraries.length > 0 ? 'border-t border-gray-200' : ''} p-1`}>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={busy || !hasSelection}
-              onClick={() => {
-                if (busy || !hasSelection) return;
-                setOpen(false);
-                if (!assertCanCreateNewLibrary()) return;
-                onCreateLibrary?.();
-              }}
-              className={`relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors disabled:cursor-default disabled:opacity-50 ${
-                availableLibraries.length === 0
-                  ? 'bg-accent text-white hover:bg-accent-hover'
-                  : 'text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
-                <PlusIcon className="h-4 w-4 shrink-0" />
-              </span>
-              <span className="truncate text-center">Добавить библиотеку</span>
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function SelectionToolbarActions({
-  selectedCount = 0,
-  downloadSelected = null,
-  downloadSelectedAsFormat = null,
-  emptyTooltip = 'Выделите карточки, чтобы скачать',
-  moveControl = null,
-}) {
-  const canDownloadSelected = selectedCount > 0 && typeof downloadSelected === 'function';
-  const canDownloadSelectedAsFormat =
-    selectedCount > 0 && typeof downloadSelectedAsFormat === 'function';
-  const [viewportW, setViewportW] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth : 0,
-  );
-  const hideToolbarLabel = viewportW < 1024;
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const handleResize = () => setViewportW(window.innerWidth);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  return (
-    <>
-      {moveControl}
-      <Tooltip
-        as="span"
-        content={canDownloadSelected ? `Скачать выделенные (${selectedCount})` : emptyTooltip}
-        className="inline-flex"
-      >
-        <CatalogDownloadSplitButton
-          className={`mr-3 ${hideToolbarLabel ? 'w-[5.5rem]' : 'w-auto'}`}
-          layout="comfortable"
-          heightClass="h-8"
-          tone="accent"
-          disabled={!canDownloadSelected}
-          primaryLabel="Скачать"
-          primaryCount={selectedCount}
-          hidePrimaryLabel={hideToolbarLabel}
-          primaryAriaLabel={
-            selectedCount > 0
-              ? `Скачать выделенные шрифты (${selectedCount})`
-              : 'Скачать выделенные шрифты'
-          }
-          onPrimaryClick={() => downloadSelected?.()}
-          menuItems={[
-            {
-              key: 'zip',
-              label: 'ZIP (по умолчанию)',
-              onSelect: () => downloadSelected?.(),
-            },
-            {
-              key: 'ttf',
-              label: 'TTF',
-              disabled: !canDownloadSelectedAsFormat,
-              onSelect: () => downloadSelectedAsFormat?.('ttf'),
-            },
-            {
-              key: 'otf',
-              label: 'OTF',
-              disabled: !canDownloadSelectedAsFormat,
-              onSelect: () => downloadSelectedAsFormat?.('otf'),
-            },
-            {
-              key: 'woff',
-              label: 'WOFF',
-              disabled: !canDownloadSelectedAsFormat,
-              onSelect: () => downloadSelectedAsFormat?.('woff'),
-            },
-            {
-              key: 'woff2',
-              label: 'WOFF2',
-              disabled: !canDownloadSelectedAsFormat,
-              onSelect: () => downloadSelectedAsFormat?.('woff2'),
-            },
-          ]}
-        />
-      </Tooltip>
-    </>
-  );
-}
-
-/** Синхронное восстановление до paint: без лишней вкладки «Новый» и без выбора её вместо сохранённой вкладки. */
-function readEditorShellFromStorage() {
-  if (typeof window === 'undefined') return null;
-  try {
-    const rawSlots = localStorage.getItem(EDITOR_EMPTY_SLOTS_LS_KEY);
-    const savedMain = localStorage.getItem(EDITOR_MAIN_TAB_LS_KEY);
-
-    let emptySlotIds;
-    if (rawSlots !== null) {
-      const p = JSON.parse(rawSlots);
-      emptySlotIds = Array.isArray(p) ? p.filter((x) => typeof x === 'string' && x.length > 0) : [];
-    } else if (!savedMain) {
-      emptySlotIds = [newEmptySlotId()];
-    } else if (savedMain.startsWith(EMPTY_PREFIX)) {
-      emptySlotIds = [savedMain.slice(EMPTY_PREFIX.length)];
-    } else {
-      emptySlotIds = [];
-    }
-
-    let mainTabResolved = 'library';
-    if (savedMain === 'library') {
-      mainTabResolved = 'library';
-    } else if (savedMain?.startsWith(EMPTY_PREFIX)) {
-      const sid = savedMain.slice(EMPTY_PREFIX.length);
-      if (emptySlotIds.includes(sid)) {
-        mainTabResolved = savedMain;
-      } else {
-        mainTabResolved = emptySlotIds.length > 0 ? `${EMPTY_PREFIX}${emptySlotIds[0]}` : 'library';
-      }
-    } else if (savedMain && savedMain !== 'library') {
-      mainTabResolved = savedMain;
-    } else if (!savedMain && emptySlotIds.length > 0) {
-      mainTabResolved = `${EMPTY_PREFIX}${emptySlotIds[0]}`;
-    }
-
-    return { emptySlotIds, mainTab: mainTabResolved };
-  } catch {
-    const id = newEmptySlotId();
-    return { emptySlotIds: [id], mainTab: `${EMPTY_PREFIX}${id}` };
-  }
-}
-
-/** Вкладки внутри экрана «Все шрифты»: единый каталог + пользовательские библиотеки */
-const LIBRARY_MAIN_TABS = [{ id: 'catalog', label: 'Каталог' }];
-
-function makeSavedLibraryTabId(libraryId) {
-  return `${SAVED_LIBRARY_TAB_PREFIX}${libraryId}`;
-}
-
-function readSavedLibraryId(tabId) {
-  return typeof tabId === 'string' && tabId.startsWith(SAVED_LIBRARY_TAB_PREFIX)
-    ? tabId.slice(SAVED_LIBRARY_TAB_PREFIX.length)
-    : null;
-}
-
-const CATALOG_SOURCE_OPTIONS = [
-  { value: 'google', label: 'Google' },
-  { value: 'fontsource', label: 'Fontsource' },
-];
-
-const LIBRARY_FONT_SCOPE_TABS = [
-  { id: 'all', label: 'Все' },
-  { id: 'recent', label: 'Новые' },
-  { id: 'local', label: 'С диска' },
-  { id: 'google', label: 'Google' },
-  { id: 'fontsource', label: 'Fontsource' },
-];
-
-const FONTSOURCE_PREWARM_LIMIT = 24;
-const FONTSOURCE_PREWARM_CONCURRENCY = 2;
-const FONTSOURCE_PREWARM_DELAY_MS = 1200;
-
-function countFontsByScope(fonts) {
-  const list = Array.isArray(fonts) ? fonts : [];
-  return {
-    all: list.length,
-    recent: countRecentlyAddedLibraryFonts(list),
-    local: list.filter((font) => (font?.source || 'local') === 'local').length,
-    google: list.filter((font) => font?.source === 'google').length,
-    fontsource: list.filter((font) => font?.source === 'fontsource').length,
-  };
-}
-
-function buildScopeSelectOptions(counts) {
-  return LIBRARY_FONT_SCOPE_TABS.map((tab) => ({
-    value: tab.id,
-    label: (
-      <span className="flex w-full items-center justify-between gap-3">
-        <span className="truncate">{tab.label}</span>
-        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-50 text-[10px] tabular-nums leading-none text-gray-800 transition-colors group-hover:bg-white group-hover:text-accent">
-          {counts?.[tab.id] ?? 0}
-        </span>
-      </span>
-    ),
-    triggerLabel: tab.label,
-  }));
-}
-
-function newEmptySlotId() {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-}
+import { SelectionToolbarActions } from '../components/library/SelectionToolbarActions';
+import {
+  EDITOR_MAIN_TAB_LS_KEY,
+  EDITOR_EMPTY_SLOTS_LS_KEY,
+  EDITOR_CLOSED_LIBRARY_FONT_IDS_LS_KEY,
+  FONTS_LIBRARY_INNER_TAB_LS_KEY,
+  SESSION_FONT_ORDER_LS_KEY,
+  SESSION_FONT_TABS_PREVIEW_KEY,
+  EDITOR_MAIN_TAB_PENDING,
+  newEmptySlotId,
+  readEditorShellFromStorage,
+  isFontTabId,
+} from '../utils/editorShellStorage';
+import { SAVED_LIBRARY_TAB_PREFIX, makeSavedLibraryTabId, readSavedLibraryId } from '../utils/savedLibraryTabIds';
+import {
+  LIBRARY_MAIN_TABS,
+  FONTSOURCE_PREWARM_LIMIT,
+  FONTSOURCE_PREWARM_CONCURRENCY,
+  FONTSOURCE_PREWARM_DELAY_MS,
+} from '../constants/fontsLibraryScreen';
+import { countFontsByScope, buildScopeSelectOptions } from '../utils/fontLibraryScopeUi';
 
 export default function Home() {
   const router = useRouter();
@@ -769,6 +285,7 @@ export default function Home() {
     handleVariableSettingsChange,
     safeSelectFont,
     removeFont,
+    removeFontsByIds,
     setSelectedFont,
     availableStyles,
     selectedPresetName,
@@ -2593,10 +2110,52 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 
   const handleDeleteSavedLibrary = useCallback(
     (libraryId) => {
+      const deletedLibrary = fontLibraries.find((library) => library.id === libraryId) || null;
+      const remainingLibraries = fontLibraries.filter((library) => library.id !== libraryId);
+      const idsToRemove = getFontIdsToRemoveWhenLibraryDeleted(fonts, deletedLibrary, remainingLibraries);
+
       deleteFontLibrary(libraryId);
       setFontsLibraryTab((prev) => (prev === makeSavedLibraryTabId(libraryId) ? 'catalog' : prev));
+
+      if (idsToRemove.length === 0) return;
+
+      const removedSet = new Set(idsToRemove.map((id) => String(id)));
+      const remainingAfter = fonts.filter((font) => !removedSet.has(String(font.id)));
+
+      removeFontsByIds(idsToRemove);
+      setClosedLibraryFontIds((prev) => prev.filter((id) => !removedSet.has(String(id))));
+
+      if (removedSet.has(String(mainTab))) {
+        const nextVisible =
+          remainingAfter.find((font) => !closedLibraryFontIds.includes(font.id)) || null;
+        if (nextVisible) {
+          setMainTab(nextVisible.id);
+          if (String(selectedFont?.id) !== String(nextVisible.id)) {
+            safeSelectFont(nextVisible);
+          }
+        } else if (emptySlotIds.length > 0) {
+          setMainTab(`${EMPTY_PREFIX}${emptySlotIds[0]}`);
+          setSelectedFont(null);
+        } else {
+          setMainTab('library');
+          setSelectedFont(null);
+        }
+      }
     },
-    [deleteFontLibrary],
+    [
+      closedLibraryFontIds,
+      deleteFontLibrary,
+      emptySlotIds,
+      fontLibraries,
+      fonts,
+      mainTab,
+      removeFontsByIds,
+      safeSelectFont,
+      selectedFont,
+      setClosedLibraryFontIds,
+      setMainTab,
+      setSelectedFont,
+    ],
   );
 
   const handleMoveLibraryFont = useCallback(
@@ -3631,462 +3190,77 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           )}
 
           {mainTab === 'library' && (
-            <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
-              {libraryTabs.length > 1 ? (
-                <div className="flex shrink-0 overflow-x-auto border-b border-gray-200 px-6 pt-6">
-                  {libraryTabs.map((tab) => (
-                    <UnderlineTab
-                      key={tab.id}
-                      isActive={fontsLibraryTab === tab.id}
-                      onClick={() => setFontsLibraryTab(tab.id)}
-                      onDragOver={
-                        tab.id === 'catalog' ? undefined : (event) => handleLibraryTabDragOver(event, tab.id)
-                      }
-                      onDrop={
-                        tab.id === 'catalog' ? undefined : (event) => handleLibraryTabDrop(event, tab.id)
-                      }
-                      onDragLeave={
-                        tab.id === 'catalog'
-                          ? undefined
-                          : () =>
-                              setLibraryDropTargetTabId((prev) => (prev === tab.id ? null : prev))
-                      }
-                      className={
-                        libraryDropTargetTabId === tab.id
-                          ? 'border-b-2 border-black text-black'
-                          : ''
-                      }
-                    >
-                      {tab.label}
-                    </UnderlineTab>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 pt-4">
-              {fontsLibraryTab === 'catalog' && (
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                  <div className={catalogSource === 'google' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
-                    <GoogleFontsCatalogPanel
-                      isActive={catalogSource === 'google'}
-                      fonts={fonts}
-                      fontLibraries={fontLibraries}
-                      onAddFontToLibrary={addFontEntryToLibrary}
-                      onRequestCreateLibrary={requestCreateLibraryWithFonts}
-                      onOpenGoogleEntryInEditorTab={openGoogleCatalogEntryInEditorTab}
-                      onSelectionActionsChange={handleCatalogSelectionActionsChange}
-                      onTotalItemsChange={setGoogleCatalogTotalItems}
-                      trailingToolbar={
-                        <SegmentedControl
-                          value={catalogSource}
-                          onChange={setCatalogSource}
-                          options={CATALOG_SOURCE_OPTIONS}
-                          variant="pairOutline"
-                          className={catalogSourceToggleClassName}
-                        />
-                      }
-                    />
-                  </div>
-                  <div className={catalogSource === 'fontsource' ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden' : 'hidden'}>
-                    <FontsourceCatalogPanel
-                      isActive={catalogSource === 'fontsource'}
-                      fonts={fonts}
-                      fontLibraries={fontLibraries}
-                      onAddFontToLibrary={addFontEntryToLibrary}
-                      onRequestCreateLibrary={requestCreateLibraryWithFonts}
-                      onOpenFontsourceInEditorTab={openFontsourceSlugInEditorTab}
-                      onSelectionActionsChange={handleCatalogSelectionActionsChange}
-                      onTotalItemsChange={setFontsourceCatalogTotalItems}
-                      trailingToolbar={
-                        <SegmentedControl
-                          value={catalogSource}
-                          onChange={setCatalogSource}
-                          options={CATALOG_SOURCE_OPTIONS}
-                          variant="pairOutline"
-                          className={catalogSourceToggleClassName}
-                        />
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeSavedLibrary && (
-                <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-7">
-                  {savedLibraryToolbarIsWideRow ? (
-                    <div className="shrink-0 pb-4" ref={savedLibrarySearchWrapRef}>
-                      <div className="relative">
-                        <div className="grid max-w-full grid-cols-5 items-center gap-4">
-                          <div className="min-w-0">
-                            <CustomSelect
-                              id="saved-library-fonts-scope"
-                              value={savedLibraryFontsScope}
-                              onChange={setSavedLibraryFontsScope}
-                              className={customSelectTriggerClass()}
-                              aria-label={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
-                              options={activeSavedLibraryScopeOptions}
-                            />
-                          </div>
-                          {savedLibrarySearchActive ? (
-                            savedLibrarySearchOverlayEnabled ? (
-                              <>
-                                <button
-                                  type="button"
-                                  aria-pressed={savedLibraryCatalogSearchSource === 'google'}
-                                  className={`${savedLibrarySourceButtonBaseClass} col-start-2 ${
-                                    savedLibraryCatalogSearchSource === 'google'
-                                      ? 'border-accent bg-accent text-white'
-                                      : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
-                                  }`}
-                                  onClick={() => setSavedLibraryCatalogSearchSource('google')}
-                                >
-                                  Google
-                                </button>
-                                <button
-                                  type="button"
-                                  aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
-                                  className={`${savedLibrarySourceButtonBaseClass} col-start-3 ${
-                                    savedLibraryCatalogSearchSource === 'fontsource'
-                                      ? 'border-accent bg-accent text-white'
-                                      : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
-                                  }`}
-                                  onClick={() => setSavedLibraryCatalogSearchSource('fontsource')}
-                                >
-                                  Fontsource
-                                </button>
-                                <div className="relative col-start-4 col-span-2 min-w-0 pr-24">
-                                  <div className="relative">
-                                    <input
-                                      ref={savedLibrarySearchInputRef}
-                                      type="search"
-                                      value={savedLibrarySearchQuery}
-                                      onFocus={() => setIsSavedLibrarySearchExpanded(true)}
-                                      onBlur={handleSavedLibrarySearchBlur}
-                                      onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
-                                      placeholder="Поиск в библиотеке"
-                                      className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
-                                      autoComplete="off"
-                                      spellCheck={false}
-                                    />
-                                    {savedLibrarySearchQueryTrimmed ? (
-                                      <SearchClearButton
-                                        onClick={clearSavedLibrarySearchTextOnly}
-                                        ariaLabel="Очистить текст поиска"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2"
-                                      />
-                                    ) : null}
-                                  </div>
-                                  <IconCircleButton
-                                    variant="searchToggle"
-                                    size="md"
-                                    pressed
-                                    className="absolute right-12 top-1/2 z-10 -translate-y-1/2 focus:outline-none"
-                                    onClick={clearSavedLibrarySearch}
-                                    aria-label="Закрыть поиск"
-                                  >
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth={1.6}
-                                      className="h-5 w-5"
-                                      aria-hidden
-                                    >
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </IconCircleButton>
-                                  <div className="absolute right-0 top-1/2 z-10 -translate-y-1/2">
-                                    {savedLibraryShareButton}
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="col-start-2 col-span-4 min-w-0">{savedLibrarySearchDesktopControls}</div>
-                            )
-                          ) : (
-                            <>
-                              <div className="min-w-0">
-                                <CustomSelect
-                                  id="saved-library-filter-variable"
-                                  value={savedLibraryFilterVariable}
-                                  onChange={setSavedLibraryFilterVariable}
-                                  className={customSelectTriggerClass({
-                                    placeholderMuted: String(savedLibraryFilterVariable || 'all') === 'all',
-                                  })}
-                                  aria-label="Вариативность"
-                                  placeholder="Вариативность"
-                                  emptyValue="all"
-                                  clearable
-                                  clearAriaLabel="Очистить фильтр вариативности"
-                                  options={savedLibraryVariableOptions}
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <CustomSelect
-                                  id="saved-library-filter-subsets"
-                                  value={savedLibraryFilterSubsets}
-                                  onChange={setSavedLibraryFilterSubsets}
-                                  className={customSelectTriggerClass({
-                                    placeholderMuted:
-                                      !Array.isArray(savedLibraryFilterSubsets) ||
-                                      savedLibraryFilterSubsets.length === 0,
-                                  })}
-                                  aria-label="Языки"
-                                  placeholder="Языки"
-                                  multiple
-                                  searchable
-                                  clearable
-                                  clearAriaLabel="Очистить фильтр языков"
-                                  searchPlaceholder="Поиск языка"
-                                  options={savedLibrarySubsetOptions}
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <CatalogCheckboxControl
-                                  checked={savedLibraryFilterItalic}
-                                  onChange={(next) => setSavedLibraryFilterItalic(next)}
-                                  label="Курсив"
-                                  inline={savedLibraryToolbarViewportW > 1440}
-                                />
-                              </div>
-                              <div
-                                className={`flex min-w-0 items-center justify-between ${
-                                  savedLibraryToolbarIsTightResetGap ? 'gap-0' : 'gap-3'
-                                }`}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={resetSavedLibraryFilters}
-                                  disabled={
-                                    !savedLibraryHasAdvancedFilters &&
-                                    String(savedLibraryFontsScope || 'all') === 'all' &&
-                                    !savedLibrarySearchQueryTrimmed
-                                  }
-                                  className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
-                                >
-                                  {savedLibraryResetLabel}
-                                </button>
-                                <div className="flex items-center gap-2">
-                                  {renderSavedLibrarySearchToggleButton(
-                                    '',
-                                    savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
-                                  )}
-                                  {savedLibraryShareButton}
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <ScopeFilterToolbar
-                        id="saved-library-fonts-scope"
-                        value={savedLibraryFontsScope}
-                        onChange={setSavedLibraryFontsScope}
-                        options={activeSavedLibraryScopeOptions}
-                        count={activeSavedLibraryScopeCounts[savedLibraryFontsScope] ?? 0}
-                        ariaLabel={`Показать шрифты в библиотеке ${activeSavedLibrary.name}`}
-                        gridClassName={
-                          savedLibraryToolbarIs4Col
-                            ? 'grid max-w-full grid-cols-4 gap-4'
-                            : savedLibraryToolbarIs2Col
-                              ? 'grid max-w-full grid-cols-2 gap-4'
-                              : 'grid max-w-full grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-                        }
-                        selectCellClassName={savedLibraryToolbarIs4Col ? 'col-span-2 min-w-0' : 'min-w-0'}
-                        trailingCellClassName={
-                          savedLibraryToolbarIs4Col
-                            ? 'col-start-3 col-span-2 flex min-w-0 justify-end'
-                            : savedLibraryToolbarIs2Col
-                              ? 'col-start-2 col-span-1 flex min-w-0 justify-end'
-                              : 'col-start-2 col-span-1 md:col-start-2 md:col-span-2 lg:col-start-2 lg:col-span-3 xl:col-start-2 xl:col-span-4 flex min-w-0 justify-end'
-                        }
-                        trailing={
-                          savedLibrarySearchOverlayEnabled
-                            ? savedLibrarySearchActive
-                              ? null
-                              : savedLibraryToolbarIs4Col
-                                ? (
-                                    <div className="flex min-w-0 flex-1 items-center gap-4">
-                                      <div className="min-w-0 flex-1">
-                                        <CustomSelect
-                                          id="saved-library-filter-subsets-top"
-                                          value={savedLibraryFilterSubsets}
-                                          onChange={setSavedLibraryFilterSubsets}
-                                          className={customSelectTriggerClass({
-                                            placeholderMuted:
-                                              !Array.isArray(savedLibraryFilterSubsets) ||
-                                              savedLibraryFilterSubsets.length === 0,
-                                          })}
-                                          aria-label="Языки"
-                                          placeholder="Языки"
-                                          multiple
-                                          searchable
-                                          clearable
-                                          clearAriaLabel="Очистить фильтр языков"
-                                          searchPlaceholder="Поиск языка"
-                                          options={savedLibrarySubsetOptions}
-                                        />
-                                      </div>
-                                      <div className="shrink-0">{savedLibrarySearchInlineButton}</div>
-                                    </div>
-                                  )
-                                : savedLibrarySearchInlineButton
-                            : savedLibrarySearchDesktopControls
-                        }
-                        trailingOverlay={
-                          savedLibrarySearchOverlayEnabled ? savedLibrarySearchMobileExpandedControls : null
-                        }
-                      />
-                      <div className="shrink-0 pb-4">
-                        <div
-                          className={`grid max-w-full gap-4 ${
-                            savedLibraryToolbarIs5Col
-                              ? 'grid-cols-5'
-                              : savedLibraryToolbarIs4Col
-                                ? 'grid-cols-4'
-                                : savedLibraryToolbarIs2Col
-                                  ? 'grid-cols-2'
-                                  : 'grid-cols-5'
-                          }`}
-                        >
-                          {!savedLibraryToolbarIs4Col ? (
-                            <div className="col-span-2 min-w-0">
-                              <CustomSelect
-                                id="saved-library-filter-subsets"
-                                value={savedLibraryFilterSubsets}
-                                onChange={setSavedLibraryFilterSubsets}
-                                className={customSelectTriggerClass({
-                                  placeholderMuted:
-                                    !Array.isArray(savedLibraryFilterSubsets) ||
-                                    savedLibraryFilterSubsets.length === 0,
-                                })}
-                                aria-label="Языки"
-                                placeholder="Языки"
-                                multiple
-                                searchable
-                                clearable
-                                clearAriaLabel="Очистить фильтр языков"
-                                searchPlaceholder="Поиск языка"
-                                options={savedLibrarySubsetOptions}
-                              />
-                            </div>
-                          ) : null}
-                          <div className={savedLibraryToolbarIs4Col ? 'col-span-2 min-w-0' : 'min-w-0'}>
-                            <CustomSelect
-                              id="saved-library-filter-variable"
-                              value={savedLibraryFilterVariable}
-                              onChange={setSavedLibraryFilterVariable}
-                              className={customSelectTriggerClass({
-                                placeholderMuted: String(savedLibraryFilterVariable || 'all') === 'all',
-                              })}
-                              aria-label="Вариативность"
-                              placeholder="Вариативность"
-                              emptyValue="all"
-                              clearable
-                              clearAriaLabel="Очистить фильтр вариативности"
-                              options={savedLibraryVariableOptions}
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <CatalogCheckboxControl
-                              checked={savedLibraryFilterItalic}
-                              onChange={(next) => setSavedLibraryFilterItalic(next)}
-                              label="Курсив"
-                            />
-                          </div>
-                          <div className={savedLibraryToolbarIs4Col ? 'flex min-w-0 items-center justify-end' : 'min-w-0'}>
-                            <button
-                              type="button"
-                              onClick={resetSavedLibraryFilters}
-                              disabled={
-                                !savedLibraryHasAdvancedFilters &&
-                                String(savedLibraryFontsScope || 'all') === 'all' &&
-                                !savedLibrarySearchQueryTrimmed
-                              }
-                              className={
-                                savedLibraryToolbarIs4Col
-                                  ? 'box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900'
-                                  : 'box-border h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm font-semibold uppercase text-gray-900 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white disabled:cursor-default disabled:opacity-40'
-                              }
-                            >
-                              {savedLibraryToolbarIs4Col ? 'Сбросить все' : savedLibraryResetLabel}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  <div className="min-h-0 flex-1 pb-10">
-                  {savedLibrarySearchQueryTrimmed ? (
-                    activeSavedLibraryItems.length === 0 && activeSavedLibraryCatalogItems.length === 0 ? (
-                      <p className="py-4 text-sm text-gray-500">Ничего не найдено.</p>
-                    ) : (
-                      <div className="space-y-6">
-                        {activeSavedLibraryItems.length > 0 ? (
-                          <div>
-                            <div className="mb-3 text-xs font-semibold uppercase text-gray-500">В библиотеке</div>
-                            <SortableFontCardGrid
-                              items={activeSavedLibraryItems}
-                              draggable={false}
-                              onMoveItem={undefined}
-                              renderAfter={null}
-                            />
-                          </div>
-                        ) : null}
-                        {activeSavedLibraryCatalogItems.length > 0 ? (
-                          <div>
-                            <div className="mb-3 text-xs font-semibold uppercase text-gray-500">В каталоге</div>
-                            <SortableFontCardGrid
-                              items={activeSavedLibraryCatalogItems}
-                              draggable={false}
-                              onMoveItem={undefined}
-                              renderAfter={null}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    )
-                  ) : filteredActiveSavedLibraryFonts.length > 0 ||
-                    savedLibraryFontsScope === 'all' ||
-                    savedLibraryFontsScope === 'local' ? (
-                    <div>
-                      <SortableFontCardGrid
-                        items={activeSavedLibraryItems}
-                        draggable={savedLibraryFontsScope === 'all' && selectedSavedLibraryFontIds.size === 0}
-                        onMoveItem={(draggedId, targetId) =>
-                          handleMoveLibraryFont(activeSavedLibrary.id, draggedId, targetId)
-                        }
-                        renderAfter={
-                          (savedLibraryFontsScope === 'all' || savedLibraryFontsScope === 'local') && (
-                            <UploadFromDiskCard
-                              onClick={() => {
-                                setFileUploadTarget('library');
-                                fileInputRef.current?.click();
-                              }}
-                            />
-                          )
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <p className="py-4 text-sm text-gray-500">В этой выборке пока пусто.</p>
-                  )}
-                  </div>
-                  {savedLibraryFontsScope === 'all' && filteredActiveSavedLibraryFonts.length > 1 ? (
-                    <LibraryReorderHint />
-                  ) : null}
-                </div>
-              )}
-              </div>
-              <EditorStatusBar
-                leading={libraryStatusBar.leading}
-                center={libraryStatusBar.center}
-              />
-            </div>
+            <FontsLibraryHomeScreen
+              libraryTabs={libraryTabs}
+              fontsLibraryTab={fontsLibraryTab}
+              setFontsLibraryTab={setFontsLibraryTab}
+              handleLibraryTabDragOver={handleLibraryTabDragOver}
+              handleLibraryTabDrop={handleLibraryTabDrop}
+              libraryDropTargetTabId={libraryDropTargetTabId}
+              setLibraryDropTargetTabId={setLibraryDropTargetTabId}
+              catalogSource={catalogSource}
+              setCatalogSource={setCatalogSource}
+              catalogSourceToggleClassName={catalogSourceToggleClassName}
+              fonts={fonts}
+              fontLibraries={fontLibraries}
+              addFontEntryToLibrary={addFontEntryToLibrary}
+              requestCreateLibraryWithFonts={requestCreateLibraryWithFonts}
+              openGoogleCatalogEntryInEditorTab={openGoogleCatalogEntryInEditorTab}
+              openFontsourceSlugInEditorTab={openFontsourceSlugInEditorTab}
+              handleCatalogSelectionActionsChange={handleCatalogSelectionActionsChange}
+              setGoogleCatalogTotalItems={setGoogleCatalogTotalItems}
+              setFontsourceCatalogTotalItems={setFontsourceCatalogTotalItems}
+              activeSavedLibrary={activeSavedLibrary}
+              savedLibraryToolbarIsWideRow={savedLibraryToolbarIsWideRow}
+              savedLibrarySearchWrapRef={savedLibrarySearchWrapRef}
+              savedLibraryFontsScope={savedLibraryFontsScope}
+              setSavedLibraryFontsScope={setSavedLibraryFontsScope}
+              activeSavedLibraryScopeOptions={activeSavedLibraryScopeOptions}
+              savedLibrarySearchActive={savedLibrarySearchActive}
+              savedLibrarySearchOverlayEnabled={savedLibrarySearchOverlayEnabled}
+              savedLibraryCatalogSearchSource={savedLibraryCatalogSearchSource}
+              setSavedLibraryCatalogSearchSource={setSavedLibraryCatalogSearchSource}
+              savedLibrarySourceButtonBaseClass={savedLibrarySourceButtonBaseClass}
+              savedLibrarySearchInputRef={savedLibrarySearchInputRef}
+              savedLibrarySearchQuery={savedLibrarySearchQuery}
+              setSavedLibrarySearchQuery={setSavedLibrarySearchQuery}
+              setIsSavedLibrarySearchExpanded={setIsSavedLibrarySearchExpanded}
+              handleSavedLibrarySearchBlur={handleSavedLibrarySearchBlur}
+              savedLibrarySearchQueryTrimmed={savedLibrarySearchQueryTrimmed}
+              clearSavedLibrarySearchTextOnly={clearSavedLibrarySearchTextOnly}
+              clearSavedLibrarySearch={clearSavedLibrarySearch}
+              savedLibraryShareButton={savedLibraryShareButton}
+              savedLibrarySearchDesktopControls={savedLibrarySearchDesktopControls}
+              savedLibraryFilterVariable={savedLibraryFilterVariable}
+              setSavedLibraryFilterVariable={setSavedLibraryFilterVariable}
+              savedLibraryVariableOptions={savedLibraryVariableOptions}
+              savedLibraryFilterSubsets={savedLibraryFilterSubsets}
+              setSavedLibraryFilterSubsets={setSavedLibraryFilterSubsets}
+              savedLibrarySubsetOptions={savedLibrarySubsetOptions}
+              savedLibraryFilterItalic={savedLibraryFilterItalic}
+              setSavedLibraryFilterItalic={setSavedLibraryFilterItalic}
+              savedLibraryToolbarViewportW={savedLibraryToolbarViewportW}
+              savedLibraryToolbarIsTightResetGap={savedLibraryToolbarIsTightResetGap}
+              resetSavedLibraryFilters={resetSavedLibraryFilters}
+              savedLibraryHasAdvancedFilters={savedLibraryHasAdvancedFilters}
+              savedLibraryResetLabel={savedLibraryResetLabel}
+              renderSavedLibrarySearchToggleButton={renderSavedLibrarySearchToggleButton}
+              openSavedLibrarySearch={openSavedLibrarySearch}
+              activeSavedLibraryScopeCounts={activeSavedLibraryScopeCounts}
+              savedLibraryToolbarIs4Col={savedLibraryToolbarIs4Col}
+              savedLibraryToolbarIs2Col={savedLibraryToolbarIs2Col}
+              savedLibraryToolbarIs5Col={savedLibraryToolbarIs5Col}
+              savedLibrarySearchInlineButton={savedLibrarySearchInlineButton}
+              savedLibrarySearchMobileExpandedControls={savedLibrarySearchMobileExpandedControls}
+              activeSavedLibraryItems={activeSavedLibraryItems}
+              activeSavedLibraryCatalogItems={activeSavedLibraryCatalogItems}
+              filteredActiveSavedLibraryFonts={filteredActiveSavedLibraryFonts}
+              selectedSavedLibraryFontIds={selectedSavedLibraryFontIds}
+              handleMoveLibraryFont={handleMoveLibraryFont}
+              setFileUploadTarget={setFileUploadTarget}
+              fileInputRef={fileInputRef}
+              libraryStatusBar={libraryStatusBar}
+            />
           )}
         </div>
       </div>

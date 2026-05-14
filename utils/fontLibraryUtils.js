@@ -117,6 +117,62 @@ export function mapFontsourceCatalogItemsToLibraryEntries(items) {
     .filter(Boolean);
 }
 
+/** Ключи для сопоставления сессионного шрифта с `id` записей в библиотеках. */
+export function getSessionFontLibraryEntryMatchKeys(font) {
+  const keys = [];
+  const add = (k) => {
+    const s = String(k || '').trim();
+    if (s) keys.push(s);
+  };
+  add(font?.originKey);
+  if (font?.id != null) add(`session:${String(font.id).trim()}`);
+  const source = String(font?.source || '').trim();
+  const rawDisplay = String(font?.displayName || '').trim();
+  const rawName = String(font?.name || '').trim();
+  if (source === 'google') {
+    const parts = [...new Set([rawDisplay, rawName].filter(Boolean))];
+    for (const p of parts) {
+      add(`google:${p}`);
+      add(`google:${normalizeLibraryText(p)}`);
+    }
+  }
+  if (source === 'fontsource' && rawName) {
+    add(`fontsource:${rawName}`);
+    add(`fontsource:${normalizeLibraryText(rawName)}`);
+  }
+  if (source === 'local' && font?.id != null) {
+    add(`local:${String(font.id).trim()}`);
+  }
+  return [...new Set(keys)];
+}
+
+/**
+ * Шрифты сессии, соответствующие записям удаляемой библиотеки и не остающиеся ни в одной другой библиотеке.
+ */
+export function getFontIdsToRemoveWhenLibraryDeleted(fonts, deletedLibrary, remainingLibraries) {
+  const deletedEntryIds = new Set(
+    (Array.isArray(deletedLibrary?.fonts) ? deletedLibrary.fonts : [])
+      .map((e) => String(e?.id || '').trim())
+      .filter(Boolean),
+  );
+  if (deletedEntryIds.size === 0) return [];
+
+  const otherEntryIds = new Set(
+    (Array.isArray(remainingLibraries) ? remainingLibraries : []).flatMap((lib) =>
+      (Array.isArray(lib?.fonts) ? lib.fonts : []).map((e) => String(e?.id || '').trim()).filter(Boolean),
+    ),
+  );
+
+  const out = [];
+  for (const font of fonts || []) {
+    const keys = getSessionFontLibraryEntryMatchKeys(font);
+    const hitsDeleted = keys.some((k) => deletedEntryIds.has(k));
+    const staysInOther = keys.some((k) => otherEntryIds.has(k));
+    if (hitsDeleted && !staysInOther) out.push(font.id);
+  }
+  return out;
+}
+
 export function isGoogleFontInSession(fonts, family) {
   return (Array.isArray(fonts) ? fonts : []).some(
     (font) =>

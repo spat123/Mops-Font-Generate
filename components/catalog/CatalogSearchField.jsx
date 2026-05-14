@@ -1,5 +1,5 @@
 import React from 'react';
-import { SearchClearButton } from './SearchClearButton';
+import { SearchClearButton } from '../ui/SearchClearButton';
 
 export function CatalogSearchField({
   id,

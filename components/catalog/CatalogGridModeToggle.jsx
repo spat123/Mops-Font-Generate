@@ -1,7 +1,7 @@
 import React from 'react';
-import { EditAssetIcon } from './EditAssetIcon';
-import { gridIconUrl, rowIconUrl } from './editIconUrls';
-import { Tooltip } from './Tooltip';
+import { EditAssetIcon } from '../ui/EditAssetIcon';
+import { gridIconUrl, rowIconUrl } from '../ui/editIconUrls';
+import { Tooltip } from '../ui/Tooltip';
 
 const GRID_MODE_TOOLTIP = 'Сетка';
 const ROW_MODE_TOOLTIP = 'Строка';

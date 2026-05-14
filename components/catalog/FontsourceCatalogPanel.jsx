@@ -1,35 +1,35 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { toast } from '../utils/appNotify';
-import { HexProgressLoader } from './ui/HexProgressLoader';
-import { FontsourceCatalogCard } from './ui/FontsourceCatalogCard';
-import { useCatalogToolbarLayout } from './ui/useCatalogToolbarLayout';
-import { isFontsourceFontInSession } from '../utils/fontLibraryUtils';
-import { createCatalogLibraryEntry } from '../utils/fontLibraryUtils';
+import { toast } from '../../utils/appNotify';
+import { HexProgressLoader } from '../ui/HexProgressLoader';
+import { FontsourceCatalogCard } from './FontsourceCatalogCard';
+import { useCatalogToolbarLayout } from './useCatalogToolbarLayout';
+import { isFontsourceFontInSession } from '../../utils/fontLibraryUtils';
+import { createCatalogLibraryEntry } from '../../utils/fontLibraryUtils';
 import {
   readFontsourceCatalogCache,
   writeFontsourceCatalogCache,
-} from '../utils/fontsourceCatalogCache';
-import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
+} from '../../utils/fontsourceCatalogCache';
+import { readGoogleFontCatalogCache } from '../../utils/googleFontCatalogCache';
 import {
   getFontsourcePreviewFamily,
   hasFontsourcePreviewFamily,
   loadFontsourcePreviewFamily,
-} from '../utils/fontsourcePreviewRuntimeCache';
+} from '../../utils/fontsourcePreviewRuntimeCache';
 import {
   compareFontCategoryLabelsRu,
   getFontCategoryLabelRu,
-} from '../utils/fontCategoryLabels';
-import { getFontSubsetLabelRu } from '../utils/fontSubsetLabels';
-import { writeLibraryFontDragData } from '../utils/libraryDragData';
-import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
-import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
-import { useStickyTimedSet } from './ui/useStickyTimedSet';
-import { CatalogPanelToolbar } from './ui/CatalogPanelToolbar';
-import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
-import { filterCatalogItems, sortCatalogItems } from '../utils/catalogFilterSort';
-import { useCatalogEngine } from './ui/useCatalogEngine';
-import { useOverlayScrollbar } from './ui/useOverlayScrollbar';
-import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
+} from '../../utils/fontCategoryLabels';
+import { getFontSubsetLabelRu } from '../../utils/fontSubsetLabels';
+import { writeLibraryFontDragData } from '../../utils/libraryDragData';
+import { isInteractiveTarget } from '../../utils/dom/isInteractiveTarget';
+import { useLongPressMultiSelect } from '../ui/useLongPressMultiSelect';
+import { useStickyTimedSet } from '../ui/useStickyTimedSet';
+import { CatalogPanelToolbar } from './CatalogPanelToolbar';
+import { useSelectionActionsEffect } from '../ui/useSelectionActionsEffect';
+import { filterCatalogItems, sortCatalogItems } from '../../utils/catalogFilterSort';
+import { useCatalogEngine } from './useCatalogEngine';
+import { useOverlayScrollbar } from '../ui/useOverlayScrollbar';
+import { addLibraryEntryToLibrary } from '../../utils/libraryEntryActions';
 import {
   buildArchiveBlobFromEntries,
   buildFontsourceFormatArchiveEntry,
@@ -39,7 +39,7 @@ import {
   downloadFontsourcePackageZip,
   downloadFontsourceVariableVariant,
   saveArchiveBlob,
-} from '../utils/catalogDownloadActions';
+} from '../../utils/catalogDownloadActions';
 
 const { startTransition } = React;
 

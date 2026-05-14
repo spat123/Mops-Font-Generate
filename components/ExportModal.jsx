@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
+import { AppButton } from './ui/AppButton';
 import { toast } from '../utils/appNotify';
 import { saveBlobAsFile } from '../utils/fileDownloadUtils';
 import { slugifyFontKey } from '../utils/fontSlug';
@@ -181,10 +182,12 @@ export default function ExportModal({
           <div className="relative rounded-md border border-gray-200 bg-gray-50 py-4 pl-4 pr-1 shadow-inner">
             {isTextExport ? (
               <>
-                <button
+                <AppButton
                   type="button"
+                  variant="outline"
+                  size="icon"
+                  className="absolute right-2 top-2 !h-8 !w-8 !min-h-8 !min-w-8 !border-gray-300 !p-0"
                   onClick={copyToClipboard}
-                  className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 bg-white text-black transition-colors hover:border-black hover:bg-black hover:text-white"
                   aria-label="Копировать код"
                   title={copied ? 'Скопировано' : 'Копировать'}
                 >
@@ -192,7 +195,7 @@ export default function ExportModal({
                     <path d="M8.25 8.25h9.5v9.5h-9.5z" stroke="currentColor" strokeWidth="1.8" />
                     <path d="M6.25 15.75h-1v-10.5h10.5v1" stroke="currentColor" strokeWidth="1.8" />
                   </svg>
-                </button>
+                </AppButton>
                 <textarea
                   ref={textareaRef}
                   className={`code-scrollbar h-64 w-full resize-none overflow-y-auto bg-transparent pr-10 font-mono text-sm focus:outline-none ${
@@ -218,20 +221,12 @@ export default function ExportModal({
         </div>
 
         <div className="flex items-center gap-3 border-t border-gray-200 px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full rounded-md min-h-8 border border-gray-200 px-4 py-2 text-sm font-semibold uppercase text-gray-700 transition-colors hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white"
-          >
+          <AppButton type="button" variant="outline" fullWidth className="!min-h-8" onClick={onClose}>
             Отменить
-          </button>
-          <button
-            type="button"
-            onClick={downloadExport}
-            className="w-full inline-flex items-center justify-center rounded-md min-h-8 border border-accent bg-accent px-4 py-2 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover"
-          >
+          </AppButton>
+          <AppButton type="button" variant="accent" fullWidth className="!min-h-8" onClick={downloadExport}>
             Скачать файл
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

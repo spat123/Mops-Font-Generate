@@ -21,6 +21,7 @@ import { EDITOR_SIDEBAR_FOOTER_BAR_CLASS } from './ui/editorChromeClasses';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
+import { AppButton } from './ui/AppButton';
 
 const sidebarSelectClass = customSelectTriggerClass({ compact: true });
 
@@ -494,14 +495,6 @@ const SIDEBAR_VERTICAL_ALIGN_OPTIONS = [
   { value: 'middle', title: 'По центру вертикали', 'aria-label': 'Вертикально: по центру', Icon: IconVerticalTextMiddle },
   { value: 'bottom', title: 'По нижнему краю', 'aria-label': 'Вертикально: по низу', Icon: IconVerticalTextBottom },
 ];
-
-const SIDEBAR_PRESET_BTN_BASE =
-  'rounded-md border px-3 py-1.5 text-center text-xs uppercase font-semibold transition-colors duration-150 disabled:opacity-40';
-const SIDEBAR_PRESET_BTN_IDLE =
-  `${SIDEBAR_PRESET_BTN_BASE} h-8 border-gray-200 bg-white text-gray-800 hover:bg-black/[0.9] hover:text-white disabled:hover:bg-white disabled:hover:text-gray-800`;
-/** Активные чипы/сегменты: акцентный фон */
-const SIDEBAR_PRESET_BTN_ACTIVE =
-  `${SIDEBAR_PRESET_BTN_BASE} border-accent bg-accent text-white hover:bg-accent-hover disabled:hover:bg-accent disabled:hover:text-white`;
 
 /** Строка: переключатель HEX/RGB + поле(я) в единой сетке */
 const COLOR_VALUE_ROW = 'flex min-w-0 w-full max-w-full items-center gap-2';
@@ -1956,15 +1949,18 @@ export default function Sidebar({
               presets.map(({ key, label }) => {
                 const active = sidebarTextPreset === `${kind}:${key}`;
                 return (
-                  <button
+                  <AppButton
                     key={`${kind}-${key}`}
                     type="button"
+                    variant="chip"
+                    pressed={active}
+                    size="xs"
+                    fullWidth
                     disabled={isGlyphsView}
-                    className={active ? SIDEBAR_PRESET_BTN_ACTIVE : SIDEBAR_PRESET_BTN_IDLE}
                     onClick={() => pickSidebarTextPreset(kind, key)}
                   >
                     {label}
-                  </button>
+                  </AppButton>
                 );
               }),
             )}

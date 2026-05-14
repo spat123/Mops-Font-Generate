@@ -4,6 +4,7 @@ import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import DraggableValueRangeSlider from './ui/DraggableValueRangeSlider';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
+import { AppButton } from './ui/AppButton';
 
 function slugFileBase(name) {
   const s = String(name || 'font')
@@ -206,22 +207,18 @@ export default function GenerateFontModal({
         </div>
 
         <div className="flex shrink-0 items-stretch gap-3 border-t border-gray-200 bg-white px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full min-h-10 rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={busy}
-          >
+          <AppButton type="button" variant="outline" fullWidth onClick={onClose} disabled={busy}>
             Отменить
-          </button>
-          <button
+          </AppButton>
+          <AppButton
             type="button"
+            variant="accent"
+            fullWidth
             onClick={handleGenerate}
             disabled={!vf || busy}
-            className="inline-flex w-full min-h-10 items-center justify-center rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? 'Генерация…' : 'Сгенерировать'}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

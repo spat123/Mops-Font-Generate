@@ -5,6 +5,7 @@ import { getGlyphDataForFont } from '../utils/fontParser';
 import { useSettings } from '../contexts/SettingsContext';
 import { VirtualizedGlyphGrid } from './ui/VirtualizedGlyphGrid';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
+import { AppButton } from './ui/AppButton';
 
 // Глобальный кэш глифов, чтобы не загружать их повторно.
 const glyphDataCache = new Map();
@@ -599,30 +600,33 @@ function GlyphsMode({
                       : 'grid-cols-1'
                 }`}
               >
-                <button
+                <AppButton
                   type="button"
+                  variant="outline"
+                  fullWidth
                   onClick={() => copyToClipboard(selectedGlyphDetails.name, 'Имя')}
-                  className="min-h-10 w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
                 >
                   Имя
-                </button>
+                </AppButton>
                 {selectedGlyphDetails.unicodeStr ? (
-                  <button
+                  <AppButton
                     type="button"
+                    variant="outline"
+                    fullWidth
                     onClick={() => copyToClipboard(selectedGlyphDetails.unicodeStr, 'Unicode')}
-                    className="min-h-10 w-full rounded-md border border-gray-200 px-4 py-2.5 text-sm font-semibold uppercase text-gray-700 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
                   >
                     Unicode
-                  </button>
+                  </AppButton>
                 ) : null}
                 {selectedGlyphDetails.isPrintable ? (
-                  <button
+                  <AppButton
                     type="button"
+                    variant="accent"
+                    fullWidth
                     onClick={() => copyToClipboard(selectedGlyphDetails.char, 'Символ')}
-                    className="min-h-10 w-full rounded-md border border-accent bg-accent px-4 py-2.5 text-sm font-semibold uppercase text-white transition-colors hover:bg-accent-hover"
                   >
                     Символ
-                  </button>
+                  </AppButton>
                 ) : null}
               </div>
             </div>

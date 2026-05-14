@@ -1,19 +1,19 @@
 import React from 'react';
+import { AppButton } from './AppButton';
 
-/** Кнопка-«чип» с заливкой при выборе (наборы глифов в сайдбаре). */
+/** Кнопка-«чип» с заливкой при выборе (наборы глифов в сайдбаре). Стили — {@link AppButton} `variant="chip"`. */
 export function SelectableChip({ active, onClick, children, className = '', type = 'button', ...props }) {
   return (
-    <button
+    <AppButton
       type={type}
+      variant="chip"
+      pressed={Boolean(active)}
+      size="xs"
+      className={className}
       onClick={onClick}
       {...props}
-      className={`rounded-md px-3 py-1.5 text-xs transition-all duration-150 ${
-        active
-          ? 'bg-accent text-white'
-          : 'border border-gray-200 bg-white text-gray-800 hover:bg-black/[0.9] hover:border-black/[0.9] hover:text-white'
-      } ${className}`.trim()}
     >
       {children}
-    </button>
+    </AppButton>
   );
 }

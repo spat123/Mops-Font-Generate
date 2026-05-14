@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from './SignInProviderButtons';
+import { AppButton } from '../ui/AppButton';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 
 function IconUser({ className }) {
@@ -36,15 +37,21 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const loading = status === 'loading';
 
   return (
-    <div ref={rootRef} className="relative flex items-center justify-center">
-      <button
+    <div
+      ref={rootRef}
+      className={`relative flex items-center justify-center ${isSidebarCollapsed ? '' : 'h-full min-h-0 w-full'}`}
+    >
+      <AppButton
         type="button"
+        variant="toolbarIcon"
+        pressed={open}
+        size={isSidebarCollapsed ? 'icon' : 'rail'}
+        className={
+          isSidebarCollapsed
+            ? 'group'
+            : 'group overflow-hidden [&_img]:max-h-9'
+        }
         onClick={() => setOpen((v) => !v)}
-        className={`group inline-flex items-center justify-center rounded-md transition-all ${
-          open
-            ? 'bg-accent text-white shadow-sm'
-            : 'bg-gray-50 text-gray-600 hover:bg-accent/10 hover:text-accent'
-        } ${isSidebarCollapsed ? 'h-9 w-9' : ''}`}
         aria-label={authenticated ? 'Аккаунт' : 'Войти'}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -54,12 +61,12 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
           <img
             src={session.user.image}
             alt=""
-            className={`rounded-md object-cover ${isSidebarCollapsed ? 'h-6 w-6' : 'h-4 w-4'}`}
+            className={`rounded-md object-cover ${isSidebarCollapsed ? 'h-6 w-6' : 'h-full w-full min-h-0 min-w-0 max-h-9'}`}
           />
         ) : (
-          <IconUser className={isSidebarCollapsed ? 'h-4 w-4' : 'h-4 w-4'} />
+          <IconUser className={`transition-transform ${isSidebarCollapsed ? 'h-4 w-4' : 'h-5 w-5'} group-hover:scale-110`} />
         )}
-      </button>
+      </AppButton>
 
       {open ? (
         <div
@@ -78,33 +85,36 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   <p className="truncate text-xs text-gray-500">{session.user.email}</p>
                 ) : null}
               </div>
-              <button
+              <AppButton
                 type="button"
-                className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold uppercase text-gray-800 transition-colors hover:bg-gray-50"
+                size="sm"
+                fullWidth
                 onClick={() => {
                   setOpen(false);
                   void signOut({ callbackUrl: router.asPath || '/' });
                 }}
               >
                 Выйти
-              </button>
+              </AppButton>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-center text-xs font-semibold uppercase leading-snug text-gray-700">
-                Войдите, чтобы создавать библиотеки (до 3)
+                Войдите, чтобы создавать библиотеки.
               </p>
               <SignInProviderButtons callbackUrl={callbackUrl} />
-              <button
+              <AppButton
                 type="button"
-                className="text-center text-[11px] font-medium uppercase text-gray-400 underline-offset-2 hover:text-accent hover:underline"
+                variant="link"
+                fullWidth
+                className="text-center"
                 onClick={() => {
                   setOpen(false);
                   void router.push('/auth/signin');
                 }}
               >
                 Полная страница входа
-              </button>
+              </AppButton>
             </div>
           )}
         </div>

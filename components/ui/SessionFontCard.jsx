@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CardActionsMenu } from './CardActionsMenu';
-import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
+import { CatalogDownloadSplitButton } from '../catalog/CatalogDownloadSplitButton';
 import { Tooltip } from './Tooltip';
 
 const PREVIEW_SAMPLE = 'AaBbCcDdEe';

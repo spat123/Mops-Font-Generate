@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Tooltip } from '../ui/Tooltip';
+import { AppButton } from '../ui/AppButton';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { countRecentlyAddedLibraryFonts } from '../../utils/fontLibraryUtils';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../../utils/colorUtils';
@@ -245,19 +246,18 @@ function CollapsedLibraryRail({
           return (
             <Tooltip key={library?.id || library?.name || 'library'} content={library?.name || 'Библиотека'}>
               <span className="relative inline-flex">
-                <button
+                <AppButton
                   type="button"
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[11px] font-semibold leading-none transition-colors ${
-                    isActive
-                      ? 'border-accent bg-accent text-white'
-                      : 'border-gray-300 bg-white text-gray-900 hover:border-black hover:bg-black hover:text-white'
-                  }`}
+                  variant="chip"
+                  pressed={isActive}
+                  size="icon"
+                  className={`!h-9 !min-h-9 !w-9 !min-w-9 !rounded-full !p-0 text-[11px] font-semibold leading-none ${!isActive ? '!border-gray-300' : ''}`}
                   aria-label={`${library?.name || 'Библиотека'}: ${fontCount} шт.${recentAddedCount > 0 ? `, новых ${recentAddedCount}` : ''}`}
                   aria-pressed={isActive}
                   onClick={() => onOpenLibrary?.(library?.id || null)}
                 >
                   {fontCount}
-                </button>
+                </AppButton>
                 {recentAddedCount > 0 ? (
                   <span
                     className={`pointer-events-none absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none shadow-sm ring-2 ring-white ${
@@ -1376,19 +1376,19 @@ export function CollapsedSidebarControls({
               const active = sidebarTextPreset === presetKey;
               return (
                 <Tooltip key={presetKey} content={label} as="div" className="w-full">
-                  <button
+                  <AppButton
                     type="button"
-                    onClick={() => pickSidebarTextPreset(kind, key)}
+                    variant="chip"
+                    pressed={active}
+                    size="xs"
+                    fullWidth
                     disabled={isGlyphsView}
-                    className={`inline-flex h-8 w-full items-center justify-center rounded-md border transition-colors ${
-                      active
-                        ? 'border-accent bg-accent text-white'
-                        : 'border-gray-200 bg-white text-gray-900 hover:border-black hover:bg-black hover:text-white'
-                    } disabled:cursor-default disabled:opacity-40`}
+                    className="h-8 !min-h-8 py-0"
+                    onClick={() => pickSidebarTextPreset(kind, key)}
                     aria-label={`Быстрый пресет: ${label}`}
                   >
                     <QuickPresetIcon kind={kind} itemKey={key} />
-                  </button>
+                  </AppButton>
                 </Tooltip>
               );
             }),

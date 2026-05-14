@@ -387,6 +387,43 @@ export function useFontManager() {
     });
   }, [selectedFont, setFonts, setSelectedFont]);
 
+  const removeFontsByIds = useCallback(
+    (fontIds) => {
+      const idSet = new Set((fontIds || []).map((id) => String(id)));
+      if (idSet.size === 0) return;
+
+      setFonts((prev) => {
+        const toRemove = prev.filter((f) => idSet.has(String(f.id)));
+        for (const fontToRemove of toRemove) {
+          if (fontToRemove.url) {
+            revokeObjectURL(fontToRemove.url);
+          }
+          deleteFontDB(String(fontToRemove.id)).catch((err) => {
+            console.error(`[DB] Ошибка удаления шрифта ${fontToRemove.id} из DB:`, err);
+            toast.error('Ошибка удаления шрифта из базы данных.');
+          });
+        }
+
+        const updatedFonts = prev.filter((f) => !idSet.has(String(f.id)));
+
+        if (selectedFont && idSet.has(String(selectedFont.id))) {
+          if (updatedFonts.length > 0) {
+            const newFont = updatedFonts[0];
+            setSelectedFont(newFont);
+            setTimeout(() => {
+              safeSelectFontRef.current?.(newFont);
+            }, 0);
+          } else {
+            setSelectedFont(null);
+          }
+        }
+
+        return updatedFonts;
+      });
+    },
+    [selectedFont, setFonts, setSelectedFont],
+  );
+
   // Обертки для совместимости с предыдущим API
   const exportToCSS = useCallback((download = false) => {
     return exportToCSSFromExportHook(selectedFont, selectedFontName, download);
@@ -512,6 +549,7 @@ export function useFontManager() {
     loadAndSelectFontsourceFont,
     selectOrAddFontsourceFont,
     removeFont,
+    removeFontsByIds,
     safeSelectFont,
     getVariableAxesInfo,
     getVariableAxes: getVariableAxesInfo,
@@ -532,5 +570,6 @@ export function useFontManager() {
     resetApplicationState,
     saveFontSettings,
     resetSelectedFontState,
+    getResetTargetPresetName: resolveResetPresetName,
   };
 } 

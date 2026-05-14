@@ -15,14 +15,15 @@ import { formatCatalogUnionAvailabilityShort, getCatalogUnionStats } from '../ut
 import { ensureGoogleFontPreviewCss } from '../utils/googleFontPreviewCss';
 import { matchesSearch } from '../utils/searchMatching';
 import { SearchClearButton } from './ui/SearchClearButton';
-import { CatalogFontCard } from './ui/CatalogFontCard';
+import { CatalogFontCard } from './catalog/CatalogFontCard';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchIcon } from './ui/CommonIcons';
 import { IconCircleButton } from './ui/IconCircleButton';
+import { AppButton } from './ui/AppButton';
 import { FontLibraryStatusMenu } from './ui/FontLibraryStatusMenu';
-import { CatalogLibraryActions } from './ui/CatalogLibraryActions';
-import { CatalogDownloadSplitButton } from './ui/CatalogDownloadSplitButton';
-import { buildCatalogDownloadButtonProps } from './ui/buildCatalogDownloadButtonProps';
+import { CatalogLibraryActions } from './catalog/CatalogLibraryActions';
+import { CatalogDownloadSplitButton } from './catalog/CatalogDownloadSplitButton';
+import { buildCatalogDownloadButtonProps } from './catalog/buildCatalogDownloadButtonProps';
 import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
@@ -949,14 +950,16 @@ export default function FontPreview({
                 {filteredPresetFonts.length > 0 ? (
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     {filteredPresetFonts.map((fontName) => (
-                      <button
+                      <AppButton
                         key={fontName}
-                        onClick={() => loadPresetFont(fontName)}
                         type="button"
-                        className="rounded-md border border-gray-200 bg-white px-4 py-3 font-sans font-medium text-gray-800 transition-all duration-200 hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white"
+                        variant="outline"
+                        fullWidth
+                        className="!normal-case px-4 py-3 font-sans font-medium"
+                        onClick={() => loadPresetFont(fontName)}
                       >
                         {fontName}
-                      </button>
+                      </AppButton>
                     ))}
                   </div>
                 ) : (

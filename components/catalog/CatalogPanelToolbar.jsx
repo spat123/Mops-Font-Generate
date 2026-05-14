@@ -5,11 +5,11 @@ import { CatalogSearchButton } from './CatalogSearchButton';
 import { CatalogTextSortControls } from './CatalogTextSortControls';
 import { CatalogGridModeToggle } from './CatalogGridModeToggle';
 import { CatalogCheckboxControl } from './CatalogCheckbox';
-import { CustomSelect } from './CustomSelect';
+import { CustomSelect } from '../ui/CustomSelect';
 import {
   NATIVE_SELECT_FIELD_INTERACTIVE,
   customSelectTriggerClass,
-} from './nativeSelectFieldClasses';
+} from '../ui/nativeSelectFieldClasses';
 
 export function CatalogPanelToolbar({
   trailingToolbar = null,

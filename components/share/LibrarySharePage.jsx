@@ -18,7 +18,7 @@ import { useFontLibraries } from '../../hooks/useFontLibraries';
 import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../../utils/authLibraryLimits';
 import { toast } from '../../utils/appNotify';
 import { Tooltip } from '../ui/Tooltip';
-import { CatalogGridModeToggle } from '../ui/CatalogGridModeToggle';
+import { CatalogGridModeToggle } from '../catalog/CatalogGridModeToggle';
 import { PlusIcon } from '../ui/CommonIcons';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { downloudIconUrl, linkIconUrl } from '../ui/editIconUrls';
@@ -32,9 +32,9 @@ import {
   writeGoogleFontCatalogCache,
 } from '../../utils/googleFontCatalogCache';
 import { loadFontsourcePreviewFamily } from '../../utils/fontsourcePreviewRuntimeCache';
-import { GoogleFontsCatalogCard } from '../ui/GoogleFontsCatalogCard';
-import { FontsourceCatalogCard } from '../ui/FontsourceCatalogCard';
-import { CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX } from '../ui/CatalogRowModeCard';
+import { GoogleFontsCatalogCard } from '../catalog/GoogleFontsCatalogCard';
+import { FontsourceCatalogCard } from '../catalog/FontsourceCatalogCard';
+import { CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX } from '../catalog/CatalogRowModeCard';
 import {
   downloadFontsourceAsFormat,
   downloadFontsourcePackageZip,
@@ -43,11 +43,7 @@ import {
   downloadGooglePackageZip,
   downloadGoogleVariableVariant,
 } from '../../utils/catalogDownloadActions';
-
-const btnPrimary =
-  'inline-flex items-center justify-center gap-2 rounded-sm border border-accent bg-accent px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50';
-const btnSecondary =
-  'inline-flex items-center justify-center gap-2 rounded-sm border border-gray-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-800 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50';
+import { AppButton } from '../ui/AppButton';
 
 const SHARE_ROW_SAMPLE_TOOLTIP =
   'Дважды щёлкните, чтобы изменить образец в этой строке (только на этой странице)';
@@ -421,14 +417,16 @@ export function LibrarySharePage() {
           <div className="mx-auto flex h-12 min-h-12 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
             <ShareLogoLink />
             <Tooltip content="Полный редактор шрифтов на главной" openDelayMs={120}>
-              <Link
+              <AppButton
+                as={Link}
                 href="/"
-                className={`${btnSecondary} inline-flex shrink-0 items-center gap-2 py-2`}
+                variant="outline"
+                className="!rounded-sm shrink-0 py-2"
                 aria-label="Открыть редактор"
               >
                 <EditAssetIcon src={linkIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
                 <span>Открыть редактор</span>
-              </Link>
+              </AppButton>
             </Tooltip>
           </div>
         </header>
@@ -443,9 +441,9 @@ export function LibrarySharePage() {
                 Откройте полную ссылку «Поделиться» из редактора — в адресе должен быть параметр{' '}
                 <code className="rounded-sm bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800">share=</code>.
               </p>
-              <Link href="/" className={`${btnPrimary} mt-8`}>
+              <AppButton as={Link} href="/" variant="accent" className="mt-8 !rounded-sm">
                 На главную
-              </Link>
+              </AppButton>
             </div>
           ) : invalid ? (
             <div className={emptyStateCard}>
@@ -453,9 +451,9 @@ export function LibrarySharePage() {
                 Ссылка повреждена или устарела
               </h1>
               <p className="mt-3 text-sm text-gray-600">Попросите отправителя сформировать ссылку заново.</p>
-              <Link href="/" className={`${btnPrimary} mt-8`}>
+              <AppButton as={Link} href="/" variant="accent" className="mt-8 !rounded-sm">
                 На главную
-              </Link>
+              </AppButton>
             </div>
           ) : (
             <>
@@ -465,9 +463,12 @@ export function LibrarySharePage() {
               >
                 <div className="pointer-events-auto flex w-full max-w-xl flex-col gap-2 rounded-lg bg-white p-2 shadow-lg sm:max-w-2xl sm:flex-row sm:items-stretch">
                   <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-1">
-                    <button
+                    <AppButton
                       type="button"
-                      className={`${btnSecondary} w-full min-w-0`}
+                      variant="outline"
+                      size="xs"
+                      fullWidth
+                      className="!rounded-sm"
                       disabled={importBusy}
                       onClick={handleImport}
                     >
@@ -475,11 +476,13 @@ export function LibrarySharePage() {
                         <PlusIcon className="h-4 w-4 shrink-0" aria-hidden />
                         <span className="min-w-0 truncate">{importBusy ? 'Сохранение…' : 'Сохранить в редактор'}</span>
                       </span>
-                    </button>
+                    </AppButton>
                     {status !== 'authenticated' ? (
-                      <button
+                      <AppButton
                         type="button"
-                        className="w-full py-1 text-center text-[10px] font-semibold uppercase text-gray-500 underline-offset-2 transition-colors hover:text-accent hover:underline"
+                        variant="link"
+                        fullWidth
+                        className="text-center"
                         onClick={() => {
                           const callbackUrl =
                             typeof window !== 'undefined'
@@ -489,15 +492,21 @@ export function LibrarySharePage() {
                         }}
                       >
                         Войти, чтобы начать
-                      </button>
+                      </AppButton>
                     ) : null}
                   </div>
-                  <button type="button" className={`${btnPrimary} min-w-0 flex-1 sm:flex-1`} disabled={zipBusy} onClick={handleZipAll}>
+                  <AppButton
+                    type="button"
+                    variant="accent"
+                    className="!rounded-sm min-w-0 flex-1 sm:flex-1"
+                    disabled={zipBusy}
+                    onClick={handleZipAll}
+                  >
                     <span className="flex w-full min-w-0 items-center justify-center gap-2">
                       <EditAssetIcon src={downloudIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
                       <span className="min-w-0 truncate">{zipBusy ? 'Сборка…' : 'Скачать всё (ZIP)'}</span>
                     </span>
-                  </button>
+                  </AppButton>
                 </div>
               </div>
 

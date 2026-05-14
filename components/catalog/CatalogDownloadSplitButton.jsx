@@ -1,8 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { EditAssetIcon } from './EditAssetIcon';
-import { downloudIconUrl } from './editIconUrls';
-import { useDismissibleLayer } from './useDismissibleLayer';
+import { EditAssetIcon } from '../ui/EditAssetIcon';
+import { downloudIconUrl } from '../ui/editIconUrls';
+import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
