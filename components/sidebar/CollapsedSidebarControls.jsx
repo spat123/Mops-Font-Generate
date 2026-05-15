@@ -4,6 +4,9 @@ import { Tooltip } from '../ui/Tooltip';
 import { AppButton } from '../ui/AppButton';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { countRecentlyAddedLibraryFonts } from '../../utils/fontLibraryUtils';
+import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
+import { EditAssetIcon } from '../ui/EditAssetIcon';
+import { updateIconUrl } from '../ui/editIconUrls';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../../utils/colorUtils';
 
 function getNextCycleValue(options, currentValue) {
@@ -236,6 +239,8 @@ function CollapsedLibraryRail({
   activeLibraryId = null,
   onOpenLibrary,
 }) {
+  const { openPlans, canCreateNewLibrary, isAuthenticated } = useLibraryAuth();
+  const showLimitUpgrade = isAuthenticated && !canCreateNewLibrary;
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center gap-2">
       <div className="editor-sidebar-scroll flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto pb-1">
@@ -273,6 +278,22 @@ function CollapsedLibraryRail({
           );
         })}
       </div>
+      {showLimitUpgrade ? (
+        <div className="shrink-0 pb-1">
+          <Tooltip content="Лимит библиотек — открыть планы" openDelayMs={200}>
+            <AppButton
+              type="button"
+              variant="toolbarIcon"
+              size="icon"
+              className="!text-accent hover:!bg-accent hover:!text-white"
+              aria-label="Улучшить план"
+              onClick={() => openPlans?.()}
+            >
+              <EditAssetIcon src={updateIconUrl} className="h-5 w-5" />
+            </AppButton>
+          </Tooltip>
+        </div>
+      ) : null}
     </div>
   );
 }

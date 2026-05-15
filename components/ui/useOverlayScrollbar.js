@@ -2,6 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}) {
   const scrollRef = useRef(null);
+  /** Нужен в зависимостях эффектов: область появляется после загрузки/фильтров, иначе scroll-слушатель не навесится. */
+  const [scrollTarget, setScrollTarget] = useState(null);
   const hideTimerRef = useRef(null);
   const [scrollbarVisible, setScrollbarVisible] = useState(false);
   const [scrollLayout, setScrollLayout] = useState({
@@ -39,7 +41,9 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
 
   const setScrollElement = useCallback(
     (node) => {
-      scrollRef.current = node instanceof HTMLElement ? node : null;
+      const el = node instanceof HTMLElement ? node : null;
+      scrollRef.current = el;
+      setScrollTarget(el);
       syncScrollLayout();
     },
     [syncScrollLayout],
@@ -47,30 +51,27 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
 
   useLayoutEffect(() => {
     syncScrollLayout();
-  }, [syncScrollLayout]);
+  }, [syncScrollLayout, scrollTarget]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return undefined;
+    if (!scrollTarget) return undefined;
     const onScroll = () => showScrollbarTemporarily();
-    el.addEventListener('scroll', onScroll, { passive: true });
+    scrollTarget.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      el.removeEventListener('scroll', onScroll);
+      scrollTarget.removeEventListener('scroll', onScroll);
       clearHideTimer();
     };
-  }, [clearHideTimer, showScrollbarTemporarily]);
+  }, [scrollTarget, clearHideTimer, showScrollbarTemporarily]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    if (!scrollTarget || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(() => syncScrollLayout());
-    ro.observe(el);
+    ro.observe(scrollTarget);
     return () => ro.disconnect();
-  }, [syncScrollLayout]);
+  }, [scrollTarget, syncScrollLayout]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || typeof MutationObserver === 'undefined') return undefined;
+    if (!scrollTarget || typeof MutationObserver === 'undefined') return undefined;
     let timerId = null;
     const mo = new MutationObserver(() => {
       if (timerId != null) {
@@ -81,14 +82,14 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
         syncScrollLayout();
       }, 64);
     });
-    mo.observe(el, { subtree: true, childList: true, attributes: true, characterData: true });
+    mo.observe(scrollTarget, { subtree: true, childList: true, attributes: true, characterData: true });
     return () => {
       if (timerId != null) {
         clearTimeout(timerId);
       }
       mo.disconnect();
     };
-  }, [syncScrollLayout]);
+  }, [scrollTarget, syncScrollLayout]);
 
   const overlayThumb = useMemo(() => {
     const { scrollTop, scrollHeight, clientHeight } = scrollLayout;

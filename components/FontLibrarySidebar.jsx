@@ -21,7 +21,7 @@ import {
 } from '../utils/fontLibraryUtils';
 import { readLibraryFontDragData } from '../utils/libraryDragData';
 import { EditAssetIcon } from './ui/EditAssetIcon';
-import { downloudIconUrl, editIconUrl } from './ui/editIconUrls';
+import { downloudIconUrl, editIconUrl, updateIconUrl } from './ui/editIconUrls';
 import { downloadLibraryAsZip } from '../utils/libraryArchiveDownload';
 import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
@@ -31,6 +31,16 @@ import { AppButton } from './ui/AppButton';
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
 const FONT_LIBRARY_DRAFT_STORAGE_KEY = 'fontLibrarySidebarDraft';
+
+/** Род. после «до N …»: до 1 библиотеки, до 3 библиотек, до 21 библиотеки. */
+function librariesWordAfterDo(n) {
+  const num = Math.floor(Number(n)) || 0;
+  const mod10 = num % 10;
+  const mod100 = num % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'библиотек';
+  if (mod10 === 1) return 'библиотеки';
+  return 'библиотек';
+}
 
 function readCachedGoogleCatalog() {
   return mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache());
@@ -104,7 +114,24 @@ export default function FontLibrarySidebar({
   onAddFontToLibrary,
   onShareLibrary,
 }) {
-  const { assertCanCreateNewLibrary, isAuthenticated, requestSignIn, authLoading } = useLibraryAuth();
+  const {
+    assertCanCreateNewLibrary,
+    isAuthenticated,
+    requestSignIn,
+    authLoading,
+    canCreateNewLibrary,
+    openPlans,
+    isPro,
+    planName,
+    librariesLimit,
+  } = useLibraryAuth();
+  const planBadgeTooltip = useMemo(() => {
+    if (isPro) return 'Тариф Pro — расширенные возможности.';
+    if (typeof librariesLimit === 'number' && librariesLimit > 0) {
+      return `Доступно до ${librariesLimit} ${librariesWordAfterDo(librariesLimit)}`;
+    }
+    return 'Доступно несколько библиотек';
+  }, [isPro, librariesLimit]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [draft, setDraft] = useState(() => readStoredDraft());
   const [catalogEntries, setCatalogEntries] = useState(() => readCachedGoogleCatalog());
@@ -352,7 +379,7 @@ export default function FontLibrarySidebar({
             onClick={closeDialog}
           >
             <div
-              className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-none bg-white shadow-xl"
+              className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-none border border-gray-200 bg-white"
               onClick={(event) => event.stopPropagation()}
             >
               <PopupDialogHeader title={dialogTitle} onClose={closeDialog} closeAriaLabel="Закрыть окно" />
@@ -471,9 +498,17 @@ export default function FontLibrarySidebar({
       <div className="flex min-h-0 flex-1 flex-col p-4">
         {libraries.length > 0 ? (
           <>
-            <div className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-900">Библиотеки</div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="space-y-3">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold uppercase tracking-wide text-gray-900">Библиотеки</span>
+              <Tooltip content={planBadgeTooltip} openDelayMs={200} side="bottom">
+                <span className="inline-flex shrink-0 cursor-default rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+                  {isPro ? 'Pro' : planName || 'Free'}
+                </span>
+              </Tooltip>
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="space-y-3">
                 {libraries.map((library) => {
                   const isActive = activeLibraryId === library.id;
                   const fontCount = Array.isArray(library.fonts) ? library.fonts.length : 0;
@@ -642,7 +677,7 @@ export default function FontLibrarySidebar({
                           {recentAddedCount > 0 && remainingFontCount === 0 && fontCount === 1 ? (
                             <Tooltip content="Добавлены за последние 24 ч" openDelayMs={150}>
                               <span
-                                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums shadow-sm ring-2 ${
+                                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ring-2 ${
                                   isActive
                                     ? 'bg-white text-accent ring-white/80'
                                     : 'bg-accent text-white ring-white/90'
@@ -656,7 +691,7 @@ export default function FontLibrarySidebar({
                           {recentAddedCount > 0 && remainingFontCount > 0 ? (
                             <Tooltip content="Добавлены за последние 24 ч" openDelayMs={150}>
                               <span
-                                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums shadow-sm ring-2 ${
+                                className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[11px] font-bold tabular-nums ring-2 ${
                                   isActive
                                     ? 'bg-white text-accent ring-white/80'
                                     : 'bg-accent text-white ring-white/90'
@@ -672,18 +707,56 @@ export default function FontLibrarySidebar({
                     </div>
                   );
                 })}
+                </div>
               </div>
-              <div className="sticky bottom-0 flex justify-center bg-white/95 pt-4 pb-1 backdrop-blur-sm">
-                <Tooltip content="Добавить библиотеку">
-                  <IconCircleButton
-                    variant="accent"
-                    size="md"
-                    onClick={openCreateDialog}
-                    aria-label="Добавить библиотеку"
+              <div>
+                {canCreateNewLibrary ? (
+                  <div className="flex justify-center">
+                    <Tooltip content="Добавить библиотеку">
+                      <IconCircleButton
+                        variant="accent"
+                        size="md"
+                        onClick={openCreateDialog}
+                        aria-label="Добавить библиотеку"
+                      >
+                        <PlusIcon />
+                      </IconCircleButton>
+                    </Tooltip>
+                  </div>
+                ) : isAuthenticated ? (
+                  <div
+                    className="rounded-xl bg-gray-50 p-3"
+                    role="region"
+                    aria-label="Лимит библиотек"
                   >
-                    <PlusIcon />
-                  </IconCircleButton>
-                </Tooltip>
+                    <div className="flex gap-2">
+                      <div className="group shrink-0" aria-hidden>
+                        <EditAssetIcon
+                          src={updateIconUrl}
+                          className="h-4 w-4 text-accent transition-colors group-hover:text-white"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold uppercase leading-snug tracking-wide text-gray-900">
+                          Лимит библиотек достигнут
+                        </p>
+                        <p className="mt-1.5 text-[10px] font-normal text-gray-500">
+                          Улучшите план, чтобы получать больше возможностей.
+                        </p>
+                      </div>
+                    </div>
+                    <AppButton
+                      type="button"
+                      variant="accent"
+                      fullWidth
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => openPlans?.()}
+                    >
+                      Улучшить
+                    </AppButton>
+                  </div>
+                ) : null}
               </div>
             </div>
           </>

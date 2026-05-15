@@ -39,6 +39,18 @@ export function SignInProviderButtons({ callbackUrl = '/', layout = 'stack' }) {
 
   const showGoogle = !providerIds || providerIds.includes('google');
   const showYandex = !providerIds || providerIds.includes('yandex');
+  const hasOAuthButtons = showGoogle || showYandex;
+
+  // Когда NextAuth отдаёт только credentials — providerIds = ["credentials"].
+  // В этом случае нужно показать понятное состояние, а не пустой блок.
+  if (providerIds && !hasOAuthButtons) {
+    return (
+      <p className="text-center text-xs leading-relaxed text-gray-500">
+        Вход через Google/Яндекс пока не настроен. Заполните переменные в <code className="font-mono">.env.local</code> — см.{' '}
+        <code className="font-mono">docs/AUTH_SETUP.md</code>.
+      </p>
+    );
+  }
 
   return (
     <div className={wrap}>

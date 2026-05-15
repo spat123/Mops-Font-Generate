@@ -81,6 +81,11 @@ export function useFontLibraries() {
     );
   }, []);
 
+  /** Сброс при выходе из аккаунта (локальное состояние + localStorage через эффект). */
+  const clearAllLibraries = useCallback(() => {
+    setLibraries([]);
+  }, []);
+
   return {
     libraries,
     createLibrary,
@@ -88,5 +93,6 @@ export function useFontLibraries() {
     deleteLibrary,
     reorderLibraries,
     reorderLibraryFonts,
+    clearAllLibraries,
   };
 }

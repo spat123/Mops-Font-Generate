@@ -320,6 +320,9 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
         apply(newSettings, false, null, { skipSideEffects: true });
       }
       onSettingsChangeRef.current?.(newSettings);
+      // Иначе локальный `settings` не двигается: sync-effect пропускает кадр из‑за isUpdatingFromExternal,
+      // а слайдеры рисуются из `settings` — «таблетки» замирают при Play.
+      setSettings(newSettings);
     }
 
     animationRef.current = requestAnimationFrame(animateAxes);
@@ -636,24 +639,28 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
               </div>
             </div>
             
-            <DraggableValueRangeSlider
-              min={axis.min}
-              max={axis.max}
-              step={1}
-              value={value}
-              disabled={isAnimating}
-              defaultMarkerValue={axis.default}
-              formatDisplay={(v) => String(Math.round(v))}
-              interactionLockId={axis.tag}
-              onInteractionLock={setEditingAxis}
-              onChange={(v) => handleSliderChange(axis.tag, v, false)}
-              onMarkerDrag={(v) => handleSliderChange(axis.tag, v, true)}
-              onMarkerDragEnd={(v) => {
-                const rounded = Math.round(v);
-                const currentSettings = { ...settings, [axis.tag]: rounded };
-                handleVariableSettingsChange(currentSettings, true);
-              }}
-            />
+            {/* Во время анимации не ставим native disabled — иначе часть браузеров плохо обновляет положение «таблетки» при смене value. */}
+            <div className={isAnimating ? 'pointer-events-none select-none' : undefined}>
+              <DraggableValueRangeSlider
+                min={axis.min}
+                max={axis.max}
+                step={1}
+                value={value}
+                disabled={false}
+                defaultMarkerValue={axis.default}
+                formatDisplay={(v) => String(Math.round(v))}
+                interactionLockId={axis.tag}
+                onInteractionLock={setEditingAxis}
+                onChange={(v) => handleSliderChange(axis.tag, v, false)}
+                onMarkerDrag={(v) => handleSliderChange(axis.tag, v, true)}
+                onMarkerDragEnd={(v) => {
+                  if (isAnimating) return;
+                  const rounded = Math.round(v);
+                  const currentSettings = { ...settings, [axis.tag]: rounded };
+                  handleVariableSettingsChange(currentSettings, true);
+                }}
+              />
+            </div>
           </div>
         );
       })}

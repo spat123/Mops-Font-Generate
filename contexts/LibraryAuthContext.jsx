@@ -4,7 +4,12 @@ const defaultValue = {
   authLoading: false,
   isAuthenticated: false,
   canCreateNewLibrary: false,
+  isPro: false,
+  planName: 'Free',
+  librariesCount: 0,
+  librariesLimit: 3,
   requestSignIn: () => {},
+  openPlans: () => {},
   assertCanCreateNewLibrary: () => false,
 };
 

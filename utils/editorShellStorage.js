@@ -69,5 +69,10 @@ export function readEditorShellFromStorage() {
 }
 
 export function isFontTabId(tab) {
-  return typeof tab === 'string' && tab !== 'library' && !tab.startsWith(EMPTY_PREFIX);
+  return (
+    typeof tab === 'string' &&
+    tab !== 'library' &&
+    tab !== EDITOR_MAIN_TAB_PENDING &&
+    !tab.startsWith(EMPTY_PREFIX)
+  );
 }

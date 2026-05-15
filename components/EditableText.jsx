@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useLayoutEffect, memo, useCallback } from 'react';
 // Импортируем useSettings
 import { useSettings } from '../contexts/SettingsContext';
+import { previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 
 /**
  * Компонент для редактируемого текста с оптимизацией курсора
@@ -67,6 +68,13 @@ const EditableText = memo(({
   // Синхронизируем локальный текст с глобальным при изменении текста извне или смене режима
   useEffect(() => {
     if (contentRef.current && localTextRef.current !== text) {
+      previewTextDbg('EditableText: синхронизация DOM из глобального text', {
+        syncId,
+        viewMode,
+        prevLocalLen: typeof localTextRef.current === 'string' ? localTextRef.current.length : 0,
+        nextLen: typeof text === 'string' ? text.length : 0,
+        nextSnippet: previewTextSnippet(text, 120),
+      });
       contentRef.current.innerText = text;
       resetHorizontalScroll(contentRef.current);
       localTextRef.current = text;
@@ -77,6 +85,12 @@ const EditableText = memo(({
   // Функция для сохранения изменений в глобальное состояние
   const commitTextChanges = useCallback(() => {
     if (setText && hasModificationsRef.current && localTextRef.current !== text) {
+      previewTextDbg('EditableText: commit в Settings (blur/unmount)', {
+        syncId,
+        committedLen: typeof localTextRef.current === 'string' ? localTextRef.current.length : 0,
+        prevGlobalLen: typeof text === 'string' ? text.length : 0,
+        snippet: previewTextSnippet(localTextRef.current, 120),
+      });
       setText(localTextRef.current);
       hasModificationsRef.current = false;
     }

@@ -42,6 +42,95 @@ function areValuesEqual(currentValue, defaultValue) {
   return currentValue === defaultValue;
 }
 
+/** Поля Waterfall — сброс в WF не трогает размер/типографику Plain. */
+const WATERFALL_PREVIEW_RESET_KEYS = new Set([
+  'waterfallRows',
+  'waterfallBaseSize',
+  'waterfallEditTarget',
+  'waterfallHeadingPresetName',
+  'waterfallBodyPresetName',
+  'waterfallHeadingLineHeight',
+  'waterfallBodyLineHeight',
+  'waterfallHeadingLetterSpacing',
+  'waterfallBodyLetterSpacing',
+  'waterfallScaleRatio',
+  'waterfallUnit',
+  'waterfallRoundPx',
+]);
+
+/** Plain / Text: типографика и фон превью (без полей Waterfall). */
+const PLAIN_TEXT_PREVIEW_RESET_KEYS = new Set([
+  'fontSize',
+  'lineHeight',
+  'letterSpacing',
+  'textColor',
+  'backgroundColor',
+  'textDirection',
+  'textAlignment',
+  'textCase',
+  'textDecoration',
+  'listStyle',
+  'textColumns',
+  'textColumnGap',
+  'verticalAlignment',
+  'textFill',
+  'previewBackgroundImage',
+]);
+
+const STYLES_PREVIEW_RESET_KEYS = new Set(['stylesFontSize', 'stylesLetterSpacing']);
+const GLYPHS_PREVIEW_RESET_KEYS = new Set(['glyphsFontSize']);
+
+function getPreviewResetKeysForViewMode(viewMode) {
+  switch (viewMode) {
+    case 'waterfall':
+      return WATERFALL_PREVIEW_RESET_KEYS;
+    case 'plain':
+    case 'text':
+      return PLAIN_TEXT_PREVIEW_RESET_KEYS;
+    case 'styles':
+      return new Set([...PLAIN_TEXT_PREVIEW_RESET_KEYS, ...STYLES_PREVIEW_RESET_KEYS]);
+    case 'glyphs':
+      return new Set([...PLAIN_TEXT_PREVIEW_RESET_KEYS, ...GLYPHS_PREVIEW_RESET_KEYS]);
+    default:
+      return null;
+  }
+}
+
+/** Сбрасываем к дефолту только ключи режима; остальное берём из current (в т.ч. другой режим). */
+function buildMergedResetSnapshot(defaults, current, viewMode) {
+  const keysToReset = getPreviewResetKeysForViewMode(viewMode);
+  if (!keysToReset) {
+    return { ...defaults, viewMode: current.viewMode, text: current.text };
+  }
+  const out = { ...defaults };
+  out.viewMode = current.viewMode;
+  out.text = current.text;
+  for (const key of Object.keys(defaults)) {
+    if (key === 'viewMode' || key === 'text') continue;
+    if (!keysToReset.has(key)) {
+      out[key] = Object.prototype.hasOwnProperty.call(current, key) ? current[key] : defaults[key];
+    }
+  }
+  return out;
+}
+
+function getPerViewResetShortLabel(viewMode) {
+  switch (viewMode) {
+    case 'plain':
+      return 'Сбросить Plain';
+    case 'waterfall':
+      return 'Сбросить Waterfall';
+    case 'styles':
+      return 'Сбросить Styles';
+    case 'glyphs':
+      return 'Сбросить Glyphs';
+    case 'text':
+      return 'Сбросить Text';
+    default:
+      return 'Сбросить настройки';
+  }
+}
+
 function CloseIcon(props) {
   return (
     <svg viewBox="0 0 20 20" fill="none" aria-hidden {...props}>
@@ -128,6 +217,8 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     setVerticalAlignment,
     textFill,
     setTextFill,
+    textCenter,
+    setTextCenter,
     previewBackgroundImage,
     setPreviewBackgroundImage,
   } = useSettings();
@@ -136,6 +227,48 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
   const [pendingTargetFontId, setPendingTargetFontId] = useState(null);
   const [progressActive, setProgressActive] = useState(false);
   const defaultPreviewSettings = useMemo(() => getDefaultPreviewSettingsSnapshot(), []);
+  /** Актуальные значения на момент срабатывания отложенного сброса (не уводим режим/текст в дефолт). */
+  const viewModeRef = useRef(viewMode);
+  const textRef = useRef(text);
+  viewModeRef.current = viewMode;
+  textRef.current = text;
+
+  const previewStateRef = useRef({});
+  previewStateRef.current = {
+    text,
+    fontSize,
+    glyphsFontSize,
+    stylesFontSize,
+    lineHeight,
+    letterSpacing,
+    stylesLetterSpacing,
+    textColor,
+    backgroundColor,
+    viewMode,
+    textDirection,
+    textAlignment,
+    textCase,
+    textDecoration,
+    listStyle,
+    textColumns,
+    textColumnGap,
+    waterfallRows,
+    waterfallBaseSize,
+    waterfallEditTarget,
+    waterfallHeadingPresetName,
+    waterfallBodyPresetName,
+    waterfallHeadingLineHeight,
+    waterfallBodyLineHeight,
+    waterfallHeadingLetterSpacing,
+    waterfallBodyLetterSpacing,
+    waterfallScaleRatio,
+    waterfallUnit,
+    waterfallRoundPx,
+    verticalAlignment,
+    textFill,
+    textCenter,
+    previewBackgroundImage,
+  };
 
   const clearPendingReset = useCallback(() => {
     if (resetTimeoutRef.current != null) {
@@ -200,7 +333,13 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
       previewBackgroundImage,
     };
 
+    const keysForDirty =
+      getPreviewResetKeysForViewMode(viewMode) ??
+      new Set(Object.keys(defaultPreviewSettings).filter((k) => k !== 'viewMode' && k !== 'text'));
+
     return Object.entries(currentPreviewSettings).some(([key, value]) => {
+      if (key === 'viewMode' || key === 'text') return false;
+      if (!keysForDirty.has(key)) return false;
       if (key === 'previewBackgroundImage') {
         return value !== null;
       }
@@ -288,7 +427,13 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
         setPendingTargetFontId(null);
         setProgressActive(false);
         if (hasPreviewChanges) {
-          applyPerFontPreviewSnapshot(defaultPreviewSettings, {
+          const cur = previewStateRef.current;
+          const snapshotToApply = buildMergedResetSnapshot(
+            defaultPreviewSettings,
+            cur,
+            viewModeRef.current,
+          );
+          applyPerFontPreviewSnapshot(snapshotToApply, {
             setText,
             setFontSize,
             setGlyphsFontSize,
@@ -320,17 +465,19 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
             setWaterfallRoundPx,
             setVerticalAlignment,
             setTextFill,
+            setTextCenter,
           });
-          setPreviewBackgroundImage(null);
+          setPreviewBackgroundImage(snapshotToApply.previewBackgroundImage ?? null);
         }
 
         if (hasFontSpecificChanges) {
           onResetSelectedFont();
         } else if (hasPreviewChanges) {
+          const modeLabel = getPerViewResetShortLabel(viewModeRef.current);
           toast.success(
             selectedFont?.name
-              ? `Настройки шрифта "${selectedFont.name}" сброшены`
-              : 'Настройки превью сброшены',
+              ? `${modeLabel}: «${selectedFont.name}»`
+              : `${modeLabel}: настройки превью`,
           );
         }
       }, RESET_DELAY_MS);
@@ -375,6 +522,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     setTextDecoration,
     setTextDirection,
     setTextFill,
+    setTextCenter,
     setVerticalAlignment,
     setWaterfallBaseSize,
     setWaterfallBodyLetterSpacing,
@@ -391,13 +539,14 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     selectedFont,
   ]);
 
-  const buttonText = onResetSelectedFont ? 'Сбросить настройки' : 'Сбросить всё состояние';
+  const resetActionLabel = getPerViewResetShortLabel(viewMode);
+  const buttonText = onResetSelectedFont ? resetActionLabel : 'Сбросить всё состояние';
   const title = isPendingReset
     ? 'Отменить запланированный сброс'
     : onResetSelectedFont
       ? hasResettableChanges
-        ? 'Сбросить настройки выбранного шрифта'
-        : 'Нет изменений для сброса'
+        ? `${resetActionLabel} — только настройки текущего режима превью`
+        : 'Нет изменений для сброса в этом режиме'
       : 'Сбросить все настройки приложения и удалить локальные шрифты';
 
   if (isPendingReset && onResetSelectedFont) {

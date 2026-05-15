@@ -283,9 +283,7 @@ const WaterfallMode = ({
               <div className="flex items-center gap-2">
                 {typeLabel ? (
                   <span
-                    className={`inline-flex h-6 w-12 items-center justify-start text-xs uppercase font-semibold
-                      
-                    `.trim()}
+                    className="inline-flex h-6 w-12 shrink-0 items-center justify-start text-xs font-semibold uppercase text-gray-500"
                   >
                     {typeLabel}
                   </span>
@@ -407,7 +405,7 @@ const WaterfallMode = ({
         <FloatingTooltip content="Скопировано" anchorRect={copyToast.anchorRect} side="top" />
       ) : null}
       <div
-        className="relative min-h-full w-full min-w-0 pb-8 pr-8 pt-0"
+        className="relative min-h-full w-full min-w-0 pb-8 pt-0"
         style={{
           backgroundColor: previewBackgroundImage ? 'transparent' : (backgroundColor ?? undefined),
           color: textColor ?? undefined,

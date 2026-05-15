@@ -1479,6 +1479,21 @@ export default function Sidebar({
 
       {!isSidebarCollapsed ? (
       <div className="relative min-h-0 flex flex-1 flex-col">
+        {!isLibraryTab ? (
+          <div
+            className="flex min-h-12 shrink-0 items-center bg-white px-4 pt-4"
+            role="toolbar"
+            aria-label="Режим превью"
+          >
+            <SegmentedControl
+              value={viewMode}
+              onChange={setViewMode}
+              options={VIEW_MODE_OPTIONS}
+              variant="surface"
+              className="w-full min-w-0"
+            />
+          </div>
+        ) : null}
         <div
           ref={sidebarScrollRef}
           className="editor-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto"
@@ -1500,20 +1515,6 @@ export default function Sidebar({
         />
       ) : (
         <>
-      <div
-        className="flex h-12 min-h-12 shrink-0 items-center bg-white px-4 pt-4"
-        role="toolbar"
-        aria-label="Режим превью"
-      >
-        <SegmentedControl
-          value={viewMode}
-          onChange={setViewMode}
-          options={VIEW_MODE_OPTIONS}
-          variant="surface"
-          className="w-full min-w-0"
-        />
-      </div>
-      
           {/* Базовые настройки шрифта */}
       <div className="p-4">
         <div>
@@ -1743,30 +1744,38 @@ export default function Sidebar({
                   }}
                   options={[
                     ...WATERFALL_SCALE_PRESETS.map((p) => ({ value: p.key, label: p.label })),
-                    { value: 'custom', label: 'Enter value...' },
+                    { value: 'custom', label: 'Своё значение', rightLabel: 'Pro' },
                   ]}
                   className={sidebarSelectClass}
                   aria-label="Waterfall: шкала"
                 />
                 {waterfallScaleSelectKey === 'custom' ? (
-                  <input
-                    type="number"
-                    step={0.001}
-                    inputMode="decimal"
-                    value={Number.isFinite(Number(waterfallScaleRatio)) ? waterfallScaleRatio : ''}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value);
-                      if (Number.isFinite(v)) setWaterfallScaleRatio(v);
-                    }}
-                    onBlur={() => {
-                      const v = Number(waterfallScaleRatio);
-                      if (!Number.isFinite(v)) return;
-                      const clamped = Math.max(1.001, Math.min(3, v));
-                      setWaterfallScaleRatio(clamped);
-                    }}
-                    className="no-arrows h-8 w-full rounded-md border border-gray-50 bg-gray-50 px-2 text-xs tabular-nums text-gray-800 focus:border-black/[0.14] focus:outline-none"
-                    aria-label="Waterfall: коэффициент"
-                  />
+                  <div className="flex min-w-0 items-center gap-2">
+                    <input
+                      type="number"
+                      step={0.001}
+                      inputMode="decimal"
+                      value={Number.isFinite(Number(waterfallScaleRatio)) ? waterfallScaleRatio : ''}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (Number.isFinite(v)) setWaterfallScaleRatio(v);
+                      }}
+                      onBlur={() => {
+                        const v = Number(waterfallScaleRatio);
+                        if (!Number.isFinite(v)) return;
+                        const clamped = Math.max(1.001, Math.min(3, v));
+                        setWaterfallScaleRatio(clamped);
+                      }}
+                      className="no-arrows h-8 min-w-0 flex-1 rounded-md border border-gray-50 bg-gray-50 px-2 text-xs tabular-nums text-gray-800 focus:border-black/[0.14] focus:outline-none"
+                      aria-label="Waterfall: коэффициент"
+                    />
+                    <span
+                      className="shrink-0 rounded bg-gray-900/90 px-1.5 py-1 text-[9px] font-bold uppercase leading-none tracking-wide text-white"
+                      title="Расширенная настройка шкалы"
+                    >
+                      Pro
+                    </span>
+                  </div>
                 ) : null}
                 <div className="flex min-w-0 items-stretch gap-2">
                   <SegmentedControl

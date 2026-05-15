@@ -1,11 +1,14 @@
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useLayoutEffect, useCallback } from 'react';
 import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
+import { isPreviewTextDebugEnabled, previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 
 const SettingsContext = createContext(null);
 
 const LOCAL_STORAGE_KEYS = {
   /** Data URL фона области превью (может быть большим) */
   PREVIEW_BACKGROUND_IMAGE: 'previewBackgroundImage',
+  /** Текст превью (contenteditable) */
+  TEXT: 'previewText',
   BACKGROUND_COLOR: 'backgroundColor',
   TEXT_COLOR: 'textColor',
   FONT_SIZE: 'fontSize',
@@ -250,7 +253,8 @@ export const SettingsProvider = ({ children }) => {
     return undefined;
   }, []);
 
-  useEffect(() => {
+  /** До paint и до layout-детей (вкладка редактора), иначе race: mainTab уже шрифт, а text ещё дефолт → сброс строк в previewSettings. */
+  useLayoutEffect(() => {
     setFontSize(getLocalStorageItem(LOCAL_STORAGE_KEYS.FONT_SIZE, DEFAULT_SETTINGS.FONT_SIZE));
     setGlyphsFontSize(
       getLocalStorageItem(LOCAL_STORAGE_KEYS.GLYPHS_FONT_SIZE, DEFAULT_SETTINGS.GLYPHS_FONT_SIZE),
@@ -263,6 +267,21 @@ export const SettingsProvider = ({ children }) => {
     setStylesLetterSpacing(
       getLocalStorageItem(LOCAL_STORAGE_KEYS.STYLES_LETTER_SPACING, DEFAULT_SETTINGS.STYLES_LETTER_SPACING),
     );
+    let rawPreviewTextKey = null;
+    try {
+      rawPreviewTextKey = typeof window !== 'undefined' ? window.localStorage?.getItem(LOCAL_STORAGE_KEYS.TEXT) : null;
+    } catch {
+      rawPreviewTextKey = null;
+    }
+    const storedText = getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT, DEFAULT_SETTINGS.TEXT);
+    const resolvedText = typeof storedText === 'string' ? storedText : DEFAULT_SETTINGS.TEXT;
+    previewTextDbg('hydrate: чтение previewText из localStorage', {
+      key: LOCAL_STORAGE_KEYS.TEXT,
+      rawKeyPresent: rawPreviewTextKey != null,
+      resolvedLen: resolvedText.length,
+      snippet: previewTextSnippet(resolvedText, 120),
+    });
+    setText(resolvedText);
     setTextColor(getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT_COLOR, DEFAULT_SETTINGS.TEXT_COLOR));
     setBackgroundColor(getLocalStorageItem(LOCAL_STORAGE_KEYS.BACKGROUND_COLOR, DEFAULT_SETTINGS.BACKGROUND_COLOR));
     setViewMode(getLocalStorageItem(LOCAL_STORAGE_KEYS.VIEW_MODE, DEFAULT_SETTINGS.VIEW_MODE));
@@ -347,6 +366,16 @@ export const SettingsProvider = ({ children }) => {
 
   useDebouncedSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.BACKGROUND_COLOR, backgroundColor);
   useDebouncedSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT_COLOR, textColor);
+  useDebouncedSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.TEXT, text, 220);
+
+  useEffect(() => {
+    if (!isClient) return;
+    if (!isPreviewTextDebugEnabled()) return;
+    previewTextDbg('state: text изменился (React)', {
+      len: typeof text === 'string' ? text.length : 0,
+      snippet: previewTextSnippet(text, 120),
+    });
+  }, [isClient, text]);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.FONT_SIZE, fontSize);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.GLYPHS_FONT_SIZE, glyphsFontSize);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.STYLES_FONT_SIZE, stylesFontSize);
@@ -383,6 +412,27 @@ export const SettingsProvider = ({ children }) => {
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.DARK_THEME, darkTheme);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.THEME_MODE, themeMode);
   useSyncSettingToStorage(isClient, LOCAL_STORAGE_KEYS.PREVIEW_BACKGROUND_IMAGE, previewBackgroundImage);
+
+  // Страховка: при уходе со страницы (F5/закрытие/сворачивание) синхронно флашим текст в localStorage.
+  useEffect(() => {
+    if (!isClient || typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+    const flush = () => {
+      previewTextDbg('flush: запись previewText в localStorage (pagehide / visibility hidden)', {
+        len: typeof text === 'string' ? text.length : 0,
+        snippet: previewTextSnippet(text, 120),
+      });
+      setLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT, text);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [isClient, text]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

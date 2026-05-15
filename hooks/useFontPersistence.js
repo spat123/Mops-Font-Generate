@@ -3,6 +3,11 @@ import { toast } from '../utils/appNotify';
 import { getAllFonts, deleteAllFontsDB, updateFontSettings, saveFont } from '../utils/db';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from '../utils/cssGenerator'; // Нужен для восстановления
 import {
+  FONTSOURCE_UNICODE_RANGE_CYRILLIC,
+  FONTSOURCE_UNICODE_RANGE_LATIN,
+} from '../utils/fontsourceSubsetUnicodeRange';
+import { base64ToArrayBuffer } from '../utils/fontManagerUtils';
+import {
   revokeObjectURL,
   buildGoogleStaticSliceFaceDescriptors,
   buildGoogleVariableSliceFaceDescriptors,
@@ -95,6 +100,35 @@ async function enrichGoogleVfAxesFromGithubIfNeeded(font) {
     }
 }
 
+/**
+ * Fontsource VF: в IndexedDB сохранялся только латинский сабсет в `file`, кириллица — в инжектируемом CSS и терялась после F5.
+ * Догружаем cyrillic и дописываем в запись, чтобы восстановление зарегистрировало оба FontFace.
+ */
+async function enrichFontsourceVfSubsetsIfNeeded(font) {
+    if (!font || font.source !== 'fontsource' || !font.isVariableFont) return;
+    if (font.fontsourceCyrillicFile instanceof Blob && font.fontsourceCyrillicFile.size > 0) return;
+    const family = String(font.name || '').trim();
+    if (!family) return;
+
+    try {
+        const variableApiUrl = `/api/fontsource/${encodeURIComponent(family)}/variable?subset=cyrillic&style=normal&forceVariable=true`;
+        const res = await fetch(variableApiUrl);
+        if (!res.ok) return;
+        const payload = await res.json();
+        const b64 = payload?.fontBufferBase64;
+        const fileName = String(payload?.fileName || 'font.woff2');
+        if (!b64) return;
+        const fontBuffer = base64ToArrayBuffer(b64);
+        const ext = fileName.split('.').pop()?.toLowerCase() || 'woff2';
+        const mime =
+            ext === 'ttf' ? 'font/ttf' : ext === 'otf' ? 'font/otf' : ext === 'woff' ? 'font/woff' : 'font/woff2';
+        font.fontsourceCyrillicFile = new Blob([fontBuffer], { type: mime });
+        await saveFont(font);
+    } catch (e) {
+        console.warn('[DB] enrichFontsourceVfSubsetsIfNeeded:', family, e);
+    }
+}
+
 /** Быстрый проход: только валидация и нормализация имени без arrayBuffer / FontFace / сети. */
 function stageFontFromRecord(font) {
     if (!font?.id || !font.file || !(font.file instanceof Blob)) return null;
@@ -118,6 +152,7 @@ async function loadFontFacesForRestoredFont(font) {
     const working = { ...font };
     try {
         await enrichGoogleVfAxesFromGithubIfNeeded(working);
+        await enrichFontsourceVfSubsetsIfNeeded(working);
 
         working.url = undefined;
         const fontFamilyToLoad = working.fontFamily;
@@ -138,24 +173,66 @@ async function loadFontFacesForRestoredFont(font) {
         } else if (working.googleFontFirstSliceMeta) {
             mainFaceDescriptors = buildGoogleStaticSliceFaceDescriptors(working.googleFontFirstSliceMeta);
         }
+
+        const fontsourceLatin =
+            working.source === 'fontsource' ? { unicodeRange: FONTSOURCE_UNICODE_RANGE_LATIN } : {};
+        const mainFaceForLoad =
+            Object.keys(fontsourceLatin).length > 0 ? { ...mainFaceDescriptors, ...fontsourceLatin } : mainFaceDescriptors;
+
         await loadFontFaceIfNeeded(
             fontFamilyToLoad,
             fontBinary,
             initialVarSettings,
             working.id,
-            mainFaceDescriptors,
+            mainFaceForLoad,
         );
 
-        if (working.isVariableFont && working.italicMode === 'separate-style' && working.googleFontItalicFile instanceof Blob) {
-            const italicBinary = await working.googleFontItalicFile.arrayBuffer();
-            const italicDescriptors = buildVariableFontFaceDescriptors(working.variableAxes, { style: 'italic' });
+        if (working.source === 'fontsource' && working.fontsourceCyrillicFile instanceof Blob) {
+            const cyBuf = await working.fontsourceCyrillicFile.arrayBuffer();
+            const cyBase = working.isVariableFont
+                ? buildVariableFontFaceDescriptors(working.variableAxes)
+                : {};
             await loadFontFaceIfNeeded(
                 fontFamilyToLoad,
-                italicBinary,
-                {},
-                `${working.id}-italic`,
-                italicDescriptors,
+                cyBuf,
+                working.isVariableFont ? initialVarSettings : {},
+                `${working.id}-subset-cyrillic`,
+                { ...cyBase, unicodeRange: FONTSOURCE_UNICODE_RANGE_CYRILLIC },
             );
+        }
+
+        if (working.isVariableFont && working.italicMode === 'separate-style') {
+            if (working.source === 'fontsource' && working.fontsourceItalicLatinFile instanceof Blob) {
+                const italicLatinBuf = await working.fontsourceItalicLatinFile.arrayBuffer();
+                const italicVarDesc = buildVariableFontFaceDescriptors(working.variableAxes, { style: 'italic' });
+                await loadFontFaceIfNeeded(
+                    fontFamilyToLoad,
+                    italicLatinBuf,
+                    {},
+                    `${working.id}-subset-italic-latin`,
+                    { ...italicVarDesc, unicodeRange: FONTSOURCE_UNICODE_RANGE_LATIN },
+                );
+                if (working.fontsourceItalicCyrillicFile instanceof Blob) {
+                    const italicCyBuf = await working.fontsourceItalicCyrillicFile.arrayBuffer();
+                    await loadFontFaceIfNeeded(
+                        fontFamilyToLoad,
+                        italicCyBuf,
+                        {},
+                        `${working.id}-subset-italic-cyrillic`,
+                        { ...italicVarDesc, unicodeRange: FONTSOURCE_UNICODE_RANGE_CYRILLIC },
+                    );
+                }
+            } else if (working.googleFontItalicFile instanceof Blob) {
+                const italicBinary = await working.googleFontItalicFile.arrayBuffer();
+                const italicDescriptors = buildVariableFontFaceDescriptors(working.variableAxes, { style: 'italic' });
+                await loadFontFaceIfNeeded(
+                    fontFamilyToLoad,
+                    italicBinary,
+                    {},
+                    `${working.id}-italic`,
+                    italicDescriptors,
+                );
+            }
         }
 
         const extraMeta = working.googleFontExtraSliceMeta;

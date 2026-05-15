@@ -13,9 +13,6 @@ export default class MyDocument extends Document {
       /* По умолчанию скрываем SSR-заглушку «Новый», чтобы она не мигала у пользователей, которые закрыли её. */
       .editor-new-ssr-fallback { display: none !important; }
       html[data-editor-show-new-fallback='1'] .editor-new-ssr-fallback { display: flex !important; }
-
-      /* Убираем «плюсик → потом вкладки»: не показываем строку вкладок, пока shell не восстановлен на клиенте. */
-      html:not([data-editor-ui-ready='1']) .editor-tabbar-container { visibility: hidden !important; }
     `;
 
     return (

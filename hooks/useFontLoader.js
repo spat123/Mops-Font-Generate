@@ -98,6 +98,16 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
         type: `font/${getFormatFromExtension(latinRow.fileName || '.woff2')}`,
       });
 
+      if (fontObj && cyrillicRow && !(fontObj.fontsourceCyrillicFile instanceof Blob)) {
+        try {
+          fontObj.fontsourceCyrillicFile = new Blob([base64ToArrayBuffer(cyrillicRow.fontBufferBase64)], {
+            type: `font/${getFormatFromExtension(cyrillicRow.fileName || '.woff2')}`,
+          });
+        } catch (persistCyErr) {
+          console.warn(`[FontLoader] Не удалось сохранить cyrillic blob для ${fontFamily}:`, persistCyErr?.message || persistCyErr);
+        }
+      }
+
       const ffName = JSON.stringify(fontFamilyName);
       const rules = [
         `@font-face {
@@ -279,6 +289,9 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
 
           fontObj.file = normalLatin.blob;
           fontObj.url = normalLatin.blobUrl;
+          if (normalCyrillic) {
+            fontObj.fontsourceCyrillicFile = normalCyrillic.blob;
+          }
 
           const ff = JSON.stringify(displayName);
           const normalRules = [
@@ -329,6 +342,10 @@ export function useFontLoader(setFonts, setIsLoading, safeSelectFont, currentFon
               const italicStyleElement = document.createElement('style');
               italicStyleElement.textContent = italicRules.join('\n');
               document.head.appendChild(italicStyleElement);
+              fontObj.fontsourceItalicLatinFile = italicLatin.blob;
+              if (italicCyrillic) {
+                fontObj.fontsourceItalicCyrillicFile = italicCyrillic.blob;
+              }
             } catch (italicLoadError) {
               console.warn(`[FontLoader] Не удалось догрузить italic-face для ${displayName}:`, italicLoadError);
             }

@@ -56,7 +56,7 @@ export function useFontExport(exportToCSSFromHook) {
   }, [exportToCSSFromHook, downloadFile]);
 
   const generateStaticFontFile = useCallback(async (selectedFont, variableSettings, format = 'woff2', opts = {}) => {
-    const { outputFontName, skipPseudoCssPrompt } = opts;
+    const { outputFontName, skipPseudoCssPrompt, canExportTextCss: allowCssBundle = true } = opts;
     if (!selectedFont || !selectedFont.isVariableFont) {
       toast.error('Выберите вариативный шрифт для создания статической версии');
       return null;
@@ -105,7 +105,7 @@ export function useFontExport(exportToCSSFromHook) {
         toast.warning(result.warning);
       }
 
-      if (result.css && !skipPseudoCssPrompt) {
+      if (result.css && !skipPseudoCssPrompt && allowCssBundle) {
         const downloadCSS = window.confirm('Создан псевдо-статический шрифт с CSS. Скачать CSS файл?');
         if (downloadCSS) {
           downloadFile(result.css, `${displayName}-static.css`, 'text/css');

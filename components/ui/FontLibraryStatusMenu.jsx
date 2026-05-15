@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { normalizeLibraryText } from '../../utils/fontLibraryUtils';
 import {
   addLibraryEntryToLibrary,
@@ -6,6 +6,7 @@ import {
 } from '../../utils/libraryEntryActions';
 import { useDismissibleLayer } from './useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
+import { Tooltip } from './Tooltip';
 
 export function FontLibraryStatusMenu({
   libraries = [],
@@ -13,7 +14,7 @@ export function FontLibraryStatusMenu({
   onMoveToLibrary,
   onCreateLibrary,
 }) {
-  const { assertCanCreateNewLibrary, isAuthenticated, requestSignIn } = useLibraryAuth();
+  const { assertCanCreateNewLibrary, isAuthenticated, requestSignIn, canCreateNewLibrary, openPlans } = useLibraryAuth();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -69,6 +70,7 @@ export function FontLibraryStatusMenu({
   });
 
   if (!libraryEntry?.label) return null;
+  if (!isAuthenticated) return null;
 
   const inLibrary = attachedLibraryIds.size > 0;
   const attachedLibraries = availableLibraries.filter((lib) => attachedLibraryIds.has(lib.id));
@@ -132,30 +134,46 @@ export function FontLibraryStatusMenu({
             <div className="px-3 py-2 text-xs font-semibold uppercase text-gray-400">Библиотек нет</div>
           )}
           <div className={`${availableLibraries.length > 0 ? 'border-t border-gray-200' : ''} p-1`}>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                if (!isAuthenticated) {
-                  requestSignIn();
-                  return;
-                }
-                if (!assertCanCreateNewLibrary()) return;
-                requestCreateLibraryFromEntry({
-                  libraryEntry,
-                  onRequestCreateLibrary: onCreateLibrary,
-                });
-              }}
-              className="relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-gray-100"
-            >
-              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
-                  <path d="M12 4.5v15m7.5-7.5h-15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </span>
-              <span className="truncate text-center">Создать новую</span>
-            </button>
+            <Tooltip content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'} openDelayMs={150}>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={isAuthenticated && !canCreateNewLibrary}
+                onClick={() => {
+                  setOpen(false);
+                  if (!isAuthenticated) {
+                    requestSignIn();
+                    return;
+                  }
+                  if (!canCreateNewLibrary) {
+                    openPlans?.();
+                    return;
+                  }
+                  if (!assertCanCreateNewLibrary()) return;
+                  requestCreateLibraryFromEntry({
+                    libraryEntry,
+                    onRequestCreateLibrary: onCreateLibrary,
+                  });
+                }}
+                className={`relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
+                  isAuthenticated && !canCreateNewLibrary
+                    ? 'cursor-not-allowed text-gray-400'
+                    : 'text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+                    <path d="M12 4.5v15m7.5-7.5h-15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span className="truncate text-center">Создать новую</span>
+                {isAuthenticated && !canCreateNewLibrary ? (
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                    Pro
+                  </span>
+                ) : null}
+              </button>
+            </Tooltip>
           </div>
         </div>
       ) : null}

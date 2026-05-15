@@ -30,7 +30,7 @@ export function LibraryMoveMenu({
   onMoveToLibrary,
   onCreateLibrary,
 }) {
-  const { assertCanCreateNewLibrary } = useLibraryAuth();
+  const { assertCanCreateNewLibrary, isAuthenticated } = useLibraryAuth();
   const [open, setOpen] = useState(false);
   const [pendingTargetLibraryId, setPendingTargetLibraryId] = useState(null);
   const [progressActive, setProgressActive] = useState(false);
@@ -119,6 +119,10 @@ export function LibraryMoveMenu({
   const isMoveDisabled = disabled || busy || !hasSelection;
   const hideToolbarLabel = viewportW < 1024;
   const moveMenuWidthClass = hideToolbarLabel ? 'w-[5.5rem]' : 'w-[11.6rem]';
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div

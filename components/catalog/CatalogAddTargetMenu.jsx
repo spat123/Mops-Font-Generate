@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { PlusIcon } from '../ui/CommonIcons';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
+import { Tooltip } from '../ui/Tooltip';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
@@ -151,19 +152,21 @@ export function CatalogAddTargetMenu({
       return null;
     }
     return (
-      <button
-        type="button"
-        disabled={busy || !canCreateNewLibrary}
-        aria-busy={busy}
-        aria-label="Создать библиотеку"
-        onClick={() => {
-          if (!assertCanCreateNewLibrary()) return;
-          void runAction(onCreateLibrary);
-        }}
-        className={standaloneAddButtonClassName}
-      >
-        {busy ? busyIndicator : completed ? <CheckIcon className={plusIconClassName} /> : <PlusIcon className={plusIconClassName} />}
-      </button>
+      <Tooltip content={!canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'} openDelayMs={150}>
+        <button
+          type="button"
+          disabled={busy || !canCreateNewLibrary}
+          aria-busy={busy}
+          aria-label="Создать библиотеку"
+          onClick={() => {
+            if (!assertCanCreateNewLibrary()) return;
+            void runAction(onCreateLibrary);
+          }}
+          className={standaloneAddButtonClassName}
+        >
+          {busy ? busyIndicator : completed ? <CheckIcon className={plusIconClassName} /> : <PlusIcon className={plusIconClassName} />}
+        </button>
+      </Tooltip>
     );
   }
 
@@ -231,27 +234,39 @@ export function CatalogAddTargetMenu({
             ))}
           </div>
           <div className="border-t border-gray-200 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                if (!isAuthenticated) {
-                  requestSignIn();
-                  return;
-                }
-                if (!canCreateNewLibrary) {
-                  void assertCanCreateNewLibrary();
-                  return;
-                }
-                onCreateLibrary?.();
-              }}
-              className="relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-gray-100"
-            >
-              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
-                <PlusIcon className="h-4 w-4 shrink-0" />
-              </span>
-              <span className="truncate text-center">Создать новую</span>
-            </button>
+            <Tooltip content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'} openDelayMs={150}>
+              <button
+                type="button"
+                disabled={isAuthenticated && !canCreateNewLibrary}
+                onClick={() => {
+                  setOpen(false);
+                  if (!isAuthenticated) {
+                    requestSignIn();
+                    return;
+                  }
+                  if (!canCreateNewLibrary) {
+                    void assertCanCreateNewLibrary();
+                    return;
+                  }
+                  onCreateLibrary?.();
+                }}
+                className={`relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
+                  isAuthenticated && !canCreateNewLibrary
+                    ? 'cursor-not-allowed text-gray-400'
+                    : 'text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
+                  <PlusIcon className="h-4 w-4 shrink-0" />
+                </span>
+                <span className="truncate text-center">Создать новую</span>
+                {isAuthenticated && !canCreateNewLibrary ? (
+                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                    Pro
+                  </span>
+                ) : null}
+              </button>
+            </Tooltip>
           </div>
         </div>
       ) : null}

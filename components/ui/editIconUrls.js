@@ -12,6 +12,9 @@ import moveAndSwapIconUrl from '../../assets/icon/edit/Move and swap.svg';
 import delIconUrl from '../../assets/icon/edit/Del.svg';
 import shareIconUrl from '../../assets/icon/edit/Share.svg';
 import searchIconUrl from '../../assets/icon/edit/Search.svg';
+import updateIconUrl from '../../assets/icon/edit/Update.svg';
+import loginIconUrl from '../../assets/icon/edit/Login.svg';
+import userIconUrl from '../../assets/icon/edit/User.svg';
 
 export {
   gridIconUrl,
@@ -28,4 +31,7 @@ export {
   delIconUrl,
   shareIconUrl,
   searchIconUrl,
+  updateIconUrl,
+  loginIconUrl,
+  userIconUrl,
 };

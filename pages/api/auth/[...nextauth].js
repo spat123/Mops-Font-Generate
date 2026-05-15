@@ -1,6 +1,8 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../../../utils/authLibraryLimits';
+import { upsertOAuthUser, verifyCredentialsUser, findUserByEmail, findUserById } from '../../../lib/auth/userStore';
 
 function buildProviders() {
   const list = [];
@@ -12,6 +14,47 @@ function buildProviders() {
       }),
     );
   }
+  list.push(
+    CredentialsProvider({
+      name: 'Логин и пароль',
+      credentials: {
+        email: { label: 'Логин или email', type: 'text' },
+        password: { label: 'Пароль', type: 'password' },
+      },
+      async authorize(credentials) {
+        const login = String(credentials?.email ?? '').trim();
+        const password = String(credentials?.password ?? '');
+        if (!login || !password) return null;
+
+        const user = await verifyCredentialsUser({ email: login, password });
+        if (user) {
+          return {
+            id: user.id,
+            name: user.name || (user.email ? user.email.split('@')[0] : 'User'),
+            email: user.email || null,
+            image: user.image || null,
+          };
+        }
+
+        if (process.env.AUTH_CREDENTIALS_LOGIN && process.env.AUTH_CREDENTIALS_PASSWORD) {
+          if (
+            login === String(process.env.AUTH_CREDENTIALS_LOGIN) &&
+            password === String(process.env.AUTH_CREDENTIALS_PASSWORD)
+          ) {
+            const looksLikeEmail = login.includes('@');
+            return {
+              id: `credentials:${login}`,
+              name: looksLikeEmail ? login.split('@')[0] : login,
+              email: looksLikeEmail ? login : null,
+              image: null,
+            };
+          }
+        }
+
+        return null;
+      },
+    }),
+  );
   if (process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET) {
     list.push({
       id: 'yandex',
@@ -55,16 +98,94 @@ export const authOptions = {
     signIn: '/auth/signin',
   },
   callbacks: {
-    jwt({ token, account }) {
+    async jwt({ token, account, user }) {
       if (account?.provider) {
         token.provider = account.provider;
       }
+      if (account && user) {
+        if (account.provider === 'credentials') {
+          const rec = user.email ? await findUserByEmail(user.email) : null;
+          token.userId = rec?.id || user.id || token.sub;
+          token.accountCreatedAt = rec?.createdAt || null;
+          token.needsLink = false;
+          token.pendingLink = null;
+        } else {
+          const email = user.email || null;
+          const existing = email ? await findUserByEmail(email) : null;
+          const alreadyLinked =
+            existing &&
+            Array.isArray(existing?.accounts) &&
+            existing.accounts.some(
+              (a) =>
+                String(a?.provider || '').trim() === String(account.provider || '').trim() &&
+                String(a?.providerAccountId || '').trim() === String(account.providerAccountId || '').trim(),
+            );
+
+          if (existing && !alreadyLinked && String(existing?.provider || '') === 'credentials') {
+            token.needsLink = true;
+            token.pendingLink = {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              email: email,
+              name: user.name || null,
+              image: user.image || null,
+            };
+            token.userId = `pending:${account.provider}:${account.providerAccountId}`;
+            token.accountCreatedAt = existing.createdAt || null;
+          } else {
+            token.needsLink = false;
+            token.pendingLink = null;
+            const rec = await upsertOAuthUser({
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+              email: user.email,
+              name: user.name,
+              image: user.image,
+            });
+            token.userId = rec?.id || user.id || token.sub;
+            token.accountCreatedAt = rec?.createdAt || null;
+          }
+        }
+      }
       return token;
     },
-    session({ session, token }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.provider = token.provider;
+        session.user.id = token.userId || session.user.id;
+        session.user.accountCreatedAt = token.accountCreatedAt || null;
+        session.user.needsLink = Boolean(token.needsLink);
+        session.user.pendingLink = token.pendingLink || null;
+        const createdAtMs = token.accountCreatedAt ? Date.parse(token.accountCreatedAt) : NaN;
+        const ageDays = Number.isFinite(createdAtMs) ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : null;
+        session.user.accountAgeDays = ageDays;
         session.user.maxLibraries = MAX_SAVED_LIBRARIES_PER_ACCOUNT;
+
+        const minAgeDays = Number.parseInt(process.env.MIN_OAUTH_ACCOUNT_AGE_DAYS || '30', 10);
+        const isOAuth = token.provider && token.provider !== 'credentials';
+        if (session.user.needsLink) {
+          session.user.canCreateLibraries = false;
+          session.user.canCreateLibrariesReason = 'Подтвердите привязку аккаунта, чтобы продолжить.';
+        } else if (isOAuth && Number.isFinite(minAgeDays) && minAgeDays > 0 && Number.isFinite(ageDays) && ageDays < minAgeDays) {
+          session.user.canCreateLibraries = false;
+          session.user.canCreateLibrariesReason = `Новые аккаунты смогут создавать библиотеки через ${minAgeDays - ageDays} дн.`;
+        } else {
+          session.user.canCreateLibraries = true;
+          session.user.canCreateLibrariesReason = null;
+        }
+
+        let plan = 'free';
+        const uid = token.userId != null ? String(token.userId) : '';
+        if (uid && !uid.startsWith('pending:')) {
+          try {
+            const rec = await findUserById(uid);
+            plan = String(rec?.plan || '').toLowerCase() === 'pro' ? 'pro' : 'free';
+          } catch {
+            plan = 'free';
+          }
+        }
+        session.user.plan = plan;
+        session.user.isPro = plan === 'pro';
       }
       return session;
     },

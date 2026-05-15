@@ -21,10 +21,10 @@ import {
 import { Tooltip } from '../components/ui/Tooltip';
 import { EditorTabBar, EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
-import { updateFontSettings } from '../utils/db';
 import { useFontLibraries } from '../hooks/useFontLibraries';
 import { LibraryAuthProvider } from '../contexts/LibraryAuthContext';
 import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../utils/authLibraryLimits';
+import { PlansDialog } from '../components/ui/PlansDialog';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
 import {
   getFontIdsToRemoveWhenLibraryDeleted,
@@ -34,12 +34,7 @@ import {
   sanitizeLibraryFont,
   stampLibraryFontAddedNow,
 } from '../utils/fontLibraryUtils';
-import {
-  collectPerFontPreviewSnapshot,
-  applyPerFontPreviewSnapshot,
-} from '../utils/perFontPreviewSettings';
 import { revokeObjectURL } from '../utils/localFontProcessor';
-import { preloadFontsourcePreviewSlugs } from '../utils/fontsourcePreviewRuntimeCache';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
 import { formatCatalogAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
@@ -48,10 +43,7 @@ import {
   notifyFontMovedToLibrary,
 } from '../components/ui/FontLibraryToastNotifications';
 import { readLibraryFontDragData } from '../utils/libraryDragData';
-import {
-  prefetchFontsourceLibraryFontEntry,
-  prefetchGoogleLibraryFontEntry,
-} from '../utils/catalogLibraryBackgroundPrefetch';
+import { useLibraryEntryPrefetch } from '../hooks/useLibraryEntryPrefetch';
 import {
   buildSavedLibraryDownloadSplitButtonProps,
   countDownloadableSavedLibraryFonts,
@@ -88,18 +80,18 @@ import {
   EDITOR_CLOSED_LIBRARY_FONT_IDS_LS_KEY,
   FONTS_LIBRARY_INNER_TAB_LS_KEY,
   SESSION_FONT_ORDER_LS_KEY,
-  SESSION_FONT_TABS_PREVIEW_KEY,
   EDITOR_MAIN_TAB_PENDING,
   newEmptySlotId,
-  readEditorShellFromStorage,
   isFontTabId,
 } from '../utils/editorShellStorage';
 import { SAVED_LIBRARY_TAB_PREFIX, makeSavedLibraryTabId, readSavedLibraryId } from '../utils/savedLibraryTabIds';
+import { useEditorShellPersistence } from '../hooks/useEditorShellPersistence';
+import { editorShellDbg } from '../utils/editorShellDebugLog';
+import { usePerFontPreviewPersistence } from '../hooks/usePerFontPreviewPersistence';
+import { useFontsourcePreviewPrewarm } from '../hooks/useFontsourcePreviewPrewarm';
+import { useSessionFontTabsPreviewCache } from '../hooks/useSessionFontTabsPreviewCache';
 import {
   LIBRARY_MAIN_TABS,
-  FONTSOURCE_PREWARM_LIMIT,
-  FONTSOURCE_PREWARM_CONCURRENCY,
-  FONTSOURCE_PREWARM_DELAY_MS,
 } from '../constants/fontsLibraryScreen';
 import { countFontsByScope, buildScopeSelectOptions } from '../utils/fontLibraryScopeUi';
 
@@ -237,15 +229,32 @@ export default function Home() {
     deleteLibrary: deleteFontLibrary,
     reorderLibraries: reorderFontLibraries,
     reorderLibraryFonts,
+    clearAllLibraries,
   } = useFontLibraries();
 
-  const { status: authStatus } = useSession();
+  const { data: session, status: authStatus } = useSession();
+  const needsLink = session?.user?.needsLink === true;
+
+  useEffect(() => {
+    if (authStatus !== 'unauthenticated') return;
+    clearAllLibraries();
+    setFontsLibraryTab('catalog');
+  }, [authStatus, clearAllLibraries]);
+  const [isPlansOpen, setIsPlansOpen] = useState(false);
+  const openPlans = useCallback(() => setIsPlansOpen(true), []);
 
   const requestSignIn = useCallback(() => {
     if (typeof window === 'undefined') return;
     const callbackUrl = `${window.location.pathname}${window.location.search || ''}`;
     void signIn(undefined, { callbackUrl });
   }, []);
+
+  useEffect(() => {
+    if (!needsLink) return;
+    if (typeof window === 'undefined') return;
+    toast.info('Подтвердите привязку аккаунта');
+    void router.push('/auth/link');
+  }, [needsLink, router]);
 
   const assertCanCreateNewLibrary = useCallback(() => {
     if (authStatus === 'loading') {
@@ -257,23 +266,60 @@ export default function Home() {
       requestSignIn();
       return false;
     }
+    if (needsLink) {
+      toast.info('Подтвердите привязку аккаунта');
+      void router.push('/auth/link');
+      return false;
+    }
+    if (session?.user?.canCreateLibraries === false) {
+      toast.info(session.user.canCreateLibrariesReason || 'Действие недоступно для нового аккаунта');
+      return false;
+    }
     if (fontLibraries.length >= MAX_SAVED_LIBRARIES_PER_ACCOUNT) {
-      toast.info(`Доступно не более ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} библиотек на аккаунт`);
+      toast.info('Лимит библиотек достигнут. Посмотрите планы, чтобы получить больше возможностей.');
+      openPlans();
       return false;
     }
     return true;
-  }, [authStatus, fontLibraries.length, requestSignIn]);
+  }, [
+    authStatus,
+    fontLibraries.length,
+    requestSignIn,
+    session?.user?.canCreateLibraries,
+    session?.user?.canCreateLibrariesReason,
+    needsLink,
+    router,
+    openPlans,
+  ]);
 
   const libraryAuthValue = useMemo(
     () => ({
       authLoading: authStatus === 'loading',
       isAuthenticated: authStatus === 'authenticated',
+      isPro: Boolean(session?.user?.isPro),
+      planName: session?.user?.plan === 'pro' ? 'Pro' : 'Free',
+      librariesCount: fontLibraries.length,
+      librariesLimit: MAX_SAVED_LIBRARIES_PER_ACCOUNT,
       canCreateNewLibrary:
-        authStatus === 'authenticated' && fontLibraries.length < MAX_SAVED_LIBRARIES_PER_ACCOUNT,
+        authStatus === 'authenticated' &&
+        !needsLink &&
+        session?.user?.canCreateLibraries !== false &&
+        fontLibraries.length < MAX_SAVED_LIBRARIES_PER_ACCOUNT,
       requestSignIn,
+      openPlans,
       assertCanCreateNewLibrary,
     }),
-    [authStatus, fontLibraries.length, requestSignIn, assertCanCreateNewLibrary],
+    [
+      authStatus,
+      fontLibraries.length,
+      requestSignIn,
+      assertCanCreateNewLibrary,
+      session?.user?.canCreateLibraries,
+      session?.user?.isPro,
+      session?.user?.plan,
+      needsLink,
+      openPlans,
+    ],
   );
 
   // Используем хук useFontContext вместо useFontManager
@@ -378,130 +424,69 @@ export default function Home() {
     setVerticalAlignment,
     setTextFill,
   };
-
-  const lastMainTabForPreviewRef = useRef(null);
   const catalogPreviewSlotsByIdRef = useRef(catalogPreviewSlotsById);
   catalogPreviewSlotsByIdRef.current = catalogPreviewSlotsById;
   const initialSessionFontOrderIdsRef = useRef([]);
   const hasAppliedInitialSessionFontOrderRef = useRef(false);
-  const hasStartedFontsourcePreviewPrewarmRef = useRef(false);
 
-  /** После чтения shell из LS — можно безопасно писать mainTab и emptySlotIds обратно. */
-  const [hasRestoredEditorMainTab, setHasRestoredEditorMainTab] = useState(false);
+  const hasRestoredEditorMainTab = useEditorShellPersistence({
+    mainTab,
+    emptySlotIds,
+    closedLibraryFontIds,
+    fontsLibraryTab,
+    setMainTab,
+    setEmptySlotIds,
+    setClosedLibraryFontIds,
+    setFontsLibraryTab,
+    setTabStripPreviewFromCache,
+    initialSessionFontOrderIdsRef,
+  });
 
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = sessionStorage.getItem(SESSION_FONT_TABS_PREVIEW_KEY);
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (
-          Array.isArray(p) &&
-          p.length > 0 &&
-          p.every(
-            (x) => x && typeof x.id === 'string' && (typeof x.label === 'string' || typeof x.name === 'string'),
-          )
-        ) {
-          setTabStripPreviewFromCache(
-            p.map((x) => ({ id: x.id, label: (x.label || x.name || 'Шрифт').slice(0, 120) })),
-          );
-        }
-      }
-    } catch {
-      /* ignore */
-    }
+  useFontsourcePreviewPrewarm({ hasRestoredEditorMainTab });
 
-    const shell = readEditorShellFromStorage();
-    if (shell) {
-      setEmptySlotIds(shell.emptySlotIds);
-      setMainTab(shell.mainTab);
-    }
-    try {
-      localStorage.removeItem('editorClosedFontTabIds');
-    } catch {
-      /* ignore */
-    }
-
-    try {
-      const rawClosed = localStorage.getItem(EDITOR_CLOSED_LIBRARY_FONT_IDS_LS_KEY);
-      if (rawClosed) {
-        const parsed = JSON.parse(rawClosed);
-        if (
-          Array.isArray(parsed) &&
-          parsed.length > 0 &&
-          parsed.every((id) => typeof id === 'string' && id.length > 0)
-        ) {
-          setClosedLibraryFontIds(parsed);
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-
-    try {
-      const inner = localStorage.getItem(FONTS_LIBRARY_INNER_TAB_LS_KEY);
-      if (inner === 'catalog' || inner?.startsWith(SAVED_LIBRARY_TAB_PREFIX)) {
-        setFontsLibraryTab(inner);
-      } else if (inner === 'session') {
-        // Legacy-миграция старого значения внутренней вкладки.
-        setFontsLibraryTab('catalog');
-      }
-    } catch {
-      /* ignore */
-    }
-    try {
-      const rawOrder = localStorage.getItem(SESSION_FONT_ORDER_LS_KEY);
-      const parsed = rawOrder ? JSON.parse(rawOrder) : [];
-      if (Array.isArray(parsed)) {
-        initialSessionFontOrderIdsRef.current = parsed.filter((id) => typeof id === 'string');
-      }
-    } catch {
-      /* ignore */
-    }
-    try {
-      document.documentElement.dataset.editorUiReady = '1';
-    } catch {
-      /* ignore */
-    }
-    setHasRestoredEditorMainTab(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasRestoredEditorMainTab || typeof window === 'undefined') return;
-    if (mainTab === EDITOR_MAIN_TAB_PENDING) return;
-    try {
-      window.localStorage.setItem(EDITOR_MAIN_TAB_LS_KEY, mainTab);
-    } catch {
-      /* ignore quota */
-    }
-  }, [mainTab, hasRestoredEditorMainTab]);
-
-  useEffect(() => {
-    if (!hasRestoredEditorMainTab || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(EDITOR_EMPTY_SLOTS_LS_KEY, JSON.stringify(emptySlotIds));
-    } catch {
-      /* ignore quota */
-    }
-  }, [emptySlotIds, hasRestoredEditorMainTab]);
-
-  useEffect(() => {
-    if (!hasRestoredEditorMainTab || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(EDITOR_CLOSED_LIBRARY_FONT_IDS_LS_KEY, JSON.stringify(closedLibraryFontIds));
-    } catch {
-      /* ignore quota */
-    }
-  }, [closedLibraryFontIds, hasRestoredEditorMainTab]);
-
-  useEffect(() => {
-    if (!hasRestoredEditorMainTab || typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(FONTS_LIBRARY_INNER_TAB_LS_KEY, fontsLibraryTab);
-    } catch {
-      /* ignore quota */
-    }
-  }, [fontsLibraryTab, hasRestoredEditorMainTab]);
+  usePerFontPreviewPersistence({
+    hasRestoredEditorMainTab,
+    isInitialLoadComplete,
+    mainTab,
+    fonts,
+    setFonts,
+    previewSettingsValuesRef,
+    previewSettersRef,
+    getDefaultPreviewSettingsSnapshot,
+    previewSettingsDeps: [
+      text,
+      fontSize,
+      glyphsFontSize,
+      stylesFontSize,
+      lineHeight,
+      letterSpacing,
+      stylesLetterSpacing,
+      textColor,
+      backgroundColor,
+      viewMode,
+      textDirection,
+      textAlignment,
+      textCase,
+      textDecoration,
+      listStyle,
+      textColumns,
+      textColumnGap,
+      waterfallRows,
+      waterfallBaseSize,
+      waterfallEditTarget,
+      waterfallHeadingPresetName,
+      waterfallBodyPresetName,
+      waterfallHeadingLineHeight,
+      waterfallBodyLineHeight,
+      waterfallHeadingLetterSpacing,
+      waterfallBodyLetterSpacing,
+      waterfallScaleRatio,
+      waterfallUnit,
+      waterfallRoundPx,
+      verticalAlignment,
+      textFill,
+    ],
+  });
 
   useEffect(() => {
     if (fontsLibraryTab === 'catalog') return;
@@ -535,105 +520,6 @@ export default function Home() {
       /* ignore */
     }
   }, [fonts, isInitialLoadComplete]);
-
-  /** Фоновый prewarm превью Fontsource (даже до открытия вкладки Fontsource). */
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    if (!hasRestoredEditorMainTab) return undefined;
-    if (hasStartedFontsourcePreviewPrewarmRef.current) return undefined;
-    hasStartedFontsourcePreviewPrewarmRef.current = true;
-
-    let cancelled = false;
-    let idleHandle = null;
-    let timeoutHandle = null;
-
-    const runPrewarm = async () => {
-      if (cancelled) return;
-
-      const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-      const saveData = Boolean(connection?.saveData);
-      const effectiveType = String(connection?.effectiveType || '').toLowerCase();
-      if (saveData || effectiveType === '2g' || effectiveType === 'slow-2g') {
-        return;
-      }
-
-      try {
-        const catalogRes = await fetch('/api/fontsource-catalog');
-        if (!catalogRes.ok) return;
-        const catalogData = await catalogRes.json();
-        const slugs = (Array.isArray(catalogData?.items) ? catalogData.items : [])
-          .map((row) => row?.id || row?.slug)
-          .filter(Boolean)
-          .slice(0, FONTSOURCE_PREWARM_LIMIT);
-
-        if (slugs.length === 0) return;
-
-        await preloadFontsourcePreviewSlugs(slugs, {
-          concurrency: FONTSOURCE_PREWARM_CONCURRENCY,
-          weight: 400,
-          style: 'normal',
-        });
-      } catch (e) {
-        // Игнорируем: prewarm необязателен
-      }
-    };
-
-    const start = () => {
-      if (typeof window.requestIdleCallback === 'function') {
-        idleHandle = window.requestIdleCallback(() => {
-          runPrewarm();
-        }, { timeout: 4000 });
-      } else {
-        timeoutHandle = window.setTimeout(() => {
-          runPrewarm();
-        }, FONTSOURCE_PREWARM_DELAY_MS);
-      }
-    };
-
-    start();
-
-    return () => {
-      cancelled = true;
-      if (idleHandle !== null && typeof window.cancelIdleCallback === 'function') {
-        window.cancelIdleCallback(idleHandle);
-      }
-      if (timeoutHandle !== null) {
-        window.clearTimeout(timeoutHandle);
-      }
-    };
-  }, [hasRestoredEditorMainTab]);
-
-  /** Настройки левой панели / превью — отдельно на каждую вкладку шрифта */
-  useEffect(() => {
-    const prevTab = lastMainTabForPreviewRef.current;
-    const nextTab = mainTab;
-
-    if (nextTab === EDITOR_MAIN_TAB_PENDING) {
-      lastMainTabForPreviewRef.current = nextTab;
-      return;
-    }
-
-    if (prevTab !== null && prevTab !== nextTab && isFontTabId(prevTab)) {
-      const snap = collectPerFontPreviewSnapshot(previewSettingsValuesRef.current);
-      setFonts((fs) =>
-        fs.map((f) => (f.id === prevTab ? { ...f, previewSettings: { ...snap } } : f)),
-      );
-      updateFontSettings(prevTab, { previewSettings: snap }).catch(() => {});
-    }
-
-    if (isFontTabId(nextTab)) {
-      const font = fontsRef.current.find((f) => f.id === nextTab);
-      if (font?.previewSettings) {
-        applyPerFontPreviewSnapshot(font.previewSettings, previewSettersRef.current);
-      } else {
-        applyPerFontPreviewSnapshot(getDefaultPreviewSettingsSnapshot(), previewSettersRef.current);
-      }
-    } else if (nextTab === 'library' || nextTab.startsWith(EMPTY_PREFIX)) {
-      applyPerFontPreviewSnapshot(getDefaultPreviewSettingsSnapshot(), previewSettersRef.current);
-    }
-
-    lastMainTabForPreviewRef.current = nextTab;
-  }, [mainTab, setFonts]);
 
   /** Sidebar должен соответствовать активной вкладке: на «Все шрифты»/«Новый» — дефолт, на вкладке шрифта — выбранный. */
   const sidebarSelectedFont = useMemo(
@@ -1463,27 +1349,38 @@ export default function Home() {
   );
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !isInitialLoadComplete) return;
-    if (fontsVisibleInTabBar.length === 0) {
-      try {
-        sessionStorage.removeItem(SESSION_FONT_TABS_PREVIEW_KEY);
-      } catch {
-        /* ignore */
-      }
-      setTabStripPreviewFromCache([]);
+    let editorUiReady = null;
+    let showNewFallback = null;
+    if (typeof document !== 'undefined') {
+      editorUiReady = document.documentElement.dataset.editorUiReady ?? null;
+      showNewFallback = document.documentElement.dataset.editorShowNewFallback ?? null;
     }
-    if (fontsVisibleInTabBar.length > 0) {
-      try {
-        const snapshot = fontsVisibleInTabBar.map((f) => ({
-          id: f.id,
-          label: (f.displayName || f.name || 'Шрифт').slice(0, 120),
-        }));
-        sessionStorage.setItem(SESSION_FONT_TABS_PREVIEW_KEY, JSON.stringify(snapshot));
-      } catch {
-        /* ignore */
-      }
-    }
-  }, [fontsVisibleInTabBar, isInitialLoadComplete]);
+    const tabbarBranch = mainTab === EDITOR_MAIN_TAB_PENDING ? 'skeleton' : 'EditorTabBar';
+    editorShellDbg('index: UI shell / таббар', {
+      mainTab,
+      hasRestoredEditorMainTab,
+      isInitialLoadComplete,
+      tabbarBranch,
+      editorUiReady,
+      editorShowNewFallback: showNewFallback,
+      emptySlots: emptySlotIds.length,
+      fontsVisibleTabBar: fontsVisibleInTabBar.length,
+      placeholdersCount: Array.isArray(fontTabPlaceholders) ? fontTabPlaceholders.length : 0,
+    });
+  }, [
+    mainTab,
+    hasRestoredEditorMainTab,
+    isInitialLoadComplete,
+    emptySlotIds.length,
+    fontsVisibleInTabBar.length,
+    fontTabPlaceholders,
+  ]);
+
+  useSessionFontTabsPreviewCache({
+    isInitialLoadComplete,
+    fontsVisibleInTabBar,
+    setTabStripPreviewFromCache,
+  });
 
   useEffect(() => {
     if (!isInitialLoadComplete) return;
@@ -2067,9 +1964,13 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       toast.error('Сначала выберите шрифт');
       return;
     }
-    setCssString(buildExportCssCode());
+    if (libraryAuthValue.isPro) {
+      setCssString(buildExportCssCode());
+    } else {
+      setCssString('');
+    }
     setIsExportModalOpen(true);
-  }, [selectedFont, buildExportCssCode]);
+  }, [selectedFont, buildExportCssCode, libraryAuthValue.isPro]);
 
   const handleGenerateClick = useCallback(() => {
     if (!selectedFont) {
@@ -2165,6 +2066,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     [reorderLibraryFonts],
   );
 
+  const prefetchLibraryEntry = useLibraryEntryPrefetch();
+
   const addFontEntryToLibrary = useCallback(
     (libraryId, fontEntry) => {
       const entry = stampLibraryFontAddedNow(fontEntry);
@@ -2179,14 +2082,10 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         fonts: [...targetLibrary.fonts, entry],
       });
       notifyFontMovedToLibrary(entry.label, targetLibrary.name);
-      if (entry.source === 'google') {
-        prefetchGoogleLibraryFontEntry(entry);
-      } else if (entry.source === 'fontsource') {
-        prefetchFontsourceLibraryFontEntry(entry);
-      }
+      prefetchLibraryEntry(entry);
       return true;
     },
-    [fontLibraries, handleUpdateSavedLibrary],
+    [fontLibraries, handleUpdateSavedLibrary, prefetchLibraryEntry],
   );
 
   const handleLibraryTabDragOver = useCallback((event, tabId) => {
@@ -2866,7 +2765,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           }
           downloadSelected={catalogSelectionActions.downloadSelected}
           downloadSelectedAsFormat={catalogSelectionActions.downloadSelectedAsFormat}
-          emptyTooltip="Выделите карточки в каталоге (долгий зажим), чтобы скачать"
+          emptyTooltip="Выделите карточки в каталоге (долгий зажим), чтобы скачать несколько шрифтов"
         />
       );
     }
@@ -2888,7 +2787,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           downloadSelectedAsFormat={
             selectedSavedLibraryDownloadableCount > 0 ? downloadSelectedSavedLibraryAsFormat : null
           }
-          emptyTooltip="Выделите карточки в библиотеке (долгий зажим), чтобы скачать"
+          emptyTooltip="Выделите карточки в библиотеке (долгий зажим), чтобы скачать несколько шрифтов"
         />
       );
     }
@@ -2907,7 +2806,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           }
           downloadSelected={emptyTabSelectionActions.downloadSelected}
           downloadSelectedAsFormat={emptyTabSelectionActions.downloadSelectedAsFormat}
-          emptyTooltip="Выделите карточки в быстром поиске (долгий зажим), чтобы скачать"
+          emptyTooltip="Выделите карточки в быстром поиске (долгий зажим), чтобы скачать несколько шрифтов"
         />
       );
     }
@@ -3034,9 +2933,20 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         ),
       };
     }
+    const planBadgeShort = libraryAuthValue.isPro ? 'Pro' : libraryAuthValue.planName || 'Free';
     return {
       leading: '',
-      center: <span className="truncate uppercase">Библиотеки</span>,
+      center: (
+        <span className="flex min-w-0 max-w-full items-center justify-center gap-2">
+          <span className="truncate uppercase">Библиотеки</span>
+          <span
+            className="shrink-0 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600"
+            title="Тариф"
+          >
+            {planBadgeShort}
+          </span>
+        </span>
+      ),
     };
   }, [
     fontsLibraryTab,
@@ -3044,10 +2954,17 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     googleCatalogTotalItems,
     fontsourceCatalogTotalItems,
     activeSavedLibrary,
+    libraryAuthValue.isPro,
+    libraryAuthValue.planName,
   ]);
 
   return (
     <LibraryAuthProvider value={libraryAuthValue}>
+    <PlansDialog
+      open={isPlansOpen}
+      onClose={() => setIsPlansOpen(false)}
+      currentPlan={libraryAuthValue.isPro ? 'Pro' : 'Free'}
+    />
     <div className="flex h-screen min-h-0 flex-row overflow-hidden bg-gray-50">
       <Head>
         <title>DINAMIC FONT — тестирование и сравнение шрифтов</title>
@@ -3065,6 +2982,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         variableSettings={variableSettings}
         generateStaticFontFile={generateStaticFontFile}
         downloadFile={downloadFile}
+        canExportTextCss={libraryAuthValue.isPro}
+        onRequestPro={openPlans}
       />
       <GenerateFontModal
         isOpen={isGenerateModalOpen}
@@ -3134,38 +3053,77 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* Панель вкладок — flex-шапка, всегда у верхнего края колонки */}
         <div className="editor-tabbar-container z-20 flex min-h-12 w-full shrink-0 items-stretch overflow-visible bg-white">
-          <EditorTabBar
-            mainTab={mainTab}
-            emptySlotIds={emptySlotIds}
-            emptySlotLabelsById={emptySlotLabelsById}
-            fonts={fontsVisibleInTabBar}
-            fontTabPlaceholders={fontTabPlaceholders}
-            showNewTabSsrFallback={mainTab === EDITOR_MAIN_TAB_PENDING && emptySlotIds.length === 0}
-            onLibraryClick={() => setMainTab('library')}
-            onEmptyTabClick={(slotId) => {
-              setMainTab(`${EMPTY_PREFIX}${slotId}`);
-              const previewFont = catalogPreviewSlotsById?.[slotId] || null;
-              if (previewFont) {
-                safeSelectFont(previewFont);
-              } else {
-                setSelectedFont(null);
-              }
-            }}
-            onRemoveEmptySlot={handleRemoveEmptySlot}
-            onFontClick={(font) => {
-              setClosedLibraryFontIds((prev) => prev.filter((id) => id !== font.id));
-              safeSelectFont(font);
-              setMainTab(font.id);
-            }}
-            onRemoveFont={closeFontTab}
-            onAddEmptySlot={addEmptyPreviewSlot}
-            endActions={tabBarEndActions}
-          />
+          {mainTab === EDITOR_MAIN_TAB_PENDING ? (
+            <div className="flex w-full items-center gap-2 px-3 py-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+                <div className="h-8 w-28 rounded-md bg-gray-100 animate-pulse" />
+                <div className="h-8 w-44 rounded-md bg-gray-100 animate-pulse" />
+                <div className="h-8 w-24 rounded-md bg-gray-100 animate-pulse" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-20 rounded-md bg-gray-100 animate-pulse" />
+                <div className="h-8 w-10 rounded-md bg-gray-100 animate-pulse" />
+              </div>
+            </div>
+          ) : (
+            <EditorTabBar
+              mainTab={mainTab}
+              emptySlotIds={emptySlotIds}
+              emptySlotLabelsById={emptySlotLabelsById}
+              fonts={fontsVisibleInTabBar}
+              fontTabPlaceholders={fontTabPlaceholders}
+              showNewTabSsrFallback={false}
+              onLibraryClick={() => setMainTab('library')}
+              onEmptyTabClick={(slotId) => {
+                setMainTab(`${EMPTY_PREFIX}${slotId}`);
+                const previewFont = catalogPreviewSlotsById?.[slotId] || null;
+                if (previewFont) {
+                  safeSelectFont(previewFont);
+                } else {
+                  setSelectedFont(null);
+                }
+              }}
+              onRemoveEmptySlot={handleRemoveEmptySlot}
+              onFontClick={(font) => {
+                setClosedLibraryFontIds((prev) => prev.filter((id) => id !== font.id));
+                safeSelectFont(font);
+                setMainTab(font.id);
+              }}
+              onRemoveFont={closeFontTab}
+              onAddEmptySlot={addEmptyPreviewSlot}
+              endActions={tabBarEndActions}
+            />
+          )}
         </div>
 
         {/* Контент вкладок: «Все шрифты» — внутренний скролл у каталога, не вся страница */}
         <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
-          {mainTab !== EDITOR_MAIN_TAB_PENDING && mainTab !== 'library' && (
+          {(() => {
+            const isPendingTab = mainTab === EDITOR_MAIN_TAB_PENDING;
+            const isLibraryTab = mainTab === 'library';
+            const isEmptyTab = mainTab.startsWith(EMPTY_PREFIX);
+            const isFontTab = !isPendingTab && !isLibraryTab && !isEmptyTab;
+            const fontIsReady = Boolean(sidebarSelectedFont && sidebarSelectedFont.id === mainTab);
+
+            if (isFontTab && !fontIsReady) {
+              // Важно: не показываем empty-state (загрузчик/«перетащите шрифт»),
+              // если вкладка — шрифт, но сам шрифт ещё не восстановился из IndexedDB.
+              return (
+                <div className="min-h-0 flex-1 bg-gray-50" aria-hidden>
+                  <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3 px-6 py-6">
+                    <div className="h-10 w-72 rounded-md bg-gray-100 animate-pulse" />
+                    <div className="h-72 w-full rounded-xl bg-gray-100 animate-pulse" />
+                    <div className="h-10 w-60 rounded-md bg-gray-100 animate-pulse" />
+                    <div className="h-28 w-full rounded-xl bg-gray-100 animate-pulse" />
+                  </div>
+                </div>
+              );
+            }
+
+            if (isPendingTab || isLibraryTab) return null;
+            if (!(isEmptyTab || fontIsReady)) return null;
+
+            return (
             <FontPreview
               selectedFont={sidebarSelectedFont}
               getFontFamily={getFontFamily}
@@ -3180,13 +3138,21 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
               onMoveFontToLibrary={moveFontEntryToLibrary}
               onRequestCreateLibrary={requestCreateLibraryWithFonts}
               onSelectionActionsChange={handleEmptyTabSelectionActionsChange}
-              selectionActionsActive={mainTab.startsWith(EMPTY_PREFIX)}
+              selectionActionsActive={isEmptyTab}
               currentWaterfallBaseSize={liveWaterfallBaseSize}
             />
-          )}
+            );
+          })()}
 
           {mainTab === EDITOR_MAIN_TAB_PENDING && (
-            <div className="min-h-0 flex-1 bg-gray-50" aria-hidden />
+            <div className="min-h-0 flex-1 bg-gray-50" aria-hidden>
+              <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-3 px-6 py-6">
+                <div className="h-10 w-56 rounded-md bg-gray-100 animate-pulse" />
+                <div className="h-64 w-full rounded-xl bg-gray-100 animate-pulse" />
+                <div className="h-10 w-72 rounded-md bg-gray-100 animate-pulse" />
+                <div className="h-24 w-full rounded-xl bg-gray-100 animate-pulse" />
+              </div>
+            </div>
           )}
 
           {mainTab === 'library' && (
