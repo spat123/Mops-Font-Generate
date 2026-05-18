@@ -23,7 +23,7 @@ import { EditorTabBar, EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { useFontLibraries } from '../hooks/useFontLibraries';
 import { LibraryAuthProvider } from '../contexts/LibraryAuthContext';
-import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../utils/authLibraryLimits';
+import { getMaxSavedLibrariesForUser } from '../utils/authLibraryLimits';
 import { PlansDialog } from '../components/ui/PlansDialog';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
 import {
@@ -275,7 +275,8 @@ export default function Home() {
       toast.info(session.user.canCreateLibrariesReason || 'Действие недоступно для нового аккаунта');
       return false;
     }
-    if (fontLibraries.length >= MAX_SAVED_LIBRARIES_PER_ACCOUNT) {
+    const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
+    if (fontLibraries.length >= maxLibs) {
       toast.info('Лимит библиотек достигнут. Посмотрите планы, чтобы получить больше возможностей.');
       openPlans();
       return false;
@@ -287,29 +288,32 @@ export default function Home() {
     requestSignIn,
     session?.user?.canCreateLibraries,
     session?.user?.canCreateLibrariesReason,
+    session?.user?.isPro,
     needsLink,
     router,
     openPlans,
   ]);
 
-  const libraryAuthValue = useMemo(
-    () => ({
+  const libraryAuthValue = useMemo(() => {
+    const isPro = Boolean(session?.user?.isPro);
+    const maxLibs = getMaxSavedLibrariesForUser(isPro);
+    return {
       authLoading: authStatus === 'loading',
       isAuthenticated: authStatus === 'authenticated',
-      isPro: Boolean(session?.user?.isPro),
+      isPro,
       planName: session?.user?.plan === 'pro' ? 'Pro' : 'Free',
       librariesCount: fontLibraries.length,
-      librariesLimit: MAX_SAVED_LIBRARIES_PER_ACCOUNT,
+      librariesLimit: maxLibs,
       canCreateNewLibrary:
         authStatus === 'authenticated' &&
         !needsLink &&
         session?.user?.canCreateLibraries !== false &&
-        fontLibraries.length < MAX_SAVED_LIBRARIES_PER_ACCOUNT,
+        fontLibraries.length < maxLibs,
       requestSignIn,
       openPlans,
       assertCanCreateNewLibrary,
-    }),
-    [
+    };
+  }, [
       authStatus,
       fontLibraries.length,
       requestSignIn,

@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Tooltip } from '../ui/Tooltip';
 import { AppButton } from '../ui/AppButton';
+import { IconCircleButton } from '../ui/IconCircleButton';
+import { PlusIcon } from '../ui/CommonIcons';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { countRecentlyAddedLibraryFonts } from '../../utils/fontLibraryUtils';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
@@ -238,62 +240,96 @@ function CollapsedLibraryRail({
   libraries = [],
   activeLibraryId = null,
   onOpenLibrary,
+  onRequestCreateLibrary,
 }) {
-  const { openPlans, canCreateNewLibrary, isAuthenticated } = useLibraryAuth();
+  const { openPlans, canCreateNewLibrary, isAuthenticated, authLoading } = useLibraryAuth();
   const showLimitUpgrade = isAuthenticated && !canCreateNewLibrary;
-  return (
-    <div className="flex min-h-0 flex-1 flex-col items-center gap-2">
-      <div className="editor-sidebar-scroll flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto pb-1">
-        {(Array.isArray(libraries) ? libraries : []).map((library) => {
-          const isActive = activeLibraryId === library?.id;
-          const fontCount = Array.isArray(library?.fonts) ? library.fonts.length : 0;
-          const recentAddedCount = countRecentlyAddedLibraryFonts(library?.fonts);
-          return (
-            <Tooltip key={library?.id || library?.name || 'library'} content={library?.name || 'Библиотека'}>
-              <span className="relative inline-flex">
-                <AppButton
-                  type="button"
-                  variant="chip"
-                  pressed={isActive}
-                  size="icon"
-                  className={`!h-9 !min-h-9 !w-9 !min-w-9 !rounded-full !p-0 text-[11px] font-semibold leading-none ${!isActive ? '!border-gray-300' : ''}`}
-                  aria-label={`${library?.name || 'Библиотека'}: ${fontCount} шт.${recentAddedCount > 0 ? `, новых ${recentAddedCount}` : ''}`}
-                  aria-pressed={isActive}
-                  onClick={() => onOpenLibrary?.(library?.id || null)}
-                >
-                  {fontCount}
-                </AppButton>
-                {recentAddedCount > 0 ? (
-                  <span
-                    className={`pointer-events-none absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none shadow-sm ring-2 ring-white ${
-                      isActive ? 'bg-white text-accent' : 'bg-accent text-white'
-                    }`}
-                    aria-hidden
-                  >
-                    +{recentAddedCount}
-                  </span>
-                ) : null}
-              </span>
-            </Tooltip>
-          );
-        })}
-      </div>
-      {showLimitUpgrade ? (
-        <div className="shrink-0 pb-1">
-          <Tooltip content="Лимит библиотек — открыть планы" openDelayMs={200}>
-            <AppButton
-              type="button"
-              variant="toolbarIcon"
-              size="icon"
-              className="!text-accent hover:!bg-accent hover:!text-white"
-              aria-label="Улучшить план"
-              onClick={() => openPlans?.()}
+  const showAddLibrary = Boolean(onRequestCreateLibrary) && !showLimitUpgrade;
+  const libs = Array.isArray(libraries) ? libraries : [];
+  /** Как в FontLibrarySidebar: от 4 библиотек — скролл только списка, действие снизу колонки. */
+  const pinAddToBottom = libs.length >= 4;
+
+  const libraryChips = libs.map((library) => {
+    const isActive = activeLibraryId === library?.id;
+    const fontCount = Array.isArray(library?.fonts) ? library.fonts.length : 0;
+    const recentAddedCount = countRecentlyAddedLibraryFonts(library?.fonts);
+    return (
+      <Tooltip key={library?.id || library?.name || 'library'} content={library?.name || 'Библиотека'}>
+        <span className="relative inline-flex">
+          <AppButton
+            type="button"
+            variant="chip"
+            pressed={isActive}
+            size="icon"
+            className={`!h-9 !min-h-9 !w-9 !min-w-9 !rounded-full !p-0 text-[11px] font-semibold leading-none ${!isActive ? '!border-gray-300' : ''}`}
+            aria-label={`${library?.name || 'Библиотека'}: ${fontCount} шт.${recentAddedCount > 0 ? `, новых ${recentAddedCount}` : ''}`}
+            aria-pressed={isActive}
+            onClick={() => onOpenLibrary?.(library?.id || null)}
+          >
+            {fontCount}
+          </AppButton>
+          {recentAddedCount > 0 ? (
+            <span
+              className={`pointer-events-none absolute -right-1 -top-1 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none shadow-sm ring-2 ring-white ${
+                isActive ? 'bg-white text-accent' : 'bg-accent text-white'
+              }`}
+              aria-hidden
             >
-              <EditAssetIcon src={updateIconUrl} className="h-5 w-5" />
-            </AppButton>
-          </Tooltip>
+              +{recentAddedCount}
+            </span>
+          ) : null}
+        </span>
+      </Tooltip>
+    );
+  });
+
+  const limitFooter = showLimitUpgrade ? (
+    <div className="w-full shrink-0 bg-white">
+      <div className="flex justify-center">
+        <Tooltip content="Лимит библиотек достигнут — открыть планы" openDelayMs={200}>
+          <AppButton
+            type="button"
+            variant="toolbarIcon"
+            size="icon"
+            className="!text-accent hover:!bg-accent hover:!text-white"
+            aria-label="Лимит библиотек достигнут. Улучшить план"
+            onClick={() => openPlans?.()}
+          >
+            <EditAssetIcon src={updateIconUrl} className="h-5 w-5" />
+          </AppButton>
+        </Tooltip>
+      </div>
+    </div>
+  ) : null;
+
+  const plusFooter = showAddLibrary ? (
+    <div className="flex shrink-0 justify-center pb-1">
+      <Tooltip content="Добавить библиотеку" openDelayMs={200}>
+        <IconCircleButton
+          variant="accent"
+          size="md"
+          disabled={authLoading}
+          onClick={() => onRequestCreateLibrary?.()}
+          aria-label="Добавить библиотеку"
+        >
+          <PlusIcon />
+        </IconCircleButton>
+      </Tooltip>
+    </div>
+  ) : null;
+
+  return (
+    <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col items-stretch">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2">
+        <div className="editor-sidebar-scroll flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overscroll-contain pb-1">
+          {libraryChips}
+          {!pinAddToBottom && plusFooter ? <div className="mt-2 shrink-0 w-full">{plusFooter}</div> : null}
         </div>
-      ) : null}
+        {pinAddToBottom && plusFooter ? (
+          <div className="w-full shrink-0 border-t border-gray-100 bg-white pt-2">{plusFooter}</div>
+        ) : null}
+      </div>
+      {limitFooter}
     </div>
   );
 }
@@ -313,6 +349,7 @@ export function CollapsedSidebarControls({
         libraries={library?.libraries}
         activeLibraryId={library?.activeLibraryId}
         onOpenLibrary={library?.onOpenLibrary}
+        onRequestCreateLibrary={library?.onRequestCreateLibrary}
       />
     );
   }

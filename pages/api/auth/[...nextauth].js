@@ -1,8 +1,44 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../../../utils/authLibraryLimits';
+import { getMaxSavedLibrariesForUser } from '../../../utils/authLibraryLimits';
 import { upsertOAuthUser, verifyCredentialsUser, findUserByEmail, findUserById } from '../../../lib/auth/userStore';
+
+/** Только локальная разработка: поднять тариф до Pro без правки БД. */
+function applyDevProSimulation(session) {
+  if (process.env.NODE_ENV !== 'development') return;
+  const u = session?.user;
+  if (!u) return;
+
+  if (String(process.env.DEV_PRO_SIMULATION || '').trim() === '1') {
+    u.plan = 'pro';
+    u.isPro = true;
+    return;
+  }
+
+  const emails = String(process.env.DEV_PRO_EMAILS || '')
+    .split(/[,;\s]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  const userEmail = String(u.email || '')
+    .trim()
+    .toLowerCase();
+  if (userEmail && emails.includes(userEmail)) {
+    u.plan = 'pro';
+    u.isPro = true;
+    return;
+  }
+
+  const ids = String(process.env.DEV_PRO_USER_IDS || '')
+    .split(/[,;\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const uid = String(u.id || '').trim();
+  if (uid && ids.includes(uid)) {
+    u.plan = 'pro';
+    u.isPro = true;
+  }
+}
 
 function buildProviders() {
   const list = [];
@@ -159,7 +195,6 @@ export const authOptions = {
         const createdAtMs = token.accountCreatedAt ? Date.parse(token.accountCreatedAt) : NaN;
         const ageDays = Number.isFinite(createdAtMs) ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : null;
         session.user.accountAgeDays = ageDays;
-        session.user.maxLibraries = MAX_SAVED_LIBRARIES_PER_ACCOUNT;
 
         const minAgeDays = Number.parseInt(process.env.MIN_OAUTH_ACCOUNT_AGE_DAYS || '30', 10);
         const isOAuth = token.provider && token.provider !== 'credentials';
@@ -186,6 +221,9 @@ export const authOptions = {
         }
         session.user.plan = plan;
         session.user.isPro = plan === 'pro';
+
+        applyDevProSimulation(session);
+        session.user.maxLibraries = getMaxSavedLibrariesForUser(Boolean(session.user.isPro));
       }
       return session;
     },

@@ -56,7 +56,13 @@ export function useFontExport(exportToCSSFromHook) {
   }, [exportToCSSFromHook, downloadFile]);
 
   const generateStaticFontFile = useCallback(async (selectedFont, variableSettings, format = 'woff2', opts = {}) => {
-    const { outputFontName, skipPseudoCssPrompt, canExportTextCss: allowCssBundle = true } = opts;
+    const {
+      outputFontName,
+      outputFontSubfamily,
+      outputPostScriptName,
+      skipPseudoCssPrompt,
+      canExportTextCss: allowCssBundle = true,
+    } = opts;
     if (!selectedFont || !selectedFont.isVariableFont) {
       toast.error('Выберите вариативный шрифт для создания статической версии');
       return null;
@@ -94,15 +100,27 @@ export function useFontExport(exportToCSSFromHook) {
         throw new Error(`Неправильный тип данных шрифта. Ожидается ArrayBuffer, получен: ${typeof fontData}`);
       }
 
-      const displayName = outputFontName || selectedFont.name || 'VariableFont';
+      const familyName = String(outputFontName || selectedFont.name || 'VariableFont').trim() || 'VariableFont';
+      const subfamilyName = String(outputFontSubfamily || 'Regular').trim() || 'Regular';
+      const displayName = familyName;
 
       const result = await generateStaticFont(fontData, variableSettings, {
         format,
         fontName: displayName,
+        rename: {
+          family: familyName,
+          subfamily: subfamilyName,
+          postScriptName: outputPostScriptName,
+        },
       });
 
       if (result.warning) {
         toast.warning(result.warning);
+      }
+      if (capabilities.server && outputFontName && !capabilities.internalRename) {
+        toast.warning(
+          'Серверная генерация доступна, но переименование внутри файла недоступно в текущем окружении. Имя изменится только у скачиваемого файла.',
+        );
       }
 
       if (result.css && !skipPseudoCssPrompt && allowCssBundle) {

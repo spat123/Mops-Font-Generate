@@ -10,6 +10,10 @@ import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { toast } from '../../utils/appNotify';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { loginIconUrl, userIconUrl } from '../ui/editIconUrls';
+import {
+  FREE_STATIC_GENERATIONS_LIMIT,
+  readFreeStaticGenerationsUsed,
+} from '../../utils/freeStaticGenerationQuota';
 
 function ProfileRow({ label, children }) {
   return (
@@ -42,6 +46,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const panelRef = useRef(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [freeGenUsed, setFreeGenUsed] = useState(0);
 
   const callbackUrl = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
 
@@ -71,8 +76,8 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const planBlurb = isPro
     ? 'Расширенные лимиты и приоритетные возможности.'
     : typeof librariesLimit === 'number'
-      ? `Доступно до ${librariesLimit} библиотек, генерация вариативных шрифтов`
-      : 'Доступно несколько библиотек, генерация вариативных шрифтов';
+      ? `Доступно до ${librariesLimit} библиотек и до ${FREE_STATIC_GENERATIONS_LIMIT} генераций статических файлов.`
+      : 'Доступно несколько библиотек и генерации статических файлов.';
 
   const sessionNameParts = authenticated && session?.user?.name ? String(session.user.name).trim().split(/\s+/) : [];
   const sessionFirst = sessionNameParts[0] || '';
@@ -90,6 +95,32 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
     setFirstName(parts[0] || '');
     setLastName(parts.slice(1).join(' ') || '');
   }, [authenticated, session?.user?.name]);
+
+  useEffect(() => {
+    if (!open || !authenticated || typeof window === 'undefined') return;
+    const uid = session?.user?.id;
+    setFreeGenUsed(readFreeStaticGenerationsUsed(uid));
+  }, [open, authenticated, session?.user?.id]);
+
+  useEffect(() => {
+    if (!authenticated || typeof window === 'undefined') return;
+    const uid = session?.user?.id;
+    const onStorage = (e) => {
+      if (e.key && e.key.startsWith('dinamic-font:free-static-generations-used:')) {
+        setFreeGenUsed(readFreeStaticGenerationsUsed(uid));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [authenticated, session?.user?.id]);
+
+  useEffect(() => {
+    if (!open || !authenticated || typeof window === 'undefined') return;
+    const uid = session?.user?.id;
+    const onFocus = () => setFreeGenUsed(readFreeStaticGenerationsUsed(uid));
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [open, authenticated, session?.user?.id]);
 
   useEffect(() => {
     if (!open || !authenticated || typeof document === 'undefined') return undefined;
@@ -143,11 +174,11 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   </div>
 
                   {limitReached && !isPro ? (
-                    <div className="flex flex-col gap-2 rounded-lg border border-amber-300/90 bg-[#FFFBEB] p-4">
-                      <p className="text-base font-semibold uppercase leading-snug tracking-wide text-[#b45309]">
+                    <div className="flex flex-col gap-2 rounded-lg bg-gray-50 p-4">
+                      <p className="text-base font-semibold uppercase leading-snug tracking-wide text-gray-900">
                         Лимит библиотек достигнут
                       </p>
-                      <p className="text-xs font-medium leading-snug text-[#92400e]">
+                      <p className="text-xs font-medium leading-snug text-gray-700">
                         Улучшите план, чтобы получить больше возможностей.
                       </p>
                       <AppButton
@@ -166,10 +197,23 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                     </div>
                   ) : (
                     <div className="hidden rounded-lg border border-dashed border-gray-200 bg-gray-50/50 p-4 sm:flex sm:flex-col sm:justify-center">
-                      <p className="text-center text-[10px] font-semibold uppercase leading-relaxed tracking-wide text-gray-500">
+                      <p className="flex flex-col gap-1.5 text-center text-[10px] font-semibold uppercase leading-relaxed tracking-wide text-gray-500">
                         {limitText ? (
                           <>
-                            Библиотеки: <span className="tabular-nums text-gray-800">{limitText}</span>
+                            <span>
+                              Библиотеки: <span className="tabular-nums text-gray-800">{limitText}</span>
+                            </span>
+                            {!isPro ? (
+                              <span>
+                                Генерация:{' '}
+                                <span className="tabular-nums text-gray-800">
+                                  {Math.max(0, FREE_STATIC_GENERATIONS_LIMIT - freeGenUsed)}/
+                                  {FREE_STATIC_GENERATIONS_LIMIT}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-gray-600">Генерация: без лимита</span>
+                            )}
                           </>
                         ) : (
                           'Аккаунт в порядке'

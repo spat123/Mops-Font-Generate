@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDismissibleLayer } from './useDismissibleLayer';
 import { AppButton } from './AppButton';
+import { MAX_SAVED_LIBRARIES_PRO_ACCOUNT } from '../../utils/authLibraryLimits';
 
 function PlanCard({ title, price, features = [], active = false, highlight = false, action = null, badge = null }) {
   return (
@@ -97,7 +98,7 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free' }) {
               badge="Рекомендуем"
               active={currentPlan === 'Pro'}
               features={[
-                'Больше библиотек',
+                `До ${MAX_SAVED_LIBRARIES_PRO_ACCOUNT} библиотек`,
                 'Экспорт CSS с @font-face: копирование, .css / .txt',
                 'Приоритетные обновления',
               ]}

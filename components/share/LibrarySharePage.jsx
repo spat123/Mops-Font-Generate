@@ -15,7 +15,7 @@ import {
 } from '../../utils/libraryShareCatalogResolve';
 import { downloadLibraryAsZip } from '../../utils/libraryArchiveDownload';
 import { useFontLibraries } from '../../hooks/useFontLibraries';
-import { MAX_SAVED_LIBRARIES_PER_ACCOUNT } from '../../utils/authLibraryLimits';
+import { getMaxSavedLibrariesForUser } from '../../utils/authLibraryLimits';
 import { toast } from '../../utils/appNotify';
 import { Tooltip } from '../ui/Tooltip';
 import { CatalogGridModeToggle } from '../catalog/CatalogGridModeToggle';
@@ -115,7 +115,7 @@ function ShareCloudRow({ row, isRowMode }) {
 
 export function LibrarySharePage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const { createLibrary, libraries: savedLibraries } = useFontLibraries();
   const [layout, setLayout] = useState('list');
   const [zipBusy, setZipBusy] = useState(false);
@@ -284,9 +284,10 @@ export function LibrarySharePage() {
       void signIn(undefined, { callbackUrl });
       return;
     }
-    if (savedLibraries.length >= MAX_SAVED_LIBRARIES_PER_ACCOUNT) {
+    const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
+    if (savedLibraries.length >= maxLibs) {
       toast.info(
-        `В редакторе уже ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} библиотеки — удалите одну на главной, чтобы импортировать ещё одну.`,
+        `Достигнут лимит библиотек (${maxLibs}). Удалите одну на главной, чтобы импортировать ещё одну.`,
       );
       return;
     }
@@ -301,7 +302,7 @@ export function LibrarySharePage() {
     } finally {
       setImportBusy(false);
     }
-  }, [createLibrary, draft, savedLibraries.length, status]);
+  }, [createLibrary, draft, savedLibraries.length, session?.user?.isPro, status]);
 
   const commitRowSample = useCallback((rowKey, text) => {
     const t = String(text ?? '').trim();
@@ -462,7 +463,7 @@ export function LibrarySharePage() {
                 aria-live="polite"
               >
                 <div className="pointer-events-auto flex w-full max-w-xl flex-col gap-2 rounded-lg bg-white p-2 shadow-lg sm:max-w-2xl sm:flex-row sm:items-stretch">
-                  <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-1">
+                  <div className="flex min-w-0 flex-1 sm:flex-1">
                     <AppButton
                       type="button"
                       variant="outline"

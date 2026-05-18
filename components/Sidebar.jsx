@@ -1330,12 +1330,19 @@ export default function Sidebar({
   const sidebarScrollRef = useRef(null);
   const sidebarScrollIdleTimerRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [libraryOpenCreateSignal, setLibraryOpenCreateSignal] = useState(0);
   const [sidebarScrollbarVisible, setSidebarScrollbarVisible] = useState(false);
   const [sidebarScrollLayout, setSidebarScrollLayout] = useState({
     scrollTop: 0,
     scrollHeight: 0,
     clientHeight: 0,
   });
+
+  useEffect(() => {
+    if (!isLibraryTab) {
+      setLibraryOpenCreateSignal(0);
+    }
+  }, [isLibraryTab]);
 
   const syncSidebarScrollLayout = useCallback(() => {
     const el = sidebarScrollRef.current;
@@ -1477,43 +1484,160 @@ export default function Sidebar({
         </div>
       </div>
 
-      {!isSidebarCollapsed ? (
-      <div className="relative min-h-0 flex flex-1 flex-col">
-        {!isLibraryTab ? (
-          <div
-            className="flex min-h-12 shrink-0 items-center bg-white px-4 pt-4"
-            role="toolbar"
-            aria-label="Режим превью"
-          >
-            <SegmentedControl
-              value={viewMode}
-              onChange={setViewMode}
-              options={VIEW_MODE_OPTIONS}
-              variant="surface"
-              className="w-full min-w-0"
-            />
+      {isLibraryTab ? (
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div className={isSidebarCollapsed ? 'hidden' : 'relative flex min-h-0 flex-1 flex-col'}>
+            <div
+              ref={sidebarScrollRef}
+              className="editor-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto"
+            >
+              <FontLibrarySidebar
+                sessionFonts={sessionFonts}
+                libraries={fontLibraries}
+                activeLibraryId={activeLibraryId}
+                onOpenLibrary={onOpenFontLibrary}
+                onCreateLibrary={onCreateFontLibrary}
+                onUpdateLibrary={onUpdateFontLibrary}
+                onDeleteLibrary={onDeleteFontLibrary}
+                onReorderLibraries={onReorderFontLibraries}
+                onAddFontToLibrary={onAddFontToLibrary}
+                createLibrarySeedRequest={createLibrarySeedRequest}
+                onCreateLibrarySeedHandled={onCreateLibrarySeedHandled}
+                onShareLibrary={onShareLibrary}
+                openCreateLibrarySignal={libraryOpenCreateSignal}
+              />
+            </div>
+            {!isSidebarCollapsed && sidebarOverlayThumb ? (
+              <div
+                className="pointer-events-none absolute right-0 top-2 bottom-2 z-20 w-2"
+                aria-hidden
+              >
+                <div
+                  className={`absolute right-1 w-1.5 rounded-full bg-gray-400 transition-opacity duration-200 ${
+                    sidebarScrollbarVisible ? 'opacity-90' : 'opacity-0'
+                  }`}
+                  style={{
+                    top: `${sidebarOverlayThumb.top}px`,
+                    height: `${sidebarOverlayThumb.thumbH}px`,
+                  }}
+                />
+              </div>
+            ) : null}
           </div>
-        ) : null}
+          {isSidebarCollapsed ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="editor-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-2 py-3">
+                <CollapsedSidebarControls
+                  isLibraryTab={isLibraryTab}
+                  library={{
+                    libraries: fontLibraries,
+                    activeLibraryId,
+                    onOpenLibrary: onOpenFontLibrary,
+                    onRequestCreateLibrary: () => setLibraryOpenCreateSignal((n) => n + 1),
+                  }}
+                  options={{
+                    viewModeOptions: VIEW_MODE_OPTIONS,
+                    textAlignOptions: SIDEBAR_TEXT_ALIGN_OPTIONS,
+                    verticalAlignOptions: SIDEBAR_VERTICAL_ALIGN_OPTIONS,
+                    textCaseOptions: SIDEBAR_TEXT_CASE_OPTIONS,
+                    textDecorationOptions: SIDEBAR_TEXT_DECORATION_OPTIONS,
+                    sidebarPresetOptions,
+                    waterfallScalePresets: WATERFALL_SCALE_PRESETS,
+                    quickPresetSections,
+                  }}
+                  ui={{
+                    activeViewModeOption,
+                    activeTextAlignOption,
+                    activeVerticalAlignOption,
+                    activeWaterfallScalePreset,
+                    collapsedStylePresetName,
+                    collapsedStylePresetStyle,
+                    collapsedStylePresetLetter,
+                  }}
+                  state={{
+                    viewMode,
+                    isWaterfallView,
+                    waterfallEditTarget,
+                    selectedFont,
+                    availableStyles,
+                    isStylesView,
+                    fontSizeControl,
+                    letterSpacingControl,
+                    lineHeightControl,
+                    isGlyphsView,
+                    textAlignment,
+                    verticalAlignment,
+                    textCase,
+                    textDecoration,
+                    isTextCaseDisabled,
+                    countControl,
+                    isTextModeDisabled,
+                    textFill,
+                    isTextFillDisabled,
+                    waterfallScaleRatio,
+                    waterfallUnit,
+                    waterfallRoundTooltip,
+                    waterfallRoundEnabled,
+                    isAnimating,
+                    textColor,
+                    backgroundColor,
+                    previewBackgroundImage,
+                    sidebarTextPreset,
+                  }}
+                  actions={{
+                    setViewMode,
+                    setWaterfallEditTarget,
+                    applyPresetStyle,
+                    setWaterfallBodyPresetName,
+                    setWaterfallHeadingPresetName,
+                    setTextAlignment,
+                    setVerticalAlignment,
+                    setTextCase,
+                    setTextDecoration,
+                    toggleTextFillHandler,
+                    setWaterfallScaleSelectKey,
+                    setWaterfallScaleRatio,
+                    setWaterfallUnit,
+                    setWaterfallRoundPx,
+                    isVariableEnabled,
+                    toggleAnimation,
+                    resetVariableSettings,
+                    setTextColor,
+                    setBackgroundColor,
+                    setPreviewBackgroundImage,
+                    pickSidebarTextPreset,
+                  }}
+                  icons={{
+                    ActiveViewModeIcon,
+                    ActiveTextAlignIcon,
+                    ActiveVerticalAlignIcon,
+                    TextFillIcon: IconTextFillExpand,
+                    RoundingIcon: IconRoundingUp,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : !isSidebarCollapsed ? (
+      <div className="relative min-h-0 flex flex-1 flex-col">
+        <div
+          className="flex min-h-12 shrink-0 items-center bg-white px-4 pt-4"
+          role="toolbar"
+          aria-label="Режим превью"
+        >
+          <SegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            options={VIEW_MODE_OPTIONS}
+            variant="surface"
+            className="w-full min-w-0"
+          />
+        </div>
         <div
           ref={sidebarScrollRef}
           className="editor-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto"
         >
-      {isLibraryTab ? (
-        <FontLibrarySidebar
-          sessionFonts={sessionFonts}
-          libraries={fontLibraries}
-          activeLibraryId={activeLibraryId}
-          onOpenLibrary={onOpenFontLibrary}
-          onCreateLibrary={onCreateFontLibrary}
-          onUpdateLibrary={onUpdateFontLibrary}
-          onDeleteLibrary={onDeleteFontLibrary}
-          onReorderLibraries={onReorderFontLibraries}
-          onAddFontToLibrary={onAddFontToLibrary}
-          createLibrarySeedRequest={createLibrarySeedRequest}
-          onCreateLibrarySeedHandled={onCreateLibrarySeedHandled}
-          onShareLibrary={onShareLibrary}
-        />
-      ) : (
         <>
           {/* Базовые настройки шрифта */}
       <div className="p-4">
@@ -1981,10 +2105,9 @@ export default function Sidebar({
         <ResetButton onResetSelectedFont={resetSelectedFontState} />
       </div>
         </>
-      )}
         </div>
 
-        {sidebarOverlayThumb ? (
+        {!isLibraryTab && sidebarOverlayThumb ? (
           <div
             className="pointer-events-none absolute right-0 top-2 bottom-2 z-20 w-2"
             aria-hidden

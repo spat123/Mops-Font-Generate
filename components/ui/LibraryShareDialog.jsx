@@ -24,7 +24,7 @@ const SHARE_COPY_BTN =
   'group flex w-full min-w-0 flex-col items-center justify-center gap-2 rounded-lg bg-gray-50 px-1 py-2 text-gray-800 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40';
 
 /** Иконка «копировать ссылку» (цепочка), отдельно от соц. брендов */
-const SHARE_LINK_ICON = 'h-8 w-8 shrink-0 text-gray-900';
+const SHARE_LINK_ICON = 'h-6 w-6 shrink-0 text-gray-900';
 
 const SHARE_ICON = 'h-10 w-10 shrink-0 text-gray-900';
 

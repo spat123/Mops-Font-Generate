@@ -8,6 +8,8 @@ import { promisify } from 'util';
 const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
 
+const ALLOWED_FORMATS = new Set(['ttf', 'otf', 'woff', 'woff2']);
+
 /** Временные файлы только под /tmp — на Vercel serverless в корень проекта писать нельзя. */
 function getTempDir() {
   return path.join(os.tmpdir(), 'dinamic-generate-static-font');
@@ -49,6 +51,29 @@ function isWoff2Buffer(buf) {
   return b.length >= 4 && b[0] === 0x77 && b[1] === 0x4f && b[2] === 0x46 && b[3] === 0x32;
 }
 
+function sanitizeNameString(raw, fallback, maxLen = 80) {
+  const cleaned = String(raw || '')
+    .trim()
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .replace(/\s+/g, ' ');
+  const out = cleaned || String(fallback || '').trim() || '';
+  return out.slice(0, maxLen) || fallback || 'Font';
+}
+
+function buildPostScriptName(family, subfamily) {
+  const src = `${String(family || '').trim()}-${String(subfamily || '').trim()}`.trim() || 'Font-Static';
+  const ascii = src
+    .normalize('NFKD')
+    // eslint-disable-next-line no-control-regex -- removing diacritics from NFKD form
+    .replace(/[\u0300-\u036f]/g, '');
+  const safe = ascii
+    .replace(/[^A-Za-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 63);
+  return safe || 'Font-Static';
+}
+
 /** Опции для fontTools.varLib.instancer / instantiateVariableFont */
 function toInstancerOptions(variableSettings) {
   const out = {};
@@ -62,6 +87,103 @@ function toInstancerOptions(variableSettings) {
     out[axis] = Number.isFinite(n) ? n : value;
   }
   return out;
+}
+
+async function generateWithPythonFontTools(fontToolsPython, { inputPath, outputPath, variableSettings, format, rename }) {
+  const tempDir = getTempDir();
+  const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+  const scriptPath = path.join(tempDir, `generate-static-${stamp}.py`);
+
+  const axes = toInstancerOptions(variableSettings || {});
+  const renamePayload = rename && typeof rename === 'object' ? rename : {};
+
+  const pyCode = `
+import json
+import sys
+import time
+
+from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
+
+in_path = sys.argv[1]
+out_path = sys.argv[2]
+out_format = sys.argv[3].lower()
+axes_json = sys.argv[4]
+rename_json = sys.argv[5] if len(sys.argv) > 5 else "{}"
+
+axes = json.loads(axes_json) if axes_json else {}
+rename = json.loads(rename_json) if rename_json else {}
+
+font = TTFont(in_path)
+inst = instantiateVariableFont(font, axes, inplace=False)
+
+family = (rename.get("family") or "").strip()
+subfamily = (rename.get("subfamily") or "").strip() or "Regular"
+postscript = (rename.get("postScriptName") or "").strip()
+if not postscript:
+    # last resort fallback (ASCII-ish slug)
+    base = (family + "-" + subfamily).strip() or "Font-Static"
+    postscript = "".join([c if (c.isalnum() or c == "-") else "-" for c in base])
+    while "--" in postscript:
+        postscript = postscript.replace("--", "-")
+    postscript = postscript.strip("-")[:63] or "Font-Static"
+
+full_name = (family + " " + subfamily).strip() if family else subfamily
+
+def set_name(name_id, value):
+    if not value:
+        return
+    # Windows (Unicode)
+    inst["name"].setName(value, name_id, 3, 1, 0x409)
+    # macOS (Roman)
+    inst["name"].setName(value, name_id, 1, 0, 0)
+
+if family:
+    set_name(1, family)   # Family
+    set_name(16, family)  # Typographic family
+set_name(2, subfamily)    # Subfamily
+set_name(17, subfamily)   # Typographic subfamily
+if family:
+    set_name(4, full_name)  # Full name
+set_name(6, postscript)   # PostScript name
+if family:
+    unique_id = f"{postscript};{int(time.time())};{full_name}"
+    set_name(3, unique_id)
+
+if out_format in ("woff", "woff2"):
+    inst.flavor = out_format
+else:
+    inst.flavor = None
+
+inst.save(out_path)
+`;
+
+  await writeFile(scriptPath, pyCode, 'utf8');
+
+  try {
+    await new Promise((resolve, reject) => {
+      const args = [
+        scriptPath,
+        inputPath,
+        outputPath,
+        String(format || 'woff2').toLowerCase(),
+        JSON.stringify(axes),
+        JSON.stringify(renamePayload),
+      ];
+      const child = spawn(fontToolsPython, args, { windowsHide: true });
+      let stderr = '';
+      child.on('error', reject);
+      child.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      child.on('close', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(stderr || `fonttools exit ${code}`));
+      });
+    });
+  } finally {
+    await unlink(scriptPath).catch(() => {});
+  }
 }
 
 /**
@@ -87,10 +209,22 @@ export default async function handler(req, res) {
     return jsonMethodNotAllowed(res, 'POST');
   }
 
-  const { fontData, variableSettings, format = 'woff2', probe } = req.body;
+  const { fontData, variableSettings, format = 'woff2', probe, rename } = req.body;
+  const outFormat = String(format || 'woff2').toLowerCase();
+  const fontToolsPython = resolveFontToolsPython();
 
   if (probe === true) {
-    return res.status(200).json({ ok: true, probe: true });
+    return res.status(200).json({
+      ok: true,
+      probe: true,
+      engine: fontToolsPython ? 'python' : 'web-alchemy',
+      internalRename: Boolean(fontToolsPython),
+      formats: [...ALLOWED_FORMATS],
+    });
+  }
+
+  if (!ALLOWED_FORMATS.has(outFormat)) {
+    return res.status(400).json({ error: 'Неподдерживаемый формат', allowed: [...ALLOWED_FORMATS] });
   }
 
   if (!fontData || !variableSettings) {
@@ -100,7 +234,7 @@ export default async function handler(req, res) {
   const tempDir = getTempDir();
   const stamp = Date.now();
   const inputPath = path.join(tempDir, `input-${stamp}.bin`);
-  const outputPath = path.join(tempDir, `output-${stamp}.${format}`);
+  const outputPath = path.join(tempDir, `output-${stamp}.${outFormat}`);
 
   try {
     if (!fs.existsSync(tempDir)) {
@@ -110,34 +244,17 @@ export default async function handler(req, res) {
     const buffer = Buffer.from(fontData, 'base64');
     await writeFile(inputPath, buffer);
 
-    const fontToolsPython = resolveFontToolsPython();
-
     if (fontToolsPython) {
-      const axisArgs = Object.entries(variableSettings).map(([axis, value]) => `${axis}=${value}`);
+      const family = sanitizeNameString(rename?.family, 'Font');
+      const subfamily = sanitizeNameString(rename?.subfamily, 'Regular');
+      const postScriptName = sanitizeNameString(rename?.postScriptName, buildPostScriptName(family, subfamily), 63);
 
-      const args = [
-        '-m',
-        'fontTools.varLib.instancer',
+      await generateWithPythonFontTools(fontToolsPython, {
         inputPath,
-        ...axisArgs,
-        '--output',
         outputPath,
-      ];
-
-      await new Promise((resolve, reject) => {
-        const child = spawn(fontToolsPython, args, { windowsHide: true });
-        let stderr = '';
-
-        child.on('error', reject);
-
-        child.stderr.on('data', (data) => {
-          stderr += data.toString();
-        });
-
-        child.on('close', (code) => {
-          if (code === 0) resolve();
-          else reject(new Error(`fonttools failed with code ${code}: ${stderr}`));
-        });
+        variableSettings,
+        format: outFormat,
+        rename: { family, subfamily, postScriptName },
       });
 
       const staticFontData = fs.readFileSync(outputPath);
@@ -148,21 +265,23 @@ export default async function handler(req, res) {
         success: true,
         data: staticFontData.toString('base64'),
         size: staticFontData.length,
-        format,
+        format: outFormat,
         engine: 'python',
+        renameApplied: true,
       });
     }
 
     // Vercel / окружение без venv
-    const staticFontData = await generateWithWebAlchemy(buffer, variableSettings, format);
+    const staticFontData = await generateWithWebAlchemy(buffer, variableSettings, outFormat);
     await unlink(inputPath).catch(() => {});
 
     return res.status(200).json({
       success: true,
       data: Buffer.from(staticFontData).toString('base64'),
       size: staticFontData.length,
-      format,
+      format: outFormat,
       engine: 'web-alchemy',
+      renameApplied: false,
     });
   } catch (error) {
     try {

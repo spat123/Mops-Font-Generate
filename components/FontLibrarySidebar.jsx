@@ -113,6 +113,7 @@ export default function FontLibrarySidebar({
   onCreateLibrarySeedHandled,
   onAddFontToLibrary,
   onShareLibrary,
+  openCreateLibrarySignal = 0,
 }) {
   const {
     assertCanCreateNewLibrary,
@@ -132,6 +133,10 @@ export default function FontLibrarySidebar({
     }
     return 'Доступно несколько библиотек';
   }, [isPro, librariesLimit]);
+
+  /** От 4 библиотек — скролл только списка, блок «Добавить» закреплён снизу панели. */
+  const pinLibraryAddToBottom = libraries.length >= 4;
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [draft, setDraft] = useState(() => readStoredDraft());
   const [catalogEntries, setCatalogEntries] = useState(() => readCachedGoogleCatalog());
@@ -175,6 +180,14 @@ export default function FontLibrarySidebar({
     setDraft((prev) => (prev.mode === 'create' ? prev : createEmptyDraft()));
     setIsDialogOpen(true);
   }, [assertCanCreateNewLibrary]);
+
+  const lastOpenCreateLibrarySignalRef = useRef(openCreateLibrarySignal);
+  useEffect(() => {
+    if (typeof openCreateLibrarySignal !== 'number' || openCreateLibrarySignal < 1) return;
+    if (openCreateLibrarySignal === lastOpenCreateLibrarySignalRef.current) return;
+    lastOpenCreateLibrarySignalRef.current = openCreateLibrarySignal;
+    openCreateDialog();
+  }, [openCreateLibrarySignal, openCreateDialog]);
 
   const openEditDialog = useCallback((library) => {
     setDraft(createEditDraft(library));
@@ -493,6 +506,61 @@ export default function FontLibrarySidebar({
         )
       : null;
 
+  const addLibraryPlusBlock = useMemo(
+    () =>
+      canCreateNewLibrary ? (
+        <div className="flex justify-center">
+          <Tooltip content="Добавить библиотеку">
+            <IconCircleButton
+              variant="accent"
+              size="md"
+              onClick={openCreateDialog}
+              aria-label="Добавить библиотеку"
+            >
+              <PlusIcon />
+            </IconCircleButton>
+          </Tooltip>
+        </div>
+      ) : null,
+    [canCreateNewLibrary, openCreateDialog],
+  );
+
+  /** Всегда внизу левой колонки (отдельно от логики «плюса» под списком). */
+  const libraryLimitReachedPanel = useMemo(
+    () =>
+      isAuthenticated && !canCreateNewLibrary ? (
+        <div className="rounded-xl bg-gray-50 p-3" role="region" aria-label="Лимит библиотек">
+          <div className="flex gap-2">
+            <div className="group shrink-0" aria-hidden>
+              <EditAssetIcon
+                src={updateIconUrl}
+                className="h-4 w-4 text-accent transition-colors group-hover:text-white"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase leading-snug tracking-wide text-gray-900">
+                Лимит библиотек достигнут
+              </p>
+              <p className="mt-1.5 text-[10px] font-normal text-gray-500">
+                Улучшите план, чтобы получать больше возможностей.
+              </p>
+            </div>
+          </div>
+          <AppButton
+            type="button"
+            variant="accent"
+            fullWidth
+            size="sm"
+            className="mt-4"
+            onClick={() => openPlans?.()}
+          >
+            Улучшить
+          </AppButton>
+        </div>
+      ) : null,
+    [canCreateNewLibrary, isAuthenticated, openPlans],
+  );
+
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col p-4">
@@ -507,7 +575,14 @@ export default function FontLibrarySidebar({
               </Tooltip>
             </div>
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <div
+                className={
+                  pinLibraryAddToBottom
+                    ? 'min-h-0 flex-1 overflow-y-auto'
+                    : 'min-h-0 max-h-full w-full overflow-y-auto overscroll-contain'
+                }
+              >
                 <div className="space-y-3">
                 {libraries.map((library) => {
                   const isActive = activeLibraryId === library.id;
@@ -708,56 +783,17 @@ export default function FontLibrarySidebar({
                   );
                 })}
                 </div>
-              </div>
-              <div>
-                {canCreateNewLibrary ? (
-                  <div className="flex justify-center">
-                    <Tooltip content="Добавить библиотеку">
-                      <IconCircleButton
-                        variant="accent"
-                        size="md"
-                        onClick={openCreateDialog}
-                        aria-label="Добавить библиотеку"
-                      >
-                        <PlusIcon />
-                      </IconCircleButton>
-                    </Tooltip>
-                  </div>
-                ) : isAuthenticated ? (
-                  <div
-                    className="rounded-xl bg-gray-50 p-3"
-                    role="region"
-                    aria-label="Лимит библиотек"
-                  >
-                    <div className="flex gap-2">
-                      <div className="group shrink-0" aria-hidden>
-                        <EditAssetIcon
-                          src={updateIconUrl}
-                          className="h-4 w-4 text-accent transition-colors group-hover:text-white"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold uppercase leading-snug tracking-wide text-gray-900">
-                          Лимит библиотек достигнут
-                        </p>
-                        <p className="mt-1.5 text-[10px] font-normal text-gray-500">
-                          Улучшите план, чтобы получать больше возможностей.
-                        </p>
-                      </div>
-                    </div>
-                    <AppButton
-                      type="button"
-                      variant="accent"
-                      fullWidth
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => openPlans?.()}
-                    >
-                      Улучшить
-                    </AppButton>
-                  </div>
+                {!pinLibraryAddToBottom && addLibraryPlusBlock ? (
+                  <div className="mt-4 shrink-0">{addLibraryPlusBlock}</div>
                 ) : null}
               </div>
+              {pinLibraryAddToBottom && addLibraryPlusBlock ? (
+                <div className="shrink-0 bg-white">{addLibraryPlusBlock}</div>
+              ) : null}
+              </div>
+              {libraryLimitReachedPanel ? (
+                <div className="mt-3 shrink-0 bg-white">{libraryLimitReachedPanel}</div>
+              ) : null}
             </div>
           </>
         ) : (
