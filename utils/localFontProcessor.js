@@ -246,10 +246,16 @@ export const processLocalFont = async (incomingFontInput) => {
           else if (subfamilyLower.includes('extrabold') || subfamilyLower.includes('ultrabold')) weight = 800;
           else if (subfamilyLower.includes('black') || subfamilyLower.includes('heavy')) weight = 900;
 
+         const os2Weight = cachedMetadata.os2WeightClass;
+         if (Number.isFinite(Number(os2Weight))) {
+           weight = Number(os2Weight);
+         }
+
          fontObj.currentWeight = weight;
          fontObj.currentStyle = style;
          const styleInfo = findStyleInfoByWeightAndStyle(weight, style);
-         fontObj.availableStyles = [{ name: styleInfo.name, weight, style }];
+         const displayStyleName = String(subfamily || '').trim() || styleInfo.name;
+         fontObj.availableStyles = [{ name: displayStyleName, weight, style }];
       } else {
           // Если стилей нет в кэше (например, старый кэш или ошибка парсинга при кэшировании)
           fontObj.availableStyles = [{ name: 'Regular', weight: 400, style: 'normal' }];
@@ -412,12 +418,17 @@ export const processLocalFont = async (incomingFontInput) => {
             else if (subfamilyLower.includes('extrabold') || subfamilyLower.includes('ultrabold')) weight = 800;
             else if (subfamilyLower.includes('black') || subfamilyLower.includes('heavy')) weight = 900;
         }
+        const os2Weight = parsedFontData?.tables?.os2?.usWeightClass;
+        if (Number.isFinite(Number(os2Weight))) {
+          weight = Number(os2Weight);
+        }
          fontObj.currentWeight = weight;
          fontObj.currentStyle = style;
         fontObj.hasItalicStyles = fontObj.hasItalicStyles || style === 'italic';
         fontObj.italicMode = resolveFontItalicMode(fontObj.variableAxes, fontObj.hasItalicStyles);
         const styleInfo = findStyleInfoByWeightAndStyle(weight, style);
-        fontObj.availableStyles = [{ name: styleInfo.name, weight, style }];
+        const displayStyleName = String(preferredSubfamily || '').trim() || styleInfo.name;
+        fontObj.availableStyles = [{ name: displayStyleName, weight, style }];
       }
 
       // 6. Кэшируем результат (метаданные)
@@ -428,6 +439,9 @@ export const processLocalFont = async (incomingFontInput) => {
             preferredFamily: preferredFamily,
             preferredSubfamily: preferredSubfamily,
             isVariable: fontObj.isVariableFont,
+            os2WeightClass: Number.isFinite(Number(parsedFontData?.tables?.os2?.usWeightClass))
+              ? Number(parsedFontData.tables.os2.usWeightClass)
+              : null,
             supportedAxes: fontObj.isVariableFont ? parsedFontData.tables.fvar.axes.reduce((acc, axis) => {
                  acc[axis.tag] = { name: axis.name?.en, min: axis.minValue, max: axis.maxValue, default: axis.defaultValue };
                  return acc;

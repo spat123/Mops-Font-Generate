@@ -6,7 +6,7 @@ import {
   stampLibraryFontAddedNow,
 } from './fontLibraryUtils';
 
-function resolveCatalogIsVariable(source, key) {
+export function resolveCatalogIsVariable(source, key) {
   const k = String(key || '').trim().toLowerCase();
   if (!k) return false;
   if (source === 'google') {
@@ -27,6 +27,16 @@ function resolveCatalogIsVariable(source, key) {
     return Boolean(row?.isVariable);
   }
   return false;
+}
+
+/** VF / статика для пункта `catalog-ref` в share (пейлоад + кэш каталога). */
+export function isShareCatalogItemVariable(shareItem, libraryFont = null) {
+  if (!shareItem || shareItem.kind !== 'catalog-ref') return false;
+  if (typeof shareItem.isVariable === 'boolean') return shareItem.isVariable;
+  if (libraryFont?.isVariable === true) return true;
+  const source = String(shareItem.source || '').trim().toLowerCase();
+  const key = String(shareItem.key || '').trim();
+  return resolveCatalogIsVariable(source, key);
 }
 
 /**

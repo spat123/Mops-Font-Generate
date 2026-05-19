@@ -4,8 +4,22 @@ import Link from 'next/link';
 import { getProviders, signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
+import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
+import { hasSignedInBefore, markHasSignedInBefore } from '../../utils/authReturningUser';
+import {
+  AUTH_INPUT_CLASS,
+  AUTH_PRIMARY_BTN_CLASS,
+  AuthDividerOr,
+  AuthLegalFooter,
+  AuthLogoLink,
+  AuthSplitLayout,
+} from '../../components/auth/AuthSplitLayout';
 
-export default function AuthSignInPage() {
+export async function getServerSideProps({ req }) {
+  return { props: { isRuGeo: getIsRuGeoFromHeaders(req) } };
+}
+
+export default function AuthSignInPage({ isRuGeo = false }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const callbackUrlRaw = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/';
@@ -14,7 +28,12 @@ export default function AuthSignInPage() {
   const [password, setPassword] = React.useState('');
   const [formError, setFormError] = React.useState('');
   const [credentialsEnabled, setCredentialsEnabled] = React.useState(null);
+  const [isReturningUser, setIsReturningUser] = React.useState(false);
   const submittingRef = React.useRef(false);
+
+  useEffect(() => {
+    setIsReturningUser(hasSignedInBefore());
+  }, []);
 
   useEffect(() => {
     if (status !== 'authenticated') return;
@@ -43,140 +62,97 @@ export default function AuthSignInPage() {
   return (
     <>
       <Head>
-        <title>Вход — DINAMIC FONT</title>
+        <title>{isReturningUser ? 'С возвращением — DINAMIC FONT' : 'Вход — DINAMIC FONT'}</title>
       </Head>
-      <div className="flex min-h-screen flex-col bg-gray-50">
-        <header className="px-4 pt-10">
-          <Link href="/" className="mx-auto flex w-fit items-center justify-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo/Logo%20Mark.svg"
-              alt="DINAMIC FONT"
-              className="h-8 w-8 select-none"
-              draggable={false}
-            />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/logo/Logo%20Text.svg"
-              alt="DINAMIC FONT"
-              className="h-[1.6rem] w-auto select-none"
-              draggable={false}
-            />
+      <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
+        <AuthLogoLink className="mb-10" />
+
+        {isReturningUser ? (
+          <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">С возвращением!</h1>
+        ) : (
+          <>
+            <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">Вход</h1>
+            <p className="mt-2 text-center text-sm font-normal text-gray-500">Добро пожаловать!</p>
+          </>
+        )}
+
+        <div className="mt-8 flex flex-col gap-2">
+          <SignInProviderButtons callbackUrl={callbackUrl} appearance="auth" />
+        </div>
+
+        <div className="mt-6">
+          <AuthDividerOr />
+        </div>
+
+        <form
+          className="mt-6 flex flex-col gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (submittingRef.current) return;
+            submittingRef.current = true;
+            setFormError('');
+            try {
+              if (credentialsEnabled === false) {
+                setFormError('Вход по логину/паролю пока не настроен.');
+                return;
+              }
+              const trimmedLogin = String(login || '').trim();
+              const trimmedPassword = String(password || '');
+              if (!trimmedLogin || !trimmedPassword) {
+                setFormError('Введите логин и пароль.');
+                return;
+              }
+              const res = await signIn('credentials', {
+                redirect: false,
+                email: trimmedLogin,
+                password: trimmedPassword,
+                callbackUrl,
+              });
+              if (res?.error) {
+                setFormError('Неверный логин или пароль.');
+                return;
+              }
+              markHasSignedInBefore();
+              const nextUrl = typeof res?.url === 'string' ? res.url : callbackUrl;
+              void router.replace(nextUrl);
+            } finally {
+              submittingRef.current = false;
+            }
+          }}
+        >
+          <input
+            id="login"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
+            autoComplete="username"
+            className={AUTH_INPUT_CLASS}
+            placeholder="ЛОГИН ИЛИ EMAIL"
+          />
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            className={AUTH_INPUT_CLASS}
+            placeholder="ПАРОЛЬ"
+          />
+          {formError ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p> : null}
+          <button type="submit" className={AUTH_PRIMARY_BTN_CLASS}>
+            Вход
+          </button>
+        </form>
+
+        <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">
+          Нет аккаунта?{' '}
+          <Link
+            href="/auth/signup"
+            className="text-accent underline decoration-accent underline-offset-[3px] hover:text-accent-hover"
+          >
+            Зарегистрироваться
           </Link>
-        </header>
-
-        <main className="flex flex-1 items-center justify-center px-4 py-12">
-          <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-8">
-
-            <h1 className="text-center text-base font-semibold uppercase tracking-tight text-gray-900">
-            Добро пожаловать в DINAMIC FONT
-            </h1>
-            <form
-              className="mt-6 flex flex-col gap-3"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (submittingRef.current) return;
-                submittingRef.current = true;
-                setFormError('');
-                try {
-                  if (credentialsEnabled === false) {
-                    setFormError('Вход по логину/паролю пока не настроен.');
-                    return;
-                  }
-                  const trimmedLogin = String(login || '').trim();
-                  const trimmedPassword = String(password || '');
-                  if (!trimmedLogin || !trimmedPassword) {
-                    setFormError('Введите логин и пароль.');
-                    return;
-                  }
-                  const res = await signIn('credentials', {
-                    redirect: false,
-                    email: trimmedLogin,
-                    password: trimmedPassword,
-                    callbackUrl,
-                  });
-                  if (res?.error) {
-                    setFormError('Неверный логин или пароль.');
-                    return;
-                  }
-                  const nextUrl = typeof res?.url === 'string' ? res.url : callbackUrl;
-                  void router.replace(nextUrl);
-                } finally {
-                  submittingRef.current = false;
-                }
-              }}
-            >
-              <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500" htmlFor="login">
-                  Логин или email
-                </label>
-                <input
-                  id="login"
-                  value={login}
-                  onChange={(e) => setLogin(e.target.value)}
-                  autoComplete="username"
-                  className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-black/[0.14] focus:outline-none"
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500" htmlFor="password">
-                  Пароль
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  className="h-10 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-black/[0.14] focus:outline-none"
-                  placeholder="••••••••"
-                />
-              </div>
-              {formError ? (
-                <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p>
-              ) : null}
-              <button
-                type="submit"
-                className="mt-1 inline-flex h-10 w-full items-center justify-center gap-2 rounded-md border border-accent bg-accent px-4 text-xs font-semibold uppercase tracking-tight text-white transition-colors hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-              >
-                Войти
-              </button>
-            </form>
-
-            <div className="mt-6 flex items-center gap-3">
-              <span className="h-px flex-1 bg-gray-200" />
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400">или</span>
-              <span className="h-px flex-1 bg-gray-200" />
-            </div>
-
-            <div className="mt-4">
-              <SignInProviderButtons callbackUrl={callbackUrl} />
-            </div>
-
-            <p className="mt-6 text-center text-xs text-gray-500">
-              Нет аккаунта?{' '}
-              <Link href="/auth/signup" className="font-semibold text-accent hover:underline">
-                Зарегистрироваться
-              </Link>
-            </p>
-          </div>
-        </main>
-
-        <footer className="px-4 pb-8">
-          <p className="mx-auto max-w-sm text-center text-[11px] leading-relaxed text-gray-500">
-            Создавая аккаунт, вы соглашаетесь с{' '}
-            <Link href="/legal/terms" className="font-semibold text-gray-700 hover:text-accent hover:underline">
-              Условия использования
-            </Link>{' '}
-            и{' '}
-            <Link href="/legal/privacy" className="font-semibold text-gray-700 hover:text-accent hover:underline">
-              Политика конфиденциальности
-            </Link>
-            .
-          </p>
-        </footer>
-      </div>
+        </p>
+      </AuthSplitLayout>
     </>
   );
 }

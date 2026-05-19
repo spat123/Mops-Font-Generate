@@ -4,6 +4,7 @@ import { signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from './SignInProviderButtons';
 import { AppButton } from '../ui/AppButton';
+import { Tooltip } from '../ui/Tooltip';
 import { PopupDialogHeader } from '../ui/PopupDialogHeader';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
@@ -78,6 +79,12 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
     : typeof librariesLimit === 'number'
       ? `Доступно до ${librariesLimit} библиотек и до ${FREE_STATIC_GENERATIONS_LIMIT} генераций статических файлов.`
       : 'Доступно несколько библиотек и генерации статических файлов.';
+
+  const accountTriggerTooltip = loading
+    ? 'Загрузка сессии…'
+    : authenticated
+      ? 'Аккаунт и план'
+      : 'Войти в аккаунт';
 
   const sessionNameParts = authenticated && session?.user?.name ? String(session.user.name).trim().split(/\s+/) : [];
   const sessionFirst = sessionNameParts[0] || '';
@@ -322,51 +329,61 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
       ref={rootRef}
       className={`relative flex items-center justify-center ${isSidebarCollapsed ? '' : 'h-full min-h-0 w-full'}`}
     >
-      <AppButton
-        type="button"
-        variant="toolbarIcon"
-        pressed={open}
-        size={isSidebarCollapsed ? 'icon' : 'rail'}
+      <Tooltip
+        content={accountTriggerTooltip}
+        as="div"
         className={
           isSidebarCollapsed
-            ? 'group'
-            : 'group overflow-hidden [&_img]:max-h-9'
+            ? 'flex w-full justify-center'
+            : 'flex h-full min-h-0 w-full min-w-0'
         }
-        onClick={() => {
-          if (loading) return;
-          if (!authenticated) {
-            setOpen(false);
-            void router.push({
-              pathname: '/auth/signin',
-              query: { callbackUrl: router.asPath || '/' },
-            });
-            return;
-          }
-          setOpen((v) => !v);
-        }}
-        aria-label={authenticated ? 'Аккаунт' : 'Войти'}
-        aria-expanded={authenticated ? open : undefined}
-        aria-haspopup={authenticated ? 'dialog' : undefined}
       >
-        {authenticated && session.user?.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={session.user.image}
-            alt=""
-            className={`rounded-md object-cover ${isSidebarCollapsed ? 'h-6 w-6' : 'h-full w-full min-h-0 min-w-0 max-h-9'}`}
-          />
-        ) : !authenticated ? (
-          <EditAssetIcon
-            src={loginIconUrl}
-            className="h-4 w-4 transition-transform group-hover:scale-110"
-          />
-        ) : (
-          <EditAssetIcon
-            src={userIconUrl}
-            className="h-4 w-4 transition-transform group-hover:scale-110"
-          />
-        )}
-      </AppButton>
+        <AppButton
+          type="button"
+          variant="toolbarIcon"
+          pressed={open}
+          size={isSidebarCollapsed ? 'icon' : 'rail'}
+          className={
+            isSidebarCollapsed
+              ? 'group'
+              : 'group w-full overflow-hidden [&_img]:max-h-9'
+          }
+          onClick={() => {
+            if (loading) return;
+            if (!authenticated) {
+              setOpen(false);
+              void router.push({
+                pathname: '/auth/signin',
+                query: { callbackUrl: router.asPath || '/' },
+              });
+              return;
+            }
+            setOpen((v) => !v);
+          }}
+          aria-label={authenticated ? 'Аккаунт' : 'Войти'}
+          aria-expanded={authenticated ? open : undefined}
+          aria-haspopup={authenticated ? 'dialog' : undefined}
+        >
+          {authenticated && session.user?.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={session.user.image}
+              alt=""
+              className={`rounded-md object-cover ${isSidebarCollapsed ? 'h-6 w-6' : 'h-full w-full min-h-0 min-w-0 max-h-9'}`}
+            />
+          ) : !authenticated ? (
+            <EditAssetIcon
+              src={loginIconUrl}
+              className="h-4 w-4 transition-transform group-hover:scale-110"
+            />
+          ) : (
+            <EditAssetIcon
+              src={userIconUrl}
+              className="h-4 w-4 transition-transform group-hover:scale-110"
+            />
+          )}
+        </AppButton>
+      </Tooltip>
 
       {accountModal}
 

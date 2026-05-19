@@ -487,7 +487,7 @@ export function FontsLibraryHomeScreen({
                 </div>
               </>
             )}
-            <div className="min-h-0 flex-1 pb-10">
+            <div className="catalog-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-10">
               {savedLibrarySearchQueryTrimmed ? (
                 activeSavedLibraryItems.length === 0 && activeSavedLibraryCatalogItems.length === 0 ? (
                   <p className="py-4 text-sm text-gray-500">Ничего не найдено.</p>

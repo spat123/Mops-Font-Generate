@@ -7,6 +7,7 @@ import {
   ENTIRE_PRINTABLE_ASCII_SAMPLE,
   LEGACY_BASIC_ALNUM_PREVIEW_TEXT,
 } from './previewSampleStrings';
+import { previewTextDbg, previewTextSnippet } from './previewTextDebugLog';
 
 export function collectPerFontPreviewSnapshot(s) {
   return {
@@ -19,7 +20,8 @@ export function collectPerFontPreviewSnapshot(s) {
     stylesLetterSpacing: s.stylesLetterSpacing,
     textColor: s.textColor,
     backgroundColor: s.backgroundColor,
-    viewMode: s.viewMode,
+    // viewMode храним глобально (SettingsContext → localStorage), иначе при переключении вкладок
+    // режим неожиданно “откатывается” (например, Styles после F5).
     textDirection: s.textDirection,
     textAlignment: s.textAlignment,
     textCase: s.textCase,
@@ -62,7 +64,7 @@ export function applyPerFontPreviewSnapshot(snapshot, setters) {
     setStylesLetterSpacing,
     setTextColor,
     setBackgroundColor,
-    setViewMode,
+    // setViewMode,
     setTextDirection,
     setTextAlignment,
     setTextCase,
@@ -88,10 +90,14 @@ export function applyPerFontPreviewSnapshot(snapshot, setters) {
   } = setters;
 
   if (snapshot.text !== undefined) {
-    const t =
-      snapshot.text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT
-        ? ENTIRE_PRINTABLE_ASCII_SAMPLE
-        : snapshot.text;
+    const legacyMapped = snapshot.text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT;
+    const t = legacyMapped ? ENTIRE_PRINTABLE_ASCII_SAMPLE : snapshot.text;
+    previewTextDbg('applyPerFontPreviewSnapshot: setText', {
+      incomingLen: typeof snapshot.text === 'string' ? snapshot.text.length : -1,
+      legacyMapped,
+      resultLen: typeof t === 'string' ? t.length : -1,
+      snippet: previewTextSnippet(t, 120),
+    });
     setText(t);
   }
   if (snapshot.fontSize !== undefined) setFontSize(snapshot.fontSize);
@@ -108,7 +114,7 @@ export function applyPerFontPreviewSnapshot(snapshot, setters) {
   }
   if (snapshot.textColor !== undefined) setTextColor(snapshot.textColor);
   if (snapshot.backgroundColor !== undefined) setBackgroundColor(snapshot.backgroundColor);
-  if (snapshot.viewMode !== undefined) setViewMode(snapshot.viewMode);
+  // viewMode не применяем из snapshot — он глобальный.
   if (snapshot.textDirection !== undefined) setTextDirection(snapshot.textDirection);
   if (snapshot.textAlignment !== undefined) setTextAlignment(snapshot.textAlignment);
   if (snapshot.textCase !== undefined) setTextCase(snapshot.textCase);

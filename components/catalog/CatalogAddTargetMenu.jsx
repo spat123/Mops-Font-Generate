@@ -209,7 +209,11 @@ export function CatalogAddTargetMenu({
           className="absolute right-0 top-full z-30 mt-2 min-w-[13rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
           role="menu"
         >
-          <div className="max-h-64 overflow-y-auto">
+          <div
+            className={
+              libraries.length > 8 ? 'max-h-64 overflow-y-auto overscroll-contain' : ''
+            }
+          >
             {libraries.map((library, index) => (
               <button
                 key={library.id}
@@ -234,7 +238,12 @@ export function CatalogAddTargetMenu({
             ))}
           </div>
           <div className="border-t border-gray-200 p-1">
-            <Tooltip content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'} openDelayMs={150}>
+            <Tooltip
+              as="div"
+              className="block w-full"
+              content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'}
+              openDelayMs={150}
+            >
               <button
                 type="button"
                 disabled={isAuthenticated && !canCreateNewLibrary}
@@ -250,18 +259,16 @@ export function CatalogAddTargetMenu({
                   }
                   onCreateLibrary?.();
                 }}
-                className={`relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
                   isAuthenticated && !canCreateNewLibrary
                     ? 'cursor-not-allowed text-gray-400'
                     : 'text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
-                  <PlusIcon className="h-4 w-4 shrink-0" />
-                </span>
-                <span className="truncate text-center">Создать новую</span>
+                <PlusIcon className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-center">Создать новую</span>
                 {isAuthenticated && !canCreateNewLibrary ? (
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                  <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                     Pro
                   </span>
                 ) : null}

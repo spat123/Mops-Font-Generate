@@ -3,7 +3,7 @@ import { DEFAULT_PREVIEW_TEXT, useSettings } from '../../contexts/SettingsContex
 import { toast } from '../../utils/appNotify';
 
 /** Подсказка + сброс текста: нижняя полоса превью (слева подсказка, справа сброс текста). */
-export function PreviewEditTextHint({ className = '' } = {}) {
+export function PreviewEditTextHint({ className = '', overlay = false } = {}) {
   const { text, setText } = useSettings();
   const isDefaultText = text === DEFAULT_PREVIEW_TEXT;
 
@@ -14,7 +14,11 @@ export function PreviewEditTextHint({ className = '' } = {}) {
   }, [isDefaultText, setText]);
 
   return (
-    <div className={`pointer-events-none flex min-w-0 w-full items-end justify-between gap-4 ${className}`.trim()}>
+    <div
+      className={`pointer-events-none flex min-w-0 w-full items-end justify-between gap-4 ${
+        overlay ? 'py-4' : 'pb-4'
+      } ${className}`.trim()}
+    >
       <div className="pointer-events-auto min-w-0 flex-1 pl-6 text-xs uppercase text-gray-400 opacity-50 transition-opacity hover:opacity-100">
         Нажмите для редактирования текста
       </div>

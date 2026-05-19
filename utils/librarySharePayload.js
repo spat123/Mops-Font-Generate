@@ -1,5 +1,6 @@
 import { readGoogleFontCatalogCache } from './googleFontCatalogCache';
 import { readFontsourceCatalogCache } from './fontsourceCatalogCache';
+import { resolveCatalogIsVariable } from './libraryShareImport';
 
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
@@ -26,6 +27,16 @@ export async function buildFontFingerprint({ file, sourceHint, family }) {
     sourceHint: normalizedSourceHint,
     key: `${sha256}:${normalizedSourceHint}:${normalizeText(normalizedFamily)}`,
   };
+}
+
+function resolveIsVariableForLibraryEntry(fontEntry, sessionFont = null) {
+  if (fontEntry?.isVariable === true) return true;
+  if (sessionFont?.isVariableFont === true) return true;
+  const catalogRef = resolveCatalogRefForEntry(fontEntry);
+  if (catalogRef) {
+    return resolveCatalogIsVariable(catalogRef.source, catalogRef.key);
+  }
+  return false;
 }
 
 function resolveCatalogRefForEntry(fontEntry) {
@@ -102,22 +113,23 @@ export async function buildLibrarySharePayload(library, { resolveSessionFont } =
 
   const payloadItems = await Promise.all(
     entries.map(async (fontEntry) => {
+      const sessionFont =
+        typeof resolveSessionFont === 'function' ? resolveSessionFont(fontEntry) : null;
       const catalogRef = resolveCatalogRefForEntry(fontEntry);
       if (catalogRef) {
+        const isVariable = resolveIsVariableForLibraryEntry(fontEntry, sessionFont);
         return withOptionalCascadeSizes(
           {
             kind: 'catalog-ref',
             source: catalogRef.source,
             key: catalogRef.key,
             family: catalogRef.family,
+            ...(isVariable ? { isVariable: true } : {}),
             actions: ['download', 'add-to-library'],
           },
           fontEntry,
         );
       }
-
-      const sessionFont =
-        typeof resolveSessionFont === 'function' ? resolveSessionFont(fontEntry) : null;
       const sourceHint = String(sessionFont?.source || fontEntry?.source || 'local');
       const family = String(fontEntry?.label || sessionFont?.name || '').trim();
       const fingerprint = await buildFontFingerprint({
@@ -128,12 +140,14 @@ export async function buildLibrarySharePayload(library, { resolveSessionFont } =
       const catalogMatch = detectCatalogMatchForLocal(fontEntry);
 
       if (catalogMatch) {
+        const isVariable = resolveIsVariableForLibraryEntry(fontEntry, sessionFont);
         return withOptionalCascadeSizes(
           {
             kind: 'catalog-ref',
             source: catalogMatch.source,
             key: catalogMatch.key,
             family: catalogMatch.family,
+            ...(isVariable ? { isVariable: true } : {}),
             confidence: catalogMatch.confidence,
             needsFingerprintVerification: catalogMatch.needsFingerprintVerification,
             fingerprint,

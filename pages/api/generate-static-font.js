@@ -1,5 +1,7 @@
 import { spawn } from 'child_process';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
+import { consumeStaticGenerationQuota, resolveGenerationQuotaActor } from '../../lib/staticGenerationQuotaServer';
+import { sanitizeVariableSettingsForInstancer } from '../../utils/sanitizeVariableSettingsForInstancer';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -76,17 +78,7 @@ function buildPostScriptName(family, subfamily) {
 
 /** Опции для fontTools.varLib.instancer / instantiateVariableFont */
 function toInstancerOptions(variableSettings) {
-  const out = {};
-  for (const [axis, value] of Object.entries(variableSettings || {})) {
-    if (value === null || value === undefined) continue;
-    if (value === 'drop' || value === 'DROP') {
-      out[axis] = null;
-      continue;
-    }
-    const n = typeof value === 'number' ? value : parseFloat(String(value));
-    out[axis] = Number.isFinite(n) ? n : value;
-  }
-  return out;
+  return sanitizeVariableSettingsForInstancer(variableSettings);
 }
 
 async function generateWithPythonFontTools(fontToolsPython, { inputPath, outputPath, variableSettings, format, rename }) {
@@ -115,10 +107,14 @@ axes = json.loads(axes_json) if axes_json else {}
 rename = json.loads(rename_json) if rename_json else {}
 
 font = TTFont(in_path)
+if "fvar" in font:
+    fvar_tags = {str(a.axisTag).strip() for a in font["fvar"].axes if str(getattr(a, "axisTag", "")).strip()}
+    axes = {k: v for k, v in axes.items() if k and k in fvar_tags}
 inst = instantiateVariableFont(font, axes, inplace=False)
 
 family = (rename.get("family") or "").strip()
 subfamily = (rename.get("subfamily") or "").strip() or "Regular"
+weight_class = rename.get("weightClass", None)
 postscript = (rename.get("postScriptName") or "").strip()
 if not postscript:
     # last resort fallback (ASCII-ish slug)
@@ -135,8 +131,16 @@ def set_name(name_id, value):
         return
     # Windows (Unicode)
     inst["name"].setName(value, name_id, 3, 1, 0x409)
-    # macOS (Roman)
-    inst["name"].setName(value, name_id, 1, 0, 0)
+    # macOS (Roman) — не все строки кодируются в MacRoman (кириллица/emoji).
+    # Если не кодируется — просто пропускаем запись (Windows Unicode достаточно).
+    try:
+        value_mac = value.encode("mac_roman").decode("mac_roman")
+    except Exception:
+        return
+    try:
+        inst["name"].setName(value_mac, name_id, 1, 0, 0)
+    except Exception:
+        pass
 
 if family:
     set_name(1, family)   # Family
@@ -149,6 +153,43 @@ set_name(6, postscript)   # PostScript name
 if family:
     unique_id = f"{postscript};{int(time.time())};{full_name}"
     set_name(3, unique_id)
+
+# Вес/курсив для корректного отображения в редакторе и ОС.
+try:
+    if weight_class is not None and "OS/2" in inst:
+        w = int(round(float(weight_class)))
+        if w < 1: w = 1
+        if w > 1000: w = 1000
+        inst["OS/2"].usWeightClass = w
+        # Bold bit (heuristic)
+        try:
+            fs = int(inst["OS/2"].fsSelection)
+            if w >= 700:
+                fs = fs | (1 << 5)
+            else:
+                fs = fs & ~(1 << 5)
+            inst["OS/2"].fsSelection = fs
+        except Exception:
+            pass
+except Exception:
+    pass
+
+try:
+    if "head" in inst and "OS/2" in inst:
+        w = int(getattr(inst["OS/2"], "usWeightClass", 400) or 400)
+        italic = False
+        try:
+            fs = int(inst["OS/2"].fsSelection)
+            italic = (fs & 1) != 0
+        except Exception:
+            italic = False
+        mac = int(inst["head"].macStyle)
+        # bit0 bold, bit1 italic
+        mac = (mac | 1) if w >= 700 else (mac & ~1)
+        mac = (mac | 2) if italic else (mac & ~2)
+        inst["head"].macStyle = mac
+except Exception:
+    pass
 
 if out_format in ("woff", "woff2"):
     inst.flavor = out_format
@@ -231,6 +272,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing fontData or variableSettings' });
   }
 
+  const actor = await resolveGenerationQuotaActor(req);
+  const quotaCheck = await consumeStaticGenerationQuota(req, { ...actor, dryRun: true });
+  if (!quotaCheck.ok) {
+    return res.status(quotaCheck.status || 429).json({
+      error: 'QUOTA_EXCEEDED',
+      message: quotaCheck.message,
+      limit: quotaCheck.limit,
+      used: quotaCheck.used,
+      remaining: quotaCheck.remaining,
+      period: quotaCheck.period,
+    });
+  }
+
   const tempDir = getTempDir();
   const stamp = Date.now();
   const inputPath = path.join(tempDir, `input-${stamp}.bin`);
@@ -261,6 +315,7 @@ export default async function handler(req, res) {
       await unlink(inputPath).catch(() => {});
       await unlink(outputPath).catch(() => {});
 
+      const quotaAfter = await consumeStaticGenerationQuota(req, actor);
       return res.status(200).json({
         success: true,
         data: staticFontData.toString('base64'),
@@ -268,6 +323,9 @@ export default async function handler(req, res) {
         format: outFormat,
         engine: 'python',
         renameApplied: true,
+        quota: quotaAfter.ok
+          ? { limit: quotaAfter.limit, used: quotaAfter.used, remaining: quotaAfter.remaining, period: quotaAfter.period }
+          : undefined,
       });
     }
 
@@ -275,6 +333,7 @@ export default async function handler(req, res) {
     const staticFontData = await generateWithWebAlchemy(buffer, variableSettings, outFormat);
     await unlink(inputPath).catch(() => {});
 
+    const quotaAfter = await consumeStaticGenerationQuota(req, actor);
     return res.status(200).json({
       success: true,
       data: Buffer.from(staticFontData).toString('base64'),
@@ -282,6 +341,9 @@ export default async function handler(req, res) {
       format: outFormat,
       engine: 'web-alchemy',
       renameApplied: false,
+      quota: quotaAfter.ok
+        ? { limit: quotaAfter.limit, used: quotaAfter.used, remaining: quotaAfter.remaining, period: quotaAfter.period }
+        : undefined,
     });
   } catch (error) {
     try {

@@ -15,6 +15,7 @@ import searchIconUrl from '../../assets/icon/edit/Search.svg';
 import updateIconUrl from '../../assets/icon/edit/Update.svg';
 import loginIconUrl from '../../assets/icon/edit/Login.svg';
 import userIconUrl from '../../assets/icon/edit/User.svg';
+import heartIconUrl from '../../assets/icon/edit/Heart.svg';
 
 export {
   gridIconUrl,
@@ -34,4 +35,5 @@ export {
   updateIconUrl,
   loginIconUrl,
   userIconUrl,
+  heartIconUrl,
 };

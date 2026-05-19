@@ -476,13 +476,17 @@ function GlyphsMode({
 
     // Условие отображения загрузчика
     if (isLoadingGlyphs.current) {
-       return <div className="p-8 text-center text-gray-600">Загрузка данных глифов...</div>;
+      return (
+        <div className="flex h-full min-h-0 w-full items-center justify-center px-8 py-10 text-center text-gray-600">
+          Загрузка данных глифов...
+        </div>
+      );
     }
       
     // Сообщение, если шрифт — Google Font (после проверки isLoading)
     if (selectedFont?.source === 'google') {
         return (
-          <div className="flex min-h-full flex-col items-center justify-center px-6 py-10 text-center">
+          <div className="flex h-full min-h-0 w-full flex-col items-center justify-center px-6 py-10 text-center">
             <div className="w-full max-w-[8rem] aspect-square overflow-hidden rounded-lg">
               <img
                 src="/assets/hell-no-oh-hell-no.gif"
@@ -504,15 +508,15 @@ function GlyphsMode({
       // Не показываем ошибку, пока isLoadingGlyphs всё ещё true
       if (isLoadingGlyphs.current) return null; 
       return (
-          <div className="p-8 text-center text-gray-500">
-              Нет данных о глифах для шрифта "{selectedFont?.name || 'Неизвестный'}" 
-              или не удалось их загрузить. Проверьте консоль на наличие ошибок.
-          </div>
+        <div className="flex h-full min-h-0 w-full items-center justify-center p-8 text-center text-gray-500">
+          Нет данных о глифах для шрифта «{selectedFont?.name || 'Неизвестный'}» или не удалось их загрузить.
+          Проверьте консоль на наличие ошибок.
+        </div>
       );
     }
 
     return (
-      <div className="relative min-h-full w-full p-6 pb-8 pr-8">
+      <div className="relative h-full min-h-0 w-full min-w-0 p-6 pb-8 pr-8">
         {glyphErrors.length > 0 && (
           <div className="mb-4 rounded border border-yellow-300 bg-yellow-100 p-3 text-xs text-yellow-800">
             При обработке шрифта возникло {glyphErrors.length} ошибок.
@@ -550,7 +554,7 @@ function GlyphsMode({
               <PopupDialogHeader
                 title="Детали глифа"
                 onClose={() => setSelectedGlyph(null)}
-                titleClassName="max-w-[calc(100%-3rem)] truncate"
+                titleClassName="max-w-[calc(100%-7rem)] truncate"
                 closeAriaLabel="Закрыть"
               />
               <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">

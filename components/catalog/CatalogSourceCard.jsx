@@ -288,7 +288,6 @@ function CatalogSourceCardComponent({
       onDragEnd={onDragEnd}
       busy={busy}
       minHeightClass="min-h-32 h-[10.5rem] min-w-0"
-      className={shareSurface ? '!bg-white hover:!bg-white/30' : ''}
       selectionOverlay={selectionOverlayResolved}
       hoverOverlay={hoverOverlay}
       actions={actions}

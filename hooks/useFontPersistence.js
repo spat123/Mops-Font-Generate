@@ -16,6 +16,7 @@ import { buildVariationSettingsCssString } from '../utils/googleFontCatalogAxes'
 import { parseFontBuffer, normalizeFvarAxisTag } from '../utils/fontParser';
 import { filterPresetStylesForVariableAxes } from '../utils/fontUtilsCommon';
 import { buildFontViewStateRestorePlan } from '../utils/fontViewStateRestore';
+import { previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 
 // Ключи localStorage для настроек шрифта
 const FONT_SETTINGS_LS_KEYS = {
@@ -292,6 +293,17 @@ export function useFontPersistence(
 
                 if (storedFonts && storedFonts.length > 0) {
                     const stagedFonts = storedFonts.map(stageFontFromRecord).filter((f) => f !== null);
+
+                    stagedFonts.forEach((f) => {
+                        if (f?.previewSettings && typeof f.previewSettings.text === 'string') {
+                            previewTextDbg('IDB load: шрифт из IndexedDB с previewSettings.text', {
+                                fontId: f.id,
+                                name: f.name,
+                                textLen: f.previewSettings.text.length,
+                                snippet: previewTextSnippet(f.previewSettings.text, 120),
+                            });
+                        }
+                    });
 
                     if (isMounted && stagedFonts.length > 0) {
                         setFonts(stagedFonts);

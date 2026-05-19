@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { toast } from '../utils/appNotify';
+import { squareToast, toast } from '../utils/appNotify';
 import { saveBlobAsFile } from '../utils/fileDownloadUtils';
 import { slugifyFontFilenameStub, slugifyFontKey } from '../utils/fontSlug';
 
@@ -60,8 +60,11 @@ export function useFontExport(exportToCSSFromHook) {
       outputFontName,
       outputFontSubfamily,
       outputPostScriptName,
+      outputWeightClass,
       skipPseudoCssPrompt,
       canExportTextCss: allowCssBundle = true,
+      allowPseudoStatic = true,
+      onQuotaExceeded,
     } = opts;
     if (!selectedFont || !selectedFont.isVariableFont) {
       toast.error('Выберите вариативный шрифт для создания статической версии');
@@ -73,15 +76,13 @@ export function useFontExport(exportToCSSFromHook) {
       return null;
     }
 
+    let squareId = null;
     try {
       const { generateStaticFont, checkGenerationCapabilities } = await import('../utils/staticFontGenerator');
 
       const capabilities = await checkGenerationCapabilities();
-      if (capabilities.server) {
-        toast.info('Используется серверная генерация');
-      } else {
-        toast.warning('Используется псевдо-статический метод (ограниченная функциональность)');
-      }
+      squareId = squareToast.loading({ toastId: 'static-font-generate' });
+      // Не показываем отдельный текстовый toast во время процесса.
 
       let fontData;
       if (selectedFont.arrayBuffer) {
@@ -107,21 +108,16 @@ export function useFontExport(exportToCSSFromHook) {
       const result = await generateStaticFont(fontData, variableSettings, {
         format,
         fontName: displayName,
+        allowPseudoStatic,
         rename: {
           family: familyName,
           subfamily: subfamilyName,
           postScriptName: outputPostScriptName,
+          weightClass: outputWeightClass,
         },
       });
 
-      if (result.warning) {
-        toast.warning(result.warning);
-      }
-      if (capabilities.server && outputFontName && !capabilities.internalRename) {
-        toast.warning(
-          'Серверная генерация доступна, но переименование внутри файла недоступно в текущем окружении. Имя изменится только у скачиваемого файла.',
-        );
-      }
+      // Предупреждения (fallback / ограничения) не спамим отдельными тостами — иначе будет “белый” тост + квадрат.
 
       if (result.css && !skipPseudoCssPrompt && allowCssBundle) {
         const downloadCSS = window.confirm('Создан псевдо-статический шрифт с CSS. Скачать CSS файл?');
@@ -150,15 +146,26 @@ export function useFontExport(exportToCSSFromHook) {
 
       const blob = new Blob([result.buffer], { type: mimeType });
 
-      const statusMessage = result.isRealStatic 
-        ? `Настоящий статический шрифт сгенерирован (${(blob.size / 1024).toFixed(1)} KB)`
-        : `Псевдо-статический шрифт создан (${(blob.size / 1024).toFixed(1)} KB)`;
-      
-      toast.success(statusMessage);
+      if (squareId) {
+        squareToast.updateToSuccess(squareId);
+      } else {
+        squareToast.success();
+      }
       return blob;
 
     } catch (error) {
       console.error('[generateStaticFontFile] Ошибка при генерации:', error);
+      if (error?.code === 'QUOTA_EXCEEDED') {
+        onQuotaExceeded?.();
+        toast.info(error.message || 'Вы исчерпали лимит генераций.');
+        if (squareId) squareToast.updateToError(squareId);
+        return null;
+      }
+      if (squareId) {
+        squareToast.updateToError(squareId);
+      } else {
+        squareToast.error();
+      }
       toast.error(`Ошибка генерации статического шрифта: ${error.message}`);
       return null;
     }

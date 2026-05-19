@@ -38,6 +38,48 @@
   color: var(--color-ink);
 }
 
+.Toastify__toast.app-toast-square {
+  width: 4.25rem;
+  min-height: 4.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.75rem;
+  background: var(--color-accent);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.Toastify__toast.app-toast-square .Toastify__toast-icon {
+  display: none;
+}
+
+.Toastify__toast.app-toast-square .Toastify__toast-body.app-toast__body {
+  margin: 0;
+  padding: 0;
+  color: white;
+}
+
+.Toastify__toast.app-toast-square .Toastify__progress-bar--wrp {
+  display: none;
+}
+
+.Toastify__toast.app-toast-square .Toastify__close-button {
+  display: none;
+}
+
+.app-toast-square__inner {
+  width: 4.25rem;
+  height: 4.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.app-toast-square__loader {
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.18));
+}
+
 .Toastify__toast-icon {
   margin-inline-end: 0.5rem;
   width: 1.25rem;

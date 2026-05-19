@@ -5,17 +5,23 @@
  */
 
 import { formatFontVariationSettings } from './fontVariationSettings';
+import { getOrCreateGuestQuotaId } from './freeStaticGenerationQuota';
 
 /**
  * @param {ArrayBuffer} fontBuffer
  * @param {Record<string, number>} variableSettings
  * @param {string} [format]
- * @param {{family?: string, subfamily?: string, postScriptName?: string} | null} [rename]
+ * @param {{family?: string, subfamily?: string, postScriptName?: string, weightClass?: number} | null} [rename]
  */
 const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2', rename = null) => {
+  const guestQuotaId = getOrCreateGuestQuotaId();
+  const headers = { 'Content-Type': 'application/json' };
+  if (guestQuotaId) headers['X-Guest-Quota-Id'] = guestQuotaId;
+
   const response = await fetch('/api/generate-static-font', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    headers,
     body: JSON.stringify({
       fontData: Buffer.from(fontBuffer).toString('base64'),
       variableSettings,
@@ -26,13 +32,19 @@ const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2', re
 
   if (!response.ok) {
     let detail = 'Серверная генерация не удалась';
+    let code = null;
     try {
       const err = await response.json();
-      detail = err.details || err.error || detail;
+      detail = err.message || err.details || err.error || detail;
+      if (response.status === 429 || err.error === 'QUOTA_EXCEEDED') {
+        code = 'QUOTA_EXCEEDED';
+      }
     } catch {
       /* ignore */
     }
-    throw new Error(detail);
+    const error = new Error(detail);
+    if (code) error.code = code;
+    throw error;
   }
 
   const result = await response.json();
@@ -40,6 +52,7 @@ const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2', re
     buffer: Buffer.from(result.data, 'base64'),
     engine: result.engine || 'unknown',
     renameApplied: Boolean(result.renameApplied),
+    quota: result.quota && typeof result.quota === 'object' ? result.quota : null,
   };
 };
 
@@ -72,10 +85,16 @@ const generatePseudoStatic = (fontBuffer, variableSettings, fontName) => {
 /**
  * @param {ArrayBuffer} fontBuffer
  * @param {Record<string, number>} variableSettings
- * @param {{ format?: string, fontName?: string, rename?: {family?: string, subfamily?: string, postScriptName?: string}, preferredMethod?: 'auto'|'server'|'pseudo-static' }} [options]
+ * @param {{ format?: string, fontName?: string, rename?: {family?: string, subfamily?: string, postScriptName?: string, weightClass?: number}, preferredMethod?: 'auto'|'server'|'pseudo-static', allowPseudoStatic?: boolean }} [options]
  */
 export const generateStaticFont = async (fontBuffer, variableSettings, options = {}) => {
-  const { format = 'woff2', fontName = 'VariableFont', rename = null, preferredMethod = 'auto' } = options;
+  const {
+    format = 'woff2',
+    fontName = 'VariableFont',
+    rename = null,
+    preferredMethod = 'auto',
+    allowPseudoStatic = true,
+  } = options;
 
   if (preferredMethod === 'auto' || preferredMethod === 'server') {
     try {
@@ -86,10 +105,17 @@ export const generateStaticFont = async (fontBuffer, variableSettings, options =
         isRealStatic: true,
         engine: result.engine,
         renameApplied: result.renameApplied,
+        quota: result.quota,
       };
-    } catch {
+    } catch (e) {
+      if (e?.code === 'QUOTA_EXCEEDED') throw e;
+      if (!allowPseudoStatic) throw e;
       /* fallback */
     }
+  }
+
+  if (!allowPseudoStatic) {
+    throw new Error('Серверная генерация недоступна. Попробуйте позже.');
   }
 
   const result = generatePseudoStatic(fontBuffer, variableSettings, fontName);

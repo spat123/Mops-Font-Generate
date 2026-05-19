@@ -19,9 +19,6 @@ import { getMaxSavedLibrariesForUser } from '../../utils/authLibraryLimits';
 import { toast } from '../../utils/appNotify';
 import { Tooltip } from '../ui/Tooltip';
 import { CatalogGridModeToggle } from '../catalog/CatalogGridModeToggle';
-import { PlusIcon } from '../ui/CommonIcons';
-import { EditAssetIcon } from '../ui/EditAssetIcon';
-import { downloudIconUrl, linkIconUrl } from '../ui/editIconUrls';
 import { ensureGoogleFontPreviewCss } from '../../utils/googleFontPreviewCss';
 import {
   readFontsourceCatalogCache,
@@ -44,6 +41,15 @@ import {
   downloadGoogleVariableVariant,
 } from '../../utils/catalogDownloadActions';
 import { AppButton } from '../ui/AppButton';
+import { LibraryShareSplitLayout } from './LibraryShareSplitLayout';
+import { ShareDownloadPanel } from './ShareDownloadPanel';
+import { computeShareFontStats } from '../../utils/libraryShareStats';
+import { findOwnedShareLibrary } from '../../utils/libraryShareOwnership';
+import {
+  EDITOR_MAIN_TAB_LS_KEY,
+  FONTS_LIBRARY_INNER_TAB_LS_KEY,
+} from '../../utils/editorShellStorage';
+import { makeSavedLibraryTabId } from '../../utils/savedLibraryTabIds';
 
 const SHARE_ROW_SAMPLE_TOOLTIP =
   'Дважды щёлкните, чтобы изменить образец в этой строке (только на этой странице)';
@@ -61,25 +67,6 @@ function CascadeSizesBadge({ sizes }) {
         Каскад: {label}
       </span>
     </Tooltip>
-  );
-}
-
-function ShareLogoLink() {
-  return (
-    <Link href="/" className="inline-flex items-center gap-3 transition-opacity hover:opacity-90">
-      <img
-        src="/logo/Logo%20Mark.svg"
-        alt="DINAMIC FONT — знак"
-        className="h-8 w-8 select-none"
-        draggable={false}
-      />
-      <img
-        src="/logo/Logo%20Text.svg"
-        alt="DINAMIC FONT"
-        className="h-[1.8rem] w-auto select-none"
-        draggable={false}
-      />
-    </Link>
   );
 }
 
@@ -205,6 +192,16 @@ export function LibrarySharePage() {
   );
   const hasCascadeHint = useMemo(() => (payload ? payloadHasAnyCascadeSizes(payload) : false), [payload]);
   const libraryTitle = String(payload?.library?.name || draft.name || 'Библиотека').trim();
+  const shareStats = useMemo(
+    () => computeShareFontStats(rows),
+    [rows, shareCatalogHydratedTick],
+  );
+
+  const ownedShareLibrary = useMemo(
+    () => (payload ? findOwnedShareLibrary(payload, savedLibraries) : null),
+    [payload, savedLibraries],
+  );
+  const isShareOwner = Boolean(ownedShareLibrary);
 
   const isRowMode = layout === 'list';
   const gridToggleValue = isRowMode ? 'row' : 'grid';
@@ -269,6 +266,24 @@ export function LibrarySharePage() {
   }, [draft]);
 
   const handleImport = useCallback(async () => {
+    if (isShareOwner && ownedShareLibrary?.id) {
+      setImportBusy(true);
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(EDITOR_MAIN_TAB_LS_KEY, 'library');
+          window.localStorage.setItem(
+            FONTS_LIBRARY_INNER_TAB_LS_KEY,
+            makeSavedLibraryTabId(ownedShareLibrary.id),
+          );
+        }
+        toast.success(`Открываем «${ownedShareLibrary.name}» в редакторе`);
+        await router.push('/');
+      } finally {
+        setImportBusy(false);
+      }
+      return;
+    }
+
     if (!draft.fonts.length) {
       toast.info('При сохранении в редактор попадают только шрифты из каталога (Google / Fontsource)');
       return;
@@ -302,7 +317,16 @@ export function LibrarySharePage() {
     } finally {
       setImportBusy(false);
     }
-  }, [createLibrary, draft, savedLibraries.length, session?.user?.isPro, status]);
+  }, [
+    createLibrary,
+    draft,
+    isShareOwner,
+    ownedShareLibrary,
+    router,
+    savedLibraries.length,
+    session?.user?.isPro,
+    status,
+  ]);
 
   const commitRowSample = useCallback((rowKey, text) => {
     const t = String(text ?? '').trim();
@@ -325,7 +349,13 @@ export function LibrarySharePage() {
       : `${libraryTitle} — DINAMIC FONT`;
 
   const emptyStateCard =
-    'rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm';
+    'mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm';
+
+  const handleSignInForImport = useCallback(() => {
+    const callbackUrl =
+      typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search || ''}` : '/';
+    void signIn(undefined, { callbackUrl });
+  }, []);
 
   const renderCatalogRow = (row) => {
     if (row.kind === 'cloud-upload-ref') {
@@ -414,155 +444,95 @@ export function LibrarySharePage() {
         />
       </Head>
       <div className="min-h-screen bg-gray-50 text-gray-900">
-        <header className="border-b border-gray-200 bg-white">
-          <div className="mx-auto flex h-12 min-h-12 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-            <ShareLogoLink />
-            <Tooltip content="Полный редактор шрифтов на главной" openDelayMs={120}>
-              <AppButton
-                as={Link}
-                href="/"
-                variant="outline"
-                className="!rounded-sm shrink-0 py-2"
-                aria-label="Открыть редактор"
-              >
-                <EditAssetIcon src={linkIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
-                <span>Открыть редактор</span>
-              </AppButton>
-            </Tooltip>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-6">
-          {!pageReady ? (
+        {!pageReady ? (
+          <main className="flex min-h-screen items-center justify-center px-4 py-12">
             <div className={`${emptyStateCard} text-sm text-gray-600`}>Загрузка…</div>
-          ) : missingShare ? (
-            <div className={emptyStateCard}>
-              <h1 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Нет данных в ссылке</h1>
-              <p className="mt-3 text-sm leading-relaxed text-gray-600">
-                Откройте полную ссылку «Поделиться» из редактора — в адресе должен быть параметр{' '}
-                <code className="rounded-sm bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800">share=</code>.
-              </p>
-              <AppButton as={Link} href="/" variant="accent" className="mt-8 !rounded-sm">
-                На главную
-              </AppButton>
-            </div>
-          ) : invalid ? (
-            <div className={emptyStateCard}>
-              <h1 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-                Ссылка повреждена или устарела
-              </h1>
-              <p className="mt-3 text-sm text-gray-600">Попросите отправителя сформировать ссылку заново.</p>
-              <AppButton as={Link} href="/" variant="accent" className="mt-8 !rounded-sm">
-                На главную
-              </AppButton>
-            </div>
-          ) : (
-            <>
-              <div
-                className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 sm:bottom-8"
-                aria-live="polite"
-              >
-                <div className="pointer-events-auto flex w-full max-w-xl flex-col gap-2 rounded-lg bg-white p-2 shadow-lg sm:max-w-2xl sm:flex-row sm:items-stretch">
-                  <div className="flex min-w-0 flex-1 sm:flex-1">
-                    <AppButton
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      fullWidth
-                      className="!rounded-sm"
-                      disabled={importBusy}
-                      onClick={handleImport}
-                    >
-                      <span className="flex w-full min-w-0 items-center justify-center gap-2">
-                        <PlusIcon className="h-4 w-4 shrink-0" aria-hidden />
-                        <span className="min-w-0 truncate">{importBusy ? 'Сохранение…' : 'Сохранить в редактор'}</span>
+          </main>
+        ) : missingShare || invalid ? (
+          <main className="flex min-h-screen items-center justify-center px-4 py-12">
+            {missingShare ? (
+              <div className={emptyStateCard}>
+                <h1 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Нет данных в ссылке</h1>
+                <p className="mt-3 text-sm leading-relaxed text-gray-600">
+                  Откройте полную ссылку «Поделиться» из редактора — в адресе должен быть параметр{' '}
+                  <code className="rounded-sm bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800">share=</code>.
+                </p>
+                <AppButton as={Link} href="/" variant="accent" className="mt-8 !rounded-lg">
+                  На главную
+                </AppButton>
+              </div>
+            ) : (
+              <div className={emptyStateCard}>
+                <h1 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
+                  Ссылка повреждена или устарела
+                </h1>
+                <p className="mt-3 text-sm text-gray-600">Попросите отправителя сформировать ссылку заново.</p>
+                <AppButton as={Link} href="/" variant="accent" className="mt-8 !rounded-lg">
+                  На главную
+                </AppButton>
+              </div>
+            )}
+          </main>
+        ) : (
+          <LibraryShareSplitLayout
+            listPanel={
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <header className="shrink-0 border-b border-gray-200 px-4 py-3 sm:px-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h1 className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold uppercase tracking-wide text-gray-900">
+                      <span className="min-w-0 truncate">{libraryTitle}</span>
+                      <span className="shrink-0 whitespace-nowrap tabular-nums text-gray-500">
+                        {rows.length} шт.
                       </span>
-                    </AppButton>
-                    {status !== 'authenticated' ? (
-                      <AppButton
-                        type="button"
-                        variant="link"
-                        fullWidth
-                        className="text-center"
-                        onClick={() => {
-                          const callbackUrl =
-                            typeof window !== 'undefined'
-                              ? `${window.location.pathname}${window.location.search || ''}`
-                              : '/';
-                          void signIn(undefined, { callbackUrl });
-                        }}
-                      >
-                        Войти, чтобы начать
-                      </AppButton>
-                    ) : null}
+                    </h1>
+                    <CatalogGridModeToggle value={gridToggleValue} onChange={handleGridToggleChange} />
                   </div>
-                  <AppButton
-                    type="button"
-                    variant="accent"
-                    className="!rounded-sm min-w-0 flex-1 sm:flex-1"
-                    disabled={zipBusy}
-                    onClick={handleZipAll}
+                </header>
+                {hasCascadeHint ? (
+                  <div
+                    className="shrink-0 border-b border-accent/30 bg-accent-soft px-4 py-2.5 text-xs leading-relaxed text-gray-800 sm:px-6"
+                    role="status"
                   >
-                    <span className="flex w-full min-w-0 items-center justify-center gap-2">
-                      <EditAssetIcon src={downloudIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
-                      <span className="min-w-0 truncate">{zipBusy ? 'Сборка…' : 'Скачать всё (ZIP)'}</span>
-                    </span>
-                  </AppButton>
+                    <span className="font-semibold uppercase tracking-wide text-gray-900">Каскад в ссылке.</span>{' '}
+                    Размеры указаны у соответствующих шрифтов.
+                  </div>
+                ) : null}
+                <div className="catalog-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+                  {rows.length === 0 ? (
+                    <p className="px-4 py-10 text-center text-sm text-gray-600 sm:px-6">В ссылке нет шрифтов.</p>
+                  ) : isRowMode ? (
+                    <div className="bg-white">
+                      {rows.map((row) => (
+                        <React.Fragment key={row.rowKey}>{renderCatalogRow(row)}</React.Fragment>
+                      ))}
+                    </div>
+                  ) : (
+                    <ul className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-2 xl:grid-cols-3">
+                      {rows.map((row) => (
+                        <li key={row.rowKey} className="min-w-0">
+                          {renderCatalogRow(row)}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
-
-              <div className="pb-28 sm:pb-24">
-              {hasCascadeHint ? (
-                <div
-                  className="mt-4 border-l-4 border-accent bg-accent-soft px-4 py-3 text-sm leading-relaxed text-gray-800"
-                  role="status"
-                >
-                  <span className="font-semibold uppercase tracking-wide text-gray-900">Каскад в ссылке.</span>{' '}
-                  Размеры указаны у соответствующих шрифтов. Автоприменение в редакторе — в следующих версиях.
-                </div>
-              ) : null}
-
-              {draft.fonts.length < rows.length ? (
-                <p className="mt-4 text-sm font-semibold uppercase leading-snug text-gray-500">
-                  В архив и при сохранении в редактор: {draft.fonts.length} из каталога (Google / Fontsource)
-                </p>
-              ) : null}
-
-              <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-3 sm:px-5">
-                <h2 className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold uppercase tracking-wide text-gray-900">
-                  <span className="min-w-0 truncate">{libraryTitle}</span>
-                  <span className="shrink-0 whitespace-nowrap text-sm font-semibold uppercase tabular-nums text-gray-500">
-                    {rows.length} шт.
-                  </span>
-                </h2>
-                <div className="flex shrink-0 items-center gap-3">
-                  <CatalogGridModeToggle value={gridToggleValue} onChange={handleGridToggleChange} />
-                </div>
-              </div>
-
-              {rows.length === 0 ? (
-                <p className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-8 text-center text-sm text-gray-600">
-                  В ссылке нет шрифтов.
-                </p>
-              ) : isRowMode ? (
-                <div className="mt-4 overflow-hidden bg-white">
-                  {rows.map((row) => (
-                    <React.Fragment key={row.rowKey}>{renderCatalogRow(row)}</React.Fragment>
-                  ))}
-                </div>
-              ) : (
-                <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {rows.map((row) => (
-                    <li key={row.rowKey} className="min-w-0">
-                      {renderCatalogRow(row)}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              </div>
-            </>
-          )}
-        </main>
+            }
+            downloadPanel={
+              <ShareDownloadPanel
+                stats={shareStats}
+                catalogDownloadableCount={draft.fonts.length}
+                importBusy={importBusy}
+                zipBusy={zipBusy}
+                isShareOwner={isShareOwner}
+                isAuthenticated={status === 'authenticated'}
+                onImport={handleImport}
+                onZip={handleZipAll}
+                onSignIn={handleSignInForImport}
+              />
+            }
+          />
+        )}
       </div>
     </>
   );

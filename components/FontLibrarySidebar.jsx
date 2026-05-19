@@ -569,7 +569,7 @@ export default function FontLibrarySidebar({
             <div className="mb-4 flex items-center justify-between gap-2">
               <span className="text-sm font-semibold uppercase tracking-wide text-gray-900">Библиотеки</span>
               <Tooltip content={planBadgeTooltip} openDelayMs={200} side="bottom">
-                <span className="inline-flex shrink-0 cursor-default rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">
+                <span className="inline-flex shrink-0 cursor-default rounded-md bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                   {isPro ? 'Pro' : planName || 'Free'}
                 </span>
               </Tooltip>
@@ -580,7 +580,7 @@ export default function FontLibrarySidebar({
                 className={
                   pinLibraryAddToBottom
                     ? 'min-h-0 flex-1 overflow-y-auto'
-                    : 'min-h-0 max-h-full w-full overflow-y-auto overscroll-contain'
+                    : 'min-h-0 w-full shrink-0'
                 }
               >
                 <div className="space-y-3">

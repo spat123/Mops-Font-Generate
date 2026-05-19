@@ -8,6 +8,10 @@
  * Выключение:
  * - `window.__DEBUG_PREVIEW_TEXT__ = false`
  * - `localStorage.removeItem('debugPreviewText')`
+ *
+ * Типичная цепочка после F5 (ищите по меткам):
+ * `[previewText] hydrate:` → `shell:` (useEditorShellPersistence) → `IDB load:` (шрифты) →
+ * `tab switch:` / `applyPerFontPreviewSnapshot:` → `localStorage: setItem(previewText)` / `flush:`
  */
 export function isPreviewTextDebugEnabled() {
   if (typeof window === 'undefined') return false;

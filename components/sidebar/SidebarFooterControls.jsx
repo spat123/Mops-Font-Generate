@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useDismissibleLayer } from "../ui/useDismissibleLayer";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { PopupDialogHeader } from "../ui/PopupDialogHeader";
 import { AuthAccountPopover } from "../auth/AuthAccountPopover";
 import { AppButton } from "../ui/AppButton";
+import { Tooltip } from "../ui/Tooltip";
 
 function IconSettings(props) {
   return (
@@ -106,14 +108,6 @@ function IconTelegram({ className }) {
   );
 }
 
-function IconGithub({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-    </svg>
-  );
-}
-
 function IconMail({ className }) {
   return (
     <svg
@@ -147,22 +141,6 @@ function IconPalette({ className }) {
       <circle cx="8.5" cy="7.5" r=".5" />
       <circle cx="6.5" cy="12.5" r=".5" />
       <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.638-1.688h1.96c3.072 0 5.566-2.494 5.566-5.562C21.5 6.5 17 2 12 2z" />
-    </svg>
-  );
-}
-
-function IconZap({ className }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
     </svg>
   );
 }
@@ -225,7 +203,7 @@ function IconMoon({ className }) {
   );
 }
 
-function IconMonitor({ className }) {
+function IconCube({ className }) {
   return (
     <svg
       className={className}
@@ -236,9 +214,35 @@ function IconMonitor({ className }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
+      <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function IconFigma({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M8 24a4 4 0 004-4v-4H8a4 4 0 100 8zm0-14V6a4 4 0 114 0v4H8zm8 6a4 4 0 11-8 0 4 4 0 018 0zm-4-6a4 4 0 100-8h4v8a4 4 0 01-4 4z" />
+    </svg>
+  );
+}
+
+function IconSparkles({ className }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
+      <path d="M5 19l1 3 1-3 3-1-3-1 1-3z" />
+      <path d="M19 13l1 3 1-3 3-1-3-1 1-3z" />
     </svg>
   );
 }
@@ -271,107 +275,111 @@ const THEME_MODE_OPTIONS = [
   {
     value: "light",
     label: "Светлая",
-    title: "Светлая тема интерфейса",
-    icon: IconSun,
+    title: "Светлая тема",
+    Icon: IconSun,
   },
   {
     value: "dark",
     label: "Тёмная",
-    title: "Тёмная тема интерфейса",
-    icon: IconMoon,
-  },
-  {
-    value: "auto",
-    label: "Авто",
-    title: "Автоматически по системной теме",
-    icon: IconMonitor,
+    title: "Тёмная тема",
+    Icon: IconMoon,
   },
 ];
 
+function SettingsSectionTitle({ children }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+      {children}
+    </h3>
+  );
+}
+
+function SettingsSectionDivider({ children }) {
+  return (
+    <div className="flex items-center gap-3 py-1" role="separator">
+      <span className="h-px flex-1 bg-gray-200" aria-hidden />
+      <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.14em] text-gray-400">
+        {children}
+      </span>
+      <span className="h-px flex-1 bg-gray-200" aria-hidden />
+    </div>
+  );
+}
+
+function SettingsPanel({ children, className = "" }) {
+  return (
+    <div className={`rounded-md border border-gray-200 bg-white ${className}`.trim()}>
+      {children}
+    </div>
+  );
+}
+
 function ThemeModeCard({ themeMode, darkTheme, setThemeMode }) {
-  const currentLabel = darkTheme ? "тёмная" : "светлая";
-  const modeLabel =
-    themeMode === "auto" ? "Авто" : themeMode === "dark" ? "Тёмная" : "Светлая";
+  const effectiveTheme =
+    themeMode === "auto" ? (darkTheme ? "dark" : "light") : themeMode;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-4 py-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-          Тема интерфейса
-        </p>
-      </div>
-      <div className="p-4">
+    <SettingsPanel className="p-4">
+      <SettingsSectionTitle>Тема интерфейса</SettingsSectionTitle>
+      <div className="mt-3">
         <SegmentedControl
-          value={themeMode}
+          value={effectiveTheme}
           onChange={setThemeMode}
-          options={THEME_MODE_OPTIONS.map((opt) => ({
-            ...opt,
-            label: (
-              <span className="flex items-center gap-1.5">
-                <opt.icon className="h-3.5 w-3.5" />
-                {opt.label}
-              </span>
-            ),
-          }))}
-          variant="card"
+          options={THEME_MODE_OPTIONS}
+          variant="surface"
+          label="Тема интерфейса"
+          className="w-full max-w-md"
         />
-        <div className="mt-3 flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-          <span className="text-xs text-gray-600">Текущий режим:</span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full bg-accent animate-pulse" />
-            <span className="text-sm font-medium text-gray-900">
-              {currentLabel}
-            </span>
-          </span>
-        </div>
       </div>
-    </div>
+    </SettingsPanel>
   );
 }
 
 function HeroCard() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-accent/20 bg-gradient-to-br from-white via-white to-accent-soft/30 shadow-sm">
-      <div className="border-b border-accent/10 bg-gradient-to-r from-accent/5 to-transparent px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white shadow-sm">
-            <IconZap className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-accent">
-              DINAMIC FONT
-            </p>
-            <p className="mt-0.5 text-base font-semibold text-gray-950">
-              Тестирование, сравнение и работа со шрифтами
-            </p>
-          </div>
+    <SettingsPanel className="p-5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-50">
+          {/* eslint-disable-next-line @next/next/no-img-element -- статический SVG из /public */}
+          <img
+            src="/logo/Logo%20Mark.svg"
+            alt=""
+            className="h-7 w-7 select-none object-contain"
+            draggable={false}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-accent">
+            DINAMIC FONT
+          </p>
+          <p className="mt-0.5 text-base font-semibold text-gray-950">
+            Тестирование, сравнение и работа со шрифтами
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">
+            Инструмент для быстрой загрузки шрифтов, сравнения начертаний,
+            проверки переменных осей и сборки собственных подборок — без лишней
+            рутины.
+          </p>
         </div>
       </div>
-      <div className="px-5 py-4">
-        <p className="text-sm leading-relaxed text-gray-600">
-          Инструмент для быстрой загрузки шрифтов, сравнения начертаний,
-          проверки переменных осей и сборки собственных подборок — без лишней
-          рутины.
-        </p>
-      </div>
-    </div>
+    </SettingsPanel>
   );
 }
 
 function FeatureCard({ icon: Icon, title, description, accent = false }) {
   return (
     <div
-      className={`group flex items-start gap-3 rounded-xl border p-4 transition-all hover:shadow-md ${
+      className={`group flex items-start gap-3 rounded-md border p-4 transition-colors ${
         accent
-          ? "border-accent/30 bg-gradient-to-br from-accent-soft/20 to-white"
+          ? "border-accent/30 bg-accent-soft/20"
           : "border-gray-200 bg-white hover:border-accent/20"
       }`}
     >
       <div
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-200 transition-colors ${
           accent
-            ? "bg-accent/10 text-accent"
-            : "bg-gray-100 text-gray-600 group-hover:bg-accent/10 group-hover:text-accent"
+            ? "border-accent/20 bg-accent/10 text-accent"
+            : "bg-gray-50 text-gray-600 group-hover:border-accent/20 group-hover:text-accent"
         }`}
       >
         <Icon className="h-4 w-4" />
@@ -403,9 +411,9 @@ function ContactCard({
   };
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-gray-200 bg-white transition-all hover:border-accent/30 hover:shadow-md">
+    <div className="group rounded-md border border-gray-200 bg-white transition-colors hover:border-accent/30">
       <div className="flex items-start gap-3 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 text-gray-600 transition-colors group-hover:from-accent/10 group-hover:to-accent/5 group-hover:text-accent">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-600 transition-colors group-hover:border-accent/20 group-hover:text-accent">
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -475,10 +483,9 @@ function ContactCard({
 
 function FutureFeatureCard({ icon: Icon, title, description }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-dashed border-gray-300 bg-gray-50/50 p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-accent/5" />
-      <div className="relative flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100/80 text-gray-400">
+    <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-400">
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -544,11 +551,7 @@ export default function SidebarFooterControls({
           </div>
 
           <div className="space-y-3">
-            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-400">
-              <span className="h-px flex-1 bg-gradient-to-r from-gray-200 to-transparent" />
-              Планы на будущее
-              <span className="h-px flex-1 bg-gradient-to-l from-gray-200 to-transparent" />
-            </h3>
+            <SettingsSectionDivider>Планы на будущее</SettingsSectionDivider>
             <FeatureCard
               icon={IconHeart}
               title="Поддержать проект"
@@ -556,9 +559,19 @@ export default function SidebarFooterControls({
               accent
             />
             <FutureFeatureCard
-              icon={IconCode}
-              title="Open Source версия"
-              description="Публичный roadmap, issues и точки входа для контрибьюторов."
+              icon={IconCube}
+              title="3D-модинг текста"
+              description="Объёмные превью и настройка глубины для экспериментов с типографикой."
+            />
+            <FutureFeatureCard
+              icon={IconFigma}
+              title="Плагин Figma"
+              description="Импорт подборок и синхронизация стилей прямо в макетах."
+            />
+            <FutureFeatureCard
+              icon={IconSparkles}
+              title="Глубокое анимирование текста"
+              description="Сложные таймлайны, морфинг осей и сценарии для variable fonts."
             />
           </div>
         </div>
@@ -568,16 +581,13 @@ export default function SidebarFooterControls({
     if (activeTab === "contacts") {
       return (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-4">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-              <IconUsers className="h-4 w-4 text-gray-500" />
-              Каналы связи
-            </h3>
-            <p className="mt-1.5 text-xs leading-5 text-gray-500">
+          <SettingsPanel className="p-4">
+            <SettingsSectionTitle>Каналы связи</SettingsSectionTitle>
+            <p className="mt-2 text-xs leading-5 text-gray-500">
               Выберите удобный способ связи — для баг-репортов, вопросов или
               предложений по улучшению.
             </p>
-          </div>
+          </SettingsPanel>
 
           <div className="grid gap-4">
             <ContactCard
@@ -585,13 +595,6 @@ export default function SidebarFooterControls({
               label="Telegram"
               title="Канал обновлений"
               description="Новости продукта, опросы по фичам и быстрый фидбек."
-              placeholder
-            />
-            <ContactCard
-              icon={IconGithub}
-              label="GitHub"
-              title="Issues и Roadmap"
-              description="Баг-репорты, предложения по UX и прозрачный список задач."
               placeholder
             />
             <ContactCard
@@ -603,7 +606,7 @@ export default function SidebarFooterControls({
             />
           </div>
 
-          <div className="rounded-xl border border-dashed border-gray-300 bg-gradient-to-br from-gray-50/50 to-white p-4">
+          <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-4">
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <svg
                 className="h-4 w-4 text-gray-400"
@@ -634,34 +637,17 @@ export default function SidebarFooterControls({
         />
 
         <div className="space-y-3">
-          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-gray-400">
-            <span className="h-px flex-1 bg-gradient-to-r from-gray-200 to-transparent" />
-            Дополнительные настройки
-            <span className="h-px flex-1 bg-gradient-to-l from-gray-200 to-transparent" />
-          </h3>
-
-          <div className="grid gap-3">
-            <FutureFeatureCard
-              icon={IconPalette}
-              title="Плотность интерфейса"
-              description="Компактный, стандартный или расширенный режим отображения элементов."
-            />
-            <FutureFeatureCard
-              icon={IconZap}
-              title="Анимации и переходы"
-              description="Настройка плавности анимаций или полное отключение для производительности."
-            />
-            <FutureFeatureCard
-              icon={IconGlobe}
-              title="Размер карточек каталога"
-              description="Настройка отображения шрифтов в сетке: компактно, средне или подробно."
-            />
-          </div>
+          <SettingsSectionDivider>Дополнительные настройки</SettingsSectionDivider>
+          <FutureFeatureCard
+            icon={IconGlobe}
+            title="Размер карточек каталога"
+            description="Настройка отображения шрифтов в сетке: компактно, средне или подробно."
+          />
         </div>
 
-        <div className="rounded-xl border border-dashed border-gray-300 bg-gradient-to-br from-gray-50/50 to-white p-4">
+        <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50 text-amber-600">
               <svg
                 className="h-4 w-4"
                 viewBox="0 0 24 24"
@@ -709,7 +695,7 @@ export default function SidebarFooterControls({
     isAppSettingsOpen && !isSidebarCollapsed && typeof document !== "undefined"
       ? createPortal(
           <div
-            className="fixed inset-0 z-[400] flex items-center justify-center bg-black/20 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[400] flex items-center justify-center bg-black/30 p-4"
             role="dialog"
             aria-modal="true"
             aria-label="Настройки приложения"
@@ -717,31 +703,17 @@ export default function SidebarFooterControls({
           >
             <div
               ref={settingsDialogRef}
-              className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden bg-white shadow-2xl ring-1 ring-black/5"
+              className="relative flex max-h-[min(90vh,720px)] w-full max-w-2xl flex-col overflow-hidden rounded-none bg-white"
               onClick={(event) => event.stopPropagation()}
             >
-              {/* Шапка в стиле PopupDialogHeader: нижняя граница, заголовок uppercase, закрытие с border-l */}
-              <div className="shrink-0 flex min-h-[3rem] items-stretch border-b border-gray-200 bg-white">
-                <div className="flex min-h-12 min-w-0 flex-1 items-center px-6 py-3">
-                  <h2 className="text-lg font-semibold uppercase leading-snug tracking-tight text-gray-900">
-                    Настройки и информация
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAppSettingsOpen(false)}
-                  className="inline-flex w-12 shrink-0 items-center justify-center border-l border-gray-200 text-gray-800 transition-colors hover:bg-transparent hover:text-accent"
-                  aria-label="Закрыть окно настроек"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+              <PopupDialogHeader
+                title="Настройки и информация"
+                onClose={() => setIsAppSettingsOpen(false)}
+                closeAriaLabel="Закрыть окно настроек"
+              />
 
-              {/* Tab Navigation */}
-              <div className="shrink-0 border-b border-gray-100 bg-gray-50/40 px-6 py-4">
-                <div className="flex gap-1.5 rounded-xl bg-gray-100/80 p-1.5">
+              <div className="shrink-0 border-b border-gray-200 px-6 py-3">
+                <div className="flex gap-1 border border-gray-200 bg-gray-50 p-1">
                   {SETTINGS_TABS.map((tab) => {
                     const isActive = tab.id === activeTab;
                     const Icon = tab.icon;
@@ -750,10 +722,10 @@ export default function SidebarFooterControls({
                         key={tab.id}
                         type="button"
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                        className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
                           isActive
-                            ? "bg-white shadow-sm text-gray-900"
-                            : "text-gray-500 hover:text-gray-900 hover:bg-white/50"
+                            ? "bg-white text-gray-900"
+                            : "text-gray-500 hover:text-gray-900"
                         }`}
                         aria-pressed={isActive}
                       >
@@ -767,8 +739,7 @@ export default function SidebarFooterControls({
                 </div>
               </div>
 
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto bg-gray-50/30 px-6 py-5">
+              <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 {renderActiveTab()}
               </div>
             </div>
@@ -784,66 +755,86 @@ export default function SidebarFooterControls({
         <div
           className={
             isSidebarCollapsed
-              ? "flex h-full min-h-0 w-full flex-col items-stretch justify-center gap-2 py-1"
+              ? "flex h-full min-h-0 w-full flex-col items-stretch justify-center"
               : "grid h-full min-h-0 grid-cols-3 gap-2"
           }
         >
-          <AppButton
-            type="button"
-            variant="toolbarIcon"
-            size="rail"
-            className="group"
-            onClick={() =>
-              setIsSidebarCollapsed((prev) => {
-                const next = !prev;
-                if (next) setIsAppSettingsOpen(false);
-                return next;
-              })
-            }
-            aria-label={
+          <Tooltip
+            content={
               isSidebarCollapsed
-                ? "Развернуть левую панель"
-                : "Свернуть левую панель"
+                ? "Развернуть боковую панель"
+                : "Свернуть боковую панель"
             }
+            as="div"
+            className="h-full min-h-0 w-full"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              className="h-4 w-4 transition-transform group-hover:scale-110"
-              aria-hidden
-            >
-              {isSidebarCollapsed ? (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 6l6 6-6 6"
-                />
-              ) : (
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 18l-6-6 6-6"
-                />
-              )}
-            </svg>
-          </AppButton>
-          {!isSidebarCollapsed ? (
             <AppButton
               type="button"
               variant="toolbarIcon"
-              pressed={isAppSettingsOpen}
               size="rail"
-              fullWidth
-              className="group"
-              onClick={() => setIsAppSettingsOpen((prev) => !prev)}
-              aria-label="Настройки приложения"
-              aria-pressed={isAppSettingsOpen}
+              className="group w-full"
+              onClick={() =>
+                setIsSidebarCollapsed((prev) => {
+                  const next = !prev;
+                  if (next) setIsAppSettingsOpen(false);
+                  return next;
+                })
+              }
+              aria-label={
+                isSidebarCollapsed
+                  ? "Развернуть левую панель"
+                  : "Свернуть левую панель"
+              }
             >
-              <IconSettings className="h-4 w-4 transition-transform group-hover:rotate-90" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                className="h-4 w-4 transition-transform group-hover:scale-110"
+                aria-hidden
+              >
+                {isSidebarCollapsed ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 6l6 6-6 6"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 18l-6-6 6-6"
+                  />
+                )}
+              </svg>
             </AppButton>
+          </Tooltip>
+          {!isSidebarCollapsed ? (
+            <Tooltip
+              content={
+                isAppSettingsOpen
+                  ? "Закрыть настройки"
+                  : "Настройки приложения"
+              }
+              as="div"
+              className="h-full min-h-0 w-full"
+            >
+              <AppButton
+                type="button"
+                variant="toolbarIcon"
+                pressed={isAppSettingsOpen}
+                size="rail"
+                fullWidth
+                className="group w-full"
+                onClick={() => setIsAppSettingsOpen((prev) => !prev)}
+                aria-label="Настройки приложения"
+                aria-pressed={isAppSettingsOpen}
+              >
+                <IconSettings className="h-4 w-4 transition-transform group-hover:rotate-90" />
+              </AppButton>
+            </Tooltip>
           ) : null}
           {!isSidebarCollapsed ? <AuthAccountPopover isSidebarCollapsed={isSidebarCollapsed} /> : null}
         </div>

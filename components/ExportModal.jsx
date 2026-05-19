@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { CustomSelect } from './ui/CustomSelect';
 import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
@@ -6,24 +6,73 @@ import { AppButton } from './ui/AppButton';
 import { toast } from '../utils/appNotify';
 import { saveBlobAsFile } from '../utils/fileDownloadUtils';
 import { slugifyFontKey } from '../utils/fontSlug';
+import { SegmentedControl, VIEW_MODE_OPTIONS } from './ui/SegmentedControl';
+import {
+  buildGlyphTableCsv,
+  buildGlyphTableHtml,
+  buildGlyphTableJson,
+  buildPlainPreviewSvgPayload,
+  buildPrintToPdfHtmlDocument,
+  buildStylesInventoryCsv,
+  buildStylesInventoryMarkdown,
+  buildWaterfallLadderMarkdown,
+  loadGlyphTableForExport,
+  renderPlainTextToImageBlob,
+} from '../utils/previewExportArtifacts';
 
 /**
- * Экспорт CSS: формат файла, предпросмотр, копирование, скачивание.
- * Для Free: пример текстового пакета — только размытый плейсхолдер (без реального CSS в разметке);
- * скачивание .css / .txt и копирование — в Pro.
+ * Экспорт по режимам превью: Plain / Waterfall / Glyphs / Styles.
+ * Бинарные шрифты VF — как раньше; текст/CSS/растр/PDF — по тарифу Pro (кроме открытых CSV/JSON/MD где указано).
  */
 const BINARY_EXPORT_FORMATS = new Set(['ttf', 'otf', 'woff', 'woff2']);
 
-const ALL_FORMAT_OPTIONS = [
-  { value: 'css', label: 'CSS (.css) — стили и пример' },
-  { value: 'plain', label: 'Текст (.txt) — то же содержимое' },
-  { value: 'ttf', label: 'TTF' },
-  { value: 'otf', label: 'OTF' },
-  { value: 'woff', label: 'WOFF' },
-  { value: 'woff2', label: 'WOFF2' },
-];
+/** Нужен тариф Pro для скачивания (копирование — те же правила, что и для CSS). */
+const PRO_DOWNLOAD_FORMATS = new Set([
+  'css',
+  'plain',
+  'png',
+  'jpeg',
+  'webp',
+  'svg',
+  'pdf-html',
+  'glyph-html',
+  'styles-html',
+]);
 
-/** Условный пример: не реальный экспорт пользователя, только визуальный тизер под блюром. */
+const FORMAT_OPTIONS_BY_TAB = {
+  plain: [
+    { value: 'css', label: 'CSS (.css) — @font-face и пример' },
+    { value: 'plain', label: 'Текст (.txt) — то же содержимое' },
+    { value: 'ttf', label: 'TTF' },
+    { value: 'otf', label: 'OTF' },
+    { value: 'woff', label: 'WOFF' },
+    { value: 'woff2', label: 'WOFF2' },
+    { value: 'png', label: 'PNG — снимок текста (растр)' },
+    { value: 'jpeg', label: 'JPEG — снимок текста' },
+    { value: 'webp', label: 'WebP — снимок текста' },
+    { value: 'svg', label: 'SVG — текст как вектор' },
+    { value: 'pdf-html', label: 'PDF: HTML для печати в PDF (A4)' },
+  ],
+  waterfall: [
+    { value: 'css', label: 'CSS (.css) — пакет как в Plain' },
+    { value: 'plain', label: 'Текст (.txt)' },
+    { value: 'md-ladder', label: 'Markdown — параметры Waterfall' },
+    { value: 'pdf-html', label: 'PDF: HTML для печати в PDF' },
+  ],
+  glyphs: [
+    { value: 'csv', label: 'CSV — таблица глифов (;)' },
+    { value: 'json', label: 'JSON — глифы' },
+    { value: 'glyph-html', label: 'HTML — таблица глифов (страница)' },
+    { value: 'md-glyphs', label: 'Markdown — пояснение к выгрузке' },
+  ],
+  styles: [
+    { value: 'md-styles', label: 'Markdown — сводка начертаний / осей' },
+    { value: 'csv-styles', label: 'CSV — сводка для таблиц' },
+    { value: 'styles-html', label: 'HTML — спецификация (карточки)' },
+    { value: 'pdf-html', label: 'PDF: HTML для печати в PDF' },
+  ],
+};
+
 const PRO_CSS_PREVIEW_PLACEHOLDER = `/* Пример пакета Pro: @font-face и класс */
 @font-face {
   font-family: "YourFont";
@@ -60,7 +109,13 @@ function mimeForFontFormat(format) {
   }
 }
 
-/** Размытый плейсхолдер + подпись Pro (без ссылок и без реального кода пользователя). */
+/** Тот же MIME, что уходит в файл PNG / JPEG / WebP. */
+function rasterExportMime(exportKind) {
+  if (exportKind === 'jpeg') return 'image/jpeg';
+  if (exportKind === 'webp') return 'image/webp';
+  return 'image/png';
+}
+
 function BlurredProExportTeaser() {
   return (
     <div className="relative h-64 min-h-[16rem] overflow-hidden rounded-md border border-gray-200 bg-gray-50 shadow-inner">
@@ -79,6 +134,11 @@ function BlurredProExportTeaser() {
   );
 }
 
+function firstFormatForTab(tab) {
+  const list = FORMAT_OPTIONS_BY_TAB[tab] || FORMAT_OPTIONS_BY_TAB.plain;
+  return list[0]?.value || 'css';
+}
+
 export default function ExportModal({
   isOpen,
   onClose,
@@ -90,21 +150,44 @@ export default function ExportModal({
   downloadFile,
   canExportTextCss = true,
   onRequestPro,
+  /** Текущий режим превью в редакторе (при открытии совпадает с вкладкой экспорта). */
+  editorViewMode = 'plain',
+  previewText = '',
+  fontFamily = 'sans-serif',
+  fontSize = 32,
+  lineHeight = 1.4,
+  letterSpacing = 0,
+  textColor = '#111111',
+  backgroundColor = '#ffffff',
+  waterfallExportMeta = null,
 }) {
   const textareaRef = useRef(null);
   const codeScrollHideTimerRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [exportTab, setExportTab] = useState('plain');
   const [exportKind, setExportKind] = useState('css');
   const [copied, setCopied] = useState(false);
   const [isCodeScrollActive, setIsCodeScrollActive] = useState(false);
+  const [glyphData, setGlyphData] = useState(null);
+  const [glyphLoadError, setGlyphLoadError] = useState(null);
+  const [rasterPreviewUrl, setRasterPreviewUrl] = useState(null);
+
+  const isPlainRasterExport = useMemo(
+    () => exportTab === 'plain' && ['png', 'jpeg', 'webp'].includes(exportKind),
+    [exportTab, exportKind],
+  );
 
   const isVf = Boolean(selectedFont?.isVariableFont);
   const staticExportBlocked = Boolean(selectedFont) && !isVf && !canExportTextCss;
 
+  const formatOptions = useMemo(() => FORMAT_OPTIONS_BY_TAB[exportTab] || FORMAT_OPTIONS_BY_TAB.plain, [exportTab]);
+
+  const isProGatedFormat = useCallback((kind) => PRO_DOWNLOAD_FORMATS.has(kind), []);
+  const downloadLockedByPro = !canExportTextCss && isProGatedFormat(exportKind);
+
   const isTextFormat = exportKind === 'css' || exportKind === 'plain';
   const showTextTeaser = !canExportTextCss && isTextFormat;
   const showRealTextExport = canExportTextCss && isTextFormat;
-  const downloadLockedByPro = showTextTeaser;
 
   useEffect(() => {
     if (isOpen) {
@@ -117,6 +200,99 @@ export default function ExportModal({
       }, 300);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setExportTab(editorViewMode in FORMAT_OPTIONS_BY_TAB ? editorViewMode : 'plain');
+  }, [isOpen, editorViewMode]);
+
+  useEffect(() => {
+    setExportKind(firstFormatForTab(exportTab));
+  }, [exportTab]);
+
+  useEffect(() => {
+    if (!isOpen || exportTab !== 'glyphs' || !selectedFont) {
+      setGlyphData(null);
+      setGlyphLoadError(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setGlyphLoadError(null);
+    void (async () => {
+      const data = await loadGlyphTableForExport(selectedFont);
+      if (cancelled) return;
+      if (!data?.allGlyphs?.length) {
+        setGlyphData(null);
+        setGlyphLoadError('Не удалось прочитать глифы (нужен файл шрифта или доступный URL).');
+        return;
+      }
+      setGlyphData(data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, exportTab, selectedFont]);
+
+  /** Превью растра = тот же снимок, что сохраняется в файл (canvas → blob). */
+  useEffect(() => {
+    if (!isOpen || !isPlainRasterExport || !canExportTextCss) {
+      setRasterPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return undefined;
+    }
+
+    let cancelled = false;
+    const debounceMs = 220;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const mime = rasterExportMime(exportKind);
+          const blob = await renderPlainTextToImageBlob({
+            text: previewText,
+            fontFamily,
+            fontSizePx: fontSize,
+            lineHeight,
+            letterSpacingEm: (Number(letterSpacing) / 100) * 0.5,
+            textColor,
+            backgroundColor,
+            mime,
+          });
+          if (cancelled) return;
+          const url = URL.createObjectURL(blob);
+          setRasterPreviewUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
+        } catch {
+          if (!cancelled) {
+            setRasterPreviewUrl((prev) => {
+              if (prev) URL.revokeObjectURL(prev);
+              return null;
+            });
+          }
+        }
+      })();
+    }, debounceMs);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    isOpen,
+    isPlainRasterExport,
+    canExportTextCss,
+    exportKind,
+    previewText,
+    fontFamily,
+    fontSize,
+    lineHeight,
+    letterSpacing,
+    textColor,
+    backgroundColor,
+  ]);
 
   useEffect(() => {
     const handleEscapeKey = (e) => {
@@ -134,14 +310,81 @@ export default function ExportModal({
     };
   }, []);
 
+  const previewValue = useMemo(() => {
+    const baseName = slugifyFontKey(fontName || selectedFont?.name || 'font');
+    if (exportTab === 'waterfall' && exportKind === 'md-ladder') {
+      return buildWaterfallLadderMarkdown(waterfallExportMeta || {}, fontName || selectedFont?.name);
+    }
+    if (exportTab === 'glyphs') {
+      if (!glyphData?.allGlyphs?.length) return glyphLoadError || 'Загрузка таблицы глифов…';
+      if (exportKind === 'csv') return buildGlyphTableCsv(glyphData);
+      if (exportKind === 'json') return buildGlyphTableJson(glyphData);
+      if (exportKind === 'md-glyphs') {
+        return [
+          `# Глифы — ${fontName || selectedFont?.name || 'шрифт'}`,
+          '',
+          `- всего в выгрузке: **${glyphData.allGlyphs.length}**`,
+          '',
+          'Форматы **CSV** и **JSON** доступны без Pro. HTML-таблица — в Pro.',
+          '',
+          'Совет: откройте CSV в Excel / Numbers; для полного списка используйте JSON.',
+        ].join('\n');
+      }
+      if (exportKind === 'glyph-html') {
+        return '(Предпросмотр HTML в виде файла — скачайте, чтобы открыть в браузере)';
+      }
+    }
+    if (exportTab === 'styles') {
+      if (exportKind === 'md-styles') return buildStylesInventoryMarkdown(selectedFont);
+      if (exportKind === 'csv-styles') return buildStylesInventoryCsv(selectedFont);
+      if (exportKind === 'styles-html') return '(HTML-спецификация — скачайте файл)';
+      if (exportKind === 'pdf-html') return '(HTML для печати в PDF — скачайте файл)';
+    }
+    if (exportTab === 'waterfall' && (exportKind === 'css' || exportKind === 'plain')) {
+      const head =
+        exportKind === 'css'
+          ? `/* Waterfall: тот же @font-face / пример, что и в Plain. Добавьте размеры строк по лестнице из Markdown «Параметры Waterfall». */\n\n`
+          : '';
+      return head + String(cssCode || '');
+    }
+    if (exportTab === 'plain' && exportKind === 'svg') {
+      return buildPlainPreviewSvgPayload({
+        text: previewText,
+        fontFamily,
+        fontSizePx: fontSize,
+        textColor,
+        backgroundColor,
+      });
+    }
+    if (exportTab === 'plain' && ['png', 'jpeg', 'webp'].includes(exportKind)) {
+      return '';
+    }
+    return String(cssCode || '');
+  }, [
+    cssCode,
+    exportKind,
+    exportTab,
+    fontName,
+    selectedFont,
+    waterfallExportMeta,
+    glyphData,
+    glyphLoadError,
+    previewText,
+    fontFamily,
+    fontSize,
+    lineHeight,
+    textColor,
+    backgroundColor,
+  ]);
+
   const copyToClipboard = () => {
-    if (!canExportTextCss) {
-      toast.info('Копирование CSS и @font-face — в тарифе Pro');
+    if (!canExportTextCss && isProGatedFormat(exportKind)) {
+      toast.info('Копирование — в тарифе Pro');
       onRequestPro?.();
       return;
     }
-    const textToCopy = String(cssCode || '');
-    if (!textToCopy) return;
+    const textToCopy = String(previewValue || '');
+    if (!textToCopy || textToCopy.startsWith('(')) return;
     const applyCopiedState = () => {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1000);
@@ -163,22 +406,25 @@ export default function ExportModal({
 
   const downloadExport = async () => {
     if (downloadLockedByPro) {
-      toast.info('Скачивание CSS и текстовых файлов — в тарифе Pro');
+      toast.info('Этот формат — в тарифе Pro');
       onRequestPro?.();
       return;
     }
+
+    const base = slugifyFontKey(fontName || selectedFont?.name || 'font');
+
     if (BINARY_EXPORT_FORMATS.has(exportKind)) {
       if (!selectedFont?.isVariableFont || typeof generateStaticFontFile !== 'function') {
         toast.error('Бинарные форматы здесь доступны для вариативных шрифтов');
         return;
       }
       const blob = await generateStaticFontFile(selectedFont, variableSettings || {}, exportKind, {
-        outputFontName: slugifyFontKey(fontName || selectedFont?.name || 'font'),
+        outputFontName: base,
         skipPseudoCssPrompt: true,
         canExportTextCss,
       });
       if (!blob) return;
-      const filename = `${slugifyFontKey(fontName || selectedFont?.name || 'font')}-export.${exportKind}`;
+      const filename = `${base}-export.${exportKind}`;
       if (typeof downloadFile === 'function') {
         downloadFile(blob, filename, mimeForFontFormat(exportKind));
       } else {
@@ -186,15 +432,168 @@ export default function ExportModal({
       }
       return;
     }
-    if (!canExportTextCss) {
-      toast.info('Скачивание CSS и текстовых файлов — в тарифе Pro');
-      onRequestPro?.();
+
+    if (exportKind === 'png' || exportKind === 'jpeg' || exportKind === 'webp') {
+      if (!canExportTextCss) {
+        toast.info('Растр — в тарифе Pro');
+        onRequestPro?.();
+        return;
+      }
+      const mime = rasterExportMime(exportKind);
+      try {
+        const blob = await renderPlainTextToImageBlob({
+          text: previewText,
+          fontFamily,
+          fontSizePx: fontSize,
+          lineHeight,
+          letterSpacingEm: (Number(letterSpacing) / 100) * 0.5,
+          textColor,
+          backgroundColor,
+          mime,
+        });
+        saveBlobAsFile(blob, `${base}-plain-preview.${exportKind === 'jpeg' ? 'jpg' : exportKind}`);
+      } catch (e) {
+        toast.error(e?.message || 'Не удалось создать изображение');
+      }
       return;
     }
-    const ext = exportKind === 'css' ? 'css' : 'txt';
-    const mime = exportKind === 'css' ? 'text/css' : 'text/plain';
-    const blob = new Blob([cssCode || ''], { type: mime });
-    saveBlobAsFile(blob, `${slugifyFontKey(fontName || 'font')}-export.${ext}`);
+
+    if (exportKind === 'svg') {
+      if (!canExportTextCss) {
+        toast.info('SVG — в тарифе Pro');
+        onRequestPro?.();
+        return;
+      }
+      const svg = buildPlainPreviewSvgPayload({
+        text: previewText,
+        fontFamily,
+        fontSizePx: fontSize,
+        textColor,
+        backgroundColor,
+      });
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      saveBlobAsFile(blob, `${base}-plain-preview.svg`);
+      return;
+    }
+
+    if (exportKind === 'pdf-html') {
+      if (!canExportTextCss) {
+        toast.info('Печать в PDF — в тарифе Pro');
+        onRequestPro?.();
+        return;
+      }
+      const inner =
+        exportTab === 'styles'
+          ? `<h1>${fontName || 'Шрифт'}</h1><pre style="white-space:pre-wrap;font-family:system-ui">${previewValue.replace(/</g, '&lt;')}</pre>`
+          : `<pre style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:13px">${String(cssCode || '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')}</pre>`;
+      const html = buildPrintToPdfHtmlDocument({
+        title: `Экспорт — ${base}`,
+        bodyHtml: inner,
+        fontFamily,
+        fontSizePx: Math.min(18, fontSize),
+      });
+      saveBlobAsFile(new Blob([html], { type: 'text/html;charset=utf-8' }), `${base}-print-to-pdf.html`);
+      return;
+    }
+
+    if (exportKind === 'md-ladder') {
+      const md = buildWaterfallLadderMarkdown(waterfallExportMeta || {}, fontName || selectedFont?.name);
+      saveBlobAsFile(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${base}-waterfall.md`);
+      return;
+    }
+
+    if (exportKind === 'md-styles') {
+      const md = buildStylesInventoryMarkdown(selectedFont);
+      saveBlobAsFile(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${base}-styles.md`);
+      return;
+    }
+
+    if (exportKind === 'csv-styles') {
+      const csv = buildStylesInventoryCsv(selectedFont);
+      saveBlobAsFile(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${base}-styles.csv`);
+      return;
+    }
+
+    if (exportKind === 'csv') {
+      if (!glyphData?.allGlyphs?.length) {
+        toast.error('Нет данных глифов');
+        return;
+      }
+      const csv = buildGlyphTableCsv(glyphData);
+      saveBlobAsFile(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${base}-glyphs.csv`);
+      return;
+    }
+
+    if (exportKind === 'json') {
+      if (!glyphData?.allGlyphs?.length) {
+        toast.error('Нет данных глифов');
+        return;
+      }
+      const json = buildGlyphTableJson(glyphData);
+      saveBlobAsFile(new Blob([json], { type: 'application/json;charset=utf-8' }), `${base}-glyphs.json`);
+      return;
+    }
+
+    if (exportKind === 'glyph-html') {
+      if (!canExportTextCss) {
+        toast.info('HTML-таблица глифов — в тарифе Pro');
+        onRequestPro?.();
+        return;
+      }
+      if (!glyphData?.allGlyphs?.length) {
+        toast.error('Нет данных глифов');
+        return;
+      }
+      const html = buildGlyphTableHtml(glyphData, fontName || selectedFont?.name || 'font');
+      saveBlobAsFile(new Blob([html], { type: 'text/html;charset=utf-8' }), `${base}-glyphs.html`);
+      return;
+    }
+
+    if (exportKind === 'md-glyphs') {
+      const md = [
+        `# Глифы — ${fontName || selectedFont?.name || 'шрифт'}`,
+        '',
+        `- записей: ${glyphData?.allGlyphs?.length ?? 0}`,
+        '',
+        'Скачайте CSV или JSON для полной таблицы.',
+      ].join('\n');
+      saveBlobAsFile(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${base}-glyphs-readme.md`);
+      return;
+    }
+
+    if (exportKind === 'styles-html') {
+      if (!canExportTextCss) {
+        toast.info('HTML — в тарифе Pro');
+        onRequestPro?.();
+        return;
+      }
+      const md = buildStylesInventoryMarkdown(selectedFont);
+      const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"/><title>Styles — ${base}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:52rem;margin:1.5rem auto;padding:0 1rem}pre{white-space:pre-wrap;background:#f8f8f9;padding:1rem;border:1px solid #e5e7eb}</style></head><body>
+<h1>Styles — ${fontName || base}</h1>
+<pre>${md.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>
+</body></html>`;
+      saveBlobAsFile(new Blob([html], { type: 'text/html;charset=utf-8' }), `${base}-styles.html`);
+      return;
+    }
+
+    if (exportKind === 'css' || exportKind === 'plain') {
+      if (!canExportTextCss) {
+        toast.info('Скачивание CSS и текстовых файлов — в тарифе Pro');
+        onRequestPro?.();
+        return;
+      }
+      const ext = exportKind === 'css' ? 'css' : 'txt';
+      const mime = exportKind === 'css' ? 'text/css' : 'text/plain';
+      let body = String(cssCode || '');
+      if (exportTab === 'waterfall' && exportKind === 'css') {
+        body =
+          `/* Waterfall: добавьте размеры строк по лестнице (см. Markdown-экспорт md-ladder). */\n\n` + body;
+      }
+      saveBlobAsFile(new Blob([body], { type: mime }), `${base}-export.${ext}`);
+    }
   };
 
   const handleBackdropClick = (e) => {
@@ -214,6 +613,29 @@ export default function ExportModal({
 
   if (!isOpen) return null;
 
+  const tabOptions = VIEW_MODE_OPTIONS.map((o) => ({
+    value: o.value,
+    label: o.label,
+    title: o.title,
+    Icon: o.Icon,
+  }));
+
+  const showBinaryHint = BINARY_EXPORT_FORMATS.has(exportKind);
+  const showGlyphHtmlPlaceholder = exportTab === 'glyphs' && exportKind === 'glyph-html';
+  const showStylesHtmlPlaceholder = exportTab === 'styles' && exportKind === 'styles-html';
+  const showPdfPlaceholder = exportTab === 'styles' && exportKind === 'pdf-html';
+
+  const showBlurredCssTeaser = showTextTeaser;
+  const showRasterDownloadPreview = isPlainRasterExport && canExportTextCss;
+  const showRasterProTeaser = isPlainRasterExport && !canExportTextCss;
+  const showMonospacePreview =
+    !showBlurredCssTeaser &&
+    !showBinaryHint &&
+    !showGlyphHtmlPlaceholder &&
+    !showStylesHtmlPlaceholder &&
+    !showPdfPlaceholder &&
+    !isPlainRasterExport;
+
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center duration-300 ease-in-out ${
@@ -227,9 +649,9 @@ export default function ExportModal({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <PopupDialogHeader title="Экспорт" onClose={onClose} titleClassName="max-w-[calc(100%-3rem)] truncate" />
+        <PopupDialogHeader title="Экспорт" onClose={onClose} titleClassName="max-w-[calc(100%-7rem)] truncate" />
 
-        <div className="flex-1 overflow-auto px-6 py-4">
+        <div className="flex-1 overflow-auto space-y-4 p-6">
           {staticExportBlocked ? (
             <div className="space-y-4">
               <BlurredProExportTeaser />
@@ -245,33 +667,49 @@ export default function ExportModal({
             </div>
           ) : (
             <>
-              <div className="mb-4">
+              <div className="min-w-0">
+                <SegmentedControl
+                  value={exportTab}
+                  onChange={setExportTab}
+                  options={tabOptions}
+                  variant="surface"
+                  label="Режим экспорта"
+                  className="w-full min-w-0"
+                />
+              </div>
+
+              <div>
                 <label className="block text-sm text-gray-700">
-                  <span className="mb-1 block font-medium uppercase">Формат файла</span>
                   <CustomSelect
                     id="export-format-select"
                     className={customSelectTriggerClass()}
                     value={exportKind}
                     onChange={setExportKind}
                     aria-label="Формат экспорта"
-                    options={ALL_FORMAT_OPTIONS}
+                    options={formatOptions}
                   />
                 </label>
-                {canExportTextCss ? (
-                  <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-snug text-gray-700">
-                    В блоке <code className="rounded bg-white px-1">@font-face</code> замените{' '}
-                    <code className="rounded bg-white px-1">url(...)</code> на URL вашего хостинга шрифтов.
-                  </div>
-                ) : (
-                  <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs leading-snug text-gray-700">
-                    Выберите CSS или «Текст», чтобы увидеть пример пакета (размытый, без ваших данных). Скачивание и
-                    копирование кода — в Pro. Для вариативного шрифта на Free доступны форматы TTF / OTF / WOFF / WOFF2.
-                  </div>
-                )}
               </div>
 
-              <div className="relative rounded-md border border-gray-200 bg-gray-50 py-4 pl-4 pr-1 shadow-inner">
-                {showRealTextExport ? (
+              <div className="relative rounded-md border border-gray-200 bg-gray-50 p-4 shadow-inner">
+                {showRasterDownloadPreview ? (
+                  <div className="flex min-h-64 items-center justify-center overflow-auto px-2 py-2">
+                    {rasterPreviewUrl ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- blob: тот же снимок, что в файле */}
+                        <img
+                          src={rasterPreviewUrl}
+                          alt="Предпросмотр: так же будет выглядеть скачанный файл"
+                          className="max-h-[min(24rem,65vh)] w-auto max-w-full object-contain shadow-sm"
+                        />
+                      </>
+                    ) : (
+                      <span className="text-sm text-gray-500">Готовим превью…</span>
+                    )}
+                  </div>
+                ) : showRasterProTeaser ? (
+                  <BlurredProExportTeaser />
+                ) : showMonospacePreview ? (
                   <>
                     <AppButton
                       type="button"
@@ -279,8 +717,9 @@ export default function ExportModal({
                       size="icon"
                       className="absolute right-2 top-2 z-[1] !h-8 !w-8 !min-h-8 !min-w-8 !border-gray-300 !p-0"
                       onClick={copyToClipboard}
-                      aria-label="Копировать код"
+                      aria-label="Копировать"
                       title={copied ? 'Скопировано' : 'Копировать'}
+                      disabled={String(previewValue || '').startsWith('(')}
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
                         <path d="M8.25 8.25h9.5v9.5h-9.5z" stroke="currentColor" strokeWidth="1.8" />
@@ -292,26 +731,27 @@ export default function ExportModal({
                       className={`code-scrollbar h-64 w-full resize-none overflow-y-auto bg-transparent pr-10 font-mono text-sm focus:outline-none ${
                         isCodeScrollActive ? 'code-scrollbar-visible' : ''
                       }`}
-                      value={cssCode}
+                      value={previewValue}
                       onScroll={handleCodeScroll}
                       readOnly
                     />
                   </>
-                ) : showTextTeaser ? (
+                ) : showBlurredCssTeaser ? (
                   <BlurredProExportTeaser />
-                ) : (
+                ) : showBinaryHint ? (
                   <div className="flex h-64 items-center justify-center px-4 text-center text-sm text-gray-600">
                     Формат <strong className="mx-1 uppercase text-gray-900">{exportKind}</strong> будет сгенерирован по
                     текущим настройкам осей и скачан как файл шрифта.
                   </div>
+                ) : (
+                  <div className="flex h-64 items-center justify-center px-4 text-center text-sm text-gray-600">
+                    {showGlyphHtmlPlaceholder || showStylesHtmlPlaceholder || showPdfPlaceholder
+                      ? 'Содержимое в файле после скачивания. Нажмите «Скачать файл».'
+                      : previewValue}
+                  </div>
                 )}
               </div>
 
-              <p className="mt-3 text-sm text-gray-600">
-                {canExportTextCss
-                  ? 'В пакет входят правило @font-face, при необходимости переменные осей VF и пример класса под текущее превью.'
-                  : 'На Free текстовый пакет с вашим @font-face не показывается и не скачивается — только пример выше; полный экспорт в Pro.'}
-              </p>
             </>
           )}
         </div>
@@ -330,7 +770,7 @@ export default function ExportModal({
               variant="accent"
               fullWidth
               className="!min-h-8"
-              onClick={downloadExport}
+              onClick={() => void downloadExport()}
               disabled={downloadLockedByPro}
               title={downloadLockedByPro ? 'Доступно в Pro' : undefined}
             >

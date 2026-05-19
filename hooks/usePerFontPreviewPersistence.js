@@ -24,6 +24,7 @@ export function usePerFontPreviewPersistence({
   snapshotDebounceMs = 450,
 }) {
   const lastMainTabForPreviewRef = useRef(null);
+  const lastAppliedTabForPreviewRef = useRef(null);
   const mainTabRef = useRef(mainTab);
   mainTabRef.current = mainTab;
 
@@ -56,10 +57,22 @@ export function usePerFontPreviewPersistence({
       }
     }
 
+    const tabChanged = prevTab !== nextTab;
+    if (tabChanged) {
+      // Важно: не «пере-применять» snapshot на каждом обновлении fonts (например, при анимации осей),
+      // иначе можно «залипнуть» в viewMode из старого snapshot (кейc: Styles -> reload -> Plain -> toggle animation).
+      lastAppliedTabForPreviewRef.current = null;
+    }
+
     if (isFontTabId(nextTab)) {
       if (!isInitialLoadComplete) {
         previewTextDbg('tab switch: пропускаем apply (шрифты ещё грузятся)', { nextTab });
       } else {
+      // Применяем snapshot ТОЛЬКО один раз на вкладку (или при реальном переключении таба).
+      if (lastAppliedTabForPreviewRef.current === nextTab) {
+        lastMainTabForPreviewRef.current = nextTab;
+        return;
+      }
       const font = fonts.find((f) => f.id === nextTab);
       if (!font) {
         previewTextDbg('tab switch: шрифт ещё не в state — ждём', { nextTab });
@@ -71,6 +84,7 @@ export function usePerFontPreviewPersistence({
           snippet: previewTextSnippet(font.previewSettings.text, 120),
         });
         applyPerFontPreviewSnapshot(font.previewSettings, previewSettersRef.current);
+        lastAppliedTabForPreviewRef.current = nextTab;
       } else {
         // Важно: не затираем глобальный текст/настройки дефолтом, если previewSettings ещё не восстановились.
         // Иначе после F5 можно «срезать» введённые пользователем строки.
@@ -78,12 +92,24 @@ export function usePerFontPreviewPersistence({
       }
       }
     } else if (nextTab === 'library' || nextTab.startsWith(EMPTY_PREFIX)) {
-      previewTextDbg('tab switch: библиотека / пустая вкладка — дефолтный snapshot', { nextTab });
-      applyPerFontPreviewSnapshot(getDefaultPreviewSettingsSnapshot(), previewSettersRef.current);
+      // ВАЖНО: при старте после F5 `mainTab` часто = 'library' до восстановления из localStorage/IDB.
+      // Если в этот момент применить дефолтный snapshot, он перезатрёт пользовательский previewText
+      // и успеет записаться обратно в localStorage.
+      if (!hasRestoredEditorMainTab) {
+        previewTextDbg('tab switch: пропускаем дефолтный snapshot до восстановления mainTab', { nextTab });
+      } else {
+        previewTextDbg('tab switch: библиотека / пустая вкладка — дефолтный snapshot (глобальный текст станет DEFAULT_PREVIEW_TEXT)', {
+          nextTab,
+          hasRestoredEditorMainTab,
+        });
+        applyPerFontPreviewSnapshot(getDefaultPreviewSettingsSnapshot(), previewSettersRef.current);
+        lastAppliedTabForPreviewRef.current = nextTab;
+      }
     }
 
     lastMainTabForPreviewRef.current = nextTab;
   }, [
+    hasRestoredEditorMainTab,
     isInitialLoadComplete,
     mainTab,
     fonts,

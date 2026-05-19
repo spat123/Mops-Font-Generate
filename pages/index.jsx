@@ -1834,6 +1834,30 @@ export default function Home() {
     [setWaterfallBaseSize],
   );
 
+  /** Параметры лестницы Waterfall для Markdown-экспорта (с учётом «живого» базового размера при перетаскивании). */
+  const waterfallExportMeta = useMemo(
+    () => ({
+      rows: waterfallRows,
+      baseSize: liveWaterfallBaseSize ?? waterfallBaseSize,
+      unit: waterfallUnit,
+      scaleRatio: waterfallScaleRatio,
+      editTarget: waterfallEditTarget,
+    }),
+    [
+      waterfallRows,
+      liveWaterfallBaseSize,
+      waterfallBaseSize,
+      waterfallUnit,
+      waterfallScaleRatio,
+      waterfallEditTarget,
+    ],
+  );
+
+  const exportModalFontFamily = useMemo(() => {
+    const fam = typeof getFontFamily === 'function' ? getFontFamily() : 'sans-serif';
+    return fam === 'inherit' ? 'sans-serif' : fam;
+  }, [getFontFamily, selectedFont?.id, selectedFont?.fontFamily, selectedFont?.name]);
+
   const sampleTexts = {
     glyph: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
     title: 'The Quick Brown Fox Jumps Over The Lazy Dog',
@@ -2988,6 +3012,15 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         downloadFile={downloadFile}
         canExportTextCss={libraryAuthValue.isPro}
         onRequestPro={openPlans}
+        editorViewMode={viewMode}
+        previewText={text}
+        fontFamily={exportModalFontFamily}
+        fontSize={fontSize}
+        lineHeight={lineHeight}
+        letterSpacing={letterSpacing}
+        textColor={textColor}
+        backgroundColor={backgroundColor}
+        waterfallExportMeta={waterfallExportMeta}
       />
       <GenerateFontModal
         isOpen={isGenerateModalOpen}

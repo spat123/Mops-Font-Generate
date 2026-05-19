@@ -136,6 +136,27 @@ export function useFontManager() {
       downloadStaticFont
   } = useFontExport(exportToCSSFromHook);
 
+  const resolveDefaultStaticPresetName = useCallback((font) => {
+    const available =
+      Array.isArray(font?.availableStyles) && font.availableStyles.length > 0 ? font.availableStyles : PRESET_STYLES;
+
+    const regular = available.find((style) => style?.name === 'Regular');
+    if (regular?.name) return regular.name;
+
+    const normalStyles = available.filter((style) => style?.style === 'normal');
+    const pool = normalStyles.length > 0 ? normalStyles : available;
+    if (pool.length === 0) return 'Regular';
+
+    const best = pool.reduce((closest, style) => {
+      if (!closest) return style;
+      return Math.abs(Number(style?.weight ?? 400) - 400) < Math.abs(Number(closest?.weight ?? 400) - 400)
+        ? style
+        : closest;
+    }, null);
+
+    return best?.name || available?.[0]?.name || 'Regular';
+  }, []);
+
   const safeSelectFont = useCallback((font) => {
     if (!font) {
       console.warn('[safeSelectFont] Попытка выбрать null/undefined шрифт');
@@ -170,7 +191,18 @@ export function useFontManager() {
         setVariableSettings({});
       }
       if (applyPresetStyle) {
-        applyPresetStyle(restorePlan.presetName, font);
+        const candidate = restorePlan.presetName;
+        const available =
+          Array.isArray(font?.availableStyles) && font.availableStyles.length > 0 ? font.availableStyles : PRESET_STYLES;
+        const canUseCandidate =
+          typeof candidate === 'string' &&
+          candidate.trim() &&
+          available.some((s) => String(s?.name || '').trim() === candidate.trim());
+
+        applyPresetStyle(
+          font.isVariableFont ? candidate : canUseCandidate ? candidate : resolveDefaultStaticPresetName(font),
+          font,
+        );
       }
       return;
     }
@@ -182,9 +214,27 @@ export function useFontManager() {
     }
 
     if (applyPresetStyle) {
-      applyPresetStyle(restorePlan.presetName || 'Regular', font);
+      const candidate = restorePlan.presetName;
+      const available =
+        Array.isArray(font?.availableStyles) && font.availableStyles.length > 0 ? font.availableStyles : PRESET_STYLES;
+      const canUseCandidate =
+        typeof candidate === 'string' &&
+        candidate.trim() &&
+        available.some((s) => String(s?.name || '').trim() === candidate.trim());
+
+      applyPresetStyle(
+        font.isVariableFont ? candidate || 'Regular' : canUseCandidate ? candidate : resolveDefaultStaticPresetName(font),
+        font,
+      );
     }
-  }, [setSelectedFont, setVariableSettings, getDefaultAxisValues, applyPresetStyle, applyVariableSettings]);
+  }, [
+    setSelectedFont,
+    setVariableSettings,
+    getDefaultAxisValues,
+    applyPresetStyle,
+    applyVariableSettings,
+    resolveDefaultStaticPresetName,
+  ]);
   
   // Сохраняем ссылку на функцию для использования в колбэках
   useEffect(() => {
@@ -197,14 +247,20 @@ export function useFontManager() {
 
       // Приоритет 1: Для статических шрифтов используем currentWeight/currentStyle
       if (!selectedFont.isVariableFont) {
+        const available =
+          Array.isArray(selectedFont.availableStyles) && selectedFont.availableStyles.length > 0
+            ? selectedFont.availableStyles
+            : PRESET_STYLES;
+
         // Сначала пытаемся определить по текущему весу и стилю
         if (selectedFont.currentWeight !== undefined && selectedFont.currentStyle !== undefined) {
-          const styleInfo = findStyleInfoByWeightAndStyle(
-              selectedFont.currentWeight, 
-              selectedFont.currentStyle
-          );
-          const presetName = styleInfo?.name || 'Regular';
-          return presetName;
+          const w = Number(selectedFont.currentWeight);
+          const st = selectedFont.currentStyle === 'italic' ? 'italic' : 'normal';
+          const hit = available.find((s) => Number(s?.weight) === w && String(s?.style) === st);
+          if (hit?.name) return hit.name;
+
+          const styleInfo = findStyleInfoByWeightAndStyle(w, st);
+          return styleInfo?.name || 'Regular';
         }
         
         // Если currentWeight/currentStyle не установлены, используем сохранённый пресет
@@ -212,8 +268,8 @@ export function useFontManager() {
           return selectedFont.lastUsedPresetName;
         }
 
-        // По умолчанию
-        return 'Regular';
+        // По умолчанию — первый доступный стиль шрифта (а не всегда Regular)
+        return resolveDefaultStaticPresetName(selectedFont);
       }
       
       // Вариативный: имя пресета по осям + приведение к допустимым для диапазона wght

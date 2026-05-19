@@ -11,6 +11,7 @@ import {
 } from '../utils/editorShellStorage';
 import { SAVED_LIBRARY_TAB_PREFIX } from '../utils/savedLibraryTabIds';
 import { editorShellDbg } from '../utils/editorShellDebugLog';
+import { previewTextDbg } from '../utils/previewTextDebugLog';
 
 /**
  * Восстанавливает shell редактора (активная вкладка, пустые слоты, закрытые вкладки библиотеки, внутренняя вкладка «Все»)
@@ -63,10 +64,14 @@ export function useEditorShellPersistence({
         mainTab: shell.mainTab,
         emptySlotCount: Array.isArray(shell.emptySlotIds) ? shell.emptySlotIds.length : 0,
       });
+      previewTextDbg('shell: восстановление mainTab из localStorage (до этого per-font snapshot мог ждать)', {
+        mainTab: shell.mainTab,
+      });
       setEmptySlotIds(shell.emptySlotIds);
       setMainTab(shell.mainTab);
     } else {
       editorShellDbg('layout#1: readEditorShellFromStorage вернул null', {});
+      previewTextDbg('shell: readEditorShellFromStorage null — mainTab из shell не выставлен', {});
     }
     try {
       localStorage.removeItem('editorClosedFontTabIds');
@@ -110,6 +115,7 @@ export function useEditorShellPersistence({
 
     setHasRestoredEditorMainTab(true);
     editorShellDbg('layout#1: setHasRestoredEditorMainTab(true)', {});
+    previewTextDbg('shell: hasRestoredEditorMainTab = true (можно применять дефолтный snapshot для library/empty)', {});
   }, [
     initialSessionFontOrderIdsRef,
     setClosedLibraryFontIds,

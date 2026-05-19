@@ -12,9 +12,49 @@ import { updateIconUrl } from './ui/editIconUrls';
 import { useLibraryAuth } from '../contexts/LibraryAuthContext';
 import {
   FREE_STATIC_GENERATIONS_LIMIT,
+  GUEST_STATIC_GENERATIONS_LIMIT,
+  getStaticGenerationsAvailabilityMessage,
+  getStaticGenerationsLimit,
   readFreeStaticGenerationsUsed,
   writeFreeStaticGenerationsUsed,
 } from '../utils/freeStaticGenerationQuota';
+import { sanitizeVariableSettingsForInstancer } from '../utils/sanitizeVariableSettingsForInstancer';
+
+const SUBFAMILY_CUSTOM_VALUE = '__custom__';
+const SUBFAMILY_PRESETS = [
+  'Thin',
+  'ExtraLight',
+  'Light',
+  'Regular',
+  'Medium',
+  'SemiBold',
+  'Bold',
+  'ExtraBold',
+  'Black',
+  'Thin Italic',
+  'ExtraLight Italic',
+  'Light Italic',
+  'Italic',
+  'Medium Italic',
+  'SemiBold Italic',
+  'Bold Italic',
+  'ExtraBold Italic',
+  'Black Italic',
+];
+
+const WEIGHT_CUSTOM_AUTO = '__auto__';
+const WEIGHT_CUSTOM_OPTIONS = [
+  { value: WEIGHT_CUSTOM_AUTO, label: 'Авто' },
+  { value: '100', label: '100' },
+  { value: '200', label: '200' },
+  { value: '300', label: '300' },
+  { value: '400', label: '400' },
+  { value: '500', label: '500' },
+  { value: '600', label: '600' },
+  { value: '700', label: '700' },
+  { value: '800', label: '800' },
+  { value: '900', label: '900' },
+];
 
 function slugFileBase(name) {
   const s = String(name || 'font')
@@ -47,6 +87,27 @@ function mimeForFormat(format) {
   }
 }
 
+function guessWeightName(wght) {
+  const n = typeof wght === 'number' ? wght : Number(wght);
+  if (!Number.isFinite(n)) return 'Regular';
+  if (n <= 150) return 'Thin';
+  if (n <= 250) return 'ExtraLight';
+  if (n <= 350) return 'Light';
+  if (n <= 450) return 'Regular';
+  if (n <= 550) return 'Medium';
+  if (n <= 650) return 'SemiBold';
+  if (n <= 750) return 'Bold';
+  if (n <= 850) return 'ExtraBold';
+  return 'Black';
+}
+
+function guessSubfamily({ wght, ital, slnt }) {
+  const base = guessWeightName(wght);
+  const isItalic = ital === 1 || ital === true || (typeof slnt === 'number' && slnt < 0);
+  if (!isItalic) return base;
+  return base === 'Regular' ? 'Italic' : `${base} Italic`;
+}
+
 /**
  * Генерация статического файла из VF: имя, формат, при необходимости правка веса (wght).
  */
@@ -62,7 +123,9 @@ export default function GenerateFontModal({
   const { authLoading, isAuthenticated, isPro, requestSignIn, openPlans } = useLibraryAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [outputName, setOutputName] = useState('');
-  const [outputSubfamily, setOutputSubfamily] = useState('Regular');
+  const [subfamilyPreset, setSubfamilyPreset] = useState('Regular');
+  const [customSubfamily, setCustomSubfamily] = useState('');
+  const [customWeightClass, setCustomWeightClass] = useState(WEIGHT_CUSTOM_AUTO);
   const [format, setFormat] = useState('woff2');
   const [genSettings, setGenSettings] = useState({});
   const [busy, setBusy] = useState(false);
@@ -92,12 +155,27 @@ export default function GenerateFontModal({
     return slugFileBase(selectedFont.name || selectedFont.fontFamily || 'MyFont');
   }, [selectedFont]);
 
+  const derivedSubfamily = useMemo(() => {
+    if (subfamilyPreset === SUBFAMILY_CUSTOM_VALUE) {
+      const raw = String(customSubfamily || '').trim();
+      return raw || 'Regular';
+    }
+    return String(subfamilyPreset || 'Regular').trim() || 'Regular';
+  }, [customSubfamily, subfamilyPreset]);
+
   useEffect(() => {
     const justOpened = isOpen && !wasOpenRef.current;
     wasOpenRef.current = isOpen;
     if (justOpened && selectedFont) {
       setOutputName(defaultOutputName);
-      setOutputSubfamily('Regular');
+      const wght = variableSettings?.wght ?? selectedFont?.variableAxes?.wght?.default ?? 400;
+      const ital = variableSettings?.ital;
+      const slnt = variableSettings?.slnt;
+      const guessed = guessSubfamily({ wght, ital, slnt });
+      const preset = SUBFAMILY_PRESETS.includes(guessed) ? guessed : SUBFAMILY_CUSTOM_VALUE;
+      setSubfamilyPreset(preset);
+      setCustomSubfamily(preset === SUBFAMILY_CUSTOM_VALUE ? guessed : '');
+      setCustomWeightClass(WEIGHT_CUSTOM_AUTO);
       setGenSettings({ ...(variableSettings && typeof variableSettings === 'object' ? variableSettings : {}) });
       setFormat('woff2');
       setBusy(false);
@@ -145,41 +223,64 @@ export default function GenerateFontModal({
     onClose();
   };
 
+  const generationsLimit = isPro ? Infinity : getStaticGenerationsLimit(sessionUserId || null);
+
   const handleGenerate = async () => {
-    if (!isAuthenticated) {
-      requestSignIn?.();
-      return;
-    }
     if (!selectedFont?.isVariableFont) {
       toast.error('Выберите вариативный шрифт');
       return;
     }
-    if (!isPro && freeGenerationsUsed >= FREE_STATIC_GENERATIONS_LIMIT) {
-      toast.info('Лимит Free на генерации исчерпан. Посмотрите планы, чтобы продолжить.');
+    if (!isPro && freeGenerationsUsed >= generationsLimit) {
+      if (!isAuthenticated) {
+        toast.info('Вы исчерпали лимит генераций. Войдите в аккаунт — на Free будет 50 генераций в месяц.');
+        requestSignIn?.();
+        return;
+      }
+      toast.info('Вы исчерпали лимит генераций в этом месяце. Посмотрите планы Pro.');
       openPlans?.();
       return;
     }
     const familyRaw = String(outputName || '').trim() || 'font';
-    const subfamilyRaw = String(outputSubfamily || '').trim() || 'Regular';
+    const subfamilyRaw = String(derivedSubfamily || '').trim() || 'Regular';
+    const weightClassAuto =
+      typeof genSettings?.wght === 'number' && Number.isFinite(genSettings.wght)
+        ? Math.max(1, Math.min(1000, Math.round(genSettings.wght)))
+        : null;
+    const weightClassManual =
+      subfamilyPreset === SUBFAMILY_CUSTOM_VALUE && customWeightClass !== WEIGHT_CUSTOM_AUTO
+        ? Number(customWeightClass)
+        : null;
+    const weightClass = Number.isFinite(weightClassManual) ? weightClassManual : weightClassAuto;
+
     const fileFamily = slugFileBase(familyRaw);
     const fileSubfamily = slugFileBase(subfamilyRaw);
     const base = fileFamily;
     setBusy(true);
     try {
-      const blob = await generateStaticFontFile(selectedFont, genSettings, format, {
+      const instancerSettings = sanitizeVariableSettingsForInstancer(
+        genSettings,
+        selectedFont?.variableAxes,
+      );
+      const blob = await generateStaticFontFile(selectedFont, instancerSettings, format, {
         outputFontName: familyRaw,
         outputFontSubfamily: subfamilyRaw,
+        outputWeightClass: weightClass,
         skipPseudoCssPrompt: true,
+        allowPseudoStatic: isPro,
+        onQuotaExceeded: () => {
+          writeFreeStaticGenerationsUsed(sessionUserId || null, generationsLimit);
+          setFreeGenerationsUsed(generationsLimit);
+        },
       });
       if (blob) {
         const filename =
           fileSubfamily && fileSubfamily.toLowerCase() !== 'regular'
-            ? `${base}-${fileSubfamily}-static.${format}`
-            : `${base}-static.${format}`;
+            ? `${base}-${fileSubfamily}.${format}`
+            : `${base}.${format}`;
         downloadFile(blob, filename, mimeForFormat(format));
-        if (!isPro && sessionUserId) {
+        if (!isPro) {
           const nextUsed = freeGenerationsUsed + 1;
-          writeFreeStaticGenerationsUsed(sessionUserId, nextUsed);
+          writeFreeStaticGenerationsUsed(sessionUserId || null, nextUsed);
           setFreeGenerationsUsed(nextUsed);
         }
         onClose();
@@ -194,8 +295,10 @@ export default function GenerateFontModal({
   const vf = Boolean(selectedFont?.isVariableFont);
   const disabled = !vf || busy;
   const nameLockedByPlan = !isPro;
-  const freeRemaining = Math.max(0, FREE_STATIC_GENERATIONS_LIMIT - freeGenerationsUsed);
-  const freeLimitReached = isAuthenticated && !isPro && freeGenerationsUsed >= FREE_STATIC_GENERATIONS_LIMIT;
+  const freeRemaining = isPro ? Infinity : Math.max(0, generationsLimit - freeGenerationsUsed);
+  const freeLimitReached = !isPro && freeGenerationsUsed >= generationsLimit;
+  const inputInactive = disabled;
+  const nameReadOnly = nameLockedByPlan;
 
   const inputClass = [
     'box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 text-sm leading-normal uppercase font-semibold text-gray-900',
@@ -206,9 +309,35 @@ export default function GenerateFontModal({
     .filter(Boolean)
     .join(' ');
 
+  const lockedInputClass = `${inputClass} cursor-default opacity-60`;
   const formatClass = customSelectTriggerClass();
 
-  const showLoginGate = !authLoading && !isAuthenticated;
+  const handleProLockIconClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) return;
+    toast.info('Доступно только в Pro');
+    openPlans?.();
+  };
+
+  const proLockIcon = (iconInactive) => (
+    <div className="absolute inset-y-0 right-1 z-10 flex items-center sm:right-2">
+      <Tooltip content="Доступно только в Pro" openDelayMs={200}>
+        <button
+          type="button"
+          disabled={iconInactive}
+          onClick={handleProLockIconClick}
+          className="group/pro-lock inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-200 text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-300 disabled:opacity-50"
+          aria-label="Доступно только в Pro"
+        >
+          <EditAssetIcon
+            src={updateIconUrl}
+            className="h-5 w-5 transition-transform group-hover/pro-lock:scale-110"
+          />
+        </button>
+      </Tooltip>
+    </div>
+  );
 
   return (
     <div
@@ -233,114 +362,68 @@ export default function GenerateFontModal({
             </div>
           ) : null}
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             <div className="relative min-w-0 w-full">
               <input
                 type="text"
                 value={outputName}
-                onChange={(e) => {
-                  if (nameLockedByPlan) return;
-                  setOutputName(e.target.value);
-                }}
-                onMouseDown={(e) => {
-                  if (!nameLockedByPlan) return;
-                  e.preventDefault();
-                  if (!isAuthenticated) {
-                    toast.info('Войдите, чтобы продолжить');
-                    requestSignIn?.();
-                    return;
-                  }
-                  toast.info('Изменение имени файла доступно в Pro');
-                  openPlans?.();
-                }}
-                readOnly={nameLockedByPlan}
-                disabled={disabled}
-                className={`${inputClass} ${nameLockedByPlan ? 'cursor-pointer pr-11 sm:pr-12' : 'pr-3'}`}
+                onChange={(e) => setOutputName(e.target.value)}
+                readOnly={nameReadOnly}
+                disabled={inputInactive}
+                className={`${nameReadOnly ? lockedInputClass : inputClass} ${nameReadOnly ? 'pr-11 sm:pr-12' : 'pr-3'}`}
                 placeholder="Имя файла"
                 autoComplete="off"
                 spellCheck={false}
                 aria-label="Имя файла (без расширения)"
               />
-              {nameLockedByPlan ? (
-                <div className="absolute inset-y-0 right-1 z-10 flex items-center sm:right-2">
-                  <Tooltip content="Доступно только в Pro" openDelayMs={200}>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!isAuthenticated) {
-                          toast.info('Войдите, чтобы продолжить');
-                          requestSignIn?.();
-                          return;
-                        }
-                        toast.info('Доступно только в Pro');
-                        openPlans?.();
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-200 text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label="Доступно только в Pro"
-                    >
-                      <EditAssetIcon src={updateIconUrl} className="h-5 w-5" />
-                    </button>
-                  </Tooltip>
-                </div>
-              ) : null}
+              {nameReadOnly ? proLockIcon(inputInactive) : null}
             </div>
 
             <div className="relative min-w-0 w-full">
-              <input
-                type="text"
-                value={outputSubfamily}
-                onChange={(e) => {
-                  if (nameLockedByPlan) return;
-                  setOutputSubfamily(e.target.value);
-                }}
-                onMouseDown={(e) => {
-                  if (!nameLockedByPlan) return;
-                  e.preventDefault();
-                  if (!isAuthenticated) {
-                    toast.info('Войдите, чтобы продолжить');
-                    requestSignIn?.();
-                    return;
-                  }
-                  toast.info('Доступно только в Pro');
-                  openPlans?.();
-                }}
-                readOnly={nameLockedByPlan}
-                disabled={disabled}
-                className={`${inputClass} ${nameLockedByPlan ? 'cursor-pointer pr-11 sm:pr-12' : 'pr-3'}`}
-                placeholder="Начертание (например, Regular)"
-                autoComplete="off"
-                spellCheck={false}
+              <CustomSelect
+                id="generate-font-subfamily"
+                className={formatClass}
+                value={subfamilyPreset}
+                onChange={(v) => setSubfamilyPreset(v)}
+                disabled={inputInactive || nameReadOnly}
                 aria-label="Начертание (Subfamily)"
+                options={[
+                  ...SUBFAMILY_PRESETS.map((label) => ({ value: label, label })),
+                  { value: SUBFAMILY_CUSTOM_VALUE, label: 'Своё значение…' },
+                ]}
               />
-              {nameLockedByPlan ? (
-                <div className="absolute inset-y-0 right-1 z-10 flex items-center sm:right-2">
-                  <Tooltip content="Доступно только в Pro" openDelayMs={200}>
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!isAuthenticated) {
-                          toast.info('Войдите, чтобы продолжить');
-                          requestSignIn?.();
-                          return;
-                        }
-                        toast.info('Доступно только в Pro');
-                        openPlans?.();
-                      }}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-200 text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
-                      aria-label="Доступно только в Pro"
-                    >
-                      <EditAssetIcon src={updateIconUrl} className="h-5 w-5" />
-                    </button>
-                  </Tooltip>
-                </div>
-              ) : null}
             </div>
+
+            {subfamilyPreset === SUBFAMILY_CUSTOM_VALUE ? (
+              <div className="flex min-w-0 w-full gap-3">
+                <div className="relative min-w-0 flex-1">
+                <input
+                  type="text"
+                  value={customSubfamily}
+                  onChange={(e) => setCustomSubfamily(e.target.value)}
+                  readOnly={nameReadOnly}
+                  disabled={inputInactive}
+                  className={`${nameReadOnly ? lockedInputClass : inputClass} ${nameReadOnly ? 'pr-11 sm:pr-12' : 'pr-3'}`}
+                  placeholder="Введите начертание (например, Bold Italic)"
+                  autoComplete="off"
+                  spellCheck={false}
+                  aria-label="Своё начертание (Subfamily)"
+                />
+                {nameReadOnly ? proLockIcon(inputInactive) : null}
+              </div>
+                <div className="min-w-[6.5rem]">
+                  <CustomSelect
+                    id="generate-font-custom-weight"
+                    className={formatClass}
+                    value={customWeightClass}
+                    onChange={(v) => setCustomWeightClass(v)}
+                    disabled={inputInactive || nameReadOnly}
+                    aria-label="Жирность (OS/2 usWeightClass)"
+                    options={WEIGHT_CUSTOM_OPTIONS}
+                  />
+                </div>
+              </div>
+            ) : null}
 
             <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
               <div className="max-h-56 overflow-y-auto">
@@ -414,27 +497,25 @@ export default function GenerateFontModal({
               />
             </div>
 
-            {isAuthenticated && !isPro ? (
+            {!isPro ? (
               <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
                 {freeRemaining > 0 ? (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">
-                    Free: осталось генераций{' '}
-                    <span className="tabular-nums text-gray-900">{freeRemaining}</span>/
-                    <span className="tabular-nums">{FREE_STATIC_GENERATIONS_LIMIT}</span>
+                  <p className="text-sm leading-relaxed text-gray-800">
+                    {getStaticGenerationsAvailabilityMessage(isAuthenticated, freeRemaining, generationsLimit)}
                   </p>
                 ) : (
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-700">
-                      Free: лимит генераций исчерпан
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm leading-relaxed text-gray-800">
+                      {getStaticGenerationsAvailabilityMessage(isAuthenticated, 0)}
                     </p>
                     <AppButton
                       type="button"
                       variant="accent"
                       size="sm"
                       className="!min-h-8 shrink-0"
-                      onClick={() => openPlans?.()}
+                      onClick={() => (isAuthenticated ? openPlans?.() : requestSignIn?.())}
                     >
-                      Pro
+                      {isAuthenticated ? 'Pro' : 'Войти'}
                     </AppButton>
                   </div>
                 )}
@@ -453,38 +534,11 @@ export default function GenerateFontModal({
             fullWidth
             className="!min-h-8"
             onClick={() => void handleGenerate()}
-            disabled={busy || !vf || showLoginGate}
+            disabled={busy || !vf || freeLimitReached}
           >
-            {busy ? 'Генерация…' : freeLimitReached ? 'Pro' : 'Сгенерировать'}
+            {busy ? 'Генерация…' : 'Сгенерировать'}
           </AppButton>
         </div>
-
-        {showLoginGate ? (
-          <div
-            className="absolute bottom-0 left-0 right-0 top-12 z-[100] flex items-center justify-center backdrop-blur-sm bg-black/35 p-4"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Вход для генерации"
-          >
-            <div
-              className="w-full max-w-sm border border-gray-200 bg-white p-6 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-center text-sm leading-relaxed text-gray-800">
-                Чтобы начать генерацию, войдите в аккаунт.
-              </p>
-              <AppButton
-                type="button"
-                variant="accent"
-                fullWidth
-                className="mt-4 !min-h-10"
-                onClick={() => requestSignIn?.()}
-              >
-                Войти
-              </AppButton>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );

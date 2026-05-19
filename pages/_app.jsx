@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import '../styles/appToastify.css';
 import { SettingsProvider } from '../contexts/SettingsContext';
 import { FontProvider } from '../contexts/FontContext';
+import { AuthReturningUserMarker } from '../components/auth/AuthReturningUserMarker';
 import Head from 'next/head';
 
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
@@ -40,6 +41,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       </Head>
       
       <SessionProvider session={session}>
+        <AuthReturningUserMarker />
         <SettingsProvider>
           <FontProvider>
             <Component {...pageProps} />

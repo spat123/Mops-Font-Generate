@@ -134,7 +134,12 @@ export function FontLibraryStatusMenu({
             <div className="px-3 py-2 text-xs font-semibold uppercase text-gray-400">Библиотек нет</div>
           )}
           <div className={`${availableLibraries.length > 0 ? 'border-t border-gray-200' : ''} p-1`}>
-            <Tooltip content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'} openDelayMs={150}>
+            <Tooltip
+              as="div"
+              className="block w-full"
+              content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'}
+              openDelayMs={150}
+            >
               <button
                 type="button"
                 role="menuitem"
@@ -155,20 +160,30 @@ export function FontLibraryStatusMenu({
                     onRequestCreateLibrary: onCreateLibrary,
                   });
                 }}
-                className={`relative flex w-full items-center justify-center rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
                   isAuthenticated && !canCreateNewLibrary
                     ? 'cursor-not-allowed text-gray-400'
                     : 'text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
-                    <path d="M12 4.5v15m7.5-7.5h-15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <span className="truncate text-center">Создать новую</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="h-4 w-4 shrink-0"
+                  aria-hidden
+                >
+                  <path
+                    d="M12 4.5v15m7.5-7.5h-15"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="min-w-0 flex-1 truncate text-center">Создать новую</span>
                 {isAuthenticated && !canCreateNewLibrary ? (
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                  <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                     Pro
                   </span>
                 ) : null}

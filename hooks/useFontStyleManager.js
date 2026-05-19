@@ -17,9 +17,14 @@ export function useFontStyleManager(
     const fontToApply = font || selectedFont;
     if (!fontToApply) return;
 
-    const presetInfo = PRESET_STYLES.find(p => p.name === presetName);
+    const customStyle =
+      !fontToApply.isVariableFont &&
+      Array.isArray(fontToApply.availableStyles) &&
+      fontToApply.availableStyles.find((s) => String(s?.name || '').trim() === String(presetName || '').trim());
+
+    const presetInfo = customStyle || PRESET_STYLES.find((p) => p.name === presetName);
     if (!presetInfo) {
-      console.warn(`Пресет "${presetName}" не найден.`);
+      console.warn(`Стиль "${presetName}" не найден.`);
       return;
     }
     const { weight, style } = presetInfo;

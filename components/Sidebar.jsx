@@ -978,12 +978,33 @@ export default function Sidebar({
     [sampleTexts, setText],
   );
 
-  /** При смене шрифта ставим полный набор символов по умолчанию. */
+  const resolveSidebarTextPresetForText = useCallback(
+    (value) => {
+      if (typeof value !== 'string') return 'custom';
+
+      if (sampleTexts && typeof sampleTexts === 'object') {
+        for (const k of Object.keys(sampleTexts)) {
+          if (sampleTexts[k] === value) return `sample:${k}`;
+        }
+      }
+
+      for (const k of Object.keys(glyphSets)) {
+        if (glyphSets[k] === value) return `glyph:${k}`;
+      }
+
+      return 'custom';
+    },
+    [sampleTexts],
+  );
+
+  /**
+   * При смене шрифта НЕ перезаписываем текст (иначе после F5 затирается custom previewText).
+   * Только синхронизируем выбранный “быстрый пресет” с текущим текстом.
+   */
   useEffect(() => {
     if (!selectedFont?.id) return;
-    setSidebarTextPreset('glyph:entire');
-    setText(ENTIRE_PRINTABLE_ASCII_SAMPLE);
-  }, [selectedFont?.id, setText]);
+    setSidebarTextPreset(resolveSidebarTextPresetForText(text));
+  }, [resolveSidebarTextPresetForText, selectedFont?.id, text]);
 
   // Получаем название пресета из веса и стиля
   // Удаляем локальную функцию

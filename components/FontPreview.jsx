@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import FontUploader from './FontUploader';
 import { EditorStatusBar } from './ui/EditorStatusBar';
 import { Tooltip } from './ui/Tooltip';
@@ -27,6 +28,7 @@ import { buildCatalogDownloadButtonProps } from './catalog/buildCatalogDownloadB
 import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
+import { PreviewModeDock } from './ui/PreviewModeDock';
 import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
 import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
@@ -152,6 +154,7 @@ export default function FontPreview({
     textColor, 
     backgroundColor, 
     viewMode,
+    setViewMode,
     textDirection, 
     textAlignment, 
     textCase,
@@ -169,18 +172,31 @@ export default function FontPreview({
 
   /** Общий скролл области превью; Glyphs подписывается на этот узел для виртуализации */
   const previewBodyScrollRef = useRef(null);
+  const fullscreenScrollRef = useRef(null);
   const emptyStateSearchWrapRef = useRef(null);
 
   const [glyphFooterCount, setGlyphFooterCount] = useState(null);
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [isEmptyStateSearchExpanded, setIsEmptyStateSearchExpanded] = useState(false);
   const [googleCatalogEntries, setGoogleCatalogEntries] = useState([]);
+  const [hasEverMountedStylesMode, setHasEverMountedStylesMode] = useState(false);
+  const [hasEverMountedGlyphsMode, setHasEverMountedGlyphsMode] = useState(false);
+  const [hasEverMountedWaterfallMode, setHasEverMountedWaterfallMode] = useState(false);
   /** После входа в plain fullscreen крестик слегка гаснет; по hover/focus снова виден */
   const [plainFullscreenCloseDimmed, setPlainFullscreenCloseDimmed] = useState(false);
   const emptyStateSearchInputRef = useRef(null);
 
   useEffect(() => {
     if (viewMode !== 'glyphs') setGlyphFooterCount(null);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode === 'styles') setHasEverMountedStylesMode(true);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode === 'glyphs') setHasEverMountedGlyphsMode(true);
+    if (viewMode === 'waterfall') setHasEverMountedWaterfallMode(true);
   }, [viewMode]);
 
   useEffect(() => {
@@ -205,11 +221,6 @@ export default function FontPreview({
   }, [letterSpacing, lineHeight, fontCssProperties?.fontWeight, fontCssProperties?.fontStyle, fontCssProperties?.fontFamily]);
   
   const { letterSpacingValue, lineHeightValue, fontStyleValue, fontWeightValue } = styleValues;
-  
-  // Без rvrn/rclt часть VF/Google-сабсетов может рвано рендериться и уходить в fallback.
-  const featureSettingsValue = useMemo(() => {
-    return '"calt", "liga", "rlig", "kern"';
-  }, []);
   
   // Должно совпадать с useFontCss.fontCssProperties, иначе превью обходило хук.
   const fontFamilyValue = useMemo(() => {
@@ -274,8 +285,8 @@ export default function FontPreview({
       fontSize: `${fontSize}px`, 
       letterSpacing: letterSpacingValue,
       lineHeight: lineHeightValue,
-      color: textColor, 
-      fontFeatureSettings: featureSettingsValue,
+      color: textColor,
+      fontFeatureSettings: 'normal',
       direction: textDirection, 
       textAlign: textAlignment, 
       textTransform: textCase, 
@@ -299,7 +310,7 @@ export default function FontPreview({
     return styles;
   }, [
     fontFamilyValue, fontSize, letterSpacingValue, fontStyleValue, fontWeightValue, 
-    lineHeightValue, textColor, featureSettingsValue, selectedFont,
+    lineHeightValue, textColor, selectedFont,
     variationSettingsValue,
     textDirection, textAlignment, textCase, textDecoration
   ]);
@@ -650,7 +661,6 @@ export default function FontPreview({
       case 'waterfall':
         return `Рядов: ${effectiveWaterfallSizes.length}`;
       case 'glyphs':
-        if (selectedFont?.source === 'google') return 'Глифы недоступны (Google)';
         if (glyphFooterCount === null) return 'Глифы: загрузка…';
         return `Глифов: ${glyphFooterCount}`;
       case 'styles':
@@ -668,7 +678,6 @@ export default function FontPreview({
     viewMode,
     plainCharCount,
     effectiveWaterfallSizes.length,
-    selectedFont?.source,
     glyphFooterCount,
     stylesPreviewStats,
   ]);
@@ -676,6 +685,46 @@ export default function FontPreview({
   const handleGlyphCountForFooter = useCallback((n) => {
     setGlyphFooterCount(n);
   }, []);
+
+  const showPreviewEditTextHint =
+    viewMode === 'plain' ||
+    viewMode === 'waterfall' ||
+    viewMode === 'styles' ||
+    viewMode === 'text';
+
+  const previewColumnRef = useRef(null);
+  const [editHintFixedBox, setEditHintFixedBox] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!showPreviewEditTextHint) {
+      setEditHintFixedBox(null);
+      return undefined;
+    }
+    const root = previewColumnRef.current;
+    if (!root) return undefined;
+
+    const statusBarHeightPx = 52;
+
+    const update = () => {
+      const rect = root.getBoundingClientRect();
+      setEditHintFixedBox({
+        left: rect.left,
+        width: rect.width,
+        bottom: statusBarHeightPx,
+      });
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(root);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [showPreviewEditTextHint]);
 
   useEffect(() => {
     if (!plainPreviewOpen) return;
@@ -1072,121 +1121,140 @@ export default function FontPreview({
 
   return (
     <>
-    <div className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-white">
-      <div
-        ref={previewBodyScrollRef}
-        className="relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto pt-0 pb-4"
-        style={previewAreaBgStyle}
-      >
-        <div className="grid min-h-full min-w-0 w-full grid-rows-[1fr_auto]">
-          <div className="min-h-0 min-w-0">
-          {viewMode === 'plain' && (
-            <Suspense fallback={MODE_LOADING_FALLBACK}>
-              <PlainTextMode
-                containerStyle={containerStyle}
-                contentStyle={contentStyle}
-                variant="default"
-              />
-            </Suspense>
-          )}
-          
-          {viewMode === 'waterfall' && (
-            <Suspense fallback={MODE_LOADING_FALLBACK}>
-              <WaterfallMode
-                waterfallSizes={effectiveWaterfallSizes}
-                scrollParentRef={previewBodyScrollRef}
-                isVariableFontAnimating={isVariableFontAnimating}
-                isInteractingWithWaterfallSize={
-                  currentWaterfallBaseSize !== null && currentWaterfallBaseSize !== undefined
-                }
-              />
-            </Suspense>
-          )}
-          
-          {viewMode === 'styles' && (
-            <Suspense fallback={MODE_LOADING_FALLBACK}>
-              <StylesMode
-                selectedFont={selectedFont}
-                fontFamilyValue={fontFamilyValue}
-              />
-            </Suspense>
-          )}
+      <div ref={previewColumnRef} className="relative flex h-full min-h-0 w-full flex-1 flex-col">
+        <div
+          ref={previewBodyScrollRef}
+          data-preview-plain-export-wrap
+          className={`relative min-h-0 w-full flex-1 overflow-x-hidden overflow-y-auto ${
+            showPreviewEditTextHint ? 'pb-14' : 'pb-4'
+          }`}
+          style={previewAreaBgStyle}
+        >
+            <div className="relative flex h-full min-h-0 min-w-0 w-full flex-col">
+              {viewMode === 'plain' && (
+                <Suspense fallback={MODE_LOADING_FALLBACK}>
+                  <PlainTextMode
+                    containerStyle={containerStyle}
+                    contentStyle={contentStyle}
+                    variant="default"
+                  />
+                </Suspense>
+              )}
 
-          {viewMode === 'glyphs' && (
-            <Suspense fallback={MODE_LOADING_FALLBACK}>
-              <GlyphsMode
-                key={`${selectedFont?.id}-${viewMode === 'glyphs'}`}
-                selectedFont={selectedFont}
-                fontFamily={fontFamilyValue}
-                glyphDisplayStyle={glyphDisplayStyle}
-                isActive={viewMode === 'glyphs'}
-                scrollParentRef={previewBodyScrollRef}
-                onDisplayableGlyphCountChange={handleGlyphCountForFooter}
-              />
-            </Suspense>
-          )}
+              {(viewMode === 'waterfall' || hasEverMountedWaterfallMode) && (
+                <div
+                  className={viewMode === 'waterfall' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}
+                >
+                  <Suspense fallback={MODE_LOADING_FALLBACK}>
+                    <WaterfallMode
+                      waterfallSizes={effectiveWaterfallSizes}
+                      scrollParentRef={previewBodyScrollRef}
+                      isVariableFontAnimating={viewMode === 'waterfall' ? isVariableFontAnimating : false}
+                      isInteractingWithWaterfallSize={
+                        viewMode === 'waterfall' &&
+                        currentWaterfallBaseSize !== null &&
+                        currentWaterfallBaseSize !== undefined
+                      }
+                    />
+                  </Suspense>
+                </div>
+              )}
 
-          {viewMode === 'text' && (
-            <Suspense fallback={MODE_LOADING_FALLBACK}>
-              <TextMode
-                contentStyle={contentStyle}
-                fontFamily={fontFamilyValue}
-                variationSettingsValue={variationSettingsValue}
-              />
-            </Suspense>
-          )}
+              {(viewMode === 'styles' || hasEverMountedStylesMode) && (
+                <div className={viewMode === 'styles' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}>
+                  <Suspense fallback={MODE_LOADING_FALLBACK}>
+                    <StylesMode selectedFont={selectedFont} fontFamilyValue={fontFamilyValue} />
+                  </Suspense>
+                </div>
+              )}
+
+              {(viewMode === 'glyphs' || hasEverMountedGlyphsMode) && (
+                <div className={viewMode === 'glyphs' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}>
+                  <Suspense fallback={MODE_LOADING_FALLBACK}>
+                    <GlyphsMode
+                      key={selectedFont?.id}
+                      selectedFont={selectedFont}
+                      fontFamily={fontFamilyValue}
+                      glyphDisplayStyle={glyphDisplayStyle}
+                      isActive={viewMode === 'glyphs'}
+                      scrollParentRef={previewBodyScrollRef}
+                      onDisplayableGlyphCountChange={handleGlyphCountForFooter}
+                    />
+                  </Suspense>
+                </div>
+              )}
+
+              {viewMode === 'text' && (
+                <Suspense fallback={MODE_LOADING_FALLBACK}>
+                  <TextMode
+                    contentStyle={contentStyle}
+                    fontFamily={fontFamilyValue}
+                    variationSettingsValue={variationSettingsValue}
+                  />
+                </Suspense>
+              )}
+            </div>
           </div>
 
-          {viewMode === 'plain' ||
-          viewMode === 'waterfall' ||
-          viewMode === 'styles' ||
-          viewMode === 'glyphs' ||
-          viewMode === 'text' ? (
-            <PreviewEditTextHint/>
-          ) : null}
-        </div>
+        <EditorStatusBar
+          leading={bottomBarModeHint}
+          center={
+            selectedFont ? (
+              <div className="flex items-center justify-center gap-2">
+                <span className="truncate">{previewFontLabel}</span>
+                <span>{previewSourceLabel}</span>
+                {showVariableBadge ? (
+                  <Tooltip content="Variable Font" className="pointer-events-auto">
+                    <span>VF</span>
+                  </Tooltip>
+                ) : null}
+                {previewWeightValue !== null ? (
+                  <Tooltip content="Font-weight" className="pointer-events-auto">
+                    <span>{previewWeightValue}</span>
+                  </Tooltip>
+                ) : null}
+                {showItalicBadge ? <span>Italic</span> : null}
+              </div>
+            ) : null
+          }
+          beforeTrailing={
+            <FontLibraryStatusMenu
+              libraries={fontLibraries}
+              libraryEntry={statusLibraryEntry}
+              onMoveToLibrary={onMoveFontToLibrary}
+              onCreateLibrary={onRequestCreateLibrary}
+            />
+          }
+        />
       </div>
 
-      <EditorStatusBar
-        leading={bottomBarModeHint}
-        center={
-          selectedFont ? (
-            <div className="flex items-center justify-center gap-2">
-              <span className="truncate">{previewFontLabel}</span>
-              <span>{previewSourceLabel}</span>
-              {showVariableBadge ? (
-                <Tooltip content="Variable Font" className="pointer-events-auto">
-                  <span>VF</span>
-                </Tooltip>
-              ) : null}
-              {previewWeightValue !== null ? (
-                <Tooltip content="Font-weight" className="pointer-events-auto">
-                  <span>{previewWeightValue}</span>
-                </Tooltip>
-              ) : null}
-              {showItalicBadge ? <span>Italic</span> : null}
-            </div>
-          ) : null
-        }
-        beforeTrailing={
-          <FontLibraryStatusMenu
-            libraries={fontLibraries}
-            libraryEntry={statusLibraryEntry}
-            onMoveToLibrary={onMoveFontToLibrary}
-            onCreateLibrary={onRequestCreateLibrary}
-          />
-        }
-      />
-    </div>
+      {showPreviewEditTextHint &&
+      editHintFixedBox &&
+      typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="pointer-events-none fixed z-20 isolate bg-transparent"
+              style={{
+                left: editHintFixedBox.left,
+                width: editHintFixedBox.width,
+                bottom: editHintFixedBox.bottom,
+              }}
+            >
+              <PreviewEditTextHint overlay />
+            </div>,
+            document.body,
+          )
+        : null}
 
     {plainPreviewOpen && typeof onClosePlainPreview === 'function' && (
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Полноэкранное превью plain-текста"
+        aria-label="Полноэкранное превью"
         className="fixed inset-0 z-[220] flex flex-col"
         style={previewAreaBgStyle}
       >
+        <PreviewModeDock className="z-[222]" bottomOffsetPx={0} />
         <button
           type="button"
           onClick={onClosePlainPreview}
@@ -1199,17 +1267,76 @@ export default function FontPreview({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto" style={previewAreaBgStyle}>
-          <Suspense fallback={MODE_LOADING_FALLBACK}>
-            <PlainTextMode
-              containerStyle={containerStyle}
-              contentStyle={contentStyle}
-              variant="fullscreen"
-            />
-          </Suspense>
+        <div
+          ref={fullscreenScrollRef}
+          className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto pb-28"
+          style={previewAreaBgStyle}
+        >
+          {viewMode === 'plain' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <PlainTextMode
+                containerStyle={containerStyle}
+                contentStyle={contentStyle}
+                variant="fullscreen"
+              />
+            </Suspense>
+          )}
+
+          {(viewMode === 'waterfall' || hasEverMountedWaterfallMode) && (
+            <div
+              className={viewMode === 'waterfall' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}
+            >
+              <Suspense fallback={MODE_LOADING_FALLBACK}>
+                <WaterfallMode
+                  waterfallSizes={effectiveWaterfallSizes}
+                  scrollParentRef={fullscreenScrollRef}
+                  isVariableFontAnimating={viewMode === 'waterfall' ? isVariableFontAnimating : false}
+                  isInteractingWithWaterfallSize={
+                    viewMode === 'waterfall' &&
+                    currentWaterfallBaseSize !== null &&
+                    currentWaterfallBaseSize !== undefined
+                  }
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {(viewMode === 'styles' || hasEverMountedStylesMode) && (
+            <div className={viewMode === 'styles' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}>
+              <Suspense fallback={MODE_LOADING_FALLBACK}>
+                <StylesMode selectedFont={selectedFont} fontFamilyValue={fontFamilyValue} />
+              </Suspense>
+            </div>
+          )}
+
+          {(viewMode === 'glyphs' || hasEverMountedGlyphsMode) && (
+            <div className={viewMode === 'glyphs' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}>
+              <Suspense fallback={MODE_LOADING_FALLBACK}>
+                <GlyphsMode
+                  key={`fs-${selectedFont?.id}`}
+                  selectedFont={selectedFont}
+                  fontFamily={fontFamilyValue}
+                  glyphDisplayStyle={glyphDisplayStyle}
+                  isActive={viewMode === 'glyphs'}
+                  scrollParentRef={fullscreenScrollRef}
+                  onDisplayableGlyphCountChange={handleGlyphCountForFooter}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {viewMode === 'text' && (
+            <Suspense fallback={MODE_LOADING_FALLBACK}>
+              <TextMode
+                contentStyle={contentStyle}
+                fontFamily={fontFamilyValue}
+                variationSettingsValue={variationSettingsValue}
+              />
+            </Suspense>
+          )}
         </div>
       </div>
     )}
     </>
   );
-} 
+}

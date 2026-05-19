@@ -162,6 +162,12 @@ const setLocalStorageItem = (key, value) => {
     return;
   }
   try {
+    if (key === LOCAL_STORAGE_KEYS.TEXT) {
+      previewTextDbg('localStorage: setItem(previewText) через JSON.stringify', {
+        valueLen: typeof value === 'string' ? value.length : -1,
+        snippet: typeof value === 'string' ? previewTextSnippet(value, 120) : String(value),
+      });
+    }
     localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
     console.error(`Ошибка записи в localStorage для ключа ${key}:`, error);
@@ -275,10 +281,28 @@ export const SettingsProvider = ({ children }) => {
     }
     const storedText = getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT, DEFAULT_SETTINGS.TEXT);
     const resolvedText = typeof storedText === 'string' ? storedText : DEFAULT_SETTINGS.TEXT;
+    let rawPreviewTextLen = 0;
+    let jsonParseOk = null;
+    let jsonParseError = null;
+    try {
+      if (rawPreviewTextKey != null) {
+        rawPreviewTextLen = rawPreviewTextKey.length;
+        JSON.parse(rawPreviewTextKey);
+        jsonParseOk = true;
+      }
+    } catch (e) {
+      jsonParseOk = false;
+      jsonParseError = String(e);
+    }
     previewTextDbg('hydrate: чтение previewText из localStorage', {
       key: LOCAL_STORAGE_KEYS.TEXT,
       rawKeyPresent: rawPreviewTextKey != null,
+      rawLen: rawPreviewTextLen,
+      jsonParseOk,
+      jsonParseError,
+      storedType: typeof storedText,
       resolvedLen: resolvedText.length,
+      resolvedEqualsBuiltInDefault: resolvedText === DEFAULT_SETTINGS.TEXT,
       snippet: previewTextSnippet(resolvedText, 120),
     });
     setText(resolvedText);

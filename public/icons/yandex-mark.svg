@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+  <defs>
+    <clipPath id="yandexMarkCircle">
+      <circle cx="12" cy="12" r="12" />
+    </clipPath>
+  </defs>
+  <g clip-path="url(#yandexMarkCircle)">
+    <circle cx="12" cy="12" r="12" fill="#FC3F1D" />
+    <g transform="translate(12 12) scale(0.76) translate(-10.5 -12)">
+      <path
+        fill="#ffffff"
+        d="M13.54 12.5 8.18 4H4.8v16h2.78v-6.72l4.76 6.72H16.2l-5.2-7.22L15.9 4h-2.36l-4 8.5z"
+      />
+    </g>
+  </g>
+</svg>
