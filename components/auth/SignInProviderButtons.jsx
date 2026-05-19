@@ -3,7 +3,7 @@ import { getProviders, signIn } from 'next-auth/react';
 import { AppButton } from '../ui/AppButton';
 
 const AUTH_OAUTH_BTN_CLASS =
-  'inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-gray-200 bg-white px-4 text-xs font-semibold uppercase tracking-[0.12em] text-gray-900 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/10 [font-feature-settings:normal]';
+  'inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-gray-200 bg-white px-4 text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-gray-900 hover:text-white hover:border-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/10 [font-feature-settings:normal]';
 
 export function SignInProviderButtons({ callbackUrl = '/', layout = 'stack', appearance = 'default' }) {
   const [providerIds, setProviderIds] = useState(null);
