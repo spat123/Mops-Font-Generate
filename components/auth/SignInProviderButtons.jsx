@@ -34,7 +34,8 @@ export function SignInProviderButtons({ callbackUrl = '/', layout = 'stack', app
   if (providerIds && providerIds.length === 0) {
     return (
       <p className="text-center text-xs leading-relaxed text-gray-500">
-        Провайдеры входа не настроены. Заполните переменные в <code className="font-mono">.env.local</code> — см.{' '}
+        Провайдеры входа не настроены. Локально — <code className="font-mono">.env.local</code>, на сайте в
+        интернете — переменные в панели Vercel (Settings → Environment Variables). См.{' '}
         <code className="font-mono">docs/AUTH_SETUP.md</code>.
       </p>
     );
@@ -49,7 +50,9 @@ export function SignInProviderButtons({ callbackUrl = '/', layout = 'stack', app
   if (providerIds && !hasOAuthButtons) {
     return (
       <p className="text-center text-xs leading-relaxed text-gray-500">
-        Вход через Google/Яндекс пока не настроен. Заполните переменные в <code className="font-mono">.env.local</code> — см.{' '}
+        Вход через Google/Яндекс на сервере не подключён (нет <code className="font-mono">GOOGLE_*</code> /{' '}
+        <code className="font-mono">YANDEX_*</code> в окружении). Локально — <code className="font-mono">.env.local</code>,
+        на продакшене — Vercel → Environment Variables → Redeploy. См.{' '}
         <code className="font-mono">docs/AUTH_SETUP.md</code>.
       </p>
     );

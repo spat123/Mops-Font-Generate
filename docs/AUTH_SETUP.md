@@ -17,6 +17,25 @@
 
 Провайдер подключается **только если** заданы оба ключа для этого провайдера. Можно включить только Google или только Яндекс.
 
+### Локально и на Vercel — это разные места
+
+| Где запускается сайт | Куда писать переменные |
+| -------------------- | ---------------------- |
+| `bun dev` / `localhost` | Файл **`.env.local`** в корне репозитория |
+| **dynamicfont.ru** (Vercel) | **Vercel** → проект → **Settings** → **Environment Variables** |
+
+Файл `.env.local` **не попадает** на Vercel при деплое. Если ключи Google есть только локально, на проде будет текст «Вход через Google/Яндекс не настроен» и кнопки OAuth не появятся.
+
+На Vercel для **Production** задайте минимум:
+
+- `NEXTAUTH_SECRET` — случайная строка (не `dev-secret-change-me`)
+- `NEXTAUTH_URL` — `https://ваш-домен.ru` (как в браузере, без `/` в конце)
+- `GOOGLE_CLIENT_ID` и `GOOGLE_CLIENT_SECRET` — те же значения, что в `.env.local`
+
+После добавления или изменения переменных: **Deployments** → последний деплой → **Redeploy**.
+
+**Проверка:** откройте `https://ваш-домен.ru/api/auth/providers` — в JSON должны быть `"google"` и/или `"yandex"`, не только `"credentials"`.
+
 ## 2. Google Cloud Console
 
 1. [Google Cloud Console](https://console.cloud.google.com/) → проект → **APIs & Services** → **Credentials** → **Create credentials** → **OAuth client ID**.
@@ -44,8 +63,18 @@
 ## 5. Частые ошибки
 
 - **Redirect_uri mismatch** — в консоли Google/Яндекса должен совпадать URL **точно** с тем, что открывает NextAuth (`/api/auth/callback/...`).
-- `**NEXTAUTH_URL` не совпадает с реальным доменом** — сессии и редиректы OAuth ломаются; на проде задайте реальный HTTPS-URL.
+- **`NEXTAUTH_URL` не совпадает с реальным доменом** — сессии и редиректы OAuth ломаются; на проде задайте реальный HTTPS-URL.
 - **Нет провайдеров** — если не задан ни один пара ключей, страница входа откроется, но кнопки провайдера не сработают (в консоли сервера NextAuth предупредит).
+
+### JSON: «There is a problem with the server configuration» (HTTP 500)
+
+Откройте `https://ваш-домен.ru/api/auth/providers`.
+
+- Такой JSON и статус **500** → на сервере **нет** `NEXTAUTH_SECRET` (пустой или переменная не задана в **Vercel** для **Production**). NextAuth в production без секрета не запускается.
+- Ответ **200**, но только `"credentials"` → секрет есть, но нет `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` на Vercel (или не сделан Redeploy).
+- Ответ **200** с `"google"` → конфигурация сервера в порядке; если вход не идёт — смотрите redirect URI в Google Cloud.
+
+**Чеклист Vercel:** `NEXTAUTH_SECRET` (непустой), `NEXTAUTH_URL=https://dynamicfont.ru`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` → галочка **Production** → **Redeploy**.
 
 ## 6. Дальнейшая доработка
 
