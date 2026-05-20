@@ -238,14 +238,28 @@ vercel login
 
 В проекте подключены пакеты `@vercel/analytics` и `@vercel/speed-insights` в `pages/_app.jsx`. Данные появятся **только после включения в панели Vercel** и деплоя с этим кодом.
 
-### 11.1. Включить в Dashboard
+### 11.1. Включить в Dashboard (важен порядок)
 
 1. [vercel.com](https://vercel.com) → ваш проект.
-2. **Analytics** → **Enable** (просмотры страниц, referrers, страны).
-3. **Speed Insights** → **Enable** (Core Web Vitals: LCP, INP, CLS).
-4. **Deployments** → последний production → **Redeploy** (если код только что добавили).
+2. **Analytics** → **Enable**.
+3. **Speed Insights** → **Enable**.
+4. **Обязательно после Enable:** **Deployments** → последний **Production** → **Redeploy**.
 
-Отдельные API-ключи в Environment Variables **не нужны** — сервисы привязаны к проекту Vercel.
+Без redeploy **после** включения в панели скрипты `/_vercel/insights/` и Speed Insights на домене **не появятся** — в UI останется чеклист «выполните инструкцию», хотя код в репозитории уже есть.
+
+Отдельные API-ключи в Environment Variables **не нужны**.
+
+### 11.1a. Проверка в браузере (production)
+
+1. Откройте `https://dynamicfont.ru` **без** блокировщика рекламы (uBlock и т.п. режут `/_vercel/…`).
+2. DevTools → **Network** → обновите страницу (F5).
+3. Должны быть запросы к путям вроде:
+   - `/_vercel/insights/script.js`
+   - `/_vercel/speed-insights/script.js`
+4. Если **404** на эти URL → снова **Enable** в панели + **Redeploy** production.
+5. В консоли не должно быть `[Vercel Web Analytics] Failed to load script`.
+
+Первые цифры в графиках — через **15–60 минут** после успешных запросов. До этого чеклист «по инструкции» может не исчезать — это нормально.
 
 ### 11.2. Где смотреть метрики
 
