@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
@@ -50,6 +49,7 @@ import {
   FONTS_LIBRARY_INNER_TAB_LS_KEY,
 } from '../../utils/editorShellStorage';
 import { makeSavedLibraryTabId } from '../../utils/savedLibraryTabIds';
+import { OpenGraphHead } from '../seo/OpenGraphHead';
 
 const SHARE_ROW_SAMPLE_TOOLTIP =
   'Дважды щёлкните, чтобы изменить образец в этой строке (только на этой странице)';
@@ -100,7 +100,7 @@ function ShareCloudRow({ row, isRowMode }) {
   );
 }
 
-export function LibrarySharePage() {
+export function LibrarySharePage({ seo }) {
   const router = useRouter();
   const { status, data: session } = useSession();
   const { createLibrary, libraries: savedLibraries } = useFontLibraries();
@@ -348,6 +348,13 @@ export function LibrarySharePage() {
       ? 'Ссылка на шрифты — DINAMIC FONT'
       : `${libraryTitle} — DINAMIC FONT`;
 
+  const pageSeo = seo
+    ? { ...seo, title: headTitle }
+    : {
+        title: headTitle,
+        description: 'Список шрифтов по ссылке: скачать архивом или сохранить в редакторе.',
+      };
+
   const emptyStateCard =
     'mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm';
 
@@ -436,13 +443,7 @@ export function LibrarySharePage() {
 
   return (
     <>
-      <Head>
-        <title>{headTitle}</title>
-        <meta
-          name="description"
-          content="Список шрифтов по ссылке: скачать архивом или сохранить в редакторе."
-        />
-      </Head>
+      <OpenGraphHead {...pageSeo} />
       <div className="min-h-screen bg-gray-50 text-gray-900">
         {!pageReady ? (
           <main className="flex min-h-screen items-center justify-center px-4 py-12">

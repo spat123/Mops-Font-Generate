@@ -3264,4 +3264,16 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
     </div>
     </LibraryAuthProvider>
   );
-} 
+}
+
+/** Старые ссылки `/?share=...` — серверный редирект на `/share` (OG-краулеры не выполняют JS). */
+export async function getServerSideProps({ query }) {
+  const share = typeof query.share === 'string' ? query.share.trim() : '';
+  if (!share) return { props: {} };
+  return {
+    redirect: {
+      destination: `/share?share=${encodeURIComponent(share)}`,
+      permanent: false,
+    },
+  };
+}

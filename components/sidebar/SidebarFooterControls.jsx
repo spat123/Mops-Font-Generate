@@ -630,11 +630,7 @@ export default function SidebarFooterControls({
 
     return (
       <div className="space-y-5">
-        <ThemeModeCard
-          themeMode={themeMode}
-          darkTheme={darkTheme}
-          setThemeMode={setThemeMode}
-        />
+        {/* Переключатель темы временно скрыт — тёмная тема ещё в разработке */}
 
         <div className="space-y-3">
           <SettingsSectionDivider>Дополнительные настройки</SettingsSectionDivider>

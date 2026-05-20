@@ -9,6 +9,15 @@ import { FontProvider } from '../contexts/FontContext';
 import { AuthReturningUserMarker } from '../components/auth/AuthReturningUserMarker';
 import Head from 'next/head';
 import dynamic from 'next/dynamic';
+import { OpenGraphHead } from '../components/seo/OpenGraphHead';
+import { getDefaultSiteSeo } from '../utils/siteSeo';
+
+const defaultSiteSeo = getDefaultSiteSeo(
+  (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://dynamicfont.ru').replace(
+    /\/$/,
+    '',
+  ),
+);
 
 const VercelObservability = dynamic(
   () => import('../components/VercelObservability').then((m) => m.VercelObservability),
@@ -43,7 +52,6 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>DINAMIC FONT — инструмент для работы со шрифтами</title>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
@@ -55,7 +63,8 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
           media="(prefers-color-scheme: dark)"
         />
       </Head>
-      
+      <OpenGraphHead {...defaultSiteSeo} />
+
       <SessionProvider session={session}>
         <AuthReturningUserMarker />
         <SettingsProvider>

@@ -278,7 +278,29 @@ vercel login
 
 ---
 
-## 12. Частые проблемы
+## 12. Превью ссылок (Open Graph)
+
+Мессенджеры (Telegram, WhatsApp, VK) и соцсети **не выполняют JavaScript** — они читают только HTML с сервера.
+
+| URL | Как работает |
+|-----|----------------|
+| `/share?share=...` | `getServerSideProps` в `pages/share.jsx` — в HTML попадают `og:title`, `og:description`, `og:image`. |
+| `/?share=...` (старый формат) | Серверный редирект на `/share?share=...`. |
+| `/`, остальные страницы | Дефолтные теги из `pages/_app.jsx` + `utils/siteSeo.js`. |
+
+**На Vercel (Production):**
+
+1. Переменная **`NEXT_PUBLIC_SITE_URL`** = `https://dynamicfont.ru` (без `/` в конце).
+2. Картинка превью: **`public/assets/News and Update/RU/Dinamic post.png`** (через `utils/siteSeo.js`). Рекомендуется 1200×630.
+3. После смены баннера или env — **Redeploy** production.
+
+**Проверка:** [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) или «Предпросмотр» в Telegram при вставке ссылки. Если кэш старый — в Debugger нажать «Scrape Again».
+
+Подробнее: код в `components/seo/OpenGraphHead.jsx`, `utils/siteSeo.js`.
+
+---
+
+## 13. Частые проблемы
 
 | Симптом | Что проверить |
 |---------|----------------|
@@ -296,7 +318,7 @@ vercel login
 
 ---
 
-## 13. Краткая шпаргалка
+## 14. Краткая шпаргалка
 
 ```
 develop  --push-->  Preview URL     (тестируете вы)
