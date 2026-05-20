@@ -189,13 +189,61 @@ ${body}
 </html>`;
 }
 
-export function buildWaterfallLadderMarkdown(meta, fontName) {
-  const name = String(fontName || 'Шрифт').trim();
+function getWaterfallLadderSizes(meta) {
   const rows = Math.max(1, Math.min(32, Number(meta?.rows) || 14));
   const base = Number(meta?.baseSize) || 96;
   const unit = String(meta?.unit || 'px');
   const ratio = Number(meta?.scaleRatio);
   const r = Number.isFinite(ratio) && ratio > 0 ? ratio : 1.25;
+  const sizesPx = [];
+  let s = base;
+  for (let i = 0; i < rows; i += 1) {
+    sizesPx.push(Math.round(s * 1000) / 1000);
+    s /= r;
+  }
+  return { rows, base, unit, r, editTarget: meta?.editTarget, sizesPx };
+}
+
+/** Текстовый блок параметров лестницы (для .txt). */
+export function buildWaterfallLadderPlainText(meta, fontName) {
+  const name = String(fontName || 'Шрифт').trim();
+  const { rows, base, unit, r, editTarget, sizesPx } = getWaterfallLadderSizes(meta);
+  const target = editTarget === 'heading' ? 'Heading' : 'Body';
+  const lines = [
+    `Waterfall — ${name}`,
+    `Строк: ${rows}, база: ${base}px, шаг: ${r}, подписи: ${unit}, слой: ${target}`,
+    '',
+    'Размеры по строкам (px):',
+  ];
+  sizesPx.forEach((px, index) => {
+    lines.push(`${index + 1}. ${px}`);
+  });
+  lines.push('', '---', '');
+  return lines.join('\n');
+}
+
+/** Блок комментариев для Waterfall CSS: параметры лестницы и размеры строк. */
+export function buildWaterfallLadderCssComments(meta, fontName) {
+  const name = String(fontName || 'Шрифт').trim();
+  const { rows, base, unit, r, editTarget, sizesPx } = getWaterfallLadderSizes(meta);
+  const target = editTarget === 'heading' ? 'Heading' : 'Body';
+  const lines = [
+    '/* --- Waterfall: лестница размеров --- */',
+    `/* Шрифт: ${name} */`,
+    `/* Строк: ${rows}, база: ${base}px, шаг: ${r}, подписи: ${unit}, слой: ${target} */`,
+    '/* font-size по строкам (сверху вниз): */',
+  ];
+  sizesPx.forEach((px, index) => {
+    lines.push(`/* ${index + 1}. ${px}px */`);
+  });
+  lines.push('/* --- */', '');
+  return lines.join('\n');
+}
+
+/** @deprecated Используйте buildWaterfallLadderCssComments в экспорте. */
+export function buildWaterfallLadderMarkdown(meta, fontName) {
+  const name = String(fontName || 'Шрифт').trim();
+  const { rows, base, unit, r, editTarget, sizesPx } = getWaterfallLadderSizes(meta);
   const lines = [
     `# Waterfall — ${name}`,
     '',
@@ -205,20 +253,15 @@ export function buildWaterfallLadderMarkdown(meta, fontName) {
     `- базовый размер: **${base}px**`,
     `- единицы подписи: **${unit}**`,
     `- коэффициент шага: **${r}**`,
-    `- цель редактирования: **${meta?.editTarget === 'heading' ? 'Heading' : 'Body'}**`,
+    `- цель редактирования: **${editTarget === 'heading' ? 'Heading' : 'Body'}**`,
     '',
-    'Размеры строк (px, ориентировочно):',
+    'Размеры строк (px):',
     '',
   ];
-  let s = base;
-  for (let i = 0; i < rows; i += 1) {
-    lines.push(`- ${i + 1}. **${Math.round(s * 1000) / 1000} px**`);
-    s /= r;
-  }
-  lines.push(
-    '',
-    'Дальше: вставьте свой `@font-face` из экспорта «Plain → CSS» и задайте `font-size` по строкам так же, как в приложении.',
-  );
+  sizesPx.forEach((px, index) => {
+    lines.push(`- ${index + 1}. **${px} px**`);
+  });
+  lines.push('', 'Дальше: задайте `font-size` по строкам и подключите `@font-face` ниже.');
   return lines.join('\n');
 }
 
@@ -280,38 +323,6 @@ export function buildStylesInventoryCsv(selectedFont) {
     }
   }
   return lines.join('\n');
-}
-
-/**
- * HTML для печати в PDF через браузер (Chrome: Печать → Сохранить как PDF).
- */
-export function buildPrintToPdfHtmlDocument({ title, bodyHtml, fontFamily, fontSizePx }) {
-  const esc = (s) =>
-    String(s ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-  return `<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8"/>
-<title>${esc(title)}</title>
-<style>
-  @page { size: A4; margin: 18mm; }
-  body { font-family: ${esc(fontFamily)}, system-ui, sans-serif; font-size: ${Number(fontSizePx) || 14}px; line-height: 1.45; color: #111; }
-  .toolbar { position: sticky; top: 0; background: #fafafa; border-bottom: 1px solid #ddd; padding: 10px 0; margin: -8px -8px 16px; }
-  .hint { font-size: 12px; color: #555; max-width: 48rem; }
-  @media print { .toolbar { display: none !important; } }
-</style>
-</head>
-<body>
-  <div class="toolbar">
-    <strong>Печать в PDF</strong>
-    <p class="hint">Сочетание <kbd>Ctrl+P</kbd> (или ⌘+P) → принтер «Сохранить как PDF» / Microsoft Print to PDF.</p>
-  </div>
-  ${bodyHtml}
-</body>
-</html>`;
 }
 
 export function buildPlainPreviewSvgPayload({ text, fontFamily, fontSizePx, textColor, backgroundColor }) {

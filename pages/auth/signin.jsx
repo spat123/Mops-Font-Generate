@@ -67,14 +67,10 @@ export default function AuthSignInPage({ isRuGeo = false }) {
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
         <AuthLogoLink className="mb-10" />
 
-        {isReturningUser ? (
-          <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">С возвращением!</h1>
-        ) : (
-          <>
-            <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">Вход</h1>
-            <p className="mt-2 text-center text-sm font-normal text-gray-500">Добро пожаловать!</p>
-          </>
-        )}
+        <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">Вход</h1>
+        <p className="mt-2 text-center text-sm font-normal text-gray-500">
+          {isReturningUser ? 'С возвращением!' : 'Добро пожаловать!'}
+        </p>
 
         <div className="mt-8 flex flex-col gap-2">
           <SignInProviderButtons callbackUrl={callbackUrl} appearance="auth" />

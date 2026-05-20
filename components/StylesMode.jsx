@@ -77,7 +77,7 @@ function StylesMode({
   const titleUnderlineClass = chrome.isDark ? 'border-white/25' : 'border-gray-900/35';
 
   return (
-    <div className="relative flex min-h-0 min-w-0 max-w-full flex-col px-4 pb-8 pt-4 sm:px-6">
+    <div className="relative flex h-full min-h-0 min-w-0 max-w-full flex-1 flex-col px-4 pb-8 pt-4 sm:px-6">
       <div className="min-w-0 max-w-full">
         {/* Статические стили шрифта */}
         {showStaticStyles && (
@@ -298,7 +298,7 @@ function StylesMode({
         )}
       </div>
 
-      <div className={hasAnyStyleContent ? 'mt-auto pt-6 pb-12' : 'flex flex-1 items-center justify-center py-10'}>
+      <div className={hasAnyStyleContent ? 'mt-auto pt-6 pb-12' : 'flex min-h-0 flex-1 items-center justify-center py-10'}>
         <div
           className={[
             'mx-auto flex w-full flex-col items-stretch justify-center gap-4',

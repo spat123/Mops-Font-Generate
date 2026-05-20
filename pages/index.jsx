@@ -1992,13 +1992,9 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       toast.error('Сначала выберите шрифт');
       return;
     }
-    if (libraryAuthValue.isPro) {
-      setCssString(buildExportCssCode());
-    } else {
-      setCssString('');
-    }
+    setCssString(buildExportCssCode());
     setIsExportModalOpen(true);
-  }, [selectedFont, buildExportCssCode, libraryAuthValue.isPro]);
+  }, [selectedFont, buildExportCssCode]);
 
   const handleGenerateClick = useCallback(() => {
     if (!selectedFont) {
@@ -2997,7 +2993,6 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
       <Head>
         <title>DINAMIC FONT — тестирование и сравнение шрифтов</title>
         <meta name="description" content="DINAMIC FONT — тестирование, сравнение и работа со шрифтами" />
-        <link rel="icon" href="/favicon.ico" />
         {cssString && <style>{cssString}</style>}
       </Head>
 
@@ -3010,8 +3005,6 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         variableSettings={variableSettings}
         generateStaticFontFile={generateStaticFontFile}
         downloadFile={downloadFile}
-        canExportTextCss={libraryAuthValue.isPro}
-        onRequestPro={openPlans}
         editorViewMode={viewMode}
         previewText={text}
         fontFamily={exportModalFontFamily}

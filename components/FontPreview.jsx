@@ -1130,7 +1130,7 @@ export default function FontPreview({
           }`}
           style={previewAreaBgStyle}
         >
-            <div className="relative flex h-full min-h-0 min-w-0 w-full flex-col">
+            <div className="relative flex h-full min-h-full min-h-0 min-w-0 w-full flex-col">
               {viewMode === 'plain' && (
                 <Suspense fallback={MODE_LOADING_FALLBACK}>
                   <PlainTextMode
@@ -1161,7 +1161,7 @@ export default function FontPreview({
               )}
 
               {(viewMode === 'styles' || hasEverMountedStylesMode) && (
-                <div className={viewMode === 'styles' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}>
+                <div className={viewMode === 'styles' ? 'flex h-full min-h-0 min-w-0 flex-1 flex-col' : 'hidden'}>
                   <Suspense fallback={MODE_LOADING_FALLBACK}>
                     <StylesMode selectedFont={selectedFont} fontFamilyValue={fontFamilyValue} />
                   </Suspense>
@@ -1302,7 +1302,7 @@ export default function FontPreview({
           )}
 
           {(viewMode === 'styles' || hasEverMountedStylesMode) && (
-            <div className={viewMode === 'styles' ? 'flex h-full min-h-0 min-w-0 flex-col' : 'hidden'}>
+            <div className={viewMode === 'styles' ? 'flex h-full min-h-0 min-w-0 flex-1 flex-col' : 'hidden'}>
               <Suspense fallback={MODE_LOADING_FALLBACK}>
                 <StylesMode selectedFont={selectedFont} fontFamilyValue={fontFamilyValue} />
               </Suspense>

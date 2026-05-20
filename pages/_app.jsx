@@ -38,6 +38,16 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>DINAMIC FONT — инструмент для работы со шрифтами</title>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/favicon-32-dark.png"
+          media="(prefers-color-scheme: dark)"
+        />
       </Head>
       
       <SessionProvider session={session}>
