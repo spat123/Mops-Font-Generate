@@ -24,6 +24,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   const router = useRouter();
   const callbackUrlRaw = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/';
   const callbackUrl = callbackUrlRaw.startsWith('/') ? callbackUrlRaw : '/';
+  const oauthErrorCode = typeof router.query?.error === 'string' ? router.query.error : null;
   const [login, setLogin] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [formError, setFormError] = React.useState('');
@@ -34,6 +35,21 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   useEffect(() => {
     setIsReturningUser(hasSignedInBefore());
   }, []);
+
+  useEffect(() => {
+    if (!oauthErrorCode) return;
+    if (oauthErrorCode === 'Callback') {
+      setFormError(
+        'Не удалось завершить вход через Google/Яндекс. Обычно это сбой сохранения аккаунта на сервере. Попробуйте ещё раз; если не помогает — войдите по паролю.',
+      );
+      return;
+    }
+    if (oauthErrorCode === 'OAuthAccountNotLinked') {
+      setFormError('Этот email уже привязан к другому способу входа. Войдите тем способом или привяжите аккаунт.');
+      return;
+    }
+    setFormError('Ошибка входа. Попробуйте снова или используйте логин и пароль.');
+  }, [oauthErrorCode]);
 
   useEffect(() => {
     if (status !== 'authenticated') return;
@@ -71,6 +87,10 @@ export default function AuthSignInPage({ isRuGeo = false }) {
         <p className="mt-2 text-center text-sm font-normal text-gray-500">
           {isReturningUser ? 'С возвращением!' : 'Добро пожаловать!'}
         </p>
+
+        {formError && oauthErrorCode ? (
+          <p className="mt-6 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p>
+        ) : null}
 
         <div className="mt-8 flex flex-col gap-2">
           <SignInProviderButtons callbackUrl={callbackUrl} appearance="auth" />
@@ -133,7 +153,9 @@ export default function AuthSignInPage({ isRuGeo = false }) {
             className={AUTH_INPUT_CLASS}
             placeholder="ПАРОЛЬ"
           />
-          {formError ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p> : null}
+          {formError && !oauthErrorCode ? (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p>
+          ) : null}
           <button type="submit" className={AUTH_PRIMARY_BTN_CLASS}>
             Вход
           </button>

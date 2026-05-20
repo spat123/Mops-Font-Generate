@@ -171,15 +171,23 @@ export const authOptions = {
           } else {
             token.needsLink = false;
             token.pendingLink = null;
-            const rec = await upsertOAuthUser({
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-              email: user.email,
-              name: user.name,
-              image: user.image,
-            });
-            token.userId = rec?.id || user.id || token.sub;
-            token.accountCreatedAt = rec?.createdAt || null;
+            try {
+              const rec = await upsertOAuthUser({
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                email: user.email,
+                name: user.name,
+                image: user.image,
+              });
+              token.userId = rec?.id || user.id || token.sub;
+              token.accountCreatedAt = rec?.createdAt || null;
+            } catch (err) {
+              console.error('[nextauth] upsertOAuthUser failed:', err);
+              const provider = String(account.provider || 'oauth').trim();
+              const accountId = String(account.providerAccountId || user.id || token.sub || '').trim();
+              token.userId = accountId ? `${provider}:${accountId}` : token.sub;
+              token.accountCreatedAt = new Date().toISOString();
+            }
           }
         }
       }

@@ -76,6 +76,14 @@
 
 **Чеклист Vercel:** `NEXTAUTH_SECRET` (непустой), `NEXTAUTH_URL=https://dynamicfont.ru`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` → галочка **Production** → **Redeploy**.
 
+### `error=Callback` после Google (страница `/auth/signin?...&error=Callback`)
+
+Google уже вернул код, но NextAuth **не смог завершить callback** (часто исключение в `jwt` callback).
+
+На Vercel файловая система **read-only**: запись в `data/users.json` падает → раньше был `error=Callback`. В коде запись на Vercel пропускается, сессия создаётся по данным OAuth (без персистентного файла пользователей).
+
+Если ошибка остаётся после деплоя фикса — смотрите **Vercel → Logs** для `/api/auth/callback/google`.
+
 ## 6. Дальнейшая доработка
 
 Сейчас лимит «3 библиотеки» проверяется на клиенте. Для облачного хранения понадобятся свои API и привязка `user.id` из сессии к записям в БД — тогда лимит нужно дублировать на сервере.  
