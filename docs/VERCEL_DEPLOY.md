@@ -291,10 +291,12 @@ vercel login
 **На Vercel (Production):**
 
 1. Переменная **`NEXT_PUBLIC_SITE_URL`** = `https://dynamicfont.ru` (без `/` в конце).
-2. Картинка превью: **`public/assets/News and Update/RU/Dinamic post.png`** (через `utils/siteSeo.js`). Рекомендуется 1200×630.
-3. После смены баннера или env — **Redeploy** production.
+2. Картинка превью: **`public/og.png`** (копия баннера из `public/assets/News and Update/RU/`). Для крупной карточки в мессенджерах лучше **1200×630** (сейчас 525×225 — превью может быть только текстом или маленькой картинкой).
+3. После смены `og.png`, `NEXT_PUBLIC_SITE_URL` или кода OG — **Redeploy** production (переменные `NEXT_PUBLIC_*` попадают в билд при деплое).
 
-**Проверка:** [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) или «Предпросмотр» в Telegram при вставке ссылки. Если кэш старый — в Debugger нажать «Scrape Again».
+**Проверка:** [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) → Scrape Again. В Telegram кэш долгий: отправьте ссылку боту [@webpagebot](https://t.me/webpagebot) или добавьте к URL `?v=2` для «новой» ссылки.
+
+**Важно:** превью работает для **`https://dynamicfont.ru/share?share=...`** и главной. Ссылка только на редактор `/?` без `/share` — отдельная страница; OG там тоже есть, но шарить библиотеку нужно кнопкой «Поделиться».
 
 Подробнее: код в `components/seo/OpenGraphHead.jsx`, `utils/siteSeo.js`.
 

@@ -24,7 +24,7 @@ const VercelObservability = dynamic(
   { ssr: false },
 );
 
-export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
+export default function MyApp({ Component, pageProps: { session, seo: pageSeo, ...pageProps } }) {
   // Очищаем все шрифты при загрузке страницы
   useEffect(() => {
     // Создаем стиль, который очистит все шрифты перед загрузкой
@@ -63,7 +63,7 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
           media="(prefers-color-scheme: dark)"
         />
       </Head>
-      <OpenGraphHead {...defaultSiteSeo} />
+      {!pageSeo ? <OpenGraphHead {...defaultSiteSeo} /> : null}
 
       <SessionProvider session={session}>
         <AuthReturningUserMarker />

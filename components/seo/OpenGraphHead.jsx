@@ -9,6 +9,9 @@ export function OpenGraphHead({
   description,
   canonicalUrl,
   imageUrl,
+  imageWidth,
+  imageHeight,
+  imageType = 'image/png',
   imageAlt = 'DINAMIC FONT',
   siteName = 'DINAMIC FONT',
   type = 'website',
@@ -32,6 +35,10 @@ export function OpenGraphHead({
       {safeDescription ? <meta property="og:description" content={safeDescription} /> : null}
       {canonicalUrl ? <meta property="og:url" content={canonicalUrl} /> : null}
       {imageUrl ? <meta property="og:image" content={imageUrl} /> : null}
+      {imageUrl ? <meta property="og:image:secure_url" content={imageUrl} /> : null}
+      {imageUrl && imageWidth ? <meta property="og:image:width" content={String(imageWidth)} /> : null}
+      {imageUrl && imageHeight ? <meta property="og:image:height" content={String(imageHeight)} /> : null}
+      {imageUrl && imageType ? <meta property="og:image:type" content={imageType} /> : null}
       {imageUrl ? <meta property="og:image:alt" content={imageAlt} /> : null}
 
       <meta name="twitter:card" content={imageUrl ? 'summary_large_image' : 'summary'} />

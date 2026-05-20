@@ -1,8 +1,11 @@
 import { decodeLibrarySharePayloadFromQueryParam } from './libraryShareLinkServer';
-import { editorNewsAssetUrl } from '../data/editorNewsFeed';
 
 const SITE_NAME = 'DINAMIC FONT';
-const DEFAULT_OG_IMAGE_PATH = editorNewsAssetUrl('RU', 'Dinamic post.png');
+/** Плоский путь без пробелов — надёжнее для Telegram / WhatsApp. */
+const DEFAULT_OG_IMAGE_PATH = '/og.png';
+/** Размеры `public/og.png` (копия баннера беты). */
+export const OG_IMAGE_WIDTH = 525;
+export const OG_IMAGE_HEIGHT = 225;
 const DEFAULT_TITLE = 'DINAMIC FONT — тестирование и сравнение шрифтов';
 const DEFAULT_DESCRIPTION =
   'Тестирование, сравнение и работа со шрифтами: библиотеки, каталоги Google Fonts и Fontsource, экспорт.';
@@ -23,17 +26,30 @@ export function getDefaultOgImageUrl(origin) {
   return `${base}${DEFAULT_OG_IMAGE_PATH}`;
 }
 
+function withOgImageMeta(seo, origin) {
+  const imageUrl = seo.imageUrl || getDefaultOgImageUrl(origin);
+  return {
+    ...seo,
+    imageUrl,
+    imageWidth: OG_IMAGE_WIDTH,
+    imageHeight: OG_IMAGE_HEIGHT,
+    imageType: 'image/png',
+  };
+}
+
 export function getDefaultSiteSeo(origin) {
   const siteUrl = String(origin || getSiteOrigin()).replace(/\/$/, '');
-  return {
-    title: DEFAULT_TITLE,
-    description: DEFAULT_DESCRIPTION,
-    canonicalUrl: siteUrl,
-    imageUrl: getDefaultOgImageUrl(siteUrl),
-    imageAlt: SITE_NAME,
-    siteName: SITE_NAME,
-    type: 'website',
-  };
+  return withOgImageMeta(
+    {
+      title: DEFAULT_TITLE,
+      description: DEFAULT_DESCRIPTION,
+      canonicalUrl: siteUrl,
+      imageAlt: SITE_NAME,
+      siteName: SITE_NAME,
+      type: 'website',
+    },
+    siteUrl,
+  );
 }
 
 function summarizeShareFonts(items, limit = 4) {
@@ -68,16 +84,17 @@ export function buildSharePageSeo({ origin, shareParam, payload: payloadIn }) {
     : `${siteOrigin}/share`;
 
   if (!payload) {
-    return {
-      title: `Поделиться шрифтами — ${SITE_NAME}`,
-      description: 'Ссылка на подборку шрифтов в DINAMIC FONT.',
-      canonicalUrl,
-      imageUrl: getDefaultOgImageUrl(siteOrigin),
-      imageAlt: SITE_NAME,
-      siteName: SITE_NAME,
-      type: 'website',
-      noIndex: true,
-    };
+    return withOgImageMeta(
+      {
+        title: `Поделиться шрифтами — ${SITE_NAME}`,
+        description: 'Ссылка на подборку шрифтов в DINAMIC FONT.',
+        canonicalUrl,
+        imageAlt: SITE_NAME,
+        siteName: SITE_NAME,
+        type: 'website',
+      },
+      siteOrigin,
+    );
   }
 
   const libraryName = String(payload?.library?.name || '').trim() || 'Подборка шрифтов';
@@ -87,13 +104,15 @@ export function buildSharePageSeo({ origin, shareParam, payload: payloadIn }) {
     ? `${count} шрифт${count === 1 ? '' : count < 5 ? 'а' : 'ов'}: ${sample}. Скачать или открыть в редакторе.`
     : `${count} шрифт${count === 1 ? '' : count < 5 ? 'а' : 'ов'} в подборке. Скачать или открыть в редакторе.`;
 
-  return {
-    title: `${libraryName} — ${SITE_NAME}`,
-    description,
-    canonicalUrl,
-    imageUrl: getDefaultOgImageUrl(siteOrigin),
-    imageAlt: libraryName,
-    siteName: SITE_NAME,
-    type: 'website',
-  };
+  return withOgImageMeta(
+    {
+      title: `${libraryName} — ${SITE_NAME}`,
+      description,
+      canonicalUrl,
+      imageAlt: libraryName,
+      siteName: SITE_NAME,
+      type: 'website',
+    },
+    siteOrigin,
+  );
 }
