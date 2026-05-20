@@ -1,4 +1,5 @@
-import React, { createContext, useState, useContext, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { useIsomorphicLayoutEffect } from '../hooks/useIsomorphicLayoutEffect';
 import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
 import { isPreviewTextDebugEnabled, previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 
@@ -260,7 +261,7 @@ export const SettingsProvider = ({ children }) => {
   }, []);
 
   /** До paint и до layout-детей (вкладка редактора), иначе race: mainTab уже шрифт, а text ещё дефолт → сброс строк в previewSettings. */
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setFontSize(getLocalStorageItem(LOCAL_STORAGE_KEYS.FONT_SIZE, DEFAULT_SETTINGS.FONT_SIZE));
     setGlyphsFontSize(
       getLocalStorageItem(LOCAL_STORAGE_KEYS.GLYPHS_FONT_SIZE, DEFAULT_SETTINGS.GLYPHS_FONT_SIZE),

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
@@ -96,23 +96,19 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                 setFormError('Аккаунт с такой почтой уже существует. Попробуйте войти.');
                 return;
               }
+              if (res.status === 503) {
+                setFormError('Регистрация на сервере требует DATABASE_URL. См. docs/AUTH_SETUP.md');
+                return;
+              }
               if (!res.ok) {
                 setFormError('Не удалось зарегистрироваться. Попробуйте ещё раз.');
                 return;
               }
 
-              const signInRes = await signIn('credentials', {
-                redirect: false,
-                email: trimmedEmail,
-                password: p1,
-                callbackUrl,
+              void router.replace({
+                pathname: '/auth/check-email',
+                query: { email: trimmedEmail, callbackUrl },
               });
-              if (signInRes?.error) {
-                setFormError('Аккаунт создан, но войти не получилось. Откройте страницу входа.');
-                return;
-              }
-              const nextUrl = typeof signInRes?.url === 'string' ? signInRes.url : callbackUrl;
-              void router.replace(nextUrl);
             } finally {
               submittingRef.current = false;
             }

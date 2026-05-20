@@ -25,9 +25,11 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   const callbackUrlRaw = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/';
   const callbackUrl = callbackUrlRaw.startsWith('/') ? callbackUrlRaw : '/';
   const oauthErrorCode = typeof router.query?.error === 'string' ? router.query.error : null;
+  const verifiedStatus = typeof router.query?.verified === 'string' ? router.query.verified : null;
   const [login, setLogin] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [formError, setFormError] = React.useState('');
+  const [pendingVerifyEmail, setPendingVerifyEmail] = React.useState('');
   const [credentialsEnabled, setCredentialsEnabled] = React.useState(null);
   const [isReturningUser, setIsReturningUser] = React.useState(false);
   const submittingRef = React.useRef(false);
@@ -88,6 +90,21 @@ export default function AuthSignInPage({ isRuGeo = false }) {
           {isReturningUser ? 'С возвращением!' : 'Добро пожаловать!'}
         </p>
 
+        {verifiedStatus === '1' ? (
+          <p className="mt-6 rounded-lg bg-green-50 px-3 py-2 text-xs font-medium text-green-800">
+            Email подтверждён. Теперь можно войти.
+          </p>
+        ) : null}
+        {verifiedStatus === 'expired' ? (
+          <p className="mt-6 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+            Ссылка устарела. Зарегистрируйтесь снова или запросите новое письмо на странице после регистрации.
+          </p>
+        ) : null}
+        {verifiedStatus && verifiedStatus !== '1' && verifiedStatus !== 'expired' && verifiedStatus !== 'missing' ? (
+          <p className="mt-6 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+            Ссылка подтверждения недействительна.
+          </p>
+        ) : null}
         {formError && oauthErrorCode ? (
           <p className="mt-6 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p>
         ) : null}
@@ -107,6 +124,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
             if (submittingRef.current) return;
             submittingRef.current = true;
             setFormError('');
+            setPendingVerifyEmail('');
             try {
               if (credentialsEnabled === false) {
                 setFormError('Вход по логину/паролю пока не настроен.');
@@ -125,6 +143,19 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                 callbackUrl,
               });
               if (res?.error) {
+                const hintRes = await fetch('/api/auth/email-verification-status', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: trimmedLogin }),
+                });
+                if (hintRes.ok) {
+                  const hint = await hintRes.json();
+                  if (hint?.needsVerification) {
+                    setPendingVerifyEmail(trimmedLogin);
+                    setFormError('Подтвердите email по ссылке из письма.');
+                    return;
+                  }
+                }
                 setFormError('Неверный логин или пароль.');
                 return;
               }
@@ -154,7 +185,17 @@ export default function AuthSignInPage({ isRuGeo = false }) {
             placeholder="ПАРОЛЬ"
           />
           {formError && !oauthErrorCode ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p>
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              <p>{formError}</p>
+              {pendingVerifyEmail ? (
+                <Link
+                  href={`/auth/check-email?email=${encodeURIComponent(pendingVerifyEmail)}`}
+                  className="mt-2 inline-block text-accent underline underline-offset-2"
+                >
+                  Отправить письмо снова
+                </Link>
+              ) : null}
+            </div>
           ) : null}
           <button type="submit" className={AUTH_PRIMARY_BTN_CLASS}>
             Вход

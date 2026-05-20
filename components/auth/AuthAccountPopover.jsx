@@ -1,4 +1,5 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useIsomorphicLayoutEffect } from '../../hooks/useIsomorphicLayoutEffect';
 import { createPortal } from 'react-dom';
 import { signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -109,7 +110,7 @@ function AccountMenuItem({ icon, children, onClick, className = '' }) {
 function useSidebarFooterMenuLayout(open, anchorRef) {
   const [layout, setLayout] = useState(null);
 
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!open || typeof window === 'undefined' || !anchorRef.current) {
       setLayout(null);
       return undefined;

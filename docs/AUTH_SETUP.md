@@ -17,6 +17,36 @@
 
 Провайдер подключается **только если** заданы оба ключа для этого провайдера. Можно включить только Google или только Яндекс.
 
+## 1a. Регистрация по email и подтверждение (Resend)
+
+**Полный пошаговый гайд:** [EMAIL_REGISTRATION_GUIDE.md](./EMAIL_REGISTRATION_GUIDE.md)
+
+Страницы: `/auth/signup` → письмо со ссылкой → `/api/auth/verify-email` → вход на `/auth/signin`.
+
+| Переменная | Назначение |
+| ---------- | ---------- |
+| `RESEND_API_KEY` | API-ключ [Resend](https://resend.com) (free tier) |
+| `EMAIL_FROM` | Отправитель, на free: `DINAMIC FONT <onboarding@resend.dev>` |
+| `DATABASE_URL` | Postgres (Neon или Vercel Postgres). **Обязательно на Vercel** для регистрации |
+
+**Локально без `RESEND_API_KEY`:** ссылка подтверждения печатается в консоль сервера (`bun dev`).
+
+**Локально без `DATABASE_URL`:** пользователи пишутся в `data/users.json`.
+
+**На Vercel:** без `DATABASE_URL` регистрация вернёт 503 — файловая система read-only.
+
+### Neon (бесплатный Postgres)
+
+1. [neon.tech](https://neon.tech) → проект → **Connection string** → `postgresql://...`
+2. В `.env.local` и Vercel: `DATABASE_URL=...`
+3. Таблица `users` создаётся автоматически при первой регистрации.
+
+### Resend
+
+1. Аккаунт → **API Keys** → создать ключ → `RESEND_API_KEY`
+2. Для теста: отправка с `onboarding@resend.dev` (уже в `.env.example`)
+3. Для продакшена: добавить домен `dynamicfont.ru` в Resend, DNS (SPF/DKIM), затем `EMAIL_FROM=noreply@dynamicfont.ru`
+
 ### Локально и на Vercel — это разные места
 
 | Где запускается сайт | Куда писать переменные |
@@ -31,6 +61,8 @@
 - `NEXTAUTH_SECRET` — случайная строка (не `dev-secret-change-me`)
 - `NEXTAUTH_URL` — `https://ваш-домен.ru` (как в браузере, без `/` в конце)
 - `GOOGLE_CLIENT_ID` и `GOOGLE_CLIENT_SECRET` — те же значения, что в `.env.local`
+- `DATABASE_URL` — Postgres (Neon), если нужна регистрация по email
+- `RESEND_API_KEY` и `EMAIL_FROM` — если нужны письма подтверждения
 
 После добавления или изменения переменных: **Deployments** → последний деплой → **Redeploy**.
 
