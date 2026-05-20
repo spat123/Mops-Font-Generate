@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import dynamicAnimationData from '../../assets/icon/Anim/Dinamic.json';
 
 /**
  * @typedef {import('lottie-web').AnimationItem} DinamicAnimationItem
  */
+
+const DINAMIC_ANIMATION_URL = '/icons/anim/Dinamic.json';
 
 function cloneAndRetintAnimation(source) {
   const cloned = JSON.parse(JSON.stringify(source));
@@ -44,7 +45,20 @@ function cloneAndRetintAnimation(source) {
   return cloned;
 }
 
-const loaderAnimationData = cloneAndRetintAnimation(dynamicAnimationData);
+/** @type {Promise<object> | null} */
+let loaderAnimationDataPromise = null;
+
+function loadLoaderAnimationData() {
+  if (!loaderAnimationDataPromise) {
+    loaderAnimationDataPromise = fetch(DINAMIC_ANIMATION_URL)
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load ${DINAMIC_ANIMATION_URL}`);
+        return res.json();
+      })
+      .then(cloneAndRetintAnimation);
+  }
+  return loaderAnimationDataPromise;
+}
 
 export const HexProgressLoader = React.memo(function HexProgressLoader({
   size = 80,
@@ -62,6 +76,7 @@ export const HexProgressLoader = React.memo(function HexProgressLoader({
     const mount = async () => {
       if (!containerRef.current) return;
       try {
+        const animationData = await loadLoaderAnimationData();
         const lottieModule = await import('lottie-web');
         if (destroyed || !containerRef.current) return;
         const lottie = lottieModule?.default || lottieModule;
@@ -70,7 +85,7 @@ export const HexProgressLoader = React.memo(function HexProgressLoader({
           renderer: 'svg',
           loop: true,
           autoplay: true,
-          animationData: loaderAnimationData,
+          animationData,
         });
         anim.play();
       } catch {

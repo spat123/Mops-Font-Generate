@@ -1,39 +1,23 @@
-import gridIconUrl from '../../assets/icon/edit/Grid.svg';
-import rowIconUrl from '../../assets/icon/edit/Row.svg';
-import alarmIconUrl from '../../assets/icon/edit/Alarm.svg';
-import ideaIconUrl from '../../assets/icon/edit/Idea.svg';
-import downloudIconUrl from '../../assets/icon/edit/Downloud.svg';
-import editIconUrl from '../../assets/icon/edit/Edit.svg';
-import enterIconUrl from '../../assets/icon/edit/Enter.svg';
-import linkIconUrl from '../../assets/icon/edit/Link.svg';
-import settingIconUrl from '../../assets/icon/edit/Setting.svg';
-import notificationIconUrl from '../../assets/icon/edit/Notification.svg';
-import moveAndSwapIconUrl from '../../assets/icon/edit/Move and swap.svg';
-import delIconUrl from '../../assets/icon/edit/Del.svg';
-import shareIconUrl from '../../assets/icon/edit/Share.svg';
-import searchIconUrl from '../../assets/icon/edit/Search.svg';
-import updateIconUrl from '../../assets/icon/edit/Update.svg';
-import loginIconUrl from '../../assets/icon/edit/Login.svg';
-import userIconUrl from '../../assets/icon/edit/User.svg';
-import heartIconUrl from '../../assets/icon/edit/Heart.svg';
+/** Статические SVG из `public/icons/edit/` (URL, не webpack-import). */
+function publicEditIcon(filename) {
+  return `/icons/edit/${encodeURIComponent(filename)}`;
+}
 
-export {
-  gridIconUrl,
-  rowIconUrl,
-  alarmIconUrl,
-  ideaIconUrl,
-  downloudIconUrl,
-  editIconUrl,
-  enterIconUrl,
-  linkIconUrl,
-  settingIconUrl,
-  notificationIconUrl,
-  moveAndSwapIconUrl,
-  delIconUrl,
-  shareIconUrl,
-  searchIconUrl,
-  updateIconUrl,
-  loginIconUrl,
-  userIconUrl,
-  heartIconUrl,
-};
+export const gridIconUrl = publicEditIcon('Grid.svg');
+export const rowIconUrl = publicEditIcon('Row.svg');
+export const alarmIconUrl = publicEditIcon('Alarm.svg');
+export const ideaIconUrl = publicEditIcon('Idea.svg');
+export const downloudIconUrl = publicEditIcon('Downloud.svg');
+export const editIconUrl = publicEditIcon('Edit.svg');
+export const enterIconUrl = publicEditIcon('Enter.svg');
+export const linkIconUrl = publicEditIcon('Link.svg');
+export const settingIconUrl = publicEditIcon('Setting.svg');
+export const notificationIconUrl = publicEditIcon('Notification.svg');
+export const moveAndSwapIconUrl = publicEditIcon('Move and swap.svg');
+export const delIconUrl = publicEditIcon('Del.svg');
+export const shareIconUrl = publicEditIcon('Share.svg');
+export const searchIconUrl = publicEditIcon('Search.svg');
+export const updateIconUrl = publicEditIcon('Update.svg');
+export const loginIconUrl = publicEditIcon('Login.svg');
+export const userIconUrl = publicEditIcon('User.svg');
+export const heartIconUrl = publicEditIcon('Heart.svg');

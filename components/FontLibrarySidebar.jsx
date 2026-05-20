@@ -27,6 +27,7 @@ import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
 import { useLibraryAuth } from '../contexts/LibraryAuthContext';
 import { AppButton } from './ui/AppButton';
+import { getBillingCopy } from '../utils/billingCopy';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
@@ -542,7 +543,7 @@ export default function FontLibrarySidebar({
                 Лимит библиотек достигнут
               </p>
               <p className="mt-1.5 text-[10px] font-normal text-gray-500">
-                Улучшите план, чтобы получать больше возможностей.
+                {getBillingCopy().upgradeHintReceive}
               </p>
             </div>
           </div>

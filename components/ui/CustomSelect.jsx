@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom';
 import { CatalogCheckboxMark } from '../catalog/CatalogCheckbox';
 import { SearchClearButton } from './SearchClearButton';
 import { useDismissibleLayer } from './useDismissibleLayer';
+import { SelectChevronIcon } from './SelectChevronIcon';
 
 /**
  * Кастомный выпадающий список (listbox): серый фон, акцент при наведении, разделители.
@@ -361,14 +362,7 @@ export const CustomSelect = forwardRef(function CustomSelect(
         className="pointer-events-none absolute inset-y-0 right-0 flex w-9 items-center justify-center text-gray-400 transition-colors group-hover:text-gray-800 peer-disabled:text-gray-600 peer-disabled:group-hover:text-gray-600"
         aria-hidden
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-        >
-          <path d="M5 7h10l-5 6-5-6z" />
-        </svg>
+        <SelectChevronIcon open={open} />
       </span>
       {listNode}
     </div>

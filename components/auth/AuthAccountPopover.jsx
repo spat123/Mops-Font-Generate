@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
@@ -10,11 +10,15 @@ import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { toast } from '../../utils/appNotify';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
-import { loginIconUrl, userIconUrl } from '../ui/editIconUrls';
+import { loginIconUrl, updateIconUrl, userIconUrl } from '../ui/editIconUrls';
 import {
   FREE_STATIC_GENERATIONS_LIMIT,
   readFreeStaticGenerationsUsed,
 } from '../../utils/freeStaticGenerationQuota';
+import { getBillingCopy } from '../../utils/billingCopy';
+import { SelectChevronIcon } from '../ui/SelectChevronIcon';
+
+const AVATAR_CLASS = 'h-4 w-4 shrink-0 rounded-full object-cover';
 
 function ProfileRow({ label, children }) {
   return (
@@ -38,12 +42,115 @@ function LabeledDivider({ children }) {
   );
 }
 
+function AccountTriggerAvatar({ authenticated, loading, session }) {
+  if (loading) {
+    return <span className={`${AVATAR_CLASS} animate-pulse bg-gray-200`} aria-hidden />;
+  }
+  if (authenticated && session?.user?.image) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={session.user.image} alt="" className={AVATAR_CLASS} referrerPolicy="no-referrer" />
+    );
+  }
+  if (!authenticated) {
+    return <EditAssetIcon src={loginIconUrl} className={`${AVATAR_CLASS} !rounded-none transition-transform group-hover:scale-110`} />;
+  }
+  return <EditAssetIcon src={userIconUrl} className={`${AVATAR_CLASS} !rounded-none transition-transform group-hover:scale-110`} />;
+}
+
+function ProfileDangerExpander({ onDelete }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="flex h-4 w-full items-center justify-center rounded-sm bg-gray-100 text-gray-500 transition-colors hover:bg-gray-900"
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Скрыть удаление аккаунта' : 'Показать удаление аккаунта'}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <SelectChevronIcon className="h-4 w-4" open={expanded} />
+      </button>
+      {expanded ? (
+        <div className="mt-0 overflow-hidden bg-white">
+          <div className="flex min-h-[3.25rem] items-center justify-between gap-4 pl-4 py-4">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-900">Удалить аккаунт</span>
+            <AppButton
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0 !border-accent !text-accent tracking-wide hover:!border-accent hover:!bg-accent hover:!text-white focus-visible:!ring-accent/40"
+              onClick={onDelete}
+            >
+              Удалить
+            </AppButton>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function AccountMenuItem({ icon, children, onClick, className = '' }) {
+  return (
+    <button
+      type="button"
+      className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm font-medium text-gray-900 transition-colors hover:bg-gray-100 ${className}`.trim()}
+      onClick={onClick}
+    >
+      {icon ? <span className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-600">{icon}</span> : null}
+      <span className="min-w-0 flex-1">{children}</span>
+    </button>
+  );
+}
+
+/** Меню над футером сайдбара: влево на всю доступную ширину (не обрезается overflow сайдбара). */
+function useSidebarFooterMenuLayout(open, anchorRef) {
+  const [layout, setLayout] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!open || typeof window === 'undefined' || !anchorRef.current) {
+      setLayout(null);
+      return undefined;
+    }
+
+    const sync = () => {
+      const anchorRect = anchorRef.current.getBoundingClientRect();
+      const footerEl = anchorRef.current.closest('[data-sidebar-footer]');
+      const footerRect = footerEl?.getBoundingClientRect();
+      const inset = 8;
+      const left = footerRect ? footerRect.left + inset : anchorRect.left;
+      const width = Math.max(200, anchorRect.right - left - inset);
+
+      setLayout({
+        left,
+        width,
+        bottom: window.innerHeight - anchorRect.top + inset,
+      });
+    };
+
+    sync();
+    window.addEventListener('resize', sync);
+    window.addEventListener('scroll', sync, true);
+    return () => {
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('scroll', sync, true);
+    };
+  }, [open, anchorRef]);
+
+  return layout;
+}
+
 export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const { planName, isPro, librariesCount, librariesLimit, openPlans } = useLibraryAuth();
-  const [open, setOpen] = useState(false);
+  const billing = getBillingCopy();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
   const panelRef = useRef(null);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -51,21 +158,31 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
 
   const callbackUrl = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
 
+  const showAccountMenu = menuOpen && !profileOpen;
+  const menuLayout = useSidebarFooterMenuLayout(showAccountMenu, rootRef);
+
   useDismissibleLayer({
-    open,
-    refs: [rootRef, panelRef],
-    onDismiss: () => setOpen(false),
+    open: showAccountMenu,
+    refs: [rootRef, menuRef],
+    onDismiss: () => setMenuOpen(false),
+  });
+
+  const authenticated = status === 'authenticated' && session?.user;
+
+  useDismissibleLayer({
+    open: profileOpen && Boolean(authenticated),
+    refs: [panelRef],
+    onDismiss: () => setProfileOpen(false),
   });
 
   useEffect(() => {
-    if (isSidebarCollapsed) setOpen(false);
+    if (isSidebarCollapsed) {
+      setMenuOpen(false);
+      setProfileOpen(false);
+    }
   }, [isSidebarCollapsed]);
 
-  const authenticated = status === 'authenticated' && session?.user;
   const loading = status === 'loading';
-  const provider = authenticated ? String(session.user?.provider || '') : '';
-  const providerLabel =
-    provider === 'google' ? 'Google' : provider === 'yandex' ? 'Яндекс' : provider === 'credentials' ? 'Email' : provider || '—';
   const planLabel = isPro ? 'Pro' : planName || 'Free';
   const limitText =
     typeof librariesCount === 'number' && typeof librariesLimit === 'number'
@@ -83,14 +200,20 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const accountTriggerTooltip = loading
     ? 'Загрузка сессии…'
     : authenticated
-      ? 'Аккаунт и план'
+      ? 'Аккаунт'
       : 'Войти в аккаунт';
+
+  const displayName =
+    authenticated && session.user?.name
+      ? String(session.user.name).trim()
+      : authenticated && session.user?.email
+        ? String(session.user.email).split('@')[0]
+        : '';
 
   const sessionNameParts = authenticated && session?.user?.name ? String(session.user.name).trim().split(/\s+/) : [];
   const sessionFirst = sessionNameParts[0] || '';
   const sessionRest = sessionNameParts.slice(1).join(' ') || '';
-  const profileDirty =
-    firstName.trim() !== sessionFirst || lastName.trim() !== sessionRest;
+  const profileDirty = firstName.trim() !== sessionFirst || lastName.trim() !== sessionRest;
 
   useEffect(() => {
     if (!authenticated || !session?.user?.name) {
@@ -104,10 +227,10 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   }, [authenticated, session?.user?.name]);
 
   useEffect(() => {
-    if (!open || !authenticated || typeof window === 'undefined') return;
+    if (!profileOpen || !authenticated || typeof window === 'undefined') return;
     const uid = session?.user?.id;
     setFreeGenUsed(readFreeStaticGenerationsUsed(uid));
-  }, [open, authenticated, session?.user?.id]);
+  }, [profileOpen, authenticated, session?.user?.id]);
 
   useEffect(() => {
     if (!authenticated || typeof window === 'undefined') return;
@@ -122,30 +245,36 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   }, [authenticated, session?.user?.id]);
 
   useEffect(() => {
-    if (!open || !authenticated || typeof window === 'undefined') return;
+    if (!profileOpen || !authenticated || typeof window === 'undefined') return;
     const uid = session?.user?.id;
     const onFocus = () => setFreeGenUsed(readFreeStaticGenerationsUsed(uid));
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [open, authenticated, session?.user?.id]);
+  }, [profileOpen, authenticated, session?.user?.id]);
 
   useEffect(() => {
-    if (!open || !authenticated || typeof document === 'undefined') return undefined;
+    if (!profileOpen || !authenticated || typeof document === 'undefined') return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [open, authenticated]);
+  }, [profileOpen, authenticated]);
+
+  const handleSignOut = () => {
+    setMenuOpen(false);
+    setProfileOpen(false);
+    void signOut({ callbackUrl: router.asPath || '/' });
+  };
 
   const accountModal =
-    open && authenticated && typeof document !== 'undefined'
+    profileOpen && authenticated && typeof document !== 'undefined'
       ? createPortal(
           <div
             className="fixed inset-0 z-[500] flex items-center justify-center bg-black/30 p-4"
             role="presentation"
             onClick={(e) => {
-              if (e.target === e.currentTarget) setOpen(false);
+              if (e.target === e.currentTarget) setProfileOpen(false);
             }}
           >
             <div
@@ -156,15 +285,13 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
               className="flex max-h-[min(90vh,44rem)] w-full max-w-3xl flex-col overflow-hidden rounded-none bg-white"
               onClick={(e) => e.stopPropagation()}
             >
-              <PopupDialogHeader title="Профиль" onClose={() => setOpen(false)} closeAriaLabel="Закрыть" />
+              <PopupDialogHeader title="Профиль" onClose={() => setProfileOpen(false)} closeAriaLabel="Закрыть" />
 
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-2 rounded-lg bg-gray-50 p-4">
                     <p className="text-base font-semibold uppercase leading-tight text-gray-900">{planLabel}</p>
-                    <p className="text-xs font-medium leading-snug tracking-wide text-gray-700">
-                      {planBlurb}
-                    </p>
+                    <p className="text-xs font-medium leading-snug tracking-wide text-gray-700">{planBlurb}</p>
                     <AppButton
                       type="button"
                       variant="outline"
@@ -172,11 +299,11 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                       fullWidth
                       className="mt-auto tracking-wide"
                       onClick={() => {
-                        setOpen(false);
+                        setProfileOpen(false);
                         openPlans?.();
                       }}
                     >
-                      Показать планы
+                      {billing.showPlans}
                     </AppButton>
                   </div>
 
@@ -186,7 +313,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                         Лимит библиотек достигнут
                       </p>
                       <p className="text-xs font-medium leading-snug text-gray-700">
-                        Улучшите план, чтобы получить больше возможностей.
+                        {billing.upgradeHint}
                       </p>
                       <AppButton
                         type="button"
@@ -195,7 +322,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                         fullWidth
                         className="mt-4 tracking-wide"
                         onClick={() => {
-                          setOpen(false);
+                          setProfileOpen(false);
                           openPlans?.();
                         }}
                       >
@@ -214,8 +341,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                               <span>
                                 Генерация:{' '}
                                 <span className="tabular-nums text-gray-800">
-                                  {Math.max(0, FREE_STATIC_GENERATIONS_LIMIT - freeGenUsed)}/
-                                  {FREE_STATIC_GENERATIONS_LIMIT}
+                                  {Math.max(0, FREE_STATIC_GENERATIONS_LIMIT - freeGenUsed)}/{FREE_STATIC_GENERATIONS_LIMIT}
                                 </span>
                               </span>
                             ) : (
@@ -281,10 +407,10 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   Сохранить
                 </AppButton>
 
-                <div className="mt-8">
+                <div className="mt-4">
                   <LabeledDivider>Ещё</LabeledDivider>
-                  <div className="mt-4 space-y-0 overflow-hidden bg-white">
-                    <div className="flex min-h-[3.25rem] items-center justify-between gap-4 border-b border-gray-200 pl-4 py-4">
+                  <div className="space-y-0 overflow-hidden bg-white">
+                    <div className="flex min-h-[3.25rem] items-center justify-between gap-4 pl-4 py-4">
                       <span className="text-xs font-semibold uppercase tracking-wide text-gray-900">
                         Выйти из аккаунта
                       </span>
@@ -293,32 +419,106 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                         variant="outline"
                         size="sm"
                         className="shrink-0 tracking-wide"
-                        onClick={() => {
-                          setOpen(false);
-                          void signOut({ callbackUrl: router.asPath || '/' });
-                        }}
+                        onClick={handleSignOut}
                       >
                         Выйти
                       </AppButton>
                     </div>
-                    <div className="flex min-h-[3.25rem] items-center justify-between gap-4 pl-4 py-4">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-900">Удалить аккаунт</span>
-                      <AppButton
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 !border-accent !text-accent tracking-wide hover:!border-accent hover:!bg-accent hover:!text-white focus-visible:!ring-accent/40"
-                        onClick={() => {
-                          toast.info('Удаление аккаунта появится в следующей версии.');
-                        }}
-                      >
-                        Удалить
-                      </AppButton>
-                    </div>
                   </div>
+                  <ProfileDangerExpander
+                    onDelete={() => {
+                      toast.info('Удаление аккаунта появится в следующей версии.');
+                    }}
+                  />
                 </div>
               </div>
             </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  const accountMenuPortal =
+    menuLayout && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={menuRef}
+            role={authenticated ? 'menu' : 'dialog'}
+            aria-label={authenticated ? 'Меню аккаунта' : 'Вход в аккаунт'}
+            className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+            style={{
+              position: 'fixed',
+              left: menuLayout.left,
+              width: menuLayout.width,
+              bottom: menuLayout.bottom,
+              zIndex: 450,
+            }}
+          >
+            {authenticated ? (
+              <div>
+                <div className="border-b border-gray-100 px-4 py-4">
+                  {displayName ? (
+                    <p className="truncate text-sm font-semibold leading-snug text-gray-900">{displayName}</p>
+                  ) : null}
+                  {session.user.email ? (
+                    <p className="mt-0.5 truncate text-xs text-gray-500">{session.user.email}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="mt-3 flex h-8 w-full items-center justify-center gap-2 rounded-sm border border-gray-200 bg-white text-xs font-semibold text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      openPlans?.();
+                    }}
+                  >
+                    <EditAssetIcon src={updateIconUrl} className="h-3.5 w-3.5" />
+                    {billing.menuButton}
+                  </button>
+                </div>
+
+                <div className="px-2 py-2">
+                  <AccountMenuItem
+                    icon={<EditAssetIcon src={userIconUrl} className="h-4 w-4" />}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setProfileOpen(true);
+                    }}
+                  >
+                    Профиль
+                  </AccountMenuItem>
+                </div>
+
+                <div className="border-t border-gray-100 px-2 py-2">
+                  <AccountMenuItem
+                    icon={<EditAssetIcon src={loginIconUrl} className="h-4 w-4 -scale-x-100" />}
+                    onClick={handleSignOut}
+                  >
+                    Выйти
+                  </AccountMenuItem>
+                </div>
+              </div>
+            ) : loading ? (
+              <p className="px-4 py-6 text-center text-xs uppercase text-gray-500">Загрузка…</p>
+            ) : (
+              <div className="flex flex-col gap-3 p-4">
+                <p className="text-center text-xs font-semibold uppercase leading-snug text-gray-700">
+                  Войдите, чтобы создавать библиотеки.
+                </p>
+                <SignInProviderButtons callbackUrl={callbackUrl} />
+                <AppButton
+                  type="button"
+                  variant="link"
+                  fullWidth
+                  className="text-center"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void router.push('/auth/signin');
+                  }}
+                >
+                  Полная страница входа
+                </AppButton>
+              </div>
+            )}
           </div>,
           document.body,
         )
@@ -332,92 +532,36 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
       <Tooltip
         content={accountTriggerTooltip}
         as="div"
-        className={
-          isSidebarCollapsed
-            ? 'flex w-full justify-center'
-            : 'flex h-full min-h-0 w-full min-w-0'
-        }
+        className={isSidebarCollapsed ? 'flex w-full justify-center' : 'flex h-full min-h-0 w-full min-w-0'}
       >
         <AppButton
           type="button"
           variant="toolbarIcon"
-          pressed={open}
+          pressed={menuOpen || profileOpen}
           size={isSidebarCollapsed ? 'icon' : 'rail'}
-          className={
-            isSidebarCollapsed
-              ? 'group'
-              : 'group w-full overflow-hidden [&_img]:max-h-9'
-          }
+          className={isSidebarCollapsed ? 'group' : 'group w-full overflow-hidden'}
           onClick={() => {
             if (loading) return;
             if (!authenticated) {
-              setOpen(false);
+              setMenuOpen(false);
               void router.push({
                 pathname: '/auth/signin',
                 query: { callbackUrl: router.asPath || '/' },
               });
               return;
             }
-            setOpen((v) => !v);
+            setMenuOpen((v) => !v);
           }}
           aria-label={authenticated ? 'Аккаунт' : 'Войти'}
-          aria-expanded={authenticated ? open : undefined}
-          aria-haspopup={authenticated ? 'dialog' : undefined}
+          aria-expanded={authenticated ? menuOpen : undefined}
+          aria-haspopup={authenticated ? 'menu' : undefined}
         >
-          {authenticated && session.user?.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={session.user.image}
-              alt=""
-              className={`rounded-md object-cover ${isSidebarCollapsed ? 'h-6 w-6' : 'h-full w-full min-h-0 min-w-0 max-h-9'}`}
-            />
-          ) : !authenticated ? (
-            <EditAssetIcon
-              src={loginIconUrl}
-              className="h-4 w-4 transition-transform group-hover:scale-110"
-            />
-          ) : (
-            <EditAssetIcon
-              src={userIconUrl}
-              className="h-4 w-4 transition-transform group-hover:scale-110"
-            />
-          )}
+          <AccountTriggerAvatar authenticated={authenticated} loading={loading} session={session} />
         </AppButton>
       </Tooltip>
 
+      {accountMenuPortal}
       {accountModal}
-
-      {open && !authenticated ? (
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-label="Вход в аккаунт"
-          className="absolute bottom-full right-0 z-[450] mb-2 w-[min(18rem,calc(100vw-1rem))] rounded-lg border border-gray-200 bg-white p-4"
-        >
-          {loading ? (
-            <p className="text-center text-xs uppercase text-gray-500">Загрузка…</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-center text-xs font-semibold uppercase leading-snug text-gray-700">
-                Войдите, чтобы создавать библиотеки.
-              </p>
-              <SignInProviderButtons callbackUrl={callbackUrl} />
-              <AppButton
-                type="button"
-                variant="link"
-                fullWidth
-                className="text-center"
-                onClick={() => {
-                  setOpen(false);
-                  void router.push('/auth/signin');
-                }}
-              >
-                Полная страница входа
-              </AppButton>
-            </div>
-          )}
-        </div>
-      ) : null}
     </div>
   );
 }

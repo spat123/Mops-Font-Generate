@@ -7,6 +7,7 @@ import {
 import { useDismissibleLayer } from './useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { Tooltip } from './Tooltip';
+import { SelectChevronIcon } from './SelectChevronIcon';
 
 export function FontLibraryStatusMenu({
   libraries = [],
@@ -91,9 +92,7 @@ export function FontLibraryStatusMenu({
         }`}
       >
         <span className="truncate">{buttonLabel}</span>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 shrink-0" aria-hidden>
-          <path d="M5 7h10l-5 6-5-6z" />
-        </svg>
+        <SelectChevronIcon className="h-3 w-3" open={open} />
       </button>
       {open ? (
         <div className="absolute bottom-full right-0 z-40 mb-1 min-w-[14rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg" role="menu">

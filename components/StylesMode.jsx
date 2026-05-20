@@ -9,10 +9,9 @@ import {
   ITALIC_VARIATIONS,
   WEIGHT_VARIATIONS,
 } from '../utils/stylesPreviewModel';
-import alarmIconUrl from '../assets/icon/edit/Alarm.svg';
-import ideaIconUrl from '../assets/icon/edit/Idea.svg';
+import { alarmIconUrl, ideaIconUrl } from './ui/editIconUrls';
 
-/** Монохром из assets/icon/edit: цвет через `currentColor` (mask + background). */
+/** Монохром из public/icons/edit: цвет через `currentColor` (mask + background). */
 function EditToolbarIcon({ src, className = '' }) {
   return (
     <span

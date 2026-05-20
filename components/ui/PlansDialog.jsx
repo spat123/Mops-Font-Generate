@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useDismissibleLayer } from './useDismissibleLayer';
 import { AppButton } from './AppButton';
 import { MAX_SAVED_LIBRARIES_PRO_ACCOUNT } from '../../utils/authLibraryLimits';
+import { getBillingCopy } from '../../utils/billingCopy';
 
 function PlanCard({ title, price, features = [], active = false, highlight = false, action = null, badge = null }) {
   return (
@@ -41,8 +42,9 @@ function PlanCard({ title, price, features = [], active = false, highlight = fal
   );
 }
 
-export function PlansDialog({ open, onClose, currentPlan = 'Free' }) {
+export function PlansDialog({ open, onClose, currentPlan = 'Free', locale = 'RU' }) {
   const panelRef = useRef(null);
+  const copy = getBillingCopy(locale);
 
   useDismissibleLayer({
     open,
@@ -69,7 +71,7 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free' }) {
       >
         <div className="flex items-stretch border-b border-gray-200 bg-white">
           <div className="flex min-h-12 min-w-0 flex-1 items-center px-6 py-3">
-            <h2 className="text-lg font-semibold uppercase tracking-tight text-gray-900">Планы</h2>
+            <h2 className="text-lg font-semibold uppercase tracking-tight text-gray-900">{copy.dialogTitle}</h2>
           </div>
           <button
             type="button"
@@ -104,7 +106,7 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free' }) {
               ]}
               action={
                 <AppButton type="button" fullWidth disabled>
-                  Улучшить план (скоро)
+                  {copy.upgradeCtaSoon}
                 </AppButton>
               }
             />

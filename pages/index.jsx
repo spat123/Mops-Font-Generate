@@ -25,6 +25,7 @@ import { useFontLibraries } from '../hooks/useFontLibraries';
 import { LibraryAuthProvider } from '../contexts/LibraryAuthContext';
 import { getMaxSavedLibrariesForUser } from '../utils/authLibraryLimits';
 import { PlansDialog } from '../components/ui/PlansDialog';
+import { getBillingCopy } from '../utils/billingCopy';
 import { areIdOrdersEqual, moveItemById, orderItemsByIdList } from '../utils/arrayOrder';
 import {
   getFontIdsToRemoveWhenLibraryDeleted,
@@ -277,7 +278,7 @@ export default function Home() {
     }
     const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
     if (fontLibraries.length >= maxLibs) {
-      toast.info('Лимит библиотек достигнут. Посмотрите планы, чтобы получить больше возможностей.');
+      toast.info(getBillingCopy().librariesLimitToast);
       openPlans();
       return false;
     }
@@ -2965,7 +2966,7 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           <span className="truncate uppercase">Библиотеки</span>
           <span
             className="shrink-0 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600"
-            title="Тариф"
+            title={getBillingCopy().badgeTitle}
           >
             {planBadgeShort}
           </span>

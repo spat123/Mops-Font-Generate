@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Монохромная иконка из `assets/icon/edit/*.svg`.
+ * Монохромная иконка из `public/icons/edit/*.svg` (URL через editIconUrls).
  * SVG подключается как URL (asset/resource), цвет управляется через `currentColor`.
  */
 export function EditAssetIcon({ src, className = '' }) {

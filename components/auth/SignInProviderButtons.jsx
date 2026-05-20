@@ -88,7 +88,7 @@ export function SignInProviderButtons({ callbackUrl = '/', layout = 'stack', app
     <>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/icons/yandex-mark.svg"
+        src="/icons/ya_favicon.svg"
         alt=""
         width={20}
         height={20}

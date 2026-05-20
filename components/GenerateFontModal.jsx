@@ -19,6 +19,7 @@ import {
   writeFreeStaticGenerationsUsed,
 } from '../utils/freeStaticGenerationQuota';
 import { sanitizeVariableSettingsForInstancer } from '../utils/sanitizeVariableSettingsForInstancer';
+import { getBillingCopy } from '../utils/billingCopy';
 
 const SUBFAMILY_CUSTOM_VALUE = '__custom__';
 const SUBFAMILY_PRESETS = [
@@ -236,7 +237,7 @@ export default function GenerateFontModal({
         requestSignIn?.();
         return;
       }
-      toast.info('Вы исчерпали лимит генераций в этом месяце. Посмотрите планы Pro.');
+      toast.info(getBillingCopy().generationLimitToast);
       openPlans?.();
       return;
     }

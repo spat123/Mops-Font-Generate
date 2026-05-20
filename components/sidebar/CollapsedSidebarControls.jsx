@@ -10,6 +10,7 @@ import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { updateIconUrl } from '../ui/editIconUrls';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../../utils/colorUtils';
+import { getBillingCopy } from '../../utils/billingCopy';
 
 function getNextCycleValue(options, currentValue) {
   const values = (Array.isArray(options) ? options : [])
@@ -286,13 +287,13 @@ function CollapsedLibraryRail({
   const limitFooter = showLimitUpgrade ? (
     <div className="w-full shrink-0 bg-white">
       <div className="flex justify-center">
-        <Tooltip content="Лимит библиотек достигнут — открыть планы" openDelayMs={200}>
+        <Tooltip content={getBillingCopy().tooltipOpenPlans} openDelayMs={200}>
           <AppButton
             type="button"
             variant="toolbarIcon"
             size="icon"
             className="!text-accent hover:!bg-accent hover:!text-white"
-            aria-label="Лимит библиотек достигнут. Улучшить план"
+            aria-label={getBillingCopy().ariaUpgradePlan}
             onClick={() => openPlans?.()}
           >
             <EditAssetIcon src={updateIconUrl} className="h-5 w-5" />

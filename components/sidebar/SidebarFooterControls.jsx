@@ -751,7 +751,10 @@ export default function SidebarFooterControls({
   return (
     <>
       {settingsDialog}
-      <div className="relative h-[52px] box-border border-t border-gray-200 bg-white p-2">
+      <div
+        data-sidebar-footer
+        className="relative h-[52px] box-border border-t border-gray-200 bg-white p-2"
+      >
         <div
           className={
             isSidebarCollapsed
