@@ -234,7 +234,37 @@ vercel login
 
 ---
 
-## 11. Частые проблемы
+## 11. Analytics и Speed Insights
+
+В проекте подключены пакеты `@vercel/analytics` и `@vercel/speed-insights` в `pages/_app.jsx`. Данные появятся **только после включения в панели Vercel** и деплоя с этим кодом.
+
+### 11.1. Включить в Dashboard
+
+1. [vercel.com](https://vercel.com) → ваш проект.
+2. **Analytics** → **Enable** (просмотры страниц, referrers, страны).
+3. **Speed Insights** → **Enable** (Core Web Vitals: LCP, INP, CLS).
+4. **Deployments** → последний production → **Redeploy** (если код только что добавили).
+
+Отдельные API-ключи в Environment Variables **не нужны** — сервисы привязаны к проекту Vercel.
+
+### 11.2. Где смотреть метрики
+
+| Вкладка | Что там |
+|---------|---------|
+| **Analytics** | Посещения, топ страниц, устройства |
+| **Speed Insights** | Скорость загрузки по реальным визитам |
+
+На **localhost** события обычно **не отправляются** — проверяйте на `https://dynamicfont.ru` (или preview URL).
+
+### 11.3. Приватность
+
+Упомяните в [политике конфиденциальности](/legal/privacy) использование аналитики и измерение производительности (Vercel, обезличенные технические данные). Подробнее о ПДн — [AUTH_SETUP.md](./AUTH_SETUP.md), §6.
+
+Тарифы и лимиты free tier — на [vercel.com/pricing](https://vercel.com/pricing).
+
+---
+
+## 12. Частые проблемы
 
 | Симптом | Что проверить |
 |---------|----------------|
@@ -252,7 +282,7 @@ vercel login
 
 ---
 
-## 12. Краткая шпаргалка
+## 13. Краткая шпаргалка
 
 ```
 develop  --push-->  Preview URL     (тестируете вы)

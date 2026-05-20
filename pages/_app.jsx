@@ -8,6 +8,8 @@ import { SettingsProvider } from '../contexts/SettingsContext';
 import { FontProvider } from '../contexts/FontContext';
 import { AuthReturningUserMarker } from '../components/auth/AuthReturningUserMarker';
 import Head from 'next/head';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export default function MyApp({ Component, pageProps: { session, ...pageProps } }) {
   // Очищаем все шрифты при загрузке страницы
@@ -74,6 +76,8 @@ export default function MyApp({ Component, pageProps: { session, ...pageProps } 
           </FontProvider>
         </SettingsProvider>
       </SessionProvider>
+      <Analytics />
+      <SpeedInsights />
     </>
   );
 } 
