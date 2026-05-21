@@ -161,6 +161,7 @@ export const authOptions = {
       if (account && user) {
         if (account.provider === 'credentials') {
           const rec = user.email ? await findUserByEmail(user.email) : null;
+          token.provider = 'credentials';
           token.userId = rec?.id || user.id || token.sub;
           token.accountCreatedAt = rec?.createdAt || null;
           token.needsLink = false;
@@ -215,7 +216,6 @@ export const authOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.provider = token.provider;
         session.user.id = token.userId || session.user.id;
         session.user.accountCreatedAt = token.accountCreatedAt || null;
         session.user.needsLink = Boolean(token.needsLink);
@@ -224,28 +224,27 @@ export const authOptions = {
         const ageDays = Number.isFinite(createdAtMs) ? Math.floor((Date.now() - createdAtMs) / (1000 * 60 * 60 * 24)) : null;
         session.user.accountAgeDays = ageDays;
 
-        const minAgeDays = Number.parseInt(process.env.MIN_OAUTH_ACCOUNT_AGE_DAYS || '30', 10);
-        const isOAuth = token.provider && token.provider !== 'credentials';
-        if (session.user.needsLink) {
-          session.user.canCreateLibraries = false;
-          session.user.canCreateLibrariesReason = 'Подтвердите привязку аккаунта, чтобы продолжить.';
-        } else if (isOAuth && Number.isFinite(minAgeDays) && minAgeDays > 0 && Number.isFinite(ageDays) && ageDays < minAgeDays) {
-          session.user.canCreateLibraries = false;
-          session.user.canCreateLibrariesReason = `Новые аккаунты смогут создавать библиотеки через ${minAgeDays - ageDays} дн.`;
-        } else {
-          session.user.canCreateLibraries = true;
-          session.user.canCreateLibrariesReason = null;
-        }
-
         let plan = 'free';
+        let dbProvider = null;
         const uid = token.userId != null ? String(token.userId) : '';
         if (uid && !uid.startsWith('pending:')) {
           try {
             const rec = await findUserById(uid);
             plan = String(rec?.plan || '').toLowerCase() === 'pro' ? 'pro' : 'free';
+            dbProvider = rec?.provider || null;
           } catch {
             plan = 'free';
           }
+        }
+        session.user.provider = dbProvider || token.provider || null;
+
+        // Возраст аккаунта Google через OAuth API недоступен — не блокируем по дате записи в нашей БД.
+        if (session.user.needsLink) {
+          session.user.canCreateLibraries = false;
+          session.user.canCreateLibrariesReason = 'Подтвердите привязку аккаунта, чтобы продолжить.';
+        } else {
+          session.user.canCreateLibraries = true;
+          session.user.canCreateLibrariesReason = null;
         }
         session.user.plan = plan;
         session.user.isPro = plan === 'pro';

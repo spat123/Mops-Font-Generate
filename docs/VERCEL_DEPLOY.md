@@ -74,8 +74,6 @@ git push -u origin develop
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | ✅ | ✅ | См. redirect URI в §4 |
 | `YANDEX_CLIENT_ID` / `YANDEX_CLIENT_SECRET` | ✅ | ✅ | То же |
 | `AUTH_CREDENTIALS_LOGIN` / `AUTH_CREDENTIALS_PASSWORD` | по желанию | по желанию | Демо-вход, если нужен на staging |
-| `MIN_OAUTH_ACCOUNT_AGE_DAYS` | по желанию | по желанию | Анти-фрод для OAuth |
-
 Переменные с префиксом `DEV_PRO_*` — **только локально** в `.env.local`, на Vercel не нужны.
 
 После изменения переменных сделайте **Redeploy** нужного деплоя (Variables применяются к **новым** сборкам).
