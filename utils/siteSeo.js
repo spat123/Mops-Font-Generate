@@ -68,21 +68,25 @@ function summarizeShareFonts(items, limit = 4) {
 }
 
 /**
- * SEO для `/share?share=...` (SSR — превью в Telegram, WhatsApp, VK и т.д.).
- * @param {{ origin?: string, shareParam?: string, payload?: object | null }} input
+ * SEO для `/share?id=...` или `/share?share=...` (SSR — превью в мессенджерах).
+ * @param {{ origin?: string, shortId?: string, shareParam?: string, payload?: object | null }} input
  */
-export function buildSharePageSeo({ origin, shareParam, payload: payloadIn }) {
+export function buildSharePageSeo({ origin, shortId, shareParam, payload: payloadIn }) {
   const siteOrigin = origin || getSiteOrigin();
+  const id = String(shortId || '').trim();
+  const legacy = String(shareParam || '').trim();
   const payload =
     payloadIn !== undefined
       ? payloadIn
-      : shareParam
-        ? decodeLibrarySharePayloadFromQueryParam(shareParam)
+      : legacy
+        ? decodeLibrarySharePayloadFromQueryParam(legacy)
         : null;
 
-  const canonicalUrl = shareParam
-    ? `${siteOrigin}/share?share=${encodeURIComponent(String(shareParam))}`
-    : `${siteOrigin}/share`;
+  const canonicalUrl = id
+    ? `${siteOrigin}/share?id=${encodeURIComponent(id)}`
+    : legacy
+      ? `${siteOrigin}/share?share=${encodeURIComponent(legacy)}`
+      : `${siteOrigin}/share`;
 
   if (!payload) {
     return withOgImageMeta(
@@ -105,7 +109,7 @@ export function buildSharePageSeo({ origin, shareParam, payload: payloadIn }) {
     ? `${count} шрифт${count === 1 ? '' : count < 5 ? 'а' : 'ов'}: ${sample}. Скачать или открыть в редакторе.`
     : `${count} шрифт${count === 1 ? '' : count < 5 ? 'а' : 'ов'} в подборке. Скачать или открыть в редакторе.`;
 
-  const imageUrl = buildShareOgImageUrl(siteOrigin, shareParam);
+  const imageUrl = buildShareOgImageUrl(siteOrigin, { shortId: id, shareParam: legacy });
 
   return {
     title: `${libraryName} — ${SITE_NAME}`,

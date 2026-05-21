@@ -21,10 +21,10 @@ const SHARE_ACTIONS_GRID =
   'grid w-full grid-cols-5 items-stretch gap-1.5 sm:gap-2';
 
 const SHARE_SOCIAL_BTN =
-  'group flex w-full min-w-0 flex-col items-center justify-center gap-2 border-0 bg-transparent px-0.5 py-0 text-gray-800 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-40';
+  'group flex w-full min-w-0 flex-col items-center justify-center gap-3 border-0 bg-transparent px-0.5 py-0 text-gray-800 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-40';
 
 const SHARE_COPY_BTN =
-  'group flex w-full min-w-0 flex-col items-center justify-center gap-2 rounded-lg bg-gray-50 px-1 py-2 text-gray-800 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40';
+  'group flex w-full min-w-0 flex-col items-center justify-center gap-3 rounded-lg bg-gray-50 px-1 py-2 text-gray-800 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40';
 
 /** Иконка «копировать ссылку» (цепочка), отдельно от соц. брендов */
 const SHARE_LINK_ICON = 'h-6 w-6 shrink-0 text-gray-900';

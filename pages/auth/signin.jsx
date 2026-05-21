@@ -302,19 +302,6 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               className={AUTH_INPUT_CLASS}
               placeholder="ПАРОЛЬ"
             />
-            {credentialsEnabled !== false ? (
-              <p className="-mt-1 text-right">
-                <Link
-                  href={{
-                    pathname: '/auth/forgot-password',
-                    query: { callbackUrl, email: String(login || '').trim() || undefined },
-                  }}
-                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600 underline underline-offset-2 hover:text-gray-900"
-                >
-                  Забыли пароль?
-                </Link>
-              </p>
-            ) : null}
             {formError && !oauthErrorCode ? (
               <div className={AUTH_FORM_ERROR_CLASS}>
                 <p>{formError}</p>
@@ -329,6 +316,19 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               </div>
             ) : null}
             <AuthSubmitButton loading={submitting}>Вход</AuthSubmitButton>
+            {credentialsEnabled !== false ? (
+              <p className="mt-3 text-center">
+                <Link
+                  href={{
+                    pathname: '/auth/forgot-password',
+                    query: { callbackUrl, email: String(login || '').trim() || undefined },
+                  }}
+                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600 underline underline-offset-2 hover:text-gray-900"
+                >
+                  Забыли пароль?
+                </Link>
+              </p>
+            ) : null}
           </form>
         ) : step === 'code' ? (
           <form

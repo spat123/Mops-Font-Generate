@@ -41,6 +41,7 @@ import {
   downloadGooglePackageZip,
   saveArchiveBlob,
 } from '../utils/catalogDownloadActions';
+import { GLYPH_COUNT_UNAVAILABLE } from './GlyphsMode';
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -189,6 +190,12 @@ export default function FontPreview({
   useEffect(() => {
     if (viewMode !== 'glyphs') setGlyphFooterCount(null);
   }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode === 'glyphs' && selectedFont?.source === 'google') {
+      setGlyphFooterCount(GLYPH_COUNT_UNAVAILABLE);
+    }
+  }, [viewMode, selectedFont?.source, selectedFont?.id]);
 
   useEffect(() => {
     if (viewMode === 'styles') setHasEverMountedStylesMode(true);
@@ -661,6 +668,12 @@ export default function FontPreview({
       case 'waterfall':
         return `Рядов: ${effectiveWaterfallSizes.length}`;
       case 'glyphs':
+        if (
+          selectedFont?.source === 'google' ||
+          glyphFooterCount === GLYPH_COUNT_UNAVAILABLE
+        ) {
+          return 'Глифы недоступны для Google';
+        }
         if (glyphFooterCount === null) return 'Глифы: загрузка…';
         return `Глифов: ${glyphFooterCount}`;
       case 'styles':
@@ -680,6 +693,7 @@ export default function FontPreview({
     effectiveWaterfallSizes.length,
     glyphFooterCount,
     stylesPreviewStats,
+    selectedFont?.source,
   ]);
 
   const handleGlyphCountForFooter = useCallback((n) => {

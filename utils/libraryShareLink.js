@@ -43,12 +43,28 @@ export function encodeLibrarySharePayloadToQueryParam(payload) {
 }
 
 /**
- * Абсолютный URL страницы `/share` с параметром `share` (без других query).
+ * Короткая ссылка `/share?id=…` (Postgres) или длинная `/share?share=…` (fallback).
  */
-export function buildAbsoluteLibraryShareUrl(payload) {
+export async function buildAbsoluteLibraryShareUrl(payload) {
   if (typeof window === 'undefined') return '';
+  const origin = window.location.origin;
+
+  try {
+    const res = await fetch('/api/share/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && typeof data?.url === 'string' && data.url) {
+      return data.url;
+    }
+  } catch {
+    /* fallback */
+  }
+
   const param = encodeLibrarySharePayloadToQueryParam(payload);
-  const url = new URL(`${window.location.origin}/share`);
+  const url = new URL(`${origin}/share`);
   url.searchParams.set('share', param);
   return url.toString();
 }

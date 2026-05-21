@@ -47,13 +47,15 @@ export function getShareOgDisplayData(payload) {
 
 /**
  * @param {string} origin
- * @param {string} [shareParam]
+ * @param {{ shortId?: string, shareParam?: string }} [keys]
  */
-export function buildShareOgImageUrl(origin, shareParam) {
+export function buildShareOgImageUrl(origin, keys = {}) {
   const base = String(origin || '').replace(/\/$/, '');
-  const raw = String(shareParam || '').trim();
-  if (!raw) return `${base}/og.png`;
-  return `${base}${SHARE_OG_IMAGE_PATH}?share=${encodeURIComponent(raw)}`;
+  const id = String(keys?.shortId || keys?.id || '').trim();
+  const shareParam = String(keys?.shareParam || keys?.share || '').trim();
+  if (id) return `${base}${SHARE_OG_IMAGE_PATH}?id=${encodeURIComponent(id)}`;
+  if (shareParam) return `${base}${SHARE_OG_IMAGE_PATH}?share=${encodeURIComponent(shareParam)}`;
+  return `${base}/og.png`;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
-import { decodeShareParamForOg, getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../../utils/libraryShareOg';
+import { resolveShareFromQuery } from '../../../lib/share/resolveShareFromQuery';
+import { getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../../utils/libraryShareOg';
 
 export const config = {
   runtime: 'edge',
@@ -22,9 +23,11 @@ function badgeLabel(name, overflow) {
 
 export default async function handler(req) {
   const url = new URL(req.url);
-  const shareParam = url.searchParams.get('share') || '';
   const origin = `${url.protocol}//${url.host}`;
-  const payload = decodeShareParamForOg(shareParam);
+  const { payload } = await resolveShareFromQuery({
+    id: url.searchParams.get('id') || '',
+    share: url.searchParams.get('share') || '',
+  });
   if (!payload) {
     return Response.redirect(`${origin}/og.png`, 302);
   }

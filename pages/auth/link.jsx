@@ -1,7 +1,7 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
@@ -25,7 +25,20 @@ export default function AuthLinkPage({ isRuGeo = false }) {
 
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
+  const [cancelling, setCancelling] = React.useState(false);
   const submittingRef = React.useRef(false);
+
+  const cancelLinkFlow = React.useCallback(async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    setError('');
+    try {
+      await signOut({ callbackUrl: '/auth/signin' });
+    } catch {
+      setCancelling(false);
+      setError('Не удалось выйти. Обновите страницу и попробуйте снова.');
+    }
+  }, [cancelling]);
 
   const pending = session?.user?.pendingLink || null;
   const email = pending?.email || session?.user?.email || '';
@@ -43,7 +56,14 @@ export default function AuthLinkPage({ isRuGeo = false }) {
         <title>Привязка аккаунта — DINAMIC FONT</title>
       </Head>
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
-        <AuthLogoLink className="mb-10" />
+        <AuthLogoLink
+          className="mb-10"
+          href="/auth/signin"
+          onClick={(e) => {
+            e.preventDefault();
+            void cancelLinkFlow();
+          }}
+        />
 
         <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">
           Подтвердите привязку
@@ -119,15 +139,27 @@ export default function AuthLinkPage({ isRuGeo = false }) {
           </button>
         </form>
 
-        <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">
-          Передумали?{' '}
-          <Link
-            href="/auth/signin"
-            className="text-accent underline decoration-accent underline-offset-[3px] hover:text-accent-hover"
+        <div className="mt-8 flex flex-col items-center gap-3 text-center">
+          <button
+            type="button"
+            disabled={cancelling}
+            onClick={() => void cancelLinkFlow()}
+            className="text-[11px] font-semibold uppercase tracking-[0.1em] text-accent underline decoration-accent underline-offset-[3px] hover:text-accent-hover disabled:opacity-50"
           >
-            Вернуться ко входу
-          </Link>
-        </p>
+            {cancelling ? 'Выход…' : 'Отменить привязку и войти по паролю'}
+          </button>
+          <p className="text-[11px] font-medium text-gray-500">
+            <Link
+              href={{
+                pathname: '/auth/forgot-password',
+                query: email ? { email } : undefined,
+              }}
+              className="text-gray-600 underline underline-offset-2 hover:text-gray-900"
+            >
+              Забыли пароль?
+            </Link>
+          </p>
+        </div>
       </AuthSplitLayout>
     </>
   );

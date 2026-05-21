@@ -100,7 +100,7 @@ function ShareCloudRow({ row, isRowMode }) {
   );
 }
 
-export function LibrarySharePage({ seo }) {
+export function LibrarySharePage({ seo, initialPayload = null }) {
   const router = useRouter();
   const { status, data: session } = useSession();
   const { createLibrary, libraries: savedLibraries } = useFontLibraries();
@@ -121,9 +121,10 @@ export function LibrarySharePage({ seo }) {
         : '';
 
   const payload = useMemo(() => {
+    if (initialPayload) return initialPayload;
     if (!router.isReady || !rawShare) return null;
     return decodeLibrarySharePayloadFromQueryParam(rawShare);
-  }, [router.isReady, rawShare]);
+  }, [initialPayload, router.isReady, rawShare]);
 
   const rows = useMemo(() => (payload ? buildShareViewRows(payload) : []), [payload]);
 

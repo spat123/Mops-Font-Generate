@@ -1,21 +1,26 @@
 import React from 'react';
 import { LibrarySharePage } from '../components/share/LibrarySharePage';
 import { buildSharePageSeo, getSiteOrigin } from '../utils/siteSeo';
-import { decodeLibrarySharePayloadFromQueryParam } from '../utils/libraryShareLinkServer';
+import { resolveShareFromQuery } from '../lib/share/resolveShareFromQuery';
 
 export async function getServerSideProps({ req, query }) {
   const origin = getSiteOrigin(req);
-  const shareParam = typeof query.share === 'string' ? query.share : '';
-  const payload = shareParam ? decodeLibrarySharePayloadFromQueryParam(shareParam) : null;
-  const seo = buildSharePageSeo({ origin, shareParam, payload });
+  const { payload, shortId, legacyShareParam } = await resolveShareFromQuery(query);
+  const seo = buildSharePageSeo({
+    origin,
+    shortId,
+    shareParam: legacyShareParam || '',
+    payload,
+  });
 
   return {
     props: {
       seo,
+      initialPayload: payload,
     },
   };
 }
 
-export default function SharePage({ seo }) {
-  return <LibrarySharePage seo={seo} />;
+export default function SharePage({ seo, initialPayload }) {
+  return <LibrarySharePage seo={seo} initialPayload={initialPayload} />;
 }

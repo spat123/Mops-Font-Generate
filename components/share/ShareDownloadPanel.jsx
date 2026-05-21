@@ -58,10 +58,12 @@ export function ShareDownloadPanel({
           {total}
         </p>
 
-        <div className="mt-8">
-          <StatRow label="Статических" value={staticCount} />
-          <StatRow label="Вариативных" value={variableCount} />
-        </div>
+        {staticCount > 0 || variableCount > 0 ? (
+          <div className="mt-8">
+            {staticCount > 0 ? <StatRow label="Статических" value={staticCount} /> : null}
+            {variableCount > 0 ? <StatRow label="Вариативных" value={variableCount} /> : null}
+          </div>
+        ) : null}
 
         {catalogDownloadableCount > 0 && catalogDownloadableCount < total ? (
           <p className="mt-4 text-center text-[11px] font-medium uppercase leading-snug text-gray-400">

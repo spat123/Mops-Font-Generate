@@ -104,9 +104,13 @@ export function AuthTypographyPanel({ isRuGeo = false }) {
 }
 
 /** Полная версия логотипа (mark + wordmark в одном SVG). */
-export function AuthLogoLink({ className = '' }) {
+export function AuthLogoLink({ className = '', href = '/', onClick }) {
   return (
-    <Link href="/" className={`mx-auto flex w-fit max-w-full items-center justify-center ${className}`}>
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`mx-auto flex w-fit max-w-full items-center justify-center ${className}`}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logo/Logo%20Dinamic.svg"

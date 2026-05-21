@@ -102,11 +102,17 @@ export default function Home() {
   /** Старые ссылки `/?share=` ведём на отдельную страницу предпросмотра. */
   useEffect(() => {
     if (!router.isReady) return;
-    const raw = router.query.share;
-    const share = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : '';
+    const rawShare = router.query.share;
+    const share = typeof rawShare === 'string' ? rawShare : Array.isArray(rawShare) ? rawShare[0] : '';
+    const rawId = router.query.id;
+    const shareId = typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : '';
+    if (shareId) {
+      void router.replace({ pathname: '/share', query: { id: shareId } });
+      return;
+    }
     if (!share) return;
     void router.replace({ pathname: '/share', query: { share } });
-  }, [router.isReady, router.query.share, router]);
+  }, [router.isReady, router.query.share, router.query.id, router]);
 
   // Получаем настройки из контекста
   const { 
@@ -250,12 +256,24 @@ export default function Home() {
     void signIn(undefined, { callbackUrl });
   }, []);
 
+  const needsLinkToastShownRef = useRef(false);
+
   useEffect(() => {
-    if (!needsLink) return;
+    if (!needsLink) {
+      needsLinkToastShownRef.current = false;
+      return;
+    }
     if (typeof window === 'undefined') return;
-    toast.info('Подтвердите привязку аккаунта');
-    void router.push('/auth/link');
-  }, [needsLink, router]);
+    const path = router.pathname || '';
+    if (path === '/auth/link' || path.startsWith('/auth/')) return;
+    if (!needsLinkToastShownRef.current) {
+      needsLinkToastShownRef.current = true;
+      toast.info('Подтвердите привязку аккаунта');
+    }
+    if (path !== '/auth/link') {
+      void router.push('/auth/link');
+    }
+  }, [needsLink, router.pathname, router]);
 
   const assertCanCreateNewLibrary = useCallback(() => {
     if (authStatus === 'loading') {
@@ -3266,6 +3284,15 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
 /** Старые ссылки `/?share=...` — серверный редирект на `/share` (OG-краулеры не выполняют JS). */
 export async function getServerSideProps({ query }) {
   const share = typeof query.share === 'string' ? query.share.trim() : '';
+  const id = typeof query.id === 'string' ? query.id.trim() : '';
+  if (id) {
+    return {
+      redirect: {
+        destination: `/share?id=${encodeURIComponent(id)}`,
+        permanent: false,
+      },
+    };
+  }
   if (!share) return { props: {} };
   return {
     redirect: {

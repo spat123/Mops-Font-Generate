@@ -10,6 +10,9 @@ import { AppButton } from './ui/AppButton';
 // Глобальный кэш глифов, чтобы не загружать их повторно.
 const glyphDataCache = new Map();
 
+/** Сигнал родителю: глифы недоступны (Google Fonts). */
+export const GLYPH_COUNT_UNAVAILABLE = -1;
+
 /** Квадратная сетка: размер ячейки зависит от размера шрифта и ширины контейнера. */
 function computeGlyphSquareGrid(innerWidthPx, fontSizePx) {
   const W = Math.max(64, innerWidthPx);
@@ -144,6 +147,11 @@ function GlyphsMode({
         resetState();
         return;
       }
+
+      if (selectedFont.source === 'google') {
+        resetState();
+        return;
+      }
       
       if (!selectedFont.file || !(selectedFont.file instanceof Blob)) {
         resetState();
@@ -214,7 +222,7 @@ function GlyphsMode({
     useEffect(() => {
       if (!onDisplayableGlyphCountChange || !isActive) return;
       if (selectedFont?.source === 'google') {
-        onDisplayableGlyphCountChange(null);
+        onDisplayableGlyphCountChange(GLYPH_COUNT_UNAVAILABLE);
         return;
       }
       if (!glyphsLoaded || !glyphsData) {
@@ -474,16 +482,7 @@ function GlyphsMode({
       ],
     );
 
-    // Условие отображения загрузчика
-    if (isLoadingGlyphs.current) {
-      return (
-        <div className="flex h-full min-h-0 w-full items-center justify-center px-8 py-10 text-center text-gray-600">
-          Загрузка данных глифов...
-        </div>
-      );
-    }
-      
-    // Сообщение, если шрифт — Google Font (после проверки isLoading)
+    // Google Fonts: глифы не парсятся локально — без состояния «загрузка»
     if (selectedFont?.source === 'google') {
         return (
           <div className="flex h-full min-h-0 w-full flex-col items-center justify-center px-6 py-10 text-center">
@@ -501,6 +500,14 @@ function GlyphsMode({
             </p>
           </div>
         );
+    }
+
+    if (isLoadingGlyphs.current) {
+      return (
+        <div className="flex h-full min-h-0 w-full items-center justify-center px-8 py-10 text-center text-gray-600">
+          Загрузка данных глифов...
+        </div>
+      );
     }
 
     // Условие отображения ошибки или отсутствия данных

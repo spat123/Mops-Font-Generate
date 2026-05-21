@@ -221,15 +221,17 @@ function IconCube({ className }) {
   );
 }
 
+/** Логотип Figma (Simple Icons, CC0) */
 function IconFigma({ className }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M8 24a4 4 0 004-4v-4H8a4 4 0 100 8zm0-14V6a4 4 0 114 0v4H8zm8 6a4 4 0 11-8 0 4 4 0 018 0zm-4-6a4 4 0 100-8h4v8a4 4 0 01-4 4z" />
+      <path d="M15.852 8.981h-4.588V0h4.588c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.491-4.49 4.491zM12.735 7.51h3.117c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-3.117V7.51zm0 1.471H8.148c-2.476 0-4.49-2.014-4.49-4.49S5.672 0 8.148 0h4.588v8.981zm-4.587-7.51c-1.665 0-3.019 1.355-3.019 3.019s1.354 3.02 3.019 3.02h3.117V1.471H8.148zm4.587 15.019H8.148c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h4.588v8.98zM8.148 8.981c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h3.117V8.981H8.148zM8.172 24c-2.489 0-4.515-2.014-4.515-4.49s2.014-4.49 4.49-4.49h4.588v4.441c0 2.503-2.047 4.539-4.563 4.539zm-.024-7.51a3.023 3.023 0 0 0-3.019 3.019c0 1.665 1.365 3.019 3.044 3.019 1.705 0 3.093-1.376 3.093-3.068v-2.97H8.148zm7.704 0h-.098c-2.476 0-4.49-2.014-4.49-4.49s2.014-4.49 4.49-4.49h.098c2.476 0 4.49 2.014 4.49 4.49s-2.014 4.49-4.49 4.49zm-.097-7.509c-1.665 0-3.019 1.355-3.019 3.019s1.355 3.019 3.019 3.019h.098c1.665 0 3.019-1.355 3.019-3.019s-1.355-3.019-3.019-3.019h-.098z" />
     </svg>
   );
 }
 
-function IconSparkles({ className }) {
+/** Таймлайн / ключевые кадры (Lucide timeline, ISC) */
+function IconTextAnimation({ className }) {
   return (
     <svg
       className={className}
@@ -239,10 +241,16 @@ function IconSparkles({ className }) {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden
     >
-      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
-      <path d="M5 19l1 3 1-3 3-1-3-1 1-3z" />
-      <path d="M19 13l1 3 1-3 3-1-3-1 1-3z" />
+      <circle cx="4" cy="4" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="8" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="12" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="16" r="1" fill="currentColor" stroke="none" />
+      <circle cx="4" cy="20" r="1" fill="currentColor" stroke="none" />
+      <path d="M9.414 5.414A2 2 0 0 0 10.828 6H19a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 4z" />
+      <path d="M9.414 13.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 12z" />
+      <path d="M9.414 21.414a2 2 0 0 0 1.414.586H19a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1h-8.172a2 2 0 0 0-1.414.586L8 20z" />
     </svg>
   );
 }
@@ -265,10 +273,10 @@ function IconExternalLink({ className }) {
   );
 }
 
-const SETTINGS_TABS = [
-  { id: "about", label: "О проекте", icon: IconStar },
-  { id: "contacts", label: "Контакты", icon: IconUsers },
-  { id: "settings", label: "Настройки", icon: IconSettings },
+const SETTINGS_TAB_OPTIONS = [
+  { value: "about", label: "О проекте", title: "О проекте" },
+  { value: "contacts", label: "Контакты", title: "Контакты" },
+  { value: "settings", label: "Настройки", title: "Настройки" },
 ];
 
 const THEME_MODE_OPTIONS = [
@@ -569,7 +577,7 @@ export default function SidebarFooterControls({
               description="Импорт подборок и синхронизация стилей прямо в макетах."
             />
             <FutureFeatureCard
-              icon={IconSparkles}
+              icon={IconTextAnimation}
               title="Глубокое анимирование текста"
               description="Сложные таймлайны, морфинг осей и сценарии для variable fonts."
             />
@@ -709,30 +717,14 @@ export default function SidebarFooterControls({
               />
 
               <div className="shrink-0 border-b border-gray-200 px-6 py-3">
-                <div className="flex gap-1 border border-gray-200 bg-gray-50 p-1">
-                  {SETTINGS_TABS.map((tab) => {
-                    const isActive = tab.id === activeTab;
-                    const Icon = tab.icon;
-                    return (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
-                          isActive
-                            ? "bg-white text-gray-900"
-                            : "text-gray-500 hover:text-gray-900"
-                        }`}
-                        aria-pressed={isActive}
-                      >
-                        <Icon
-                          className={`h-4 w-4 ${isActive ? "text-accent" : ""}`}
-                        />
-                        <span>{tab.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <SegmentedControl
+                  value={activeTab}
+                  onChange={setActiveTab}
+                  options={SETTINGS_TAB_OPTIONS}
+                  variant="surface"
+                  label="Раздел настроек"
+                  className="w-full"
+                />
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto p-6">
