@@ -2506,7 +2506,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
                 ? fontLibraries.filter((library) => library.id !== activeSavedLibrary.id)
                 : [];
               if (targets.length === 0) {
-                return [{ key: 'move-empty', label: 'Переносить пока некуда', disabled: true }];
+                const emptyLabel = fontLibraries?.length ? 'Других библиотек нет' : 'Библиотек нет';
+                return [{ key: 'move-empty', label: emptyLabel, disabled: true }];
               }
               return targets.map((library) => ({
                 key: `move-${library.id}`,

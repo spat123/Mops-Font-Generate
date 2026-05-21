@@ -10,6 +10,7 @@ import {
   AuthDividerOr,
   AuthLegalFooter,
   AuthLogoLink,
+  AuthOutlineButton,
   AuthSubmitButton,
   AuthSplitLayout,
 } from '../../components/auth/AuthSplitLayout';
@@ -226,18 +227,15 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
               <AuthDividerOr />
             </div>
 
-            <button
+            <AuthOutlineButton
               type="button"
-              className={`mt-6 w-full text-center text-xs font-medium ${
-                resendBlocked
-                  ? 'cursor-not-allowed text-gray-400 no-underline'
-                  : 'text-gray-600 underline underline-offset-2 hover:text-gray-900'
-              }`}
+              className="mt-6"
+              loading={busy}
               disabled={resendBlocked}
               onClick={resend}
             >
               {resendLabel}
-            </button>
+            </AuthOutlineButton>
           </>
         ) : null}
 

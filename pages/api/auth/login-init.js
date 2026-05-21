@@ -26,6 +26,15 @@ export default async function handler(req, res) {
       res.status(403).json({ error: 'Email not verified', needsVerification: true, email: result.email });
       return;
     }
+    if (result.status === 'deleted_recoverable') {
+      res.status(403).json({
+        error: 'Account was deleted',
+        code: 'DELETED_RECOVERABLE',
+        email: result.email,
+        recoverableUntil: result.recoverableUntil,
+      });
+      return;
+    }
     if (result.status === 'email_failed') {
       res.status(502).json({ error: 'Could not send login code', code: 'EMAIL_FAILED', email: result.email });
       return;

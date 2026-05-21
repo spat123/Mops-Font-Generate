@@ -9,22 +9,64 @@ export const AUTH_INPUT_CLASS =
 export const AUTH_CODE_INPUT_CLASS =
   `${AUTH_INPUT_CLASS} text-center text-lg font-semibold tracking-[0.35em] placeholder:tracking-[0.35em] placeholder:normal-case`;
 
-/** Сообщения форм auth — по центру, без цветной плашки. */
-export const AUTH_FORM_ERROR_CLASS = 'text-center text-sm font-medium text-red-700';
-export const AUTH_FORM_SUCCESS_CLASS = 'text-center text-sm font-medium text-green-800';
-export const AUTH_FORM_WARNING_CLASS = 'text-center text-sm font-medium text-amber-900';
+/** Сообщения форм auth — по центру, полупрозрачный фон. */
+export const AUTH_FORM_ERROR_CLASS =
+  'rounded-lg bg-red-500/10 px-3 py-2.5 text-center text-sm font-medium text-red-800';
+export const AUTH_FORM_SUCCESS_CLASS =
+  'rounded-lg bg-green-500/10 px-3 py-2.5 text-center text-sm font-medium text-green-800';
+export const AUTH_FORM_WARNING_CLASS =
+  'rounded-lg bg-amber-500/10 px-3 py-2.5 text-center text-sm font-medium text-amber-900';
 
 export const AUTH_PRIMARY_BTN_CLASS =
   'mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent px-4 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-90';
 
+/** Вторичная кнопка: серый бордер, чёрный текст. */
+export const AUTH_OUTLINE_BTN_CLASS =
+  'inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 text-xs font-bold uppercase tracking-[0.12em] text-gray-900 transition-colors hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/10 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-white disabled:text-gray-400';
+
+/** Кнопка отправки формы auth (контур): при loading — спиннер по центру. */
+export function AuthOutlineButton({
+  children,
+  loading = false,
+  disabled = false,
+  type = 'button',
+  className = '',
+  onClick,
+}) {
+  return (
+    <button
+      type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`${AUTH_OUTLINE_BTN_CLASS} relative ${className}`.trim()}
+      onClick={onClick}
+    >
+      <span className={loading ? 'invisible' : ''}>{children}</span>
+      {loading ? (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900" />
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
 /** Кнопка отправки формы auth: при loading — спиннер по центру. */
-export function AuthSubmitButton({ children, loading = false, disabled = false, type = 'submit', className = '' }) {
+export function AuthSubmitButton({
+  children,
+  loading = false,
+  disabled = false,
+  type = 'submit',
+  className = '',
+  onClick,
+}) {
   return (
     <button
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={`${AUTH_PRIMARY_BTN_CLASS} relative ${className}`.trim()}
+      onClick={onClick}
     >
       <span className={loading ? 'invisible' : ''}>{children}</span>
       {loading ? (

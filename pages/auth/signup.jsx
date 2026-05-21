@@ -8,12 +8,14 @@ import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_INPUT_CLASS,
   AUTH_FORM_ERROR_CLASS,
+  AUTH_FORM_SUCCESS_CLASS,
   AuthDividerOr,
   AuthSubmitButton,
   AuthLegalFooter,
   AuthLogoLink,
   AuthSplitLayout,
 } from '../../components/auth/AuthSplitLayout';
+import { formatRecoveryDeadlineRu } from '../../lib/auth/accountDeletion';
 
 export async function getServerSideProps({ req }) {
   return { props: { isRuGeo: getIsRuGeoFromHeaders(req) } };
@@ -29,8 +31,38 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
   const [password, setPassword] = React.useState('');
   const [passwordRepeat, setPasswordRepeat] = React.useState('');
   const [formError, setFormError] = React.useState('');
+  const [deletedRecover, setDeletedRecover] = React.useState(null);
   const [submitting, setSubmitting] = React.useState(false);
   const submittingRef = React.useRef(false);
+
+  const restoreDeletedAccount = async () => {
+    if (submittingRef.current) return;
+    const trimmedEmail = String(email || '').trim().toLowerCase();
+    const p1 = String(password || '');
+    if (!trimmedEmail || !p1) {
+      setFormError('Введите email и пароль от удалённого аккаунта.');
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const res = await fetch('/api/auth/restore-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, password: p1 }),
+      });
+      if (!res.ok) {
+        setFormError('Не удалось восстановить. Проверьте пароль или срок восстановления (6 месяцев).');
+        return;
+      }
+      setDeletedRecover(null);
+      void router.replace({ pathname: '/auth/signin', query: { verified: '1', callbackUrl } });
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (status !== 'authenticated') return;
@@ -67,6 +99,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
             if (submittingRef.current) return;
             submittingRef.current = true;
             setFormError('');
+            setDeletedRecover(null);
             try {
               const trimmedName = String(name || '').trim();
               const trimmedEmail = String(email || '').trim().toLowerCase();
@@ -97,6 +130,13 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
               const data = await res.json().catch(() => ({}));
               const emailForCheck = data?.email || trimmedEmail;
 
+              if (res.status === 409 && data?.code === 'DELETED_RECOVERABLE') {
+                setDeletedRecover({
+                  email: data.email || trimmedEmail,
+                  recoverableUntil: data.recoverableUntil || null,
+                });
+                return;
+              }
               if (res.status === 409) {
                 setFormError('Аккаунт с этой почтой уже подтверждён. Войдите с паролем.');
                 return;
@@ -166,8 +206,35 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
             className={AUTH_INPUT_CLASS}
             placeholder="ПОВТОРИТЬ ПАРОЛЬ"
           />
-          {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
-          <AuthSubmitButton loading={submitting}>Зарегистрироваться</AuthSubmitButton>
+          {deletedRecover ? (
+            <div className="text-center">
+              <p className={AUTH_FORM_ERROR_CLASS}>
+                Аккаунт с этой почтой был удалён. Его можно восстановить
+                {deletedRecover.recoverableUntil
+                  ? ` до ${formatRecoveryDeadlineRu(deletedRecover.recoverableUntil)}`
+                  : ' в течение 6 месяцев'}
+                .
+              </p>
+              <p className={`mt-3 ${AUTH_FORM_SUCCESS_CLASS}`}>
+                Введите тот же пароль и нажмите «Восстановить аккаунт».
+              </p>
+              <AuthSubmitButton loading={submitting} type="button" onClick={restoreDeletedAccount}>
+                Восстановить аккаунт
+              </AuthSubmitButton>
+              <button
+                type="button"
+                className="mt-3 w-full text-center text-xs font-medium text-gray-600 underline underline-offset-2"
+                onClick={() => setDeletedRecover(null)}
+              >
+                Зарегистрироваться как новый
+              </button>
+            </div>
+          ) : (
+            <>
+              {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
+              <AuthSubmitButton loading={submitting}>Зарегистрироваться</AuthSubmitButton>
+            </>
+          )}
         </form>
 
         <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">

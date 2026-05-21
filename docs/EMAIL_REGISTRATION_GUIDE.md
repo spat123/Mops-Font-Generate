@@ -64,7 +64,17 @@ EMAIL_FROM=DINAMIC FONT <noreply@dynamicfont.ru>
 
 ### 1.4 Логотип в письме и иконка в списке почты (BIMI)
 
-**В теле письма** логотип уже подставляется из `public/bimi-logo.svg` (тот же знак, что mark в `public/logo/Logo Mark.svg`).
+**В теле письма** — полный wordmark из `public/email-logo.png` (экспорт из `public/logo/Logo Dinamic.svg`).
+
+**Для BIMI / аватар в списке почты** — только квадратный `public/bimi-logo.svg` (знак, как `Logo Mark.svg`).
+
+Пересобрать PNG для писем (после смены wordmark):
+
+```bash
+npx --yes -p sharp node -e "require('sharp')('public/logo/Logo Dinamic.svg').resize(478,64,{fit:'contain',background:{r:255,g:255,b:255,alpha:0}}).png().toFile('public/email-logo.png')"
+```
+
+Проверка на проде: `https://dynamicfont.ru/email-logo.png`
 
 **В списке писем** (аватар слева в Gmail и др.) `favicon.ico` с сайта **не используется**. Нужен отдельный DNS-набор:
 

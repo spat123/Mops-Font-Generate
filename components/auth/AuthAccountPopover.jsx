@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from './SignInProviderButtons';
+import { AccountDeleteConfirmModal, AccountDeletedSuccessModal } from './AccountDeletionModals';
 import { AppButton } from '../ui/AppButton';
 import { Tooltip } from '../ui/Tooltip';
 import { PopupDialogHeader } from '../ui/PopupDialogHeader';
@@ -156,8 +157,32 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [freeGenUsed, setFreeGenUsed] = useState(0);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteSuccessOpen, setDeleteSuccessOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [recoverableUntil, setRecoverableUntil] = useState(null);
 
   const callbackUrl = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/';
+
+  const handleConfirmDeleteAccount = async () => {
+    setDeleteBusy(true);
+    try {
+      const res = await fetch('/api/auth/delete-account', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error('Не удалось удалить аккаунт. Попробуйте позже.');
+        return;
+      }
+      setRecoverableUntil(data.recoverableUntil || null);
+      setDeleteConfirmOpen(false);
+      setProfileOpen(false);
+      setMenuOpen(false);
+      setDeleteSuccessOpen(true);
+      await signOut({ redirect: false });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   const showAccountMenu = menuOpen && !profileOpen;
   const menuLayout = useSidebarFooterMenuLayout(showAccountMenu, rootRef);
@@ -184,7 +209,8 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   }, [isSidebarCollapsed]);
 
   const loading = status === 'loading';
-  const planLabel = isPro ? 'Pro' : planName || 'Free';
+  const planLabel = isPro ? billing.proPlanName : planName || billing.freePlanName;
+  const menuPlanLabel = isPro ? billing.proPlanName : billing.freePlanName;
   const limitText =
     typeof librariesCount === 'number' && typeof librariesLimit === 'number'
       ? `${librariesCount}/${librariesLimit}`
@@ -428,7 +454,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   </div>
                   <ProfileDangerExpander
                     onDelete={() => {
-                      toast.info('Удаление аккаунта появится в следующей версии.');
+                      setDeleteConfirmOpen(true);
                     }}
                   />
                 </div>
@@ -458,10 +484,17 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
             {authenticated ? (
               <div>
                 <div className="border-b border-gray-100 px-4 py-4">
-                  {displayName ? (
-                    <p className="truncate text-sm font-semibold leading-snug text-gray-900">{displayName}</p>
+                  {displayName || session.user.email ? (
+                    <div className="flex min-w-0 items-baseline gap-2">
+                      <p className="min-w-0 flex-1 truncate text-sm font-semibold leading-snug text-gray-900">
+                        {displayName || session.user.email}
+                      </p>
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">
+                        {menuPlanLabel}
+                      </span>
+                    </div>
                   ) : null}
-                  {session.user.email ? (
+                  {session.user.email && displayName ? (
                     <p className="mt-0.5 truncate text-xs text-gray-500">{session.user.email}</p>
                   ) : null}
                   <button
@@ -526,6 +559,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
       : null;
 
   return (
+    <>
     <div
       ref={rootRef}
       className={`relative flex items-center justify-center ${isSidebarCollapsed ? '' : 'h-full min-h-0 w-full'}`}
@@ -564,5 +598,20 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
       {accountMenuPortal}
       {accountModal}
     </div>
+
+    <AccountDeleteConfirmModal
+      open={deleteConfirmOpen}
+      busy={deleteBusy}
+      onClose={() => {
+        if (!deleteBusy) setDeleteConfirmOpen(false);
+      }}
+      onConfirm={handleConfirmDeleteAccount}
+    />
+    <AccountDeletedSuccessModal
+      open={deleteSuccessOpen}
+      recoverableUntil={recoverableUntil}
+      onClose={() => setDeleteSuccessOpen(false)}
+    />
+    </>
   );
 }

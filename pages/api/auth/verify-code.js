@@ -1,5 +1,6 @@
 import { confirmEmailByCode } from '../../../lib/auth/userStore';
 import { isPostgresEnabled } from '../../../lib/auth/db';
+import { deviceCookieHeader, trustDeviceForRequest } from '../../../lib/auth/loginStepUp';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,7 +17,9 @@ export default async function handler(req, res) {
   try {
     const email = typeof req.body?.email === 'string' ? req.body.email : '';
     const code = typeof req.body?.code === 'string' ? req.body.code : String(req.body?.code ?? '');
-    await confirmEmailByCode(email, code);
+    const user = await confirmEmailByCode(email, code);
+    const { newDeviceId } = await trustDeviceForRequest(req, user.id);
+    res.setHeader('Set-Cookie', deviceCookieHeader(newDeviceId));
     res.status(200).json({ ok: true });
   } catch (e) {
     if (e?.code === 'INVALID_CODE') {

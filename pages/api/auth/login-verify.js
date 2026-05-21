@@ -16,11 +16,9 @@ export default async function handler(req, res) {
   try {
     const challengeId = typeof req.body?.challengeId === 'string' ? req.body.challengeId : '';
     const code = typeof req.body?.code === 'string' ? req.body.code : String(req.body?.code ?? '');
-    const trustDevice = Boolean(req.body?.trustDevice);
     const { loginToken, newDeviceId } = await completeLoginChallenge(req, {
       challengeId,
       code,
-      trustDevice,
     });
     if (newDeviceId) {
       res.setHeader('Set-Cookie', deviceCookieHeader(newDeviceId));

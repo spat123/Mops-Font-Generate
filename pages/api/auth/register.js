@@ -58,6 +58,15 @@ export default async function handler(req, res) {
       res.status(409).json({ error: 'User already exists', code: 'EXISTS' });
       return;
     }
+    if (e?.code === 'DELETED_RECOVERABLE') {
+      res.status(409).json({
+        error: 'Account was deleted',
+        code: 'DELETED_RECOVERABLE',
+        email: String(req.body?.email || '').trim().toLowerCase(),
+        recoverableUntil: e.recoverableUntil || null,
+      });
+      return;
+    }
     if (e?.code === 'VALIDATION') {
       res.status(400).json({ error: 'Invalid input' });
       return;

@@ -253,19 +253,11 @@ export function LibraryMoveMenu({
               })}
             </div>
           ) : (
-            <div className="px-3 py-3 text-center">
-              <div className="text-xs font-semibold uppercase text-gray-900">Переносить пока некуда</div>
-              <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.04em] text-gray-400">
-                Создайте еще одну библиотеку
-              </div>
-            </div>
+            <div className="px-3 py-2 text-xs font-semibold uppercase text-gray-400">Библиотек нет</div>
           )}
-          {availableLibraries.length === 0 ? (
-            <div className="border-t border-gray-200 px-3 py-3 text-center">
-              <div className="text-xs font-semibold uppercase text-gray-900">Переносить пока некуда</div>
-              <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.04em] text-gray-400">
-                Создайте еще одну библиотеку
-              </div>
+          {libraries.length > 0 && availableLibraries.length === 0 ? (
+            <div className="border-t border-gray-200 px-3 py-2 text-xs font-semibold uppercase text-gray-400">
+              Других библиотек нет
             </div>
           ) : null}
           <div className={`${libraries.length > 0 ? 'border-t border-gray-200' : ''} p-1`}>

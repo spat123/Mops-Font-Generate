@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import { hasSignedInBefore, markHasSignedInBefore } from '../../utils/authReturningUser';
+import { formatRecoveryDeadlineRu } from '../../lib/auth/accountDeletion';
 import {
   AUTH_CODE_INPUT_CLASS,
   AUTH_FORM_ERROR_CLASS,
@@ -38,10 +39,10 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   const callbackUrl = callbackUrlRaw.startsWith('/') ? callbackUrlRaw : '/';
   const oauthErrorCode = typeof router.query?.error === 'string' ? router.query.error : null;
   const verifiedStatus = typeof router.query?.verified === 'string' ? router.query.verified : null;
+  const passwordResetDone = router.query?.reset === '1';
   const [login, setLogin] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [loginCode, setLoginCode] = React.useState('');
-  const [trustDevice, setTrustDevice] = React.useState(true);
   const [step, setStep] = React.useState('password');
   const [challengeId, setChallengeId] = React.useState('');
   const [stepUpEmail, setStepUpEmail] = React.useState('');
@@ -50,7 +51,45 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   const [credentialsEnabled, setCredentialsEnabled] = React.useState(null);
   const [isReturningUser, setIsReturningUser] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [deletedRecover, setDeletedRecover] = React.useState(null);
   const submittingRef = React.useRef(false);
+
+  const restoreDeletedAccount = async () => {
+    if (submittingRef.current) return;
+    const trimmedLogin = String(login || '').trim();
+    const trimmedPassword = String(password || '');
+    if (!trimmedLogin || !trimmedPassword) {
+      setFormError('Введите email и пароль от удалённого аккаунта.');
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    setFormError('');
+    try {
+      const res = await fetch('/api/auth/restore-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedLogin, password: trimmedPassword }),
+      });
+      if (!res.ok) {
+        setFormError('Не удалось восстановить. Проверьте пароль или срок (6 месяцев).');
+        return;
+      }
+      setDeletedRecover(null);
+      const initRes = await fetch('/api/auth/login-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedLogin, password: trimmedPassword }),
+      });
+      const initData = await initRes.json().catch(() => ({}));
+      if (initData?.loginToken) {
+        await finishWithLoginToken(initData.loginToken);
+      }
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     setIsReturningUser(hasSignedInBefore());
@@ -127,6 +166,9 @@ export default function AuthSignInPage({ isRuGeo = false }) {
         {verifiedStatus === '1' ? (
           <p className={`mt-6 ${AUTH_FORM_SUCCESS_CLASS}`}>Регистрация и подтверждение завершены. Теперь можно войти.</p>
         ) : null}
+        {passwordResetDone ? (
+          <p className={`mt-6 ${AUTH_FORM_SUCCESS_CLASS}`}>Пароль обновлён. Войдите с новым паролем.</p>
+        ) : null}
         {verifiedStatus === 'expired' ? (
           <p className={`mt-6 ${AUTH_FORM_WARNING_CLASS}`}>
             Код или ссылка устарели. Запросите новое письмо на странице после регистрации.
@@ -145,7 +187,30 @@ export default function AuthSignInPage({ isRuGeo = false }) {
           <AuthDividerOr />
         </div>
 
-        {step === 'password' ? (
+        {deletedRecover && step === 'password' ? (
+          <div className="mt-6 text-center">
+            <p className={AUTH_FORM_ERROR_CLASS}>
+              Аккаунт был удалён. Восстановить можно
+              {deletedRecover.recoverableUntil
+                ? ` до ${formatRecoveryDeadlineRu(deletedRecover.recoverableUntil)}`
+                : ' в течение 6 месяцев'}
+              .
+            </p>
+            <p className={`mt-3 ${AUTH_FORM_SUCCESS_CLASS}`}>Используйте тот же пароль.</p>
+            <AuthSubmitButton loading={submitting} type="button" onClick={restoreDeletedAccount}>
+              Восстановить аккаунт
+            </AuthSubmitButton>
+            <button
+              type="button"
+              className="mt-3 w-full text-center text-xs font-medium text-gray-600 underline underline-offset-2"
+              onClick={() => setDeletedRecover(null)}
+            >
+              Назад ко входу
+            </button>
+          </div>
+        ) : null}
+
+        {step === 'password' && !deletedRecover ? (
           <form
             className="mt-6 flex flex-col gap-3"
             onSubmit={async (e) => {
@@ -155,6 +220,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               setSubmitting(true);
               setFormError('');
               setPendingVerifyEmail('');
+              setDeletedRecover(null);
               try {
                 if (credentialsEnabled === false) {
                   setFormError('Вход по логину/паролю пока не настроен.');
@@ -177,6 +243,13 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                 if (initRes.status === 403 && initData?.needsVerification) {
                   setPendingVerifyEmail(trimmedLogin);
                   setFormError('Подтвердите email: введите код из письма на странице проверки почты.');
+                  return;
+                }
+                if (initRes.status === 403 && initData?.code === 'DELETED_RECOVERABLE') {
+                  setDeletedRecover({
+                    email: initData.email || trimmedLogin,
+                    recoverableUntil: initData.recoverableUntil || null,
+                  });
                   return;
                 }
                 if (initRes.status === 401) {
@@ -229,6 +302,19 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               className={AUTH_INPUT_CLASS}
               placeholder="ПАРОЛЬ"
             />
+            {credentialsEnabled !== false ? (
+              <p className="-mt-1 text-right">
+                <Link
+                  href={{
+                    pathname: '/auth/forgot-password',
+                    query: { callbackUrl, email: String(login || '').trim() || undefined },
+                  }}
+                  className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-600 underline underline-offset-2 hover:text-gray-900"
+                >
+                  Забыли пароль?
+                </Link>
+              </p>
+            ) : null}
             {formError && !oauthErrorCode ? (
               <div className={AUTH_FORM_ERROR_CLASS}>
                 <p>{formError}</p>
@@ -244,7 +330,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
             ) : null}
             <AuthSubmitButton loading={submitting}>Вход</AuthSubmitButton>
           </form>
-        ) : (
+        ) : step === 'code' ? (
           <form
             className="mt-6 flex flex-col gap-3"
             onSubmit={async (e) => {
@@ -265,7 +351,6 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                   body: JSON.stringify({
                     challengeId,
                     code: digits,
-                    trustDevice,
                   }),
                 });
                 const verifyData = await verifyRes.json().catch(() => ({}));
@@ -310,15 +395,6 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               className={AUTH_CODE_INPUT_CLASS}
               disabled={submitting}
             />
-            <label className="flex cursor-pointer items-center justify-center gap-2 text-xs text-gray-600">
-              <input
-                type="checkbox"
-                checked={trustDevice}
-                onChange={(e) => setTrustDevice(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-accent focus:ring-accent/30"
-              />
-              Запомнить это устройство на 30 дней
-            </label>
             {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
             <AuthSubmitButton loading={submitting}>Подтвердить вход</AuthSubmitButton>
             <button
@@ -335,7 +411,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               Назад к паролю
             </button>
           </form>
-        )}
+        ) : null}
 
         <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">
           Нет аккаунта?{' '}
