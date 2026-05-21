@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { slugifyFontKey } from '../../../../utils/fontSlug';
 import { findFontsourcePackagePath } from '../../../../utils/serverUtils';
+import { applyFontsourceMetadataCacheHeaders } from '../../../../utils/fontsourceApiCache';
 
 export default async function handler(req, res) {
   try {
@@ -43,8 +44,8 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: `Ошибка чтения метаданных для ${packageName}.` });
     }
     
-    // Возвращаем метаданные шрифта
-    return res.status(200).json({ 
+    applyFontsourceMetadataCacheHeaders(res);
+    return res.status(200).json({
       metadata: metadata 
     });
     

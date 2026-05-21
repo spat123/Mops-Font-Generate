@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { slugifyFontKey } from '../../../../utils/fontSlug';
 import { findFontsourcePackagePath } from '../../../../utils/serverUtils';
+import { applyFontsourceFontCacheHeaders } from '../../../../utils/fontsourceApiCache';
 
 // Вспомогательная функция для преобразования буфера в base64
 function bufferToBase64(buffer) {
@@ -234,7 +235,7 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: `Вариативный файл шрифта для ${packageName} не найден.` });
     }
     
-    // Отправляем ответ с данными шрифта
+    applyFontsourceFontCacheHeaders(res);
     res.status(200).json({
       fontBufferBase64: bufferToBase64(fontBuffer),
       fileName: variableFontFile,

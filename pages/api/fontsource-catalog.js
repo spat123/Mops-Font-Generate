@@ -8,6 +8,7 @@ import {
   parseFontsourceStyleStrings,
   parseFontsourceWeightNumbers,
 } from '../../utils/fontsourceApiNormalize';
+import { applyFontsourceCatalogCacheHeaders } from '../../utils/fontsourceApiCache';
 
 const FONTSOURCE_API_URL = 'https://api.fontsource.org/v1/fonts';
 const SERVER_CACHE_TTL_MS = 1000 * 60 * 60;
@@ -153,7 +154,7 @@ export default async function handler(req, res) {
       now - serverCache.updatedAt < SERVER_CACHE_TTL_MS
     ) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'public, max-age=300');
+      applyFontsourceCatalogCacheHeaders(res);
       return res.status(200).json({ items: serverCache.items, cached: true, source: serverCache.source });
     }
 
@@ -174,7 +175,7 @@ export default async function handler(req, res) {
     };
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=300');
+    applyFontsourceCatalogCacheHeaders(res);
     return res.status(200).json({ items, source });
   } catch (e) {
     console.error('[fontsource-catalog]', e);

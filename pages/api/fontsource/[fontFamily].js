@@ -3,6 +3,7 @@ import path from 'path';
 import { findFontsourcePackagePath } from '../../../utils/serverUtils'; // Нам понадобится утилита для поиска пакета
 import { slugifyFontKey } from '../../../utils/fontSlug';
 import { buildFontsourceHandlerMetadata } from '../../../utils/fontsourceApiNormalize';
+import { applyFontsourceFontCacheHeaders, applyFontsourceMetadataCacheHeaders } from '../../../utils/fontsourceApiCache';
 
 // --- Вспомогательная функция для преобразования буфера в base64 --- 
 // (На клиенте будем декодировать обратно в ArrayBuffer)
@@ -112,6 +113,7 @@ export default async function handler(req, res) {
 
       // Если запрошены только метаданные, возвращаем их
       if (metaOnly) {
+        applyFontsourceMetadataCacheHeaders(res);
         return res.status(200).json(metadata);
       }
 
@@ -176,6 +178,7 @@ export default async function handler(req, res) {
       }
 
       if (metaOnly) {
+        applyFontsourceMetadataCacheHeaders(res);
         return res.status(200).json(metadata);
       }
 
@@ -199,6 +202,7 @@ export default async function handler(req, res) {
       requestedParams: { weight, style, subset }
     };
 
+    applyFontsourceFontCacheHeaders(res);
     res.status(200).json(result);
 
   } catch (error) {
