@@ -146,6 +146,7 @@
           <div class="badge" id="statusBadge">Готово к запуску</div>
           <div class="btns">
             <button id="runBtn" type="button">Запустить тест</button>
+            <button id="stressBtn" type="button">Стресс‑тест API</button>
             <button id="copyBtn" type="button">Скопировать результат</button>
           </div>
         </div>
@@ -153,6 +154,11 @@
           Эта страница нужна, когда главная <code>/</code> не догружается или падает с <code>ERR_CONNECTION_RESET</code>.
           Она делает запросы к <code>/api/diagnostics/smoke</code> и <code>/api/diagnostics/network-probe</code> и показывает,
           что именно рвётся: доступ к origin, к NextAuth, или к внешним сервисам.
+        </div>
+        <div class="hint">
+          Стресс‑тест имитирует то, что вас ломало: несколько параллельных запросов к <code>/api/auth/session</code> и
+          <code>/api/fontsource/*</code>. Если именно тут появляются <code>Failed to fetch</code> — это почти всегда
+          сетевые обрывы/фильтрация на маршруте, а не “код неверный”.
         </div>
         <pre id="out">Нажмите «Запустить тест».</pre>
       </div>
@@ -177,6 +183,7 @@
       const outEl = document.getElementById("out");
       const badgeEl = document.getElementById("statusBadge");
       const runBtn = document.getElementById("runBtn");
+      const stressBtn = document.getElementById("stressBtn");
       const copyBtn = document.getElementById("copyBtn");
 
       const stamp = () => new Date().toISOString();
@@ -204,6 +211,92 @@
         }
       }
 
+      async function fetchTextWithTimeout(url, timeoutMs) {
+        const t0 = performance.now();
+        const controller = new AbortController();
+        const to = setTimeout(() => controller.abort("timeout"), Math.max(1000, Number(timeoutMs || 0) || 8000));
+        try {
+          const res = await fetch(url, {
+            cache: "no-store",
+            credentials: "same-origin",
+            signal: controller.signal,
+          });
+          const ms = Math.round(performance.now() - t0);
+          const text = await res.text().catch(() => "");
+          return { ok: res.ok, status: res.status, ms, bytes: text.length };
+        } catch (e) {
+          const ms = Math.round(performance.now() - t0);
+          return { ok: false, status: 0, ms, error: String((e && e.message) || e) };
+        } finally {
+          clearTimeout(to);
+        }
+      }
+
+      async function runClientChecks() {
+        // Эти запросы важны: показывают, что именно рвётся у клиента (а не на сервере).
+        const list = [
+          { id: "html_root", url: "/" },
+          { id: "auth_session", url: "/api/auth/session" },
+          { id: "fontsource_catalog", url: "/api/fontsource-catalog" },
+          { id: "fontsource_abel_latin", url: "/api/fontsource/abel?weight=400&style=normal&subset=latin" },
+          { id: "fontsource_42dot_cyr", url: "/api/fontsource/42dot-sans?weight=400&style=normal&subset=cyrillic" },
+        ];
+        const out = {};
+        for (const item of list) {
+          out[item.id] = await fetchTextWithTimeout(item.url, 12000);
+        }
+        return out;
+      }
+
+      function quantile(sorted, q) {
+        if (!sorted.length) return null;
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sorted[base + 1] == null) return sorted[base];
+        return Math.round(sorted[base] + rest * (sorted[base + 1] - sorted[base]));
+      }
+
+      async function runStressTest(opts) {
+        const total = Math.max(1, Math.min(30, Number(opts?.total || 10)));
+        const concurrency = Math.max(1, Math.min(6, Number(opts?.concurrency || 2)));
+        const timeoutMs = Math.max(1000, Math.min(20000, Number(opts?.timeoutMs || 12000)));
+        const targets = [
+          "/api/auth/session",
+          "/api/fontsource/abel?weight=400&style=normal&subset=latin",
+          "/api/fontsource/42dot-sans?weight=400&style=normal&subset=cyrillic",
+        ];
+
+        let cursor = 0;
+        const results = [];
+        const workers = Array.from({ length: Math.min(concurrency, total) }, async () => {
+          while (cursor < total) {
+            const i = cursor;
+            cursor += 1;
+            const url = targets[i % targets.length];
+            const r = await fetchTextWithTimeout(url, timeoutMs);
+            results.push({ url, ...r });
+          }
+        });
+        await Promise.allSettled(workers);
+
+        const msOk = results.filter((r) => r.ok).map((r) => r.ms).sort((a, b) => a - b);
+        const msAll = results.map((r) => r.ms).sort((a, b) => a - b);
+        const fail = results.filter((r) => !r.ok).length;
+
+        return {
+          total,
+          concurrency,
+          timeoutMs,
+          ok: results.length - fail,
+          fail,
+          p50ms_ok: quantile(msOk, 0.5),
+          p95ms_ok: quantile(msOk, 0.95),
+          maxMs_all: msAll.length ? msAll[msAll.length - 1] : null,
+          sample: results.slice(0, 12),
+        };
+      }
+
       async function sendToLogs(payload) {
         try {
           await fetch("/api/diagnostics/client", {
@@ -225,8 +318,9 @@
       async function run() {
         setBadge("Тестируем…", "warn");
         const startedAt = stamp();
-        const smoke = await fetchJson("/api/diagnostics/smoke");
+        const smoke = await fetchJson("/api/diagnostics/smoke?timeoutMs=6000");
         const probe = await fetchJson("/api/diagnostics/network-probe");
+        const clientChecks = await runClientChecks();
 
         const summary = {
           at: startedAt,
@@ -236,29 +330,56 @@
           ua: navigator.userAgent,
           smoke: smoke.ok ? smoke.json : smoke,
           networkProbe: probe.ok ? probe.json : probe,
+          clientChecks,
         };
 
         outEl.textContent = pretty(summary);
         console.log("[mfg][diag-page]", summary);
 
+        const clientHardFail = Object.values(clientChecks || {}).some(
+          (r) => r && !r.ok && String(r.error || "").toLowerCase().includes("fetch"),
+        );
         const anyHardFail =
           (!smoke.ok && (smoke.error || "").includes("Failed to fetch")) ||
-          (!probe.ok && (probe.error || "").includes("Failed to fetch"));
+          (!probe.ok && (probe.error || "").includes("Failed to fetch")) ||
+          clientHardFail;
 
         if (anyHardFail) {
           setBadge("Есть обрыв соединения (RESET/timeout)", "bad");
         } else if (!smoke.ok || !probe.ok) {
           setBadge("Есть ошибки API", "warn");
         } else {
-          setBadge("API доступны (проблема скорее в тяжёлом /)", "ok");
+          setBadge("Базовые API доступны (ищем тяжёлые запросы/параллельность)", "ok");
         }
 
         await sendToLogs(summary);
       }
 
+      async function runStress() {
+        setBadge("Стресс‑тест…", "warn");
+        const startedAt = stamp();
+        const stress = await runStressTest({ total: 12, concurrency: 3, timeoutMs: 12000 });
+
+        const base = outEl.textContent ? JSON.parse(outEl.textContent) : null;
+        const summary = base && typeof base === "object" ? base : { at: startedAt, href: location.href, host: location.host };
+        summary.stressTest = { at: startedAt, ...stress };
+
+        outEl.textContent = pretty(summary);
+        console.log("[mfg][diag-stress]", summary.stressTest);
+
+        if (stress.fail > 0) {
+          setBadge(`Стресс‑тест: FAIL ${stress.fail}/${stress.total} (обрывы)`, "bad");
+        } else {
+          setBadge("Стресс‑тест: OK (обрывов нет)", "ok");
+        }
+
+        await sendToLogs({ type: "stress", ...summary.stressTest });
+      }
+
       metaEl.textContent = `${location.host} • ${stamp()}`;
 
       runBtn.addEventListener("click", () => run());
+      stressBtn.addEventListener("click", () => runStress());
       copyBtn.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(outEl.textContent || "");
