@@ -214,16 +214,29 @@
       async function fetchTextWithTimeout(url, timeoutMs) {
         const t0 = performance.now();
         const controller = new AbortController();
-        const to = setTimeout(() => controller.abort("timeout"), Math.max(1000, Number(timeoutMs || 0) || 8000));
+        const hardTimeoutMs = Math.max(1000, Number(timeoutMs || 0) || 8000);
+        const to = setTimeout(() => controller.abort("timeout"), hardTimeoutMs);
         try {
-          const res = await fetch(url, {
-            cache: "no-store",
-            credentials: "same-origin",
-            signal: controller.signal,
-          });
+          const fetchPromise = (async () => {
+            const res = await fetch(url, {
+              cache: "no-store",
+              credentials: "same-origin",
+              signal: controller.signal,
+            });
+            const text = await res.text().catch(() => "");
+            return { ok: res.ok, status: res.status, bytes: text.length };
+          })();
+
+          const timeoutPromise = new Promise((resolve) =>
+            setTimeout(() => resolve({ __timeout: true }), hardTimeoutMs),
+          );
+
+          const raced = await Promise.race([fetchPromise, timeoutPromise]);
           const ms = Math.round(performance.now() - t0);
-          const text = await res.text().catch(() => "");
-          return { ok: res.ok, status: res.status, ms, bytes: text.length };
+          if (raced && raced.__timeout) {
+            return { ok: false, status: 0, ms, error: "timeout" };
+          }
+          return { ok: Boolean(raced.ok), status: Number(raced.status || 0), ms, bytes: Number(raced.bytes || 0) };
         } catch (e) {
           const ms = Math.round(performance.now() - t0);
           return { ok: false, status: 0, ms, error: String((e && e.message) || e) };
@@ -261,6 +274,7 @@
         const total = Math.max(1, Math.min(30, Number(opts?.total || 10)));
         const concurrency = Math.max(1, Math.min(6, Number(opts?.concurrency || 2)));
         const timeoutMs = Math.max(1000, Math.min(20000, Number(opts?.timeoutMs || 12000)));
+        const overallTimeoutMs = Math.max(5000, Math.min(180000, Number(opts?.overallTimeoutMs || 90000)));
         const targets = [
           "/api/auth/session",
           "/api/fontsource/abel?weight=400&style=normal&subset=latin",
@@ -269,13 +283,25 @@
 
         let cursor = 0;
         const results = [];
+        const startedAt = Date.now();
+        let finished = 0;
+
+        const renderProgress = () => {
+          const elapsed = Math.round((Date.now() - startedAt) / 1000);
+          setBadge(`Стресс‑тест… ${finished}/${total} • ${elapsed}s`, "warn");
+        };
+        renderProgress();
+
         const workers = Array.from({ length: Math.min(concurrency, total) }, async () => {
           while (cursor < total) {
+            if (Date.now() - startedAt > overallTimeoutMs) break;
             const i = cursor;
             cursor += 1;
             const url = targets[i % targets.length];
             const r = await fetchTextWithTimeout(url, timeoutMs);
             results.push({ url, ...r });
+            finished += 1;
+            if (finished % 1 === 0) renderProgress();
           }
         });
         await Promise.allSettled(workers);
@@ -288,6 +314,7 @@
           total,
           concurrency,
           timeoutMs,
+          overallTimeoutMs,
           ok: results.length - fail,
           fail,
           p50ms_ok: quantile(msOk, 0.5),
@@ -358,7 +385,7 @@
       async function runStress() {
         setBadge("Стресс‑тест…", "warn");
         const startedAt = stamp();
-        const stress = await runStressTest({ total: 12, concurrency: 3, timeoutMs: 12000 });
+        const stress = await runStressTest({ total: 12, concurrency: 3, timeoutMs: 12000, overallTimeoutMs: 90000 });
 
         const base = outEl.textContent ? JSON.parse(outEl.textContent) : null;
         const summary = base && typeof base === "object" ? base : { at: startedAt, href: location.href, host: location.host };
