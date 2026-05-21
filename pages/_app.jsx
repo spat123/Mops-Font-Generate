@@ -11,8 +11,6 @@ import Head from 'next/head';
 import dynamic from 'next/dynamic';
 import { OpenGraphHead } from '../components/seo/OpenGraphHead';
 import { getDefaultSiteSeo } from '../utils/siteSeo';
-import { initClientNetworkDiagnostics } from '../utils/clientNetworkDiagnostics';
-
 const defaultSiteSeo = getDefaultSiteSeo(
   (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://dynamicfont.ru').replace(
     /\/$/,
@@ -49,10 +47,6 @@ export default function MyApp({ Component, pageProps: { session, seo: pageSeo, .
     };
   }, []);
 
-  useEffect(() => {
-    initClientNetworkDiagnostics();
-  }, []);
-  
   return (
     <>
       <Head>

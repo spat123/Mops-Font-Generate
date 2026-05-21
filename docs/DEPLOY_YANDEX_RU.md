@@ -49,7 +49,7 @@ docker build -t dinamic-font-ru:latest .
 docker run --rm -p 3000:3000 --env-file .env.local dinamic-font-ru:latest
 ```
 
-Проверка: http://localhost:3000 и http://localhost:3000/api/diagnostics/ping
+Проверка: http://localhost:3000
 
 ---
 

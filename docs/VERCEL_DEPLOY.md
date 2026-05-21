@@ -309,7 +309,7 @@ vercel login
 | Сессия «слетает» на проде | `NEXTAUTH_URL` должен совпадать с доменом в браузере (HTTPS, без лишнего `/`). |
 | Preview не создаётся | **Settings → Git** → Preview Deployments; ветка не заблокирована в Ignored Build Step. |
 | Долгая сборка / таймаут API | Лимиты Hobby vs Pro; `maxDuration` в `vercel.json`. |
-| Сайт не открывается / очень медленно (мобильный, без VPN) | DNS REG.ru ↔ Vercel (§5); диагностика §15 |
+| Сайт не открывается / очень медленно (мобильный, без VPN) | Переезд на VPS: [DEPLOY_REG_RU_VPS.md](./DEPLOY_REG_RU_VPS.md) |
 
 ### Отключить автодеплой Production (только ручной релиз)
 
@@ -319,42 +319,9 @@ vercel login
 
 ---
 
-## 15. Диагностика сети и DNS (логи в Vercel)
+## 15. Production в России (VPS REG.ru)
 
-Для разбора «с телефона не открывается», медленный каталог Google/Fontsource после переноса DNS на REG.ru.
-
-### Автоматически (ничего вводить не нужно)
-
-На **dynamicfont.ru** и **\*.vercel.app** через ~1 с после загрузки:
-
-1. **F12 → Console** — блок `[mfg] Сводка сети (автоматически)` (DNS, TTFB, probe).
-2. **Vercel → Logs** — фильтр **`[client-diag-summary]`** (текст + JSON).
-
-Повтор: `mfgReport()` в консоли. Расширенный сбор ошибок: `mfgDiagOn()`.
-
-### Если главная `/` не загрузилась (RESET/timeout) — всё равно можно понять причину
-
-Консоль и авто-сводка **не успеют** запуститься, если HTML страницы не доехал. В этом случае:
-
-1. Откройте лёгкую диагностическую страницу (без Next/React):  
-   `https://dynamicfont.ru/diag.html`
-2. Или откройте API напрямую (должны отдаваться как обычный JSON):  
-   - `/api/diagnostics/ping` — минимальный ответ (проверка “жив ли origin”)  
-   - `/api/diagnostics/smoke` — self/auth + внешние сервисы (и пишет `[diag-smoke]` в Logs)  
-   - `/api/diagnostics/network-probe` — серверный probe (пишет `[network-probe]` в Logs)
-
-Интерпретация:
-- Если **`ping`/`smoke` не открываются** (RESET) — проблема **доставки до домена** (ISP/маршрут/SSL/DNS), не приложение.
-- Если **`ping` открывается**, а `/` падает — обычно тяжёлый JS/статические чанки/пачка API; смотрите slow/fail fetch после прогрузки.
-
-### Что пишется в лог
-
-| Метка | Содержимое |
-|-------|------------|
-| **`[client-diag-summary]`** | Авто-сводка: DNS/TTFB/load, probe Google/Fontsource, страна/IP |
-| `[client-diag]` | Расширенный режим (`mfgDiagOn`): медленные fetch, ошибки |
-| `[network-probe]` | Серверный probe при вызове API |
-| `[diag-smoke]` | Smoke-тест, который можно открыть даже когда `/` не грузится |
+Если Vercel нестабилен из РФ (RESET, таймауты API) — основной прод: **[DEPLOY_REG_RU_VPS.md](./DEPLOY_REG_RU_VPS.md)**.
 
 ---
 
