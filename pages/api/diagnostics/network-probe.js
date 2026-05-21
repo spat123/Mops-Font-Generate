@@ -47,7 +47,7 @@ export default async function handler(req, res) {
 
   const host = req.headers.host;
   const proto = String(req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim();
-  const selfUrl = host ? `${proto}://${host}/` : null;
+  const selfUrl = host ? `${proto}://${host}/api/diagnostics/ping` : null;
 
   const results = {};
   for (const probe of PROBES) {
@@ -56,10 +56,7 @@ export default async function handler(req, res) {
       results[probe.id] = { ok: false, error: 'no_host' };
       continue;
     }
-    results[probe.id] =
-      probe.id === 'self'
-        ? await timedFetch(url, { method: 'HEAD' })
-        : await timedFetch(url, { method: 'GET' });
+    results[probe.id] = await timedFetch(url, { method: 'GET' });
   }
 
   const payload = {

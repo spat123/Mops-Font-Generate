@@ -174,11 +174,27 @@ function buildSummaryText(timings, probe, probeClientMs) {
   if (probeClientMs != null) lines.push(`Probe с клиента: ${probeClientMs} ms`);
   const slowTtfb = timings.ttfbMs != null && timings.ttfbMs > 2000;
   const slowLoad = timings.loadMs != null && timings.loadMs > 6000;
+  const fastTtfb = timings.ttfbMs != null && timings.ttfbMs <= 2000;
   if (slowTtfb) lines.push('⚠ Медленный TTFB — сеть до сервера или DNS.');
-  if (slowLoad) lines.push('⚠ Медленная загрузка — возможны обрывы (reset) или тяжёлый JS.');
-  const probeFail = Object.values(probe?.results || {}).some((r) => r && !r.ok);
-  if (probeFail) lines.push('⚠ С сервера Vercel недоступен Google или Fontsource.');
-  if (!slowTtfb && !slowLoad && !probeFail) lines.push('По метрикам критичных проблем не видно.');
+  if (slowLoad && fastTtfb) {
+    lines.push(
+      '⚠ Долгая полная загрузка при быстром TTFB — тяжёлый JS и/или медленные /api/fontsource (см. slow/fail fetch).',
+    );
+  } else if (slowLoad) {
+    lines.push('⚠ Медленная загрузка — возможны обрывы (reset) или тяжёлый JS.');
+  }
+  const results = probe?.results || {};
+  const selfFail = results.self && !results.self.ok;
+  const googleFail = results.google_metadata && !results.google_metadata.ok;
+  const fontsourceFail = results.fontsource_api && !results.fontsource_api.ok;
+  if (selfFail) {
+    lines.push(`⚠ Self-probe origin: FAIL (${results.self.error || results.self.status || '—'}).`);
+  }
+  if (googleFail) lines.push('⚠ С сервера Vercel недоступен Google Fonts (metadata).');
+  if (fontsourceFail) lines.push('⚠ С сервера Vercel недоступен Fontsource API.');
+  if (!slowTtfb && !slowLoad && !googleFail && !fontsourceFail) {
+    lines.push('По метрикам критичных проблем не видно.');
+  }
   return lines.join('\n');
 }
 
