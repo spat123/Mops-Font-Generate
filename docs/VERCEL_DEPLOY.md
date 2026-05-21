@@ -323,30 +323,22 @@ vercel login
 
 Для разбора «с телефона не открывается», медленный каталог Google/Fontsource после переноса DNS на REG.ru.
 
-### Через консоль браузера на компьютере (F12 → Console)
+### Автоматически (ничего вводить не нужно)
 
-На любой странице сайта после загрузки:
+На **dynamicfont.ru** и **\*.vercel.app** через ~1 с после загрузки:
 
-```js
-mfgHelp()    // справка
-mfgProbe()   // таблица: доступны ли Google / Fontsource с сервера Vercel
-mfgStatus()  // DNS, TTFB, время загрузки в вашем браузере
-mfgDiagOn()  // включить запись в Vercel Logs (потом воспроизвести проблему)
-mfgDiagOff() // выключить
-```
+1. **F12 → Console** — блок `[mfg] Сводка сети (автоматически)` (DNS, TTFB, probe).
+2. **Vercel → Logs** — фильтр **`[client-diag-summary]`** (текст + JSON).
 
-Логи: **Vercel** → **Logs** → `[client-diag]` или `[network-probe]`.
-
-Опционально: `?diag=1` в URL включает `mfgDiagOn()` автоматически.
+Повтор: `mfgReport()` в консоли. Расширенный сбор ошибок: `mfgDiagOn()`.
 
 ### Что пишется в лог
 
 | Метка | Содержимое |
 |-------|------------|
-| `[client-diag]` | Страна/IP (если есть заголовки Vercel), `dnsMs`, `ttfbMs`, медленные `fetch` к `/api/*`, gstatic, fontsource |
-| `[network-probe]` | Ответ сервера Vercel: доступность `fonts.google.com`, `api.fontsource.org`, свой origin |
-
-Постоянно для всех пользователей не включать (только `?diag=1` или `NEXT_PUBLIC_NETWORK_DIAG=1` на staging).
+| **`[client-diag-summary]`** | Авто-сводка: DNS/TTFB/load, probe Google/Fontsource, страна/IP |
+| `[client-diag]` | Расширенный режим (`mfgDiagOn`): медленные fetch, ошибки |
+| `[network-probe]` | Серверный probe при вызове API |
 
 ---
 
