@@ -345,14 +345,23 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                   setFormError('Введите 6 цифр из письма.');
                   return;
                 }
-                const verifyRes = await fetch('/api/auth/login-verify', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    challengeId,
-                    code: digits,
-                  }),
-                });
+                let verifyRes;
+                try {
+                  verifyRes = await fetch('/api/auth/login-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                      challengeId,
+                      code: digits,
+                    }),
+                  });
+                } catch {
+                  setFormError(
+                    'Не удалось связаться с сервером (сбой сети). Подождите и отправьте код снова — не запрашивайте новый, если письмо свежее.',
+                  );
+                  return;
+                }
                 const verifyData = await verifyRes.json().catch(() => ({}));
                 if (verifyRes.status === 400 && verifyData?.code === 'TOKEN_EXPIRED') {
                   setFormError('Код устарел. Вернитесь и войдите снова, чтобы получить новый.');
@@ -362,8 +371,22 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                   setFormError('Слишком много попыток. Запросите новый код, войдя снова.');
                   return;
                 }
-                if (!verifyRes.ok || !verifyData?.loginToken) {
-                  setFormError('Неверный код. Проверьте письмо или запросите новый, войдя снова.');
+                if (verifyRes.status === 400 && verifyData?.code === 'INVALID_CODE') {
+                  setFormError(
+                    'Неверный код. Используйте последнее письмо (все 6 цифр, ведущие нули тоже). Или войдите снова для нового кода.',
+                  );
+                  return;
+                }
+                if (!verifyRes.ok) {
+                  setFormError(
+                    verifyRes.status >= 500
+                      ? 'Сервер временно недоступен. Подождите минуту и повторите тот же код.'
+                      : 'Не удалось проверить код. Попробуйте снова.',
+                  );
+                  return;
+                }
+                if (!verifyData?.loginToken) {
+                  setFormError('Не удалось завершить вход. Войдите снова и запросите новый код.');
                   return;
                 }
                 await finishWithLoginToken(verifyData.loginToken);
@@ -375,7 +398,9 @@ export default function AuthSignInPage({ isRuGeo = false }) {
           >
             {stepUpEmail ? (
               <p className="text-center text-xs text-gray-600">
-                Код отправлен на <span className="font-semibold text-gray-900">{stepUpEmail}</span>
+                Код отправлен на <span className="font-semibold text-gray-900">{stepUpEmail}</span>.
+                {' '}
+                Если писем несколько — введите код только из <span className="font-semibold">последнего</span>.
               </p>
             ) : null}
             <label
