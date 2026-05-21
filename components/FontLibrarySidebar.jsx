@@ -122,6 +122,7 @@ export default function FontLibrarySidebar({
     requestSignIn,
     authLoading,
     canCreateNewLibrary,
+    libraryLimitReached,
     openPlans,
     isPro,
     planName,
@@ -529,7 +530,7 @@ export default function FontLibrarySidebar({
   /** Всегда внизу левой колонки (отдельно от логики «плюса» под списком). */
   const libraryLimitReachedPanel = useMemo(
     () =>
-      isAuthenticated && !canCreateNewLibrary ? (
+      libraryLimitReached ? (
         <div className="rounded-xl bg-gray-50 p-3" role="region" aria-label="Лимит библиотек">
           <div className="flex gap-2">
             <div className="group shrink-0" aria-hidden>
@@ -559,7 +560,7 @@ export default function FontLibrarySidebar({
           </AppButton>
         </div>
       ) : null,
-    [canCreateNewLibrary, isAuthenticated, openPlans],
+    [libraryLimitReached, openPlans],
   );
 
   return (
@@ -570,7 +571,11 @@ export default function FontLibrarySidebar({
             <div className="mb-4 flex items-center justify-between gap-2">
               <span className="text-sm font-semibold uppercase tracking-wide text-gray-900">Библиотеки</span>
               <Tooltip content={planBadgeTooltip} openDelayMs={200} side="bottom">
-                <span className="inline-flex shrink-0 cursor-default rounded-md bg-gray-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                <span
+                  className={`inline-flex shrink-0 cursor-default rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    isPro ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-900'
+                  }`}
+                >
                   {isPro ? 'Pro' : planName || 'Free'}
                 </span>
               </Tooltip>

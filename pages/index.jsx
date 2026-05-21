@@ -272,10 +272,6 @@ export default function Home() {
       void router.push('/auth/link');
       return false;
     }
-    if (session?.user?.canCreateLibraries === false) {
-      toast.info(session.user.canCreateLibrariesReason || 'Действие недоступно для нового аккаунта');
-      return false;
-    }
     const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
     if (fontLibraries.length >= maxLibs) {
       toast.info(getBillingCopy().librariesLimitToast);
@@ -287,8 +283,6 @@ export default function Home() {
     authStatus,
     fontLibraries.length,
     requestSignIn,
-    session?.user?.canCreateLibraries,
-    session?.user?.canCreateLibrariesReason,
     session?.user?.isPro,
     needsLink,
     router,
@@ -298,18 +292,19 @@ export default function Home() {
   const libraryAuthValue = useMemo(() => {
     const isPro = Boolean(session?.user?.isPro);
     const maxLibs = getMaxSavedLibrariesForUser(isPro);
+    const librariesCount = fontLibraries.length;
+    const libraryLimitReached =
+      authStatus === 'authenticated' && librariesCount >= maxLibs;
     return {
       authLoading: authStatus === 'loading',
       isAuthenticated: authStatus === 'authenticated',
       isPro,
       planName: session?.user?.plan === 'pro' ? 'Pro' : 'Free',
-      librariesCount: fontLibraries.length,
+      librariesCount,
       librariesLimit: maxLibs,
+      libraryLimitReached,
       canCreateNewLibrary:
-        authStatus === 'authenticated' &&
-        !needsLink &&
-        session?.user?.canCreateLibraries !== false &&
-        fontLibraries.length < maxLibs,
+        authStatus === 'authenticated' && !needsLink && !libraryLimitReached,
       requestSignIn,
       openPlans,
       assertCanCreateNewLibrary,
@@ -319,7 +314,6 @@ export default function Home() {
       fontLibraries.length,
       requestSignIn,
       assertCanCreateNewLibrary,
-      session?.user?.canCreateLibraries,
       session?.user?.isPro,
       session?.user?.plan,
       needsLink,
@@ -2966,7 +2960,9 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         <span className="flex min-w-0 max-w-full items-center justify-center gap-2">
           <span className="truncate uppercase">Библиотеки</span>
           <span
-            className="shrink-0 rounded-md bg-gray-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600"
+            className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+              libraryAuthValue.isPro ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-900'
+            }`}
             title={getBillingCopy().badgeTitle}
           >
             {planBadgeShort}

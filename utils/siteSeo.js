@@ -1,4 +1,5 @@
 import { decodeLibrarySharePayloadFromQueryParam } from './libraryShareLinkServer';
+import { buildShareOgImageUrl, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from './libraryShareOg';
 
 const SITE_NAME = 'DINAMIC FONT';
 /** Плоский путь без пробелов — надёжнее для Telegram / WhatsApp. */
@@ -104,15 +105,18 @@ export function buildSharePageSeo({ origin, shareParam, payload: payloadIn }) {
     ? `${count} шрифт${count === 1 ? '' : count < 5 ? 'а' : 'ов'}: ${sample}. Скачать или открыть в редакторе.`
     : `${count} шрифт${count === 1 ? '' : count < 5 ? 'а' : 'ов'} в подборке. Скачать или открыть в редакторе.`;
 
-  return withOgImageMeta(
-    {
-      title: `${libraryName} — ${SITE_NAME}`,
-      description,
-      canonicalUrl,
-      imageAlt: libraryName,
-      siteName: SITE_NAME,
-      type: 'website',
-    },
-    siteOrigin,
-  );
+  const imageUrl = buildShareOgImageUrl(siteOrigin, shareParam);
+
+  return {
+    title: `${libraryName} — ${SITE_NAME}`,
+    description,
+    canonicalUrl,
+    imageUrl,
+    imageWidth: SHARE_OG_WIDTH,
+    imageHeight: SHARE_OG_HEIGHT,
+    imageType: 'image/png',
+    imageAlt: libraryName,
+    siteName: SITE_NAME,
+    type: 'website',
+  };
 }

@@ -243,8 +243,8 @@ function CollapsedLibraryRail({
   onOpenLibrary,
   onRequestCreateLibrary,
 }) {
-  const { openPlans, canCreateNewLibrary, isAuthenticated, authLoading } = useLibraryAuth();
-  const showLimitUpgrade = isAuthenticated && !canCreateNewLibrary;
+  const { openPlans, canCreateNewLibrary, libraryLimitReached, isAuthenticated, authLoading } = useLibraryAuth();
+  const showLimitUpgrade = libraryLimitReached;
   const showAddLibrary = Boolean(onRequestCreateLibrary) && !showLimitUpgrade;
   const libs = Array.isArray(libraries) ? libraries : [];
   /** Как в FontLibrarySidebar: от 4 библиотек — скролл только списка, действие снизу колонки. */

@@ -18,6 +18,7 @@ import {
   readFreeStaticGenerationsUsed,
 } from '../../utils/freeStaticGenerationQuota';
 import { getBillingCopy } from '../../utils/billingCopy';
+import { MAX_SHARE_FONTS_FREE } from '../../utils/libraryShareLimits';
 import { SelectChevronIcon } from '../ui/SelectChevronIcon';
 
 const AVATAR_CLASS = 'h-4 w-4 shrink-0 rounded-full object-cover';
@@ -219,10 +220,10 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
     typeof librariesCount === 'number' && typeof librariesLimit === 'number' ? librariesCount >= librariesLimit : false;
 
   const planBlurb = isPro
-    ? 'Расширенные лимиты и приоритетные возможности.'
+    ? 'Расширенные лимиты. В ссылке «Поделиться» — без ограничения по числу шрифтов.'
     : typeof librariesLimit === 'number'
-      ? `Доступно до ${librariesLimit} библиотек и до ${FREE_STATIC_GENERATIONS_LIMIT} генераций статических файлов.`
-      : 'Доступно несколько библиотек и генерации статических файлов.';
+      ? `До ${librariesLimit} библиотек, ${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц и до ${MAX_SHARE_FONTS_FREE} шрифтов в одной ссылке «Поделиться».`
+      : 'Лимиты тарифа Free: библиотеки, генерации и «Поделиться».';
 
   const accountTriggerTooltip = loading
     ? 'Загрузка сессии…'
@@ -365,14 +366,23 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                               Библиотеки: <span className="tabular-nums text-gray-800">{limitText}</span>
                             </span>
                             {!isPro ? (
-                              <span>
-                                Генерация:{' '}
-                                <span className="tabular-nums text-gray-800">
-                                  {Math.max(0, FREE_STATIC_GENERATIONS_LIMIT - freeGenUsed)}/{FREE_STATIC_GENERATIONS_LIMIT}
+                              <>
+                                <span>
+                                  Генерация:{' '}
+                                  <span className="tabular-nums text-gray-800">
+                                    {Math.max(0, FREE_STATIC_GENERATIONS_LIMIT - freeGenUsed)}/{FREE_STATIC_GENERATIONS_LIMIT}
+                                  </span>
                                 </span>
-                              </span>
+                                <span>
+                                  Поделиться:{' '}
+                                  <span className="tabular-nums text-gray-800">до {MAX_SHARE_FONTS_FREE} в ссылке</span>
+                                </span>
+                              </>
                             ) : (
-                              <span className="text-gray-600">Генерация: без лимита</span>
+                              <>
+                                <span className="text-gray-600">Генерация: без лимита</span>
+                                <span className="text-gray-600">Поделиться: без лимита</span>
+                              </>
                             )}
                           </>
                         ) : (

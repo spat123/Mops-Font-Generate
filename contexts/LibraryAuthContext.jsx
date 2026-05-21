@@ -4,6 +4,8 @@ const defaultValue = {
   authLoading: false,
   isAuthenticated: false,
   canCreateNewLibrary: false,
+  /** true только когда число библиотек ≥ лимита тарифа (не из-за OAuth/сессии). */
+  libraryLimitReached: false,
   isPro: false,
   planName: 'Free',
   librariesCount: 0,

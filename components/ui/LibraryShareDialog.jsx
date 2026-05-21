@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PopupDialogHeader } from './PopupDialogHeader';
 import { SelectableChip } from './SelectableChip';
+import { Tooltip } from './Tooltip';
 import {
   ShareFacebookBrandIcon,
   ShareLinkChainIcon,
@@ -13,6 +14,8 @@ import { toast } from '../../utils/appNotify';
 import { buildLibrarySharePayload } from '../../utils/librarySharePayload';
 import { buildAbsoluteLibraryShareUrl } from '../../utils/libraryShareLink';
 import { getLibrarySourceLabel } from '../../utils/fontLibraryUtils';
+import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
+import { getMaxShareFontsForUser, MAX_SHARE_FONTS_FREE } from '../../utils/libraryShareLimits';
 
 const SHARE_ACTIONS_GRID =
   'grid w-full grid-cols-5 items-stretch gap-1.5 sm:gap-2';
@@ -38,13 +41,19 @@ export function LibraryShareDialog({
   initialSelectedFontIds = [],
   resolveSessionFont,
 }) {
+  const { isPro } = useLibraryAuth();
+  const maxShareFonts = getMaxShareFontsForUser(isPro);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setSelectedIds(new Set((Array.isArray(initialSelectedFontIds) ? initialSelectedFontIds : []).map(String)));
-  }, [open, library?.id, initialSelectedFontIds]);
+    let ids = (Array.isArray(initialSelectedFontIds) ? initialSelectedFontIds : []).map(String);
+    if (!isPro && ids.length > maxShareFonts) {
+      ids = ids.slice(0, maxShareFonts);
+    }
+    setSelectedIds(new Set(ids));
+  }, [open, library?.id, initialSelectedFontIds, isPro, maxShareFonts]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -69,6 +78,7 @@ export function LibraryShareDialog({
     () => fonts.filter((f) => !selectedIds.has(String(f?.id || ''))),
     [fonts, selectedIds],
   );
+  const shareLimitFull = !isPro && selectedIds.size >= maxShareFonts;
 
   const removeTag = useCallback((id) => {
     setSelectedIds((prev) => {
@@ -78,13 +88,19 @@ export function LibraryShareDialog({
     });
   }, []);
 
-  const addTag = useCallback((id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.add(String(id));
-      return next;
-    });
-  }, []);
+  const addTag = useCallback(
+    (id) => {
+      setSelectedIds((prev) => {
+        if (!isPro && prev.size >= maxShareFonts) {
+          return prev;
+        }
+        const next = new Set(prev);
+        next.add(String(id));
+        return next;
+      });
+    },
+    [isPro, maxShareFonts],
+  );
 
   const buildShareUrl = useCallback(async () => {
     if (!library || selectedFonts.length === 0) return '';
@@ -240,8 +256,30 @@ export function LibraryShareDialog({
                 </div>
 
                 <div className="mt-6 border-t border-gray-200 pt-4">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Шрифты в ссылке
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      Шрифты в ссылке
+                    </span>
+                    {!isPro ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold tabular-nums text-gray-600">
+                          {selectedFonts.length}/{MAX_SHARE_FONTS_FREE}
+                        </span>
+                        <Tooltip
+                          content="На Free в одной ссылке — до 5 шрифтов. В Pro — без ограничения."
+                          openDelayMs={200}
+                          side="bottom"
+                        >
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-gray-100 text-[10px] font-bold italic leading-none text-gray-700"
+                            aria-label="Лимит шрифтов в ссылке"
+                          >
+                            i
+                          </button>
+                        </Tooltip>
+                      </span>
+                    ) : null}
                   </div>
                   {selectedFonts.length === 0 ? (
                     <p className="mb-3 text-sm text-gray-600">
@@ -277,16 +315,29 @@ export function LibraryShareDialog({
                         {unselectedFonts.map((font) => {
                           const id = String(font?.id || '');
                           const label = String(font?.label || id);
-                          return (
+                          const chipDisabled = shareLimitFull;
+                          const chip = (
                             <SelectableChip
-                              key={id}
                               type="button"
                               active={false}
+                              disabled={chipDisabled}
                               onClick={() => addTag(id)}
                               className="max-w-full"
                             >
                               <span className="truncate">+ {label}</span>
                             </SelectableChip>
+                          );
+                          return chipDisabled ? (
+                            <Tooltip
+                              key={id}
+                              content={`На Free в ссылке — не больше ${MAX_SHARE_FONTS_FREE} шрифтов`}
+                              openDelayMs={200}
+                              side="top"
+                            >
+                              <span className="inline-flex max-w-full">{chip}</span>
+                            </Tooltip>
+                          ) : (
+                            <React.Fragment key={id}>{chip}</React.Fragment>
                           );
                         })}
                       </div>

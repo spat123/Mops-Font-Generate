@@ -3,6 +3,7 @@ import {
   MAX_SAVED_LIBRARIES_PER_ACCOUNT,
   MAX_SAVED_LIBRARIES_PRO_ACCOUNT,
 } from './authLibraryLimits';
+import { MAX_SHARE_FONTS_FREE } from './libraryShareLimits';
 
 /** @typedef {'monthly' | 'annual'} BillingPeriod */
 /** @typedef {'RU' | 'EN'} BillingLocale */
@@ -76,7 +77,7 @@ export function getFreePlanFeatures(locale = 'RU') {
       'Preview modes: Plain, Waterfall, Glyphs, Styles',
       'CSS export with @font-face (.css / .txt)',
       `${FREE_STATIC_GENERATIONS_LIMIT} variable→static exports per month`,
-      'Share library links and ZIP download',
+      `Share links (up to ${MAX_SHARE_FONTS_FREE} fonts per link) and ZIP download`,
     ];
   }
   return [
@@ -85,7 +86,7 @@ export function getFreePlanFeatures(locale = 'RU') {
     'Режимы превью: Plain, Waterfall, Glyphs, Styles',
     'Экспорт CSS с @font-face (.css / .txt)',
     `${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц`,
-    'Ссылки «Поделиться» и скачивание архивом',
+    `Ссылки «Поделиться» (до ${MAX_SHARE_FONTS_FREE} шрифтов в ссылке) и архив`,
   ];
 }
 
@@ -98,6 +99,7 @@ export function getProPlanFeatures(locale = 'RU') {
       'Unlimited variable→static exports',
       'Your own font name and style when exporting static files from VF',
       'Priority updates and early access to new features',
+      'Unlimited fonts per «Share» link',
     ];
   }
   return [
@@ -105,6 +107,7 @@ export function getProPlanFeatures(locale = 'RU') {
     'Без лимита генераций VF → статик',
     'Своё имя и стиль шрифта при экспорте статики из VF',
     'Приоритетные обновления и ранний доступ к новым фичам',
+    'Неограниченное число шрифтов в ссылке «Поделиться»',
   ];
 }
 

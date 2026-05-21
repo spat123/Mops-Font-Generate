@@ -43,16 +43,16 @@ function PlanCard({
   return (
     <div
       className={[
-        'relative flex h-full flex-col rounded-2xl border p-5 transition-colors',
+        'relative flex h-full flex-col rounded-xl border p-5 transition-colors',
         isCurrent ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-white',
-        highlight && !isCurrent ? 'border-accent/35 shadow-sm' : '',
+        highlight && !isCurrent ? 'border-accent/35' : '',
       ].join(' ')}
     >
       {badge ? (
         <span
           className={[
             'absolute right-4 top-4 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
-            isCurrent || !highlight ? 'bg-gray-100 text-gray-600' : 'bg-accent/10 text-accent',
+            isCurrent || !highlight ? 'bg-gray-200 text-gray-600' : 'bg-accent/10 text-accent',
           ].join(' ')}
         >
           {badge}
