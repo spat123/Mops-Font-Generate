@@ -309,19 +309,13 @@ vercel login
 | Сессия «слетает» на проде | `NEXTAUTH_URL` должен совпадать с доменом в браузере (HTTPS, без лишнего `/`). |
 | Preview не создаётся | **Settings → Git** → Preview Deployments; ветка не заблокирована в Ignored Build Step. |
 | Долгая сборка / таймаут API | Лимиты Hobby vs Pro; `maxDuration` в `vercel.json`. |
-| Сайт не открывается / очень медленно (мобильный, без VPN) | Переезд на VPS: [DEPLOY_REG_RU_VPS.md](./DEPLOY_REG_RU_VPS.md) |
+| Сайт не открывается / очень медленно (мобильный, без VPN) | DNS REG.ru ↔ Vercel (§5); Cloudflare; сеть провайдера |
 
 ### Отключить автодеплой Production (только ручной релиз)
 
 **Settings** → **Git** → **Ignored Build Step** — команду, которая пропускает сборку для `main`, пока вы не запустите deploy вручную.  
 Или в GitHub: защита ветки `main` + деплой только после merge PR.  
 Для большинства команд достаточно ветки `develop` без этой настройки.
-
----
-
-## 15. Production в России (VPS REG.ru)
-
-Если Vercel нестабилен из РФ (RESET, таймауты API) — основной прод: **[DEPLOY_REG_RU_VPS.md](./DEPLOY_REG_RU_VPS.md)**.
 
 ---
 
