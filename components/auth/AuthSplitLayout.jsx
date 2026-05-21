@@ -6,8 +6,30 @@ import { AuthAnimatedLetters } from './AuthAnimatedLetters';
 export const AUTH_INPUT_CLASS =
   'h-12 w-full rounded-lg border-0 bg-[#f0f0f0] px-4 text-sm font-medium tracking-wide text-gray-900 placeholder:text-gray-500 placeholder:uppercase focus:outline-none focus:ring-2 focus:ring-black/10 [font-feature-settings:normal]';
 
+export const AUTH_CODE_INPUT_CLASS =
+  `${AUTH_INPUT_CLASS} text-center text-lg font-semibold tracking-[0.35em] placeholder:tracking-[0.35em] placeholder:normal-case`;
+
 export const AUTH_PRIMARY_BTN_CLASS =
-  'mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent px-4 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40';
+  'mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent px-4 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-90';
+
+/** Кнопка отправки формы auth: при loading — спиннер по центру. */
+export function AuthSubmitButton({ children, loading = false, disabled = false, type = 'submit', className = '' }) {
+  return (
+    <button
+      type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      className={`${AUTH_PRIMARY_BTN_CLASS} relative ${className}`.trim()}
+    >
+      <span className={loading ? 'invisible' : ''}>{children}</span>
+      {loading ? (
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+        </span>
+      ) : null}
+    </button>
+  );
+}
 
 /** Внутренняя белая карточка слева: inset-тени и градиентная обводка (прозрачный верх → 10% чёрного снизу). */
 export const AUTH_INNER_CARD_SURFACE = {

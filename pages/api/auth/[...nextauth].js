@@ -3,6 +3,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getMaxSavedLibrariesForUser } from '../../../utils/authLibraryLimits';
 import { upsertOAuthUser, verifyCredentialsUser, findUserByEmail, findUserById } from '../../../lib/auth/userStore';
+import { consumeLoginToken, isStepUpLoginDisabled } from '../../../lib/auth/stepUpLogin';
 
 /** Только локальная разработка: поднять тариф до Pro без правки БД. */
 function applyDevProSimulation(session) {
@@ -56,11 +57,30 @@ function buildProviders() {
       credentials: {
         email: { label: 'Логин или email', type: 'text' },
         password: { label: 'Пароль', type: 'password' },
+        loginToken: { label: 'Login token', type: 'text' },
       },
       async authorize(credentials) {
+        const loginToken = String(credentials?.loginToken ?? '').trim();
+        if (loginToken) {
+          const userId = await consumeLoginToken(loginToken);
+          if (!userId) return null;
+          const user = await findUserById(userId);
+          if (!user) return null;
+          return {
+            id: user.id,
+            name: user.name || (user.email ? user.email.split('@')[0] : 'User'),
+            email: user.email || null,
+            image: user.image || null,
+          };
+        }
+
         const login = String(credentials?.email ?? '').trim();
         const password = String(credentials?.password ?? '');
         if (!login || !password) return null;
+
+        if (!isStepUpLoginDisabled()) {
+          return null;
+        }
 
         const user = await verifyCredentialsUser({ email: login, password });
         if (user) {

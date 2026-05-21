@@ -7,8 +7,8 @@ import { SignInProviderButtons } from '../../components/auth/SignInProviderButto
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_INPUT_CLASS,
-  AUTH_PRIMARY_BTN_CLASS,
   AuthDividerOr,
+  AuthSubmitButton,
   AuthLegalFooter,
   AuthLogoLink,
   AuthSplitLayout,
@@ -28,6 +28,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
   const [password, setPassword] = React.useState('');
   const [passwordRepeat, setPasswordRepeat] = React.useState('');
   const [formError, setFormError] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
   const submittingRef = React.useRef(false);
 
   useEffect(() => {
@@ -113,7 +114,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
               if (!res.ok) {
                 setFormError(
                   res.status === 502
-                    ? 'Не удалось отправить письмо с подтверждением. Проверьте Resend на сервере или напишите на support@dynamicfont.ru.'
+                    ? 'Аккаунт создан, но письмо не отправилось. На следующем шаге нажмите «Отправить письмо снова» или напишите на support@dynamicfont.ru.'
                     : 'Не удалось зарегистрироваться. Попробуйте ещё раз.',
                 );
                 return;
@@ -125,6 +126,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
               });
             } finally {
               submittingRef.current = false;
+              setSubmitting(false);
             }
           }}
         >
@@ -164,9 +166,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
             placeholder="ПОВТОРИТЬ ПАРОЛЬ"
           />
           {formError ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p> : null}
-          <button type="submit" className={AUTH_PRIMARY_BTN_CLASS}>
-            Зарегистрироваться
-          </button>
+          <AuthSubmitButton loading={submitting}>Зарегистрироваться</AuthSubmitButton>
         </form>
 
         <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">

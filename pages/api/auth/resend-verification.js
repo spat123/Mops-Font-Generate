@@ -16,11 +16,12 @@ export default async function handler(req, res) {
 
   try {
     const email = typeof req.body?.email === 'string' ? req.body.email : '';
-    const { user, verificationToken } = await refreshVerificationToken(email);
+    const { user, verificationToken, verificationCode } = await refreshVerificationToken(email);
     await sendVerificationEmail({
       to: user.email,
       name: user.name,
       token: verificationToken,
+      code: verificationCode,
     });
     res.status(200).json({ ok: true });
   } catch (e) {

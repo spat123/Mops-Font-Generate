@@ -37,6 +37,7 @@ export default async function handler(req, res) {
         to: result.user.email,
         name: result.user.name,
         token: result.verificationToken,
+        code: result.verificationCode,
       });
     } catch (mailErr) {
       if (mailErr?.code === 'EMAIL_FAILED') {

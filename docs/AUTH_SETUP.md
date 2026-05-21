@@ -21,7 +21,13 @@
 
 **Полный пошаговый гайд:** [EMAIL_REGISTRATION_GUIDE.md](./EMAIL_REGISTRATION_GUIDE.md)
 
-Страницы: `/auth/signup` → письмо со ссылкой → `/api/auth/verify-email` → вход на `/auth/signin`.
+Страницы: `/auth/signup` → письмо с кодом и ссылкой → подтверждение → `/auth/signin`.
+
+**Вход по паролю:** `/api/auth/login-init` → с доверенного устройства сразу сессия; с нового — код на email (15 мин) → `/api/auth/login-verify` → одноразовый `loginToken` → NextAuth.
+
+| Переменная | Назначение |
+| ---------- | ---------- |
+| `LOGIN_STEP_UP_DISABLED` | `1` — отключить проверку устройства (удобно локально в `.env.local`) |
 
 | Переменная | Назначение |
 | ---------- | ---------- |
