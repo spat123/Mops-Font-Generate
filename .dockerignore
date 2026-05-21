@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+.cursor
+*.md
+!docs/DEPLOY_YANDEX_RU.md
+.env*
+!.env.yandex.example
+data
+terminals
+agent-transcripts
+coverage
+.DS_Store

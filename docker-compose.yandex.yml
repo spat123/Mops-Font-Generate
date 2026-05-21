@@ -1,0 +1,13 @@
+# Локальная проверка RU-образа перед Yandex Cloud:
+#   docker compose -f docker-compose.yandex.yml up --build
+services:
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
