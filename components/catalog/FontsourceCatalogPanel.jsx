@@ -30,7 +30,6 @@ import { filterCatalogItems, sortCatalogItems } from '../../utils/catalogFilterS
 import { useCatalogEngine } from './useCatalogEngine';
 import { useOverlayScrollbar } from '../ui/useOverlayScrollbar';
 import { addLibraryEntryToLibrary } from '../../utils/libraryEntryActions';
-import { isFontsourceEnabled } from '../../utils/fontsourceFeatureFlag';
 import {
   buildArchiveBlobFromEntries,
   buildFontsourceFormatArchiveEntry,
@@ -118,7 +117,6 @@ export default function FontsourceCatalogPanel({
   onSelectionActionsChange,
   onTotalItemsChange,
 }) {
-  const fontsourceEnabled = isFontsourceEnabled();
   const {
     setCatalogScrollContainer,
     setTrailingToolbarContainer,
@@ -429,7 +427,7 @@ export default function FontsourceCatalogPanel({
   ]);
 
   useEffect(() => {
-    if (!fontsourceEnabled || !isActive) return undefined;
+    if (!isActive) return undefined;
     const cached = readFontsourceCatalogCache();
     const hasCachedItems = cached.length > 0;
     const loadingStartedAt = Date.now();
@@ -879,10 +877,6 @@ export default function FontsourceCatalogPanel({
   // enqueuePreviewLoad теперь вызывается прямо из IntersectionObserver
 
   // toolbarProps приходит из useCatalogEngine
-
-  if (!fontsourceEnabled) {
-    return null;
-  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">

@@ -18,7 +18,7 @@
 
 - `Dockerfile` — сборка Next.js (standalone) + Python fonttools
 - `.env.yandex.example` — список переменных для RU
-- `docker-compose.yandex.yml` — локальная проверка образа
+- `docker-compose.prod.yml` — локальная проверка образа (`docker compose -f docker-compose.prod.yml up --build`)
 
 ---
 

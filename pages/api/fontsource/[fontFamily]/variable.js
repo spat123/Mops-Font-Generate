@@ -8,7 +8,6 @@ import path from 'path';
 import { slugifyFontKey } from '../../../../utils/fontSlug';
 import { findFontsourcePackagePath } from '../../../../utils/serverUtils';
 import { applyFontsourceFontCacheHeaders } from '../../../../utils/fontsourceApiCache';
-import { isFontsourceEnabled } from '../../../../utils/fontsourceFeatureFlag';
 
 // Вспомогательная функция для преобразования буфера в base64
 function bufferToBase64(buffer) {
@@ -129,11 +128,6 @@ async function fetchRemoteVariableFile(packageName, slug, subset, style = 'norma
 }
 
 export default async function handler(req, res) {
-  if (!isFontsourceEnabled()) {
-    res.setHeader('Cache-Control', 'no-store');
-    return res.status(503).json({ error: 'Fontsource disabled', code: 'FONTSOURCE_DISABLED' });
-  }
-
   try {
     // Получаем имя шрифта из URL
     const { fontFamily } = req.query;

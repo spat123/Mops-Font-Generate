@@ -13,7 +13,7 @@ import { SearchClearButton } from '../ui/SearchClearButton';
 import { IconCircleButton } from '../ui/IconCircleButton';
 import { LibraryReorderHint } from '../ui/LibraryReorderHint';
 import { EditorStatusBar } from '../ui/EditorStatusBar';
-import { getCatalogSourceOptions, isFontsourceEnabled } from '../../utils/fontsourceFeatureFlag';
+import { CATALOG_SOURCE_OPTIONS } from '../../constants/fontsLibraryScreen';
 
 /**
  * Экран «Все шрифты»: подвкладки каталог / сохранённые библиотеки, панели каталога, сетка библиотеки, статусбар.
@@ -90,9 +90,6 @@ export function FontsLibraryHomeScreen({
   fileInputRef,
   libraryStatusBar,
 }) {
-  const catalogSourceOptions = getCatalogSourceOptions();
-  const fontsourceCatalogOn = isFontsourceEnabled();
-
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
       {libraryTabs.length > 1 ? (
@@ -137,19 +134,16 @@ export function FontsLibraryHomeScreen({
                 onSelectionActionsChange={handleCatalogSelectionActionsChange}
                 onTotalItemsChange={setGoogleCatalogTotalItems}
                 trailingToolbar={
-                  catalogSourceOptions.length > 1 ? (
-                    <SegmentedControl
-                      value={catalogSource}
-                      onChange={setCatalogSource}
-                      options={catalogSourceOptions}
-                      variant="pairOutline"
-                      className={catalogSourceToggleClassName}
-                    />
-                  ) : null
+                  <SegmentedControl
+                    value={catalogSource}
+                    onChange={setCatalogSource}
+                    options={CATALOG_SOURCE_OPTIONS}
+                    variant="pairOutline"
+                    className={catalogSourceToggleClassName}
+                  />
                 }
               />
             </div>
-            {fontsourceCatalogOn ? (
             <div
               className={
                 catalogSource === 'fontsource'
@@ -170,14 +164,13 @@ export function FontsLibraryHomeScreen({
                   <SegmentedControl
                     value={catalogSource}
                     onChange={setCatalogSource}
-                    options={catalogSourceOptions}
+                    options={CATALOG_SOURCE_OPTIONS}
                     variant="pairOutline"
                     className={catalogSourceToggleClassName}
                   />
                 }
               />
             </div>
-            ) : null}
           </div>
         )}
 
