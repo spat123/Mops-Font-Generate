@@ -326,6 +326,8 @@
 
       async function sendToLogs(payload) {
         try {
+          const controller = new AbortController();
+          const to = setTimeout(() => controller.abort("timeout"), 2500);
           await fetch("/api/diagnostics/client", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -336,7 +338,9 @@
             }),
             keepalive: true,
             credentials: "same-origin",
+            signal: controller.signal,
           });
+          clearTimeout(to);
         } catch {
           // ignore
         }
@@ -379,7 +383,7 @@
           setBadge("Базовые API доступны (ищем тяжёлые запросы/параллельность)", "ok");
         }
 
-        await sendToLogs(summary);
+        void sendToLogs(summary);
       }
 
       async function runStress() {
@@ -387,7 +391,14 @@
         const startedAt = stamp();
         const stress = await runStressTest({ total: 12, concurrency: 3, timeoutMs: 12000, overallTimeoutMs: 90000 });
 
-        const base = outEl.textContent ? JSON.parse(outEl.textContent) : null;
+        let base = null;
+        if (outEl.textContent) {
+          try {
+            base = JSON.parse(outEl.textContent);
+          } catch {
+            base = null;
+          }
+        }
         const summary = base && typeof base === "object" ? base : { at: startedAt, href: location.href, host: location.host };
         summary.stressTest = { at: startedAt, ...stress };
 
@@ -400,7 +411,7 @@
           setBadge("Стресс‑тест: OK (обрывов нет)", "ok");
         }
 
-        await sendToLogs({ type: "stress", ...summary.stressTest });
+        void sendToLogs({ type: "stress", ...summary.stressTest });
       }
 
       metaEl.textContent = `${location.host} • ${stamp()}`;
