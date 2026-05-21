@@ -4,7 +4,7 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "regions": ["fra1"],
+  "regions": ["sfo1"],
   "github": {
     "autoAlias": false
   },
