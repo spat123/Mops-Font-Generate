@@ -1,9 +1,10 @@
 /**
- * Диагностика сети — команды в консоли браузера (F12).
- * Глобалы вешаются всегда; сбор логов на сервер — после mfgDiagOn().
+ * Авто-сводка сети при загрузке → консоль + Vercel Logs.
+ * Ручные команды: mfgReport(), mfgDiagOn() (расширенный сбор).
  */
 
 const LS_KEY = 'mfgNetworkDiag';
+const AUTO_REPORT_KEY = 'mfgAutoReportDone';
 const MAX_EVENTS = 24;
 const SLOW_FETCH_MS = 5000;
 const FLUSH_MS = 4000;
@@ -13,6 +14,7 @@ let queue = [];
 let flushTimer = null;
 let patched = false;
 let consoleInstalled = false;
+let autoReportStarted = false;
 
 function safe(fn) {
   try {
@@ -20,6 +22,12 @@ function safe(fn) {
   } catch {
     return undefined;
   }
+}
+
+function isProductionHost() {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h.endsWith('dynamicfont.ru') || h.endsWith('.vercel.app');
 }
 
 export function isNetworkDiagEnabled() {
@@ -47,6 +55,44 @@ function persistFromQuery() {
   } catch {
     /* ignore */
   }
+}
+
+function getSessionId() {
+  const key = 'mfgDiagSession';
+  try {
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+      id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return 'anonymous';
+  }
+}
+
+function postDiagnostics(events) {
+  if (!Array.isArray(events) || events.length === 0) return;
+  const body = JSON.stringify({
+    sessionId: getSessionId(),
+    page: safe(() => window.location.href),
+    events,
+  });
+  const url = '/api/diagnostics/client';
+  try {
+    if (navigator.sendBeacon) {
+      const ok = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      if (ok) return;
+    }
+  } catch {
+    /* fetch fallback */
+  }
+  void fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+    keepalive: true,
+  }).catch(() => {});
 }
 
 function shouldTrackUrl(url) {
@@ -78,40 +124,7 @@ function scheduleFlush() {
 function flushEvents() {
   if (!enabled || queue.length === 0) return;
   const batch = queue.splice(0, queue.length);
-  const body = JSON.stringify({
-    sessionId: getSessionId(),
-    page: safe(() => window.location.href),
-    events: batch,
-  });
-  const url = '/api/diagnostics/client';
-  try {
-    if (navigator.sendBeacon) {
-      const ok = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
-      if (ok) return;
-    }
-  } catch {
-    /* fetch fallback */
-  }
-  void fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body,
-    keepalive: true,
-  }).catch(() => {});
-}
-
-function getSessionId() {
-  const key = 'mfgDiagSession';
-  try {
-    let id = sessionStorage.getItem(key);
-    if (!id) {
-      id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
-      sessionStorage.setItem(key, id);
-    }
-    return id;
-  } catch {
-    return 'anonymous';
-  }
+  postDiagnostics(batch);
 }
 
 function readPageTimings() {
@@ -136,12 +149,100 @@ function readPageTimings() {
   };
 }
 
-function collectBootstrap() {
-  pushEvent('bootstrap', {
-    ...readPageTimings(),
-    ua: navigator.userAgent,
-    language: navigator.language,
-  });
+function formatProbeRows(data) {
+  return Object.entries(data?.results || {}).map(([name, r]) => ({
+    сервис: name,
+    ok: r?.ok,
+    ms: r?.ms,
+    status: r?.status ?? '—',
+    ошибка: r?.error ?? '',
+  }));
+}
+
+function buildSummaryText(timings, probe, probeClientMs) {
+  const lines = [];
+  lines.push(`Хост: ${timings.host} | online: ${timings.online}`);
+  if (timings.dnsMs != null) lines.push(`DNS: ${timings.dnsMs} ms`);
+  if (timings.ttfbMs != null) lines.push(`TTFB: ${timings.ttfbMs} ms`);
+  if (timings.loadMs != null) lines.push(`Загрузка страницы: ${timings.loadMs} ms`);
+  if (timings.effectiveType) lines.push(`Сеть: ${timings.effectiveType}, RTT ${timings.rttMs ?? '—'} ms`);
+  if (probe?.vercelRegion) lines.push(`Регион Vercel (probe): ${probe.vercelRegion}`);
+  for (const [name, r] of Object.entries(probe?.results || {})) {
+    const st = r?.ok ? 'OK' : 'FAIL';
+    lines.push(`Probe ${name}: ${st} ${r?.ms ?? '—'} ms${r?.error ? ` (${r.error})` : ''}`);
+  }
+  if (probeClientMs != null) lines.push(`Probe с клиента: ${probeClientMs} ms`);
+  const slowTtfb = timings.ttfbMs != null && timings.ttfbMs > 2000;
+  const slowLoad = timings.loadMs != null && timings.loadMs > 6000;
+  if (slowTtfb) lines.push('⚠ Медленный TTFB — сеть до сервера или DNS.');
+  if (slowLoad) lines.push('⚠ Медленная загрузка — возможны обрывы (reset) или тяжёлый JS.');
+  const probeFail = Object.values(probe?.results || {}).some((r) => r && !r.ok);
+  if (probeFail) lines.push('⚠ С сервера Vercel недоступен Google или Fontsource.');
+  if (!slowTtfb && !slowLoad && !probeFail) lines.push('По метрикам критичных проблем не видно.');
+  return lines.join('\n');
+}
+
+function printAutoReportToConsole(timings, probe, probeClientMs, summaryText) {
+  try {
+    console.group('[mfg] Сводка сети (автоматически)');
+    console.table(timings);
+    if (probe?.results) console.table(formatProbeRows(probe));
+    console.info('%c' + summaryText, 'white-space: pre-line; font-family: monospace;');
+    console.info('[mfg] Копия отправлена в Vercel Logs → фильтр [client-diag-summary]');
+    console.groupEnd();
+  } catch {
+    console.log('[mfg] summary', { timings, probe, summaryText });
+  }
+}
+
+async function fetchNetworkProbe() {
+  const t0 = performance.now();
+  const res = await fetch('/api/diagnostics/network-probe');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+  return { data, clientMs: Math.round(performance.now() - t0) };
+}
+
+/** Одна авто-сводка за вкладку (без ввода команд). */
+export async function runAutoReport() {
+  if (typeof window === 'undefined') return null;
+  try {
+    if (sessionStorage.getItem(AUTO_REPORT_KEY) === '1') return null;
+    sessionStorage.setItem(AUTO_REPORT_KEY, '1');
+  } catch {
+    /* continue without session guard */
+  }
+
+  const timings = readPageTimings();
+  let probe = null;
+  let probeClientMs = null;
+  let probeError = null;
+
+  try {
+    const out = await fetchNetworkProbe();
+    probe = out.data;
+    probeClientMs = out.clientMs;
+  } catch (e) {
+    probeError = String(e?.message || e);
+  }
+
+  const summaryText = buildSummaryText(timings, probe, probeClientMs);
+  printAutoReportToConsole(timings, probe, probeClientMs, summaryText);
+
+  postDiagnostics([
+    {
+      type: 'auto_summary',
+      t: Date.now(),
+      summaryText,
+      timings,
+      probe,
+      probeClientMs,
+      probeError,
+      ua: navigator.userAgent,
+    },
+  ]);
+
+  return { timings, probe, summaryText, probeError };
 }
 
 function patchFetch() {
@@ -167,7 +268,7 @@ function patchFetch() {
       const line = { url: url.slice(0, 120), ms, error: String(err?.message || err) };
       if (track) {
         if (enabled) pushEvent('fetch_error', line);
-        console.error('[mfg] fetch error', line);
+        console.warn('[mfg] fetch error', line);
       }
       throw err;
     }
@@ -176,16 +277,18 @@ function patchFetch() {
 
 function patchGlobalErrors() {
   window.addEventListener('error', (e) => {
-    pushEvent('window_error', {
+    const payload = {
       message: String(e.message || '').slice(0, 300),
       source: String(e.filename || '').slice(0, 200),
       line: e.lineno,
-    });
+    };
+    if (enabled) pushEvent('window_error', payload);
+    console.warn('[mfg] window error', payload);
   });
   window.addEventListener('unhandledrejection', (e) => {
-    pushEvent('unhandled_rejection', {
-      message: String(e.reason?.message || e.reason || '').slice(0, 300),
-    });
+    const payload = { message: String(e.reason?.message || e.reason || '').slice(0, 300) };
+    if (enabled) pushEvent('unhandled_rejection', payload);
+    console.warn('[mfg] unhandled rejection', payload);
   });
 }
 
@@ -198,12 +301,11 @@ function startDiagCollection() {
   }
   patchFetch();
   patchGlobalErrors();
-  collectBootstrap();
   window.addEventListener('pagehide', () => flushEvents());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushEvents();
   });
-  console.info('[mfg] Запись в Vercel Logs включена ([client-diag]). Выключить: mfgDiagOff()');
+  console.info('[mfg] Расширенная запись в Logs включена. Выключить: mfgDiagOff()');
 }
 
 function stopDiagCollection() {
@@ -214,84 +316,62 @@ function stopDiagCollection() {
     /* ignore */
   }
   flushEvents();
-  console.info('[mfg] Запись в Vercel Logs выключена.');
 }
 
-/** Проверка Google / Fontsource с сервера Vercel + вывод в консоль. */
-export async function runNetworkProbe(options = {}) {
-  const { sendToServer = true } = options;
-  console.info('[mfg] Проверка сети (сервер Vercel → внешние API)…');
-  const t0 = performance.now();
-  let data = {};
+export async function runNetworkProbe() {
   try {
-    const res = await fetch('/api/diagnostics/network-probe');
-    data = await res.json();
-    if (!res.ok) console.error('[mfg] probe HTTP', res.status, data);
+    const { data, clientMs } = await fetchNetworkProbe();
+    console.table(formatProbeRows(data));
+    console.info('[mfg] probe', { clientMs, vercelRegion: data.vercelRegion });
+    if (enabled) {
+      pushEvent('network_probe', { result: data });
+      flushEvents();
+    }
+    return data;
   } catch (e) {
     console.error('[mfg] probe failed', e);
     return { error: String(e?.message || e) };
   }
-  const elapsed = Math.round(performance.now() - t0);
-  const rows = Object.entries(data.results || {}).map(([name, r]) => ({
-    сервис: name,
-    ok: r?.ok,
-    ms: r?.ms,
-    status: r?.status ?? '—',
-    ошибка: r?.error ?? '',
-  }));
-  console.table(rows);
-  console.info('[mfg] probe', { elapsedClientMs: elapsed, vercelRegion: data.vercelRegion, at: data.at });
-  if (sendToServer && enabled) {
-    pushEvent('network_probe', { result: data });
-    flushEvents();
+}
+
+function scheduleAutoReport() {
+  if (autoReportStarted) return;
+  autoReportStarted = true;
+
+  const run = () => {
+    if (!isProductionHost()) return;
+    void runAutoReport();
+  };
+
+  if (document.readyState === 'complete') {
+    window.setTimeout(run, 800);
+  } else {
+    window.addEventListener('load', () => window.setTimeout(run, 800), { once: true });
   }
-  return data;
 }
 
-function printStatus() {
-  const timings = readPageTimings();
-  console.table(timings);
-  console.info('[mfg] diagEnabled:', enabled || isNetworkDiagEnabled());
-  return timings;
-}
-
-function printHelp() {
-  console.info(`
-[mfg] Команды в консоли (F12):
-
-  mfgHelp()       — эта справка
-  mfgProbe()      — проверка Google / Fontsource с сервера Vercel (таблица в консоли)
-  mfgStatus()     — DNS/TTFB/загрузка страницы в этом браузере
-  mfgDiagOn()     — включить запись в Vercel Logs (медленные fetch, ошибки)
-  mfgDiagOff()    — выключить запись
-
-Логи на сервере: Vercel → Logs → [client-diag] или [network-probe]
-`);
-}
-
-/** Всегда: команды в window. Опционально: автозапись если ?diag=1 или mfgDiagOn(). */
 export function installConsoleDiagnostics() {
   if (typeof window === 'undefined' || consoleInstalled) return;
   consoleInstalled = true;
 
-  window.mfgHelp = printHelp;
+  window.mfgReport = runAutoReport;
   window.mfgProbe = runNetworkProbe;
-  window.mfgStatus = printStatus;
+  window.mfgStatus = () => {
+    const t = readPageTimings();
+    console.table(t);
+    return t;
+  };
   window.mfgDiagOn = startDiagCollection;
   window.mfgDiagOff = stopDiagCollection;
-
-  window.__MFG_RUN_NETWORK_PROBE__ = runNetworkProbe;
-  window.__MFG_DIAG_HELP__ = printHelp;
+  window.mfgHelp = () => {
+    console.info('[mfg] Сводка пишется сама при загрузке. Повтор: mfgReport(). Vercel Logs: [client-diag-summary]');
+  };
 
   persistFromQuery();
+  patchFetch();
+  patchGlobalErrors();
+  scheduleAutoReport();
   if (isNetworkDiagEnabled()) startDiagCollection();
-  else {
-    try {
-      console.info('[mfg] Диагностика сети: введите mfgHelp() в консоль');
-    } catch {
-      /* ignore */
-    }
-  }
 }
 
 export function initClientNetworkDiagnostics() {

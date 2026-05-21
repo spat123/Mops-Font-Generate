@@ -1,6 +1,7 @@
 /**
- * Приём клиентских диагностических событий → Vercel Logs ([client-diag]).
- * Включение на клиенте: ?diag=1 или localStorage mfgNetworkDiag=1
+ * Приём клиентских диагностических событий → Vercel Logs.
+ * Авто-сводка: [client-diag-summary] (без действий пользователя).
+ * Расширенный режим: [client-diag] после mfgDiagOn().
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -31,7 +32,22 @@ export default async function handler(req, res) {
     events: events.slice(0, 30),
   };
 
-  console.log('[client-diag]', JSON.stringify(payload));
+  const summary = events.find((e) => e?.type === 'auto_summary');
+  if (summary?.summaryText) {
+    console.log('[client-diag-summary]', summary.summaryText);
+    console.log('[client-diag-summary-json]', JSON.stringify({
+      at: payload.at,
+      ip: payload.ip,
+      country: payload.country,
+      sessionId: payload.sessionId,
+      timings: summary.timings,
+      probe: summary.probe,
+      probeClientMs: summary.probeClientMs,
+      probeError: summary.probeError,
+    }));
+  } else {
+    console.log('[client-diag]', JSON.stringify(payload));
+  }
 
   res.status(204).end();
 }
