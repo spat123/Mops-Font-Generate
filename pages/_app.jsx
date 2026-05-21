@@ -53,15 +53,6 @@ export default function MyApp({ Component, pageProps: { session, seo: pageSeo, .
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
-        <link
-          rel="icon"
-          type="image/png"
-          sizes="32x32"
-          href="/favicon-32-dark.png"
-          media="(prefers-color-scheme: dark)"
-        />
       </Head>
       {!pageSeo ? <OpenGraphHead {...defaultSiteSeo} /> : null}
 

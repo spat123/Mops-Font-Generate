@@ -8,6 +8,9 @@ import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import { hasSignedInBefore, markHasSignedInBefore } from '../../utils/authReturningUser';
 import {
   AUTH_CODE_INPUT_CLASS,
+  AUTH_FORM_ERROR_CLASS,
+  AUTH_FORM_SUCCESS_CLASS,
+  AUTH_FORM_WARNING_CLASS,
   AUTH_INPUT_CLASS,
   AuthDividerOr,
   AuthSubmitButton,
@@ -122,21 +125,17 @@ export default function AuthSignInPage({ isRuGeo = false }) {
         </p>
 
         {verifiedStatus === '1' ? (
-          <p className="mt-6 text-center text-sm font-medium text-green-800">
-            Регистрация и подтверждение завершены. Теперь можно войти.
-          </p>
+          <p className={`mt-6 ${AUTH_FORM_SUCCESS_CLASS}`}>Регистрация и подтверждение завершены. Теперь можно войти.</p>
         ) : null}
         {verifiedStatus === 'expired' ? (
-          <p className="mt-6 text-center text-sm font-medium text-amber-900">
+          <p className={`mt-6 ${AUTH_FORM_WARNING_CLASS}`}>
             Код или ссылка устарели. Запросите новое письмо на странице после регистрации.
           </p>
         ) : null}
         {verifiedStatus && verifiedStatus !== '1' && verifiedStatus !== 'expired' && verifiedStatus !== 'missing' ? (
-          <p className="mt-6 text-center text-sm font-medium text-red-700">Код или ссылка подтверждения недействительны.</p>
+          <p className={`mt-6 ${AUTH_FORM_ERROR_CLASS}`}>Код или ссылка подтверждения недействительны.</p>
         ) : null}
-        {formError && oauthErrorCode ? (
-          <p className="mt-6 text-center text-sm font-medium text-red-700">{formError}</p>
-        ) : null}
+        {formError && oauthErrorCode ? <p className={`mt-6 ${AUTH_FORM_ERROR_CLASS}`}>{formError}</p> : null}
 
         <div className="mt-8 flex flex-col gap-2">
           <SignInProviderButtons callbackUrl={callbackUrl} appearance="auth" />
@@ -231,7 +230,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               placeholder="ПАРОЛЬ"
             />
             {formError && !oauthErrorCode ? (
-              <div className="text-center text-xs font-medium text-red-700">
+              <div className={AUTH_FORM_ERROR_CLASS}>
                 <p>{formError}</p>
                 {pendingVerifyEmail ? (
                   <Link
@@ -320,7 +319,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               />
               Запомнить это устройство на 30 дней
             </label>
-            {formError ? <p className="text-center text-xs font-medium text-red-700">{formError}</p> : null}
+            {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
             <AuthSubmitButton loading={submitting}>Подтвердить вход</AuthSubmitButton>
             <button
               type="button"

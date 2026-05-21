@@ -7,6 +7,7 @@ import { SignInProviderButtons } from '../../components/auth/SignInProviderButto
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_INPUT_CLASS,
+  AUTH_FORM_ERROR_CLASS,
   AuthDividerOr,
   AuthSubmitButton,
   AuthLegalFooter,
@@ -165,7 +166,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
             className={AUTH_INPUT_CLASS}
             placeholder="ПОВТОРИТЬ ПАРОЛЬ"
           />
-          {formError ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{formError}</p> : null}
+          {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
           <AuthSubmitButton loading={submitting}>Зарегистрироваться</AuthSubmitButton>
         </form>
 

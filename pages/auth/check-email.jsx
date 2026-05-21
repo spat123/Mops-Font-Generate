@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_CODE_INPUT_CLASS,
+  AUTH_FORM_ERROR_CLASS,
+  AUTH_FORM_SUCCESS_CLASS,
   AuthDividerOr,
   AuthLegalFooter,
   AuthLogoLink,
@@ -16,19 +18,82 @@ export async function getServerSideProps({ req }) {
   return { props: { isRuGeo: getIsRuGeoFromHeaders(req) } };
 }
 
+const RESEND_COOLDOWN_SEC = 60;
+
+function formatResendCooldown(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export default function AuthCheckEmailPage({ isRuGeo = false }) {
   const router = useRouter();
   const emailRaw = typeof router.query?.email === 'string' ? router.query.email : '';
   const email = emailRaw.trim().toLowerCase();
+  const callbackUrlRaw = typeof router.query?.callbackUrl === 'string' ? router.query.callbackUrl : '/';
+  const callbackUrl = callbackUrlRaw.startsWith('/') ? callbackUrlRaw : '/';
   const mailError = router.query?.mailError === '1';
   const [code, setCode] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [alreadyVerified, setAlreadyVerified] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(Boolean(email));
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  const signInHref = {
+    pathname: '/auth/signin',
+    query: { verified: '1', callbackUrl },
+  };
+
+  useEffect(() => {
+    if (!router.isReady || !email) {
+      setCheckingStatus(false);
+      return;
+    }
+    let cancelled = false;
+    setCheckingStatus(true);
+    fetch('/api/auth/email-verification-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        if (data && !data.needsVerification) {
+          setAlreadyVerified(true);
+          void router.replace({
+            pathname: '/auth/signin',
+            query: { verified: '1', callbackUrl },
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setCheckingStatus(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, email, router, callbackUrl]);
+
+  useEffect(() => {
+    if (!router.isReady || !email || alreadyVerified) return;
+    setResendCooldown(mailError ? 0 : RESEND_COOLDOWN_SEC);
+  }, [router.isReady, email, mailError, alreadyVerified]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined;
+    const id = window.setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [resendCooldown > 0]);
 
   const resend = async () => {
-    if (!email || busy) return;
+    if (!email || busy || resendCooldown > 0) return;
     setBusy(true);
     setError('');
     setMessage('');
@@ -44,10 +109,18 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
       }
       setMessage('Новый код отправлен. Проверьте входящие и спам.');
       setCode('');
+      setResendCooldown(RESEND_COOLDOWN_SEC);
     } finally {
       setBusy(false);
     }
   };
+
+  const resendBlocked = busy || resendCooldown > 0;
+  const resendLabel = busy
+    ? 'Отправка…'
+    : resendCooldown > 0
+      ? `Отправить код снова (${formatResendCooldown(resendCooldown)})`
+      : 'Отправить код снова';
 
   const verifyByCode = async (e) => {
     e.preventDefault();
@@ -75,7 +148,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         setError('Неверный код. Проверьте письмо или запросите новый.');
         return;
       }
-      void router.replace('/auth/signin?verified=1');
+      void router.replace(signInHref);
     } finally {
       setVerifyBusy(false);
     }
@@ -90,8 +163,15 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         <AuthLogoLink className="mb-10" />
 
         <h1 className="text-center text-xl font-bold uppercase tracking-tight text-gray-900 md:text-2xl">
-          Подтвердите почту
+          {alreadyVerified || checkingStatus ? 'Почта подтверждена' : 'Подтвердите почту'}
         </h1>
+        {checkingStatus ? (
+          <p className="mt-4 text-center text-sm text-gray-500">Проверяем статус…</p>
+        ) : null}
+        {alreadyVerified ? (
+          <p className={`mt-4 ${AUTH_FORM_SUCCESS_CLASS}`}>Перенаправляем на страницу входа…</p>
+        ) : null}
+        {!checkingStatus && !alreadyVerified ? (
         <p className="mt-4 text-center text-sm leading-relaxed text-gray-600">
           {mailError ? (
             email ? (
@@ -113,13 +193,16 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
             <>В письме — 6-значный код и ссылка. Введите код ниже или откройте ссылку из письма.</>
           )}
         </p>
-
-        {message ? (
-          <p className="mt-4 text-center text-xs font-medium text-green-800">{message}</p>
         ) : null}
-        {error ? <p className="mt-4 text-center text-xs font-medium text-red-700">{error}</p> : null}
 
-        {email ? (
+        {!checkingStatus && !alreadyVerified && message ? (
+          <p className={`mt-4 ${AUTH_FORM_SUCCESS_CLASS}`}>{message}</p>
+        ) : null}
+        {!checkingStatus && !alreadyVerified && error ? (
+          <p className={`mt-4 ${AUTH_FORM_ERROR_CLASS}`}>{error}</p>
+        ) : null}
+
+        {!checkingStatus && !alreadyVerified && email ? (
           <>
             <form className="mt-8 flex flex-col gap-3" onSubmit={verifyByCode}>
               <label htmlFor="verify-code" className="text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">
@@ -143,18 +226,27 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
               <AuthDividerOr />
             </div>
 
-            <button type="button" className="mt-6 w-full text-center text-xs font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900" disabled={busy} onClick={resend}>
-              {busy ? 'Отправка…' : 'Отправить код снова'}
+            <button
+              type="button"
+              className={`mt-6 w-full text-center text-xs font-medium ${
+                resendBlocked
+                  ? 'cursor-not-allowed text-gray-400 no-underline'
+                  : 'text-gray-600 underline underline-offset-2 hover:text-gray-900'
+              }`}
+              disabled={resendBlocked}
+              onClick={resend}
+            >
+              {resendLabel}
             </button>
           </>
         ) : null}
 
         <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">
           <Link
-            href="/auth/signin"
+            href={signInHref}
             className="text-accent underline decoration-accent underline-offset-[3px] hover:text-accent-hover"
           >
-            Перейти ко входу
+            {alreadyVerified ? 'Войти' : 'Перейти ко входу'}
           </Link>
         </p>
       </AuthSplitLayout>

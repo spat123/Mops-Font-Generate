@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_INPUT_CLASS,
+  AUTH_FORM_ERROR_CLASS,
   AUTH_PRIMARY_BTN_CLASS,
   AuthLegalFooter,
   AuthLogoLink,
@@ -112,7 +113,7 @@ export default function AuthLinkPage({ isRuGeo = false }) {
             className={AUTH_INPUT_CLASS}
             placeholder="ПАРОЛЬ"
           />
-          {error ? <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p> : null}
+          {error ? <p className={AUTH_FORM_ERROR_CLASS}>{error}</p> : null}
           <button type="submit" className={AUTH_PRIMARY_BTN_CLASS}>
             Привязать и войти
           </button>

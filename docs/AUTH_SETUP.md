@@ -52,6 +52,7 @@
 1. Аккаунт → **API Keys** → создать ключ → `RESEND_API_KEY`
 2. Для теста: отправка с `onboarding@resend.dev` (уже в `.env.example`)
 3. Для продакшена: добавить домен `dynamicfont.ru` в Resend, DNS (SPF/DKIM), затем `EMAIL_FROM=noreply@dynamicfont.ru`
+4. Логотип в письмах и BIMI (аватар в Gmail): см. [EMAIL_REGISTRATION_GUIDE.md §1.4](./EMAIL_REGISTRATION_GUIDE.md#14-логотип-в-письме-и-иконка-в-списке-почты-bimi)
 
 ### Локально и на Vercel — это разные места
 

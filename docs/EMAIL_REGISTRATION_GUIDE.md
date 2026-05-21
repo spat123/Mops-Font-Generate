@@ -62,6 +62,45 @@ EMAIL_FROM=DINAMIC FONT <onboarding@resend.dev>
 EMAIL_FROM=DINAMIC FONT <noreply@dynamicfont.ru>
 ```
 
+### 1.4 Логотип в письме и иконка в списке почты (BIMI)
+
+**В теле письма** логотип уже подставляется из `public/bimi-logo.svg` (тот же знак, что mark в `public/logo/Logo Mark.svg`).
+
+**В списке писем** (аватар слева в Gmail и др.) `favicon.ico` с сайта **не используется**. Нужен отдельный DNS-набор:
+
+#### A. BIMI (рекомендуется для Gmail)
+
+1. Убедитесь, что домен **Verified** в Resend (SPF/DKIM из шага 1.3).
+2. Файл в репозитории: `public/bimi-logo.svg` → на проде доступен по  
+   `https://dynamicfont.ru/bimi-logo.svg`
+3. В **Vercel** → проект → **Domains** → DNS для `dynamicfont.ru` добавьте:
+
+| Тип | Имя (Host) | Значение |
+|-----|------------|----------|
+| TXT | `_dmarc` | `v=DMARC1; p=quarantine; rua=mailto:support@dynamicfont.ru` |
+| TXT | `default._bimi` | `v=BIMI1; l=https://dynamicfont.ru/bimi-logo.svg` |
+
+   Политику DMARC при необходимости ужесточите до `p=reject` после проверки доставки.
+
+4. Проверка: [bimigroup.org/bimi-generator](https://bimigroup.org) или BIMI Inspector в поиске.
+5. В Gmail логотип может появиться **через несколько дней**, не сразу.
+
+#### B. Gravatar (быстрый дополнительный вариант)
+
+1. [gravatar.com](https://gravatar.com) → аккаунт на **тот же email**, что в `EMAIL_FROM` (если ящик доступен).
+2. Загрузите квадратный логотип (можно экспорт из `bimi-logo.svg`).
+3. Работает не во всех почтовиках (Яндекс.Почта — без гарантии).
+
+#### C. Переменная для корректных ссылок на логотип
+
+На Vercel задайте (если ещё нет):
+
+```env
+NEXT_PUBLIC_SITE_URL=https://dynamicfont.ru
+```
+
+Иначе в письмах подставится `NEXTAUTH_URL`.
+
 ---
 
 ## Шаг 2. Neon — база пользователей (для Vercel)
@@ -249,6 +288,8 @@ OAuth (Google/Яндекс) — как в [AUTH_SETUP.md](./AUTH_SETUP.md), от
 - [ ] `DATABASE_URL` (Neon) на Vercel
 - [ ] `RESEND_API_KEY` на Vercel
 - [ ] `EMAIL_FROM` — тестовый или свой домен с Verified в Resend
+- [ ] `NEXT_PUBLIC_SITE_URL=https://dynamicfont.ru` (логотип в письмах)
+- [ ] Опционально: DNS `_dmarc` + `default._bimi` для аватара в Gmail (§1.4)
 - [ ] Redeploy после всех переменных
 - [ ] Тест: signup → письмо → verify → signin на dynamicfont.ru
 

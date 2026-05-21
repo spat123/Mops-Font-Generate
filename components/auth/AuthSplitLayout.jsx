@@ -9,6 +9,11 @@ export const AUTH_INPUT_CLASS =
 export const AUTH_CODE_INPUT_CLASS =
   `${AUTH_INPUT_CLASS} text-center text-lg font-semibold tracking-[0.35em] placeholder:tracking-[0.35em] placeholder:normal-case`;
 
+/** Сообщения форм auth — по центру, без цветной плашки. */
+export const AUTH_FORM_ERROR_CLASS = 'text-center text-sm font-medium text-red-700';
+export const AUTH_FORM_SUCCESS_CLASS = 'text-center text-sm font-medium text-green-800';
+export const AUTH_FORM_WARNING_CLASS = 'text-center text-sm font-medium text-amber-900';
+
 export const AUTH_PRIMARY_BTN_CLASS =
   'mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent px-4 text-xs font-bold uppercase tracking-[0.12em] text-white transition-colors hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-90';
 
