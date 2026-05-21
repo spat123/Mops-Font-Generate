@@ -13,6 +13,14 @@ const glyphDataCache = new Map();
 /** Сигнал родителю: глифы недоступны (Google Fonts). */
 export const GLYPH_COUNT_UNAVAILABLE = -1;
 
+function isFontBinary(file) {
+  return (
+    file &&
+    (file instanceof Blob || (typeof File !== 'undefined' && file instanceof File)) &&
+    (typeof file.size !== 'number' || file.size > 0)
+  );
+}
+
 /** Квадратная сетка: размер ячейки зависит от размера шрифта и ширины контейнера. */
 function computeGlyphSquareGrid(innerWidthPx, fontSizePx) {
   const W = Math.max(64, innerWidthPx);
@@ -46,18 +54,39 @@ function GlyphsMode({
   const { glyphsFontSize } = useSettings();
 
   const [scrollParentEl, setScrollParentEl] = useState(null);
+
+  /** Ref на скролл-контейнер: в prod lazy-mount ref.current часто null на первом layout — пересинхронизируем при isActive. */
   useLayoutEffect(() => {
+    if (!isActive) return undefined;
+
+    const sync = () => {
+      const el = scrollParentRef?.current;
+      const next = el instanceof HTMLElement ? el : null;
+      setScrollParentEl((prev) => (Object.is(prev, next) ? prev : next));
+    };
+
+    sync();
+    const raf = requestAnimationFrame(sync);
+
     const el = scrollParentRef?.current;
-    const next = el instanceof HTMLElement ? el : null;
-    setScrollParentEl((prev) => (Object.is(prev, next) ? prev : next));
-  }, [scrollParentRef]);
+    let ro;
+    if (el instanceof HTMLElement && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(sync);
+      ro.observe(el);
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro?.disconnect();
+    };
+  }, [scrollParentRef, isActive]);
 
   try {
     // Состояние и ref для загрузки глифов
     const [glyphsLoaded, setGlyphsLoaded] = useState(false);
     const [glyphsData, setGlyphsData] = useState(null);
     const [glyphErrors, setGlyphErrors] = useState([]);
-    const isLoadingGlyphs = useRef(false);
+    const [glyphsLoading, setGlyphsLoading] = useState(false);
     // Ref to track active request and prevent race conditions.
     const currentLoadId = useRef(null);
 
@@ -83,7 +112,7 @@ function GlyphsMode({
               setGlyphsData(cachedData);
               setGlyphsLoaded(true);
               setGlyphErrors(cachedData.errors || []);
-              isLoadingGlyphs.current = false; 
+              setGlyphsLoading(false);
               if (!cachedData?.allGlyphs) {
                 console.warn("Cached glyph data is missing 'allGlyphs'.");
               }
@@ -106,7 +135,7 @@ function GlyphsMode({
         setGlyphsData(data);
         setGlyphsLoaded(true);
         setGlyphErrors(data.errors || []);
-        isLoadingGlyphs.current = false; 
+        setGlyphsLoading(false);
 
       } catch (error) {
         console.error('[GlyphsMode Debounced] Ошибка при загрузке глифов:', error);
@@ -115,7 +144,7 @@ function GlyphsMode({
             setGlyphsData(null);
             setGlyphsLoaded(false);
             setGlyphErrors([]);
-            isLoadingGlyphs.current = false; 
+            setGlyphsLoading(false);
         }
       } 
     }, []); // Пустой массив зависимостей для useCallback
@@ -139,7 +168,7 @@ function GlyphsMode({
         setGlyphsLoaded(false);
         setGlyphsData(null);
         setGlyphErrors([]);
-        isLoadingGlyphs.current = false; // Сбрасываем флаг загрузки
+        setGlyphsLoading(false);
       };
 
       // --- Проверки перед загрузкой ---
@@ -153,7 +182,7 @@ function GlyphsMode({
         return;
       }
       
-      if (!selectedFont.file || !(selectedFont.file instanceof Blob)) {
+      if (!isFontBinary(selectedFont.file)) {
         resetState();
         console.warn(`[GlyphsMode] Attempted to load glyphs for ${selectedFont.name} without a valid file object.`);
         return;
@@ -164,14 +193,10 @@ function GlyphsMode({
 
       if (!isDataLoadedInState) {
         // Поднимаем флаг загрузки перед вызовом debounced-функции
-        isLoadingGlyphs.current = true;
-        // Вызываем debounced-функцию с нужными параметрами
+        setGlyphsLoading(true);
         debouncedLoadGlyphs(loadId, selectedFont, fontId);
       } else {
-        // Если данные уже есть, но флаг загрузки всё ещё true
-        if (isLoadingGlyphs.current) {
-             isLoadingGlyphs.current = false;
-        }
+        setGlyphsLoading(false);
       }
 
       // Функция очистки для useEffect
@@ -502,7 +527,7 @@ function GlyphsMode({
         );
     }
 
-    if (isLoadingGlyphs.current) {
+    if (glyphsLoading) {
       return (
         <div className="flex h-full min-h-0 w-full items-center justify-center px-8 py-10 text-center text-gray-600">
           Загрузка данных глифов...
@@ -512,12 +537,19 @@ function GlyphsMode({
 
     // Условие отображения ошибки или отсутствия данных
     if (!glyphsLoaded || !glyphsData || displayableGlyphs.length === 0) {
-      // Не показываем ошибку, пока isLoadingGlyphs всё ещё true
-      if (isLoadingGlyphs.current) return null; 
+      if (glyphsLoading) return null;
       return (
         <div className="flex h-full min-h-0 w-full items-center justify-center p-8 text-center text-gray-500">
           Нет данных о глифах для шрифта «{selectedFont?.name || 'Неизвестный'}» или не удалось их загрузить.
           Проверьте консоль на наличие ошибок.
+        </div>
+      );
+    }
+
+    if (!scrollParentEl) {
+      return (
+        <div className="flex h-full min-h-0 w-full items-center justify-center px-8 py-10 text-center text-gray-600">
+          Подготовка сетки глифов…
         </div>
       );
     }
@@ -531,19 +563,17 @@ function GlyphsMode({
           </div>
         )}
 
-        {scrollParentEl ? (
-          <VirtualizedGlyphGrid
-            scrollParentEl={scrollParentEl}
-            totalCount={displayableGlyphs.length}
-            columnCount={glyphSquareGrid.columnCount}
-            estimatedRowHeightPx={glyphSquareGrid.rowHeightPx}
-            renderItem={renderGlyphGridItem}
-            overscanRows={2}
-            rowGapPx={0}
-            seamlessGrid
-            onInnerWidth={onGlyphGridInnerWidth}
-          />
-        ) : null}
+        <VirtualizedGlyphGrid
+          scrollParentEl={scrollParentEl}
+          totalCount={displayableGlyphs.length}
+          columnCount={glyphSquareGrid.columnCount}
+          estimatedRowHeightPx={glyphSquareGrid.rowHeightPx}
+          renderItem={renderGlyphGridItem}
+          overscanRows={2}
+          rowGapPx={0}
+          seamlessGrid
+          onInnerWidth={onGlyphGridInnerWidth}
+        />
 
         {/* Детали глифа */}
         {selectedGlyph && selectedGlyphDetails && (
