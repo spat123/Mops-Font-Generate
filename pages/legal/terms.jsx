@@ -1,28 +1,165 @@
 import React from 'react';
-import Head from 'next/head';
-import Link from 'next/link';
+import {
+  LegalLi,
+  LegalLink,
+  LegalPageLayout,
+  LegalP,
+  LegalSection,
+  LegalUl,
+} from '../../components/legal/LegalPageLayout';
+import { getOperatorLine, legalMeta } from '../../config/legal';
+import { MAX_SAVED_LIBRARIES_PER_ACCOUNT, MAX_SAVED_LIBRARIES_PRO_ACCOUNT } from '../../utils/authLibraryLimits';
+import { FREE_STATIC_GENERATIONS_LIMIT } from '../../utils/freeStaticGenerationQuota';
+import { PRO_ANNUAL_RUB, PRO_MONTHLY_RUB } from '../../utils/billingPlans';
 
 export default function TermsPage() {
+  const operator = getOperatorLine();
+
   return (
-    <>
-      <Head>
-        <title>Условия использования — DINAMIC FONT</title>
-      </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="mx-auto w-full max-w-2xl rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-          <h1 className="text-lg font-semibold uppercase tracking-tight text-gray-900">Условия использования</h1>
-          <p className="mt-3 text-sm leading-relaxed text-gray-600">
-            Черновик. Позже сюда добавим корректный текст условий использования.
-          </p>
-          <Link
-            href="/auth/signup"
-            className="mt-6 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-tight text-gray-800 transition-colors hover:border-accent hover:text-accent"
+    <LegalPageLayout
+      title="Условия использования"
+      description="Условия использования веб-сервиса DINAMIC FONT"
+    >
+      <LegalP>
+        Настоящие Условия регулируют использование веб-сервиса{' '}
+        <strong className="font-medium text-gray-800">{legalMeta.serviceName}</strong> ({' '}
+        <a href={legalMeta.siteUrl} className="text-gray-800 underline-offset-2 hover:text-accent">
+          {legalMeta.siteUrl}
+        </a>
+        ). Оператор сервиса: <strong className="font-medium text-gray-800">{operator}</strong>.
+      </LegalP>
+      <LegalP>
+        Регистрируясь или продолжая пользоваться сервисом, вы подтверждаете, что прочитали настоящие
+        Условия и <LegalLink href="/legal/privacy">Политику конфиденциальности</LegalLink>.
+      </LegalP>
+
+      <LegalSection title="1. О сервисе">
+        <LegalP>
+          {legalMeta.serviceName} — онлайн-инструмент для тестирования, сравнения и работы со шрифтами:
+          загрузка локальных файлов, каталоги Google Fonts и Fontsource, режимы превью, экспорт и
+          вспомогательные функции для вариативных шрифтов (VF).
+        </LegalP>
+        <LegalP>
+          Сервис развивается в режиме бета: функции, лимиты и интерфейс могут изменяться. Возможны
+          временные сбои. О существенных изменениях условий сообщаем на сайте или по email.
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="2. Регистрация и аккаунт">
+        <LegalP>
+          Для части функций нужен аккаунт. Доступны вход по email и паролю, а также через Google и
+          Яндекс (OAuth). Вы обязуетесь указывать достоверный email и хранить доступ к почте и
+          аккаунтам провайдеров в тайне.
+        </LegalP>
+        <LegalP>
+          Подтверждение email может быть обязательным для входа. Оператор вправе ограничить или
+          удалить аккаунт при нарушении Условий, попытках злоупотреблений или по требованию закона.
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="3. Тарифы Free и Pro">
+        <LegalP>
+          <strong className="font-medium text-gray-800">Free</strong> — бесплатный тариф с лимитами,
+          в том числе: до {MAX_SAVED_LIBRARIES_PER_ACCOUNT} пользовательских библиотек, до{' '}
+          {FREE_STATIC_GENERATIONS_LIMIT} генераций статических файлов из VF в месяц для
+          зарегистрированного пользователя.
+        </LegalP>
+        <LegalP>
+          <strong className="font-medium text-gray-800">Pro</strong> — платный тариф (подключение
+          оплаты объявляется отдельно): расширенные лимиты, в том числе до{' '}
+          {MAX_SAVED_LIBRARIES_PRO_ACCOUNT} библиотек и снятие месячного лимита на генерации VF →
+          статик, а также иные функции, указанные на странице тарифов в сервисе. Ориентировочная
+          стоимость: {PRO_MONTHLY_RUB} ₽ в месяц или {PRO_ANNUAL_RUB} ₽ в год (со скидкой при
+          годовой оплате). Фактическая цена и условия оплаты публикуются до начала приёма платежей.
+        </LegalP>
+        <LegalP>
+          До запуска оплаты доступ к Pro может предоставляться вручную (тест, промо). После запуска
+          оплаты применяются правила выбранного платёжного агрегата и чеки в соответствии с
+          законодательством РФ (в том числе для самозанятого на НПД).
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="4. Шрифты и лицензии третьих лиц">
+        <LegalP>
+          Сервис не продаёт и не передаёт вам права на шрифты. Шрифты из каталогов (Google Fonts,
+          Fontsource и др.) и загруженные вами файлы подчиняются лицензиям правообладателей (OFL,
+          SIL, коммерческие лицензии и т.д.).
+        </LegalP>
+        <LegalP>
+          Вы самостоятельно проверяете, можно ли использовать шрифт в макете, на сайте, в
+          коммерческом проекте. Ответственность за соблюдение лицензий и прав третьих лиц лежит на
+          вас.
+        </LegalP>
+        <LegalP>
+          Экспорт CSS, статических файлов и ссылки «Поделиться» — технические средства сервиса.
+          Распространение полученных файлов и ссылок — на ваш риск и в рамках применимых лицензий.
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="5. Пользовательский контент">
+        <LegalP>
+          Библиотеки, подборки шрифтов, тексты превью и иные данные, которые вы создаёте в сервисе,
+          остаются вашим контентом. Вы предоставляете оператору неисключительное право хранить и
+          обрабатывать этот контент исключительно для работы сервиса (хостинг, резервное копирование,
+          поддержка, исполнение Условий).
+        </LegalP>
+        <LegalP>
+          Запрещено размещать незаконный контент, нарушать права третьих лиц, использовать сервис
+          для рассылки спама или атак на инфраструктуру.
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="6. Допустимое использование">
+        <LegalUl>
+          <LegalLi>не обходить технические лимиты тарифов и не автоматизировать нагрузку без согласия;</LegalLi>
+          <LegalLi>не декомпилировать и не копировать сервис с целью создания конкурента;</LegalLi>
+          <LegalLi>не выдавать себя за оператора или других пользователей;</LegalLi>
+          <LegalLi>соблюдать применимое законодательство РФ и международные нормы, если вы пользуетесь сервисом из-за рубежа.</LegalLi>
+        </LegalUl>
+      </LegalSection>
+
+      <LegalSection title="7. Ограничение ответственности">
+        <LegalP>
+          Сервис предоставляется «как есть». Мы не гарантируем, что превью, экспорт или генерация
+          файлов всегда будут безошибочными или подойдут для конкретного проекта.
+        </LegalP>
+        <LegalP>
+          Оператор не отвечает за косвенные убытки, упущенную выгоду, претензии третьих лиц из-за
+          использования вами шрифтов. Совокупная ответственность оператора по платным услугам, если
+          применимо, ограничивается суммой фактически уплаченной вами подписки за последние 3 месяца,
+          если иное не предусмотрено императивными нормами закона.
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="8. Изменение и прекращение">
+        <LegalP>
+          Условия могут обновляться. Актуальная версия публикуется на этой странице с указанием даты.
+          Продолжение использования после публикации изменений означает согласие с новой редакцией,
+          если иное не требуется законом.
+        </LegalP>
+        <LegalP>
+          Вы можете прекратить использование в любой момент и запросить удаление аккаунта (см.{' '}
+          <LegalLink href="/legal/privacy">Политику конфиденциальности</LegalLink>).
+        </LegalP>
+      </LegalSection>
+
+      <LegalSection title="9. Применимое право и контакты">
+        <LegalP>
+          К отношениям применяется право Российской Федерации. Споры по возможности решаются
+          переговорами; при недостижении согласия — в суде по месту жительства оператора, если иное
+          не установлено законом.
+        </LegalP>
+        <LegalP>
+          По вопросам сервиса и Условий:{' '}
+          <a
+            href={`mailto:${legalMeta.supportEmail}`}
+            className="font-medium text-gray-800 underline-offset-2 hover:text-accent"
           >
-            Назад
-          </Link>
-        </div>
-      </div>
-    </>
+            {legalMeta.supportEmail}
+          </a>
+          .
+        </LegalP>
+      </LegalSection>
+    </LegalPageLayout>
   );
 }
-

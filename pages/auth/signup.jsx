@@ -92,22 +92,36 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: trimmedName, email: trimmedEmail, password: p1 }),
               });
+              const data = await res.json().catch(() => ({}));
+              const emailForCheck = data?.email || trimmedEmail;
+
               if (res.status === 409) {
-                setFormError('Аккаунт с такой почтой уже существует. Попробуйте войти.');
+                setFormError('Аккаунт с этой почтой уже подтверждён. Войдите с паролем.');
                 return;
               }
               if (res.status === 503) {
                 setFormError('Регистрация на сервере требует DATABASE_URL. См. docs/AUTH_SETUP.md');
                 return;
               }
+              if (res.status === 502 && data?.needsVerification) {
+                void router.replace({
+                  pathname: '/auth/check-email',
+                  query: { email: emailForCheck, callbackUrl, mailError: '1' },
+                });
+                return;
+              }
               if (!res.ok) {
-                setFormError('Не удалось зарегистрироваться. Попробуйте ещё раз.');
+                setFormError(
+                  res.status === 502
+                    ? 'Не удалось отправить письмо с подтверждением. Проверьте Resend на сервере или напишите на support@dynamicfont.ru.'
+                    : 'Не удалось зарегистрироваться. Попробуйте ещё раз.',
+                );
                 return;
               }
 
               void router.replace({
                 pathname: '/auth/check-email',
-                query: { email: trimmedEmail, callbackUrl },
+                query: { email: emailForCheck, callbackUrl },
               });
             } finally {
               submittingRef.current = false;

@@ -18,8 +18,13 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
   const router = useRouter();
   const emailRaw = typeof router.query?.email === 'string' ? router.query.email : '';
   const email = emailRaw.trim().toLowerCase();
+  const mailError = router.query?.mailError === '1';
   const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(
+    mailError
+      ? 'Аккаунт создан, но письмо не ушло. Нажмите «Отправить письмо снова» (нужен рабочий Resend на сервере).'
+      : '',
+  );
   const [busy, setBusy] = useState(false);
 
   const resend = async () => {

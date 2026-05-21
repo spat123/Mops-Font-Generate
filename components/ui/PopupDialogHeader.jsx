@@ -22,7 +22,7 @@ export function PopupDialogHeader({
       <div className="flex h-12 shrink-0 items-center">
         {closeShortcutHint ? (
           <span
-            className="mr-2 inline-flex h-5 items-center justify-center rounded-md border border-gray-900 px-1 text-[11px] font-semibold uppercase leading-none text-gray-900 select-none sm:mr-3 sm:px-2"
+            className="mr-2 inline-flex h-5 items-center justify-center rounded-md border border-gray-200 px-1 text-[11px] font-semibold uppercase leading-none text-gray-900 select-none sm:mr-3 sm:px-2"
             aria-hidden
           >
             {closeShortcutHint}

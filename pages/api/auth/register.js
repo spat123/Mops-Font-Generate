@@ -23,30 +23,42 @@ export default async function handler(req, res) {
       result = await createCredentialsUser({ name, email, password });
     } catch (e) {
       if (e?.code === 'PENDING') {
-        result = await refreshVerificationToken(email);
+        result = await refreshVerificationToken(email, {
+          password,
+          name: String(name || '').trim(),
+        });
       } else {
         throw e;
       }
     }
 
-    await sendVerificationEmail({
-      to: result.user.email,
-      name: result.user.name,
-      token: result.verificationToken,
-    });
+    try {
+      await sendVerificationEmail({
+        to: result.user.email,
+        name: result.user.name,
+        token: result.verificationToken,
+      });
+    } catch (mailErr) {
+      if (mailErr?.code === 'EMAIL_FAILED') {
+        res.status(502).json({
+          error: 'Could not send verification email',
+          code: 'EMAIL_FAILED',
+          needsVerification: true,
+          email: result.user.email,
+        });
+        return;
+      }
+      throw mailErr;
+    }
 
     res.status(201).json({ ok: true, needsVerification: true, email: result.user.email });
   } catch (e) {
     if (e?.code === 'EXISTS') {
-      res.status(409).json({ error: 'User already exists' });
+      res.status(409).json({ error: 'User already exists', code: 'EXISTS' });
       return;
     }
     if (e?.code === 'VALIDATION') {
       res.status(400).json({ error: 'Invalid input' });
-      return;
-    }
-    if (e?.code === 'EMAIL_FAILED') {
-      res.status(502).json({ error: 'Could not send verification email' });
       return;
     }
     console.error('[register]', e);
