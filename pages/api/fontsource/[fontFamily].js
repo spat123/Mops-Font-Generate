@@ -4,6 +4,7 @@ import { findFontsourcePackagePath } from '../../../utils/serverUtils'; // На�
 import { slugifyFontKey } from '../../../utils/fontSlug';
 import { buildFontsourceHandlerMetadata } from '../../../utils/fontsourceApiNormalize';
 import { applyFontsourceFontCacheHeaders, applyFontsourceMetadataCacheHeaders } from '../../../utils/fontsourceApiCache';
+import { isFontsourceEnabled } from '../../../utils/fontsourceFeatureFlag';
 
 // --- Вспомогательная функция для преобразования буфера в base64 --- 
 // (На клиенте будем декодировать обратно в ArrayBuffer)
@@ -95,6 +96,10 @@ export default async function handler(req, res) {
   if (!fontFamily) {
     console.error(`[FontsourceAPI] Отсутствует fontFamily в запросе`);
     return res.status(400).json({ error: 'fontFamily обязателен' });
+  }
+  if (!isFontsourceEnabled()) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ error: 'Fontsource disabled', code: 'FONTSOURCE_DISABLED' });
   }
 
   try {

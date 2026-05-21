@@ -9,6 +9,7 @@ import {
   parseFontsourceWeightNumbers,
 } from '../../utils/fontsourceApiNormalize';
 import { applyFontsourceCatalogCacheHeaders } from '../../utils/fontsourceApiCache';
+import { isFontsourceEnabled } from '../../utils/fontsourceFeatureFlag';
 
 const FONTSOURCE_API_URL = 'https://api.fontsource.org/v1/fonts';
 const SERVER_CACHE_TTL_MS = 1000 * 60 * 60;
@@ -143,6 +144,10 @@ async function fetchRemoteFontsourceCatalog() {
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return jsonMethodNotAllowed(res, 'GET');
+  }
+  if (!isFontsourceEnabled()) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ error: 'Fontsource disabled', code: 'FONTSOURCE_DISABLED' });
   }
 
   try {

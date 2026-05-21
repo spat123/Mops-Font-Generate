@@ -9,8 +9,14 @@ import path from 'path';
 import { slugifyFontKey } from '../../../../utils/fontSlug';
 import { findFontsourcePackagePath } from '../../../../utils/serverUtils';
 import { applyFontsourceMetadataCacheHeaders } from '../../../../utils/fontsourceApiCache';
+import { isFontsourceEnabled } from '../../../../utils/fontsourceFeatureFlag';
 
 export default async function handler(req, res) {
+  if (!isFontsourceEnabled()) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ error: 'Fontsource disabled', code: 'FONTSOURCE_DISABLED' });
+  }
+
   try {
     // Получаем имя шрифта из URL
     const { fontFamily } = req.query;

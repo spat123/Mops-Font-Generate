@@ -38,6 +38,7 @@ import {
 import { revokeObjectURL } from '../utils/localFontProcessor';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
+import { getCatalogSourceOptions, isFontsourceEnabled } from '../utils/fontsourceFeatureFlag';
 import { formatCatalogAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
 import {
   notifyFontAlreadyInLibrary,
@@ -462,6 +463,7 @@ export default function Home() {
   // В РФ/нестабильных сетях фоновые prewarm-запросы к /api/fontsource могут вызывать таймауты/RESET
   // и ломать первую загрузку/авторизацию. Поэтому включаем prewarm только по явному флагу.
   const fontsourcePrewarmEnabled =
+    isFontsourceEnabled() &&
     typeof window !== 'undefined' &&
     (() => {
       try {
@@ -479,6 +481,15 @@ export default function Home() {
     })();
 
   useFontsourcePreviewPrewarm({ hasRestoredEditorMainTab, enabled: fontsourcePrewarmEnabled });
+
+  useEffect(() => {
+    if (!isFontsourceEnabled()) {
+      if (catalogSource === 'fontsource') setCatalogSource('google');
+      if (savedLibraryCatalogSearchSource === 'fontsource') {
+        setSavedLibraryCatalogSearchSource('google');
+      }
+    }
+  }, [catalogSource, savedLibraryCatalogSearchSource]);
 
   usePerFontPreviewPersistence({
     hasRestoredEditorMainTab,
@@ -651,13 +662,7 @@ export default function Home() {
   } [&>button]:w-auto [&>button]:flex-1`;
 
   const savedLibrarySourceToggleValue = savedLibraryCatalogSearchSource;
-  const savedLibrarySourceToggleOptions = useMemo(
-    () => [
-      { value: 'google', label: 'Google' },
-      { value: 'fontsource', label: 'Fontsource' },
-    ],
-    [],
-  );
+  const savedLibrarySourceToggleOptions = useMemo(() => getCatalogSourceOptions(), []);
 
   const clearSavedLibrarySearch = useCallback(() => {
     setSavedLibrarySearchQuery('');
@@ -1054,7 +1059,7 @@ export default function Home() {
       ) : (
         <div className="min-w-0" />
       )}
-      {savedLibrarySearchActive ? (
+      {savedLibrarySearchActive && isFontsourceEnabled() ? (
         <button
           type="button"
           aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
@@ -1180,18 +1185,20 @@ export default function Home() {
           >
             Google
           </button>
-          <button
-            type="button"
-            aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
-            className={`${savedLibrarySourceButtonBaseClass} col-start-3 row-start-1 ${
-              savedLibraryCatalogSearchSource === 'fontsource'
-                ? 'border-accent bg-accent text-white'
-                : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
-            }`}
-            onClick={() => setSavedLibraryCatalogSearchSource('fontsource')}
-          >
-            Fontsource
-          </button>
+          {isFontsourceEnabled() ? (
+            <button
+              type="button"
+              aria-pressed={savedLibraryCatalogSearchSource === 'fontsource'}
+              className={`${savedLibrarySourceButtonBaseClass} col-start-3 row-start-1 ${
+                savedLibraryCatalogSearchSource === 'fontsource'
+                  ? 'border-accent bg-accent text-white'
+                  : 'border-gray-200 bg-white text-gray-900 hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9]'
+              }`}
+              onClick={() => setSavedLibraryCatalogSearchSource('fontsource')}
+            >
+              Fontsource
+            </button>
+          ) : null}
           <div className="relative col-start-4 col-span-2 row-start-1 min-w-0 pr-24">
             <div className="relative">
               <input
