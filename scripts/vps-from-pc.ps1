@@ -9,7 +9,7 @@
 param(
   [string]$VpsIp = "194.226.166.79",
   [string]$SshKey = "$env:USERPROFILE\.ssh\reg_dynamicfont",
-  [string]$LocalEnv = "C:\Mops-Font-Generate\.env.local",
+  [string]$LocalEnv = "C:\Mops-Font-Generate\.env.production",
   [ValidateSet("shell", "upload-env", "deploy", "status", "logs")]
   [string]$Action = "shell"
 )
