@@ -459,7 +459,26 @@ export default function Home() {
     initialSessionFontOrderIdsRef,
   });
 
-  useFontsourcePreviewPrewarm({ hasRestoredEditorMainTab });
+  // В РФ/нестабильных сетях фоновые prewarm-запросы к /api/fontsource могут вызывать таймауты/RESET
+  // и ломать первую загрузку/авторизацию. Поэтому включаем prewarm только по явному флагу.
+  const fontsourcePrewarmEnabled =
+    typeof window !== 'undefined' &&
+    (() => {
+      try {
+        const q = new URLSearchParams(window.location.search);
+        if (q.get('prewarm') === '1') return true;
+        if (q.get('prewarm') === '0') return false;
+      } catch {
+        // ignore
+      }
+      try {
+        return localStorage.getItem('mfgFontsourcePrewarm') === '1';
+      } catch {
+        return false;
+      }
+    })();
+
+  useFontsourcePreviewPrewarm({ hasRestoredEditorMainTab, enabled: fontsourcePrewarmEnabled });
 
   usePerFontPreviewPersistence({
     hasRestoredEditorMainTab,
