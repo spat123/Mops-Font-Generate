@@ -323,14 +323,21 @@ vercel login
 
 Для разбора «с телефона не открывается», медленный каталог Google/Fontsource после переноса DNS на REG.ru.
 
-### Включение у себя или у пользователя
+### Через консоль браузера на компьютере (F12 → Console)
 
-1. Откройте `https://dynamicfont.ru/?diag=1` (флаг сохранится в `localStorage`).
-2. Воспроизведите проблему (медленная загрузка, каталог, глифы).
-3. В консоли браузера (F12): `await __MFG_RUN_NETWORK_PROBE__()` — проверка с сервера Vercel до Google/Fontsource.
-4. **Vercel** → проект → **Logs** → фильтр `[client-diag]` или `[network-probe]`.
+На любой странице сайта после загрузки:
 
-Выключить: `localStorage.removeItem('mfgNetworkDiag')` или `?diag=0`.
+```js
+mfgHelp()    // справка
+mfgProbe()   // таблица: доступны ли Google / Fontsource с сервера Vercel
+mfgStatus()  // DNS, TTFB, время загрузки в вашем браузере
+mfgDiagOn()  // включить запись в Vercel Logs (потом воспроизвести проблему)
+mfgDiagOff() // выключить
+```
+
+Логи: **Vercel** → **Logs** → `[client-diag]` или `[network-probe]`.
+
+Опционально: `?diag=1` в URL включает `mfgDiagOn()` автоматически.
 
 ### Что пишется в лог
 

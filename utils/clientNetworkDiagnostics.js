@@ -1,10 +1,6 @@
 /**
- * Диагностика сети/DNS/медленных API (прод: Vercel Logs).
- *
- * Включение:
- * - URL: ?diag=1 (сохраняется в localStorage)
- * - localStorage.setItem('mfgNetworkDiag', '1') + перезагрузка
- * - NEXT_PUBLIC_NETWORK_DIAG=1 в env (всегда на staging)
+ * Диагностика сети — команды в консоли браузера (F12).
+ * Глобалы вешаются всегда; сбор логов на сервер — после mfgDiagOn().
  */
 
 const LS_KEY = 'mfgNetworkDiag';
@@ -16,6 +12,7 @@ let enabled = false;
 let queue = [];
 let flushTimer = null;
 let patched = false;
+let consoleInstalled = false;
 
 function safe(fn) {
   try {
@@ -65,11 +62,7 @@ function shouldTrackUrl(url) {
 
 function pushEvent(type, payload = {}) {
   if (!enabled) return;
-  queue.push({
-    type,
-    t: Date.now(),
-    ...payload,
-  });
+  queue.push({ type, t: Date.now(), ...payload });
   if (queue.length > MAX_EVENTS) queue = queue.slice(-MAX_EVENTS);
   scheduleFlush();
 }
@@ -90,7 +83,6 @@ function flushEvents() {
     page: safe(() => window.location.href),
     events: batch,
   });
-
   const url = '/api/diagnostics/client';
   try {
     if (navigator.sendBeacon) {
@@ -98,7 +90,7 @@ function flushEvents() {
       if (ok) return;
     }
   } catch {
-    /* fallback fetch */
+    /* fetch fallback */
   }
   void fetch(url, {
     method: 'POST',
@@ -122,25 +114,33 @@ function getSessionId() {
   }
 }
 
-function collectBootstrap() {
+function readPageTimings() {
   const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   const nav = performance.getEntriesByType?.('navigation')?.[0];
-  pushEvent('bootstrap', {
+  return {
     online: navigator.onLine,
-    effectiveType: conn?.effectiveType ?? null,
-    downlink: conn?.downlink ?? null,
-    rtt: conn?.rtt ?? null,
-    saveData: conn?.saveData ?? null,
-    ua: navigator.userAgent,
-    language: navigator.language,
     host: window.location.host,
-    navType: nav?.type ?? null,
-    domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
-    loadEventMs: nav ? Math.round(nav.loadEventEnd) : null,
+    href: window.location.href,
+    effectiveType: conn?.effectiveType ?? null,
+    downlinkMbps: conn?.downlink ?? null,
+    rttMs: conn?.rtt ?? null,
     dnsMs: nav ? Math.round(nav.domainLookupEnd - nav.domainLookupStart) : null,
     connectMs: nav ? Math.round(nav.connectEnd - nav.connectStart) : null,
-    tlsMs: nav ? Math.round(nav.connectEnd - nav.secureConnectionStart) : null,
+    tlsMs:
+      nav && nav.secureConnectionStart > 0
+        ? Math.round(nav.connectEnd - nav.secureConnectionStart)
+        : null,
     ttfbMs: nav ? Math.round(nav.responseStart - nav.requestStart) : null,
+    domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd) : null,
+    loadMs: nav ? Math.round(nav.loadEventEnd) : null,
+  };
+}
+
+function collectBootstrap() {
+  pushEvent('bootstrap', {
+    ...readPageTimings(),
+    ua: navigator.userAgent,
+    language: navigator.language,
   });
 }
 
@@ -152,29 +152,22 @@ function patchFetch() {
   window.fetch = async function patchedFetch(input, init) {
     const url = typeof input === 'string' ? input : input?.url || String(input);
     const track = shouldTrackUrl(url);
-    const verbose = enabled;
     const start = performance.now();
-
     try {
       const res = await original(input, init);
       const ms = Math.round(performance.now() - start);
-      if (track && (verbose || ms >= SLOW_FETCH_MS || !res.ok)) {
-        pushEvent('fetch', {
-          url: url.slice(0, 500),
-          ms,
-          status: res.status,
-          ok: res.ok,
-        });
+      if (track && (enabled || ms >= SLOW_FETCH_MS || !res.ok)) {
+        const line = { url: url.slice(0, 120), ms, status: res.status, ok: res.ok };
+        if (enabled) pushEvent('fetch', line);
+        if (!res.ok || ms >= SLOW_FETCH_MS) console.warn('[mfg] slow/fail fetch', line);
       }
       return res;
     } catch (err) {
       const ms = Math.round(performance.now() - start);
+      const line = { url: url.slice(0, 120), ms, error: String(err?.message || err) };
       if (track) {
-        pushEvent('fetch_error', {
-          url: url.slice(0, 500),
-          ms,
-          message: String(err?.message || err).slice(0, 200),
-        });
+        if (enabled) pushEvent('fetch_error', line);
+        console.error('[mfg] fetch error', line);
       }
       throw err;
     }
@@ -196,42 +189,111 @@ function patchGlobalErrors() {
   });
 }
 
-/** Запуск сбора метрик (один раз за сессию вкладки). */
-export function initClientNetworkDiagnostics() {
-  if (typeof window === 'undefined') return;
-  persistFromQuery();
-  enabled = isNetworkDiagEnabled();
-  if (!enabled) return;
-
+function startDiagCollection() {
+  enabled = true;
+  try {
+    localStorage.setItem(LS_KEY, '1');
+  } catch {
+    /* ignore */
+  }
   patchFetch();
   patchGlobalErrors();
-
-  if (document.readyState === 'complete') {
-    collectBootstrap();
-  } else {
-    window.addEventListener('load', collectBootstrap, { once: true });
-  }
-
+  collectBootstrap();
   window.addEventListener('pagehide', () => flushEvents());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushEvents();
   });
+  console.info('[mfg] Запись в Vercel Logs включена ([client-diag]). Выключить: mfgDiagOff()');
+}
 
+function stopDiagCollection() {
+  enabled = false;
   try {
-    window.__MFG_RUN_NETWORK_PROBE__ = runNetworkProbe;
-    console.info(
-      '[mfg-diag] Диагностика включена. Логи: Vercel → Logs → [client-diag]. Probe: __MFG_RUN_NETWORK_PROBE__(). Выкл: localStorage.removeItem("mfgNetworkDiag")',
-    );
+    localStorage.removeItem(LS_KEY);
   } catch {
     /* ignore */
   }
+  flushEvents();
+  console.info('[mfg] Запись в Vercel Logs выключена.');
 }
 
-/** Ручная отправка (например после проверки DNS). */
-export async function runNetworkProbe() {
-  const res = await fetch('/api/diagnostics/network-probe');
-  const data = await res.json().catch(() => ({}));
-  pushEvent('network_probe', { result: data });
-  flushEvents();
+/** Проверка Google / Fontsource с сервера Vercel + вывод в консоль. */
+export async function runNetworkProbe(options = {}) {
+  const { sendToServer = true } = options;
+  console.info('[mfg] Проверка сети (сервер Vercel → внешние API)…');
+  const t0 = performance.now();
+  let data = {};
+  try {
+    const res = await fetch('/api/diagnostics/network-probe');
+    data = await res.json();
+    if (!res.ok) console.error('[mfg] probe HTTP', res.status, data);
+  } catch (e) {
+    console.error('[mfg] probe failed', e);
+    return { error: String(e?.message || e) };
+  }
+  const elapsed = Math.round(performance.now() - t0);
+  const rows = Object.entries(data.results || {}).map(([name, r]) => ({
+    сервис: name,
+    ok: r?.ok,
+    ms: r?.ms,
+    status: r?.status ?? '—',
+    ошибка: r?.error ?? '',
+  }));
+  console.table(rows);
+  console.info('[mfg] probe', { elapsedClientMs: elapsed, vercelRegion: data.vercelRegion, at: data.at });
+  if (sendToServer && enabled) {
+    pushEvent('network_probe', { result: data });
+    flushEvents();
+  }
   return data;
+}
+
+function printStatus() {
+  const timings = readPageTimings();
+  console.table(timings);
+  console.info('[mfg] diagEnabled:', enabled || isNetworkDiagEnabled());
+  return timings;
+}
+
+function printHelp() {
+  console.info(`
+[mfg] Команды в консоли (F12):
+
+  mfgHelp()       — эта справка
+  mfgProbe()      — проверка Google / Fontsource с сервера Vercel (таблица в консоли)
+  mfgStatus()     — DNS/TTFB/загрузка страницы в этом браузере
+  mfgDiagOn()     — включить запись в Vercel Logs (медленные fetch, ошибки)
+  mfgDiagOff()    — выключить запись
+
+Логи на сервере: Vercel → Logs → [client-diag] или [network-probe]
+`);
+}
+
+/** Всегда: команды в window. Опционально: автозапись если ?diag=1 или mfgDiagOn(). */
+export function installConsoleDiagnostics() {
+  if (typeof window === 'undefined' || consoleInstalled) return;
+  consoleInstalled = true;
+
+  window.mfgHelp = printHelp;
+  window.mfgProbe = runNetworkProbe;
+  window.mfgStatus = printStatus;
+  window.mfgDiagOn = startDiagCollection;
+  window.mfgDiagOff = stopDiagCollection;
+
+  window.__MFG_RUN_NETWORK_PROBE__ = runNetworkProbe;
+  window.__MFG_DIAG_HELP__ = printHelp;
+
+  persistFromQuery();
+  if (isNetworkDiagEnabled()) startDiagCollection();
+  else {
+    try {
+      console.info('[mfg] Диагностика сети: введите mfgHelp() в консоль');
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+export function initClientNetworkDiagnostics() {
+  installConsoleDiagnostics();
 }
