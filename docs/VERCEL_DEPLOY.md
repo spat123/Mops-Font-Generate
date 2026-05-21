@@ -309,12 +309,37 @@ vercel login
 | Сессия «слетает» на проде | `NEXTAUTH_URL` должен совпадать с доменом в браузере (HTTPS, без лишнего `/`). |
 | Preview не создаётся | **Settings → Git** → Preview Deployments; ветка не заблокирована в Ignored Build Step. |
 | Долгая сборка / таймаут API | Лимиты Hobby vs Pro; `maxDuration` в `vercel.json`. |
+| Сайт не открывается / очень медленно (мобильный, без VPN) | DNS REG.ru ↔ Vercel (§5); диагностика §15 |
 
 ### Отключить автодеплой Production (только ручной релиз)
 
 **Settings** → **Git** → **Ignored Build Step** — команду, которая пропускает сборку для `main`, пока вы не запустите deploy вручную.  
 Или в GitHub: защита ветки `main` + деплой только после merge PR.  
 Для большинства команд достаточно ветки `develop` без этой настройки.
+
+---
+
+## 15. Диагностика сети и DNS (логи в Vercel)
+
+Для разбора «с телефона не открывается», медленный каталог Google/Fontsource после переноса DNS на REG.ru.
+
+### Включение у себя или у пользователя
+
+1. Откройте `https://dynamicfont.ru/?diag=1` (флаг сохранится в `localStorage`).
+2. Воспроизведите проблему (медленная загрузка, каталог, глифы).
+3. В консоли браузера (F12): `await __MFG_RUN_NETWORK_PROBE__()` — проверка с сервера Vercel до Google/Fontsource.
+4. **Vercel** → проект → **Logs** → фильтр `[client-diag]` или `[network-probe]`.
+
+Выключить: `localStorage.removeItem('mfgNetworkDiag')` или `?diag=0`.
+
+### Что пишется в лог
+
+| Метка | Содержимое |
+|-------|------------|
+| `[client-diag]` | Страна/IP (если есть заголовки Vercel), `dnsMs`, `ttfbMs`, медленные `fetch` к `/api/*`, gstatic, fontsource |
+| `[network-probe]` | Ответ сервера Vercel: доступность `fonts.google.com`, `api.fontsource.org`, свой origin |
+
+Постоянно для всех пользователей не включать (только `?diag=1` или `NEXT_PUBLIC_NETWORK_DIAG=1` на staging).
 
 ---
 
