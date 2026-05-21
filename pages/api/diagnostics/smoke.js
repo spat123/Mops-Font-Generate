@@ -9,9 +9,11 @@ async function timedFetch(url, init = {}) {
   const start = Date.now();
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort('timeout'), 12000);
+    const timeoutMs = Math.max(1000, Number(init?.timeoutMs || 0) || 6000);
+    const timeout = setTimeout(() => controller.abort('timeout'), timeoutMs);
     const res = await fetch(url, {
       ...init,
+      timeoutMs: undefined,
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; DinamicFont-Smoke/1.0)',
@@ -41,6 +43,9 @@ export default async function handler(req, res) {
   const proto = String(firstHeader(req, 'x-forwarded-proto') || 'https').split(',')[0].trim();
   const origin = host ? `${proto}://${host}` : null;
 
+  const timeoutMs = Math.max(1000, Math.min(15000, Number(req.query?.timeoutMs || 0) || 6000));
+  const includeAuthSession = String(req.query?.authSession || '1') !== '0';
+
   const ipForwarded = String(firstHeader(req, 'x-forwarded-for') || '').split(',')[0].trim() || null;
 
   const meta = {
@@ -59,22 +64,29 @@ export default async function handler(req, res) {
 
   const targets = {
     selfPing: origin ? `${origin}/api/diagnostics/ping` : null,
-    authSession: origin ? `${origin}/api/auth/session` : null,
+    ...(includeAuthSession ? { authSession: origin ? `${origin}/api/auth/session` : null } : {}),
     googleMetadata: 'https://fonts.google.com/metadata/fonts',
     fontsourceApi: 'https://api.fontsource.org/v1/fonts',
   };
 
+  const entries = Object.entries(targets);
+  const settled = await Promise.allSettled(
+    entries.map(async ([key, url]) => {
+      if (!url) return [key, { ok: false, status: 0, ms: 0, error: 'no_origin' }];
+      const result = await timedFetch(url, { method: 'GET', timeoutMs });
+      return [key, result];
+    }),
+  );
+
   const results = {};
-  for (const [key, url] of Object.entries(targets)) {
-    if (!url) {
-      results[key] = { ok: false, status: 0, ms: 0, error: 'no_origin' };
-      // eslint-disable-next-line no-continue
-      continue;
+  for (const item of settled) {
+    if (item.status === 'fulfilled' && Array.isArray(item.value) && item.value.length === 2) {
+      const [key, value] = item.value;
+      results[key] = value;
     }
-    results[key] = await timedFetch(url, { method: 'GET' });
   }
 
-  const payload = { ...meta, results };
+  const payload = { ...meta, timeoutMs, results };
   console.log('[diag-smoke]', JSON.stringify(payload));
 
   res.setHeader('Cache-Control', 'no-store');
