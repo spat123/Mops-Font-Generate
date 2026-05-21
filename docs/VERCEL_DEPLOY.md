@@ -205,7 +205,7 @@ vercel login
 
 ### `vercel.json`
 
-- Регион: `sfo1`.
+- Регион: `fra1` (Frankfurt; ближе к EU/RU для API).
 - `github.autoAlias: false` — preview-URL могут быть длиннее; на логику prod/preview не влияет.
 - API `pages/api/generate-static-font.js`: `maxDuration: 60` секунд — для тяжёлой генерации шрифтов; на Hobby проверьте лимиты плана Vercel.
 
