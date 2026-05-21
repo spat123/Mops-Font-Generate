@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DINAMIC FONT — Диагностика</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1020;
+        --panel: #111833;
+        --text: #e8eefc;
+        --muted: #9fb0d0;
+        --ok: #35d07f;
+        --bad: #ff5c7a;
+        --warn: #ffd166;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      }
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        background: radial-gradient(1200px 600px at 20% 0%, #17224c, var(--bg));
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      .h {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        margin: 0;
+        font-size: 18px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .meta {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .panel {
+        margin-top: 16px;
+        background: rgba(17, 24, 51, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 16px;
+        backdrop-filter: blur(8px);
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .btns {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 600;
+      }
+      button:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+      pre {
+        margin: 12px 0 0;
+        padding: 12px;
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 8px 12px;
+        margin-top: 12px;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .k {
+        color: var(--muted);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-family: var(--mono);
+        font-size: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .bad {
+        color: var(--bad);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .hint {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      code {
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="h">
+        <h1>Диагностика загрузки (без Next/React)</h1>
+        <div class="meta" id="meta"></div>
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <div class="badge" id="statusBadge">Готово к запуску</div>
+          <div class="btns">
+            <button id="runBtn" type="button">Запустить тест</button>
+            <button id="copyBtn" type="button">Скопировать результат</button>
+          </div>
+        </div>
+        <div class="hint">
+          Эта страница нужна, когда главная <code>/</code> не догружается или падает с <code>ERR_CONNECTION_RESET</code>.
+          Она делает запросы к <code>/api/diagnostics/smoke</code> и <code>/api/diagnostics/network-probe</code> и показывает,
+          что именно рвётся: доступ к origin, к NextAuth, или к внешним сервисам.
+        </div>
+        <pre id="out">Нажмите «Запустить тест».</pre>
+      </div>
+
+      <div class="panel">
+        <div class="row">
+          <div class="badge">Быстрые проверки (открываются напрямую)</div>
+        </div>
+        <div class="kv">
+          <div class="k">Ping</div>
+          <div><a href="/api/diagnostics/ping">/api/diagnostics/ping</a></div>
+          <div class="k">Smoke</div>
+          <div><a href="/api/diagnostics/smoke">/api/diagnostics/smoke</a></div>
+          <div class="k">Network probe</div>
+          <div><a href="/api/diagnostics/network-probe">/api/diagnostics/network-probe</a></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const metaEl = document.getElementById("meta");
+      const outEl = document.getElementById("out");
+      const badgeEl = document.getElementById("statusBadge");
+      const runBtn = document.getElementById("runBtn");
+      const copyBtn = document.getElementById("copyBtn");
+
+      const stamp = () => new Date().toISOString();
+
+      function setBadge(text, cls) {
+        badgeEl.textContent = text;
+        badgeEl.classList.remove("ok", "bad", "warn");
+        if (cls) badgeEl.classList.add(cls);
+      }
+
+      function pretty(obj) {
+        return JSON.stringify(obj, null, 2);
+      }
+
+      async function fetchJson(url, opts) {
+        const t0 = performance.now();
+        try {
+          const res = await fetch(url, { cache: "no-store", credentials: "same-origin", ...(opts || {}) });
+          const ms = Math.round(performance.now() - t0);
+          const json = await res.json().catch(() => null);
+          return { ok: res.ok, status: res.status, ms, json };
+        } catch (e) {
+          const ms = Math.round(performance.now() - t0);
+          return { ok: false, status: 0, ms, error: String((e && e.message) || e) };
+        }
+      }
+
+      async function sendToLogs(payload) {
+        try {
+          await fetch("/api/diagnostics/client", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: `diag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+              page: location.href,
+              events: [{ type: "diag_page", t: Date.now(), payload }],
+            }),
+            keepalive: true,
+            credentials: "same-origin",
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      async function run() {
+        setBadge("Тестируем…", "warn");
+        const startedAt = stamp();
+        const smoke = await fetchJson("/api/diagnostics/smoke");
+        const probe = await fetchJson("/api/diagnostics/network-probe");
+
+        const summary = {
+          at: startedAt,
+          href: location.href,
+          host: location.host,
+          online: navigator.onLine,
+          ua: navigator.userAgent,
+          smoke: smoke.ok ? smoke.json : smoke,
+          networkProbe: probe.ok ? probe.json : probe,
+        };
+
+        outEl.textContent = pretty(summary);
+        console.log("[mfg][diag-page]", summary);
+
+        const anyHardFail =
+          (!smoke.ok && (smoke.error || "").includes("Failed to fetch")) ||
+          (!probe.ok && (probe.error || "").includes("Failed to fetch"));
+
+        if (anyHardFail) {
+          setBadge("Есть обрыв соединения (RESET/timeout)", "bad");
+        } else if (!smoke.ok || !probe.ok) {
+          setBadge("Есть ошибки API", "warn");
+        } else {
+          setBadge("API доступны (проблема скорее в тяжёлом /)", "ok");
+        }
+
+        await sendToLogs(summary);
+      }
+
+      metaEl.textContent = `${location.host} • ${stamp()}`;
+
+      runBtn.addEventListener("click", () => run());
+      copyBtn.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText(outEl.textContent || "");
+          setBadge("Скопировано", "ok");
+          setTimeout(() => setBadge("Готово к запуску", ""), 2000);
+        } catch {
+          setBadge("Не удалось скопировать", "warn");
+        }
+      });
+    </script>
+  </body>
+</html>
+

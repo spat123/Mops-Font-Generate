@@ -332,6 +332,21 @@ vercel login
 
 Повтор: `mfgReport()` в консоли. Расширенный сбор ошибок: `mfgDiagOn()`.
 
+### Если главная `/` не загрузилась (RESET/timeout) — всё равно можно понять причину
+
+Консоль и авто-сводка **не успеют** запуститься, если HTML страницы не доехал. В этом случае:
+
+1. Откройте лёгкую диагностическую страницу (без Next/React):  
+   `https://dynamicfont.ru/diag.html`
+2. Или откройте API напрямую (должны отдаваться как обычный JSON):  
+   - `/api/diagnostics/ping` — минимальный ответ (проверка “жив ли origin”)  
+   - `/api/diagnostics/smoke` — self/auth + внешние сервисы (и пишет `[diag-smoke]` в Logs)  
+   - `/api/diagnostics/network-probe` — серверный probe (пишет `[network-probe]` в Logs)
+
+Интерпретация:
+- Если **`ping`/`smoke` не открываются** (RESET) — проблема **доставки до домена** (ISP/маршрут/SSL/DNS), не приложение.
+- Если **`ping` открывается**, а `/` падает — обычно тяжёлый JS/статические чанки/пачка API; смотрите slow/fail fetch после прогрузки.
+
 ### Что пишется в лог
 
 | Метка | Содержимое |
@@ -339,6 +354,7 @@ vercel login
 | **`[client-diag-summary]`** | Авто-сводка: DNS/TTFB/load, probe Google/Fontsource, страна/IP |
 | `[client-diag]` | Расширенный режим (`mfgDiagOn`): медленные fetch, ошибки |
 | `[network-probe]` | Серверный probe при вызове API |
+| `[diag-smoke]` | Smoke-тест, который можно открыть даже когда `/` не грузится |
 
 ---
 
