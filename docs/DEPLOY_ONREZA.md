@@ -81,27 +81,18 @@ next build && node scripts/copy-standalone-font-gen.mjs
 FONT_GEN_NODE_PATH=/usr/bin/node
 ```
 
-Если Node нет, worker запустится через **тот же Bun**, что и приложение (обычно достаточно без env).
+Если Node нет, worker запустится через **тот же Bun**, что и приложение — **дополнительные переменные часто не нужны**.
+
+Опционально (только если probe показывает `fonttoolsInWorkerCwd: false`):
 
 ```env
 FONT_GEN_BUN_PATH=/usr/bin/bun
+FONT_GEN_CWD=/путь/к/standalone
 ```
 
-**`FONT_GEN_CWD` задавать не обязательно** — код сам ищет каталог с `node_modules/@web-alchemy` (вверх от `process.cwd()`, плюс `/workspace`, `/app`).
-
-На ONREZA в логах сборки путь **`/workspace`**, не `/app`. Если в панели env переменная «не сохраняется» — это нормально: **ничего не нужно**, проверьте probe:
-
-```javascript
-fetch('/api/generate-static-font', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ probe: true }),
-}).then(r => r.json()).then(console.log)
-```
-
-Смотрите `runtime.workerCwd` и `runtime.fonttoolsInWorkerCwd: true`.
-
-Ручной `FONT_GEN_CWD` — только если probe показывает `fonttoolsInWorkerCwd: false` (подставьте значение `runtime.cwd` из probe).
+`FONT_GEN_CWD` — каталог, где есть `node_modules/@web-alchemy` и `server.js`.  
+**Не обязательно `/app`** — на ONREZA путь другой; код сам ищет `.next/standalone` и `process.cwd()`.  
+Если панель ONREZA не сохраняет переменную — можно не задавать, пока генерация работает.
 
 Таймаут тяжёлой генерации (мс):
 
