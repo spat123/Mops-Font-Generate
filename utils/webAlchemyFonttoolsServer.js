@@ -55,22 +55,36 @@ function workerSourceCandidates() {
   ];
 }
 
-/** Гарантирует путь к worker-скрипту (копия в /tmp, если в standalone его нет). */
-export function ensureWorkerScriptPath() {
-  if (cachedWorkerScriptPath && fs.existsSync(cachedWorkerScriptPath)) {
-    return cachedWorkerScriptPath;
-  }
-
+function readWorkerSourceFromDisk() {
   for (const candidate of workerSourceCandidates()) {
     if (fs.existsSync(candidate)) {
-      cachedWorkerScriptPath = candidate;
-      return candidate;
+      return { content: fs.readFileSync(candidate, 'utf8'), source: candidate };
     }
   }
+  return null;
+}
 
-  throw new Error(
-    `Worker ${WORKER_BASENAME} не найден (cwd=${process.cwd()}). Проверьте postbuild copy в standalone.`,
-  );
+/** Гарантирует путь к worker-скрипту (всегда копия в /tmp для standalone). */
+export function ensureWorkerScriptPath() {
+  const cached = path.join(os.tmpdir(), 'dinamic-font', WORKER_BASENAME);
+  const fromDisk = readWorkerSourceFromDisk();
+
+  if (!fromDisk) {
+    throw new Error(
+      `Worker ${WORKER_BASENAME} не найден (cwd=${process.cwd()}). Запустите npm run build (postbuild copy).`,
+    );
+  }
+
+  fs.mkdirSync(path.dirname(cached), { recursive: true });
+  const needsWrite =
+    !fs.existsSync(cached) ||
+    fs.statSync(cached).size !== Buffer.byteLength(fromDisk.content, 'utf8');
+  if (needsWrite) {
+    fs.writeFileSync(cached, fromDisk.content, 'utf8');
+  }
+
+  cachedWorkerScriptPath = cached;
+  return cached;
 }
 
 function resolveWorkerCwd() {
@@ -144,13 +158,22 @@ export async function finalizeWebAlchemyOutput(out, format, subsetFn) {
 }
 
 export function canRunNodeWorker() {
-  return Boolean(resolveNodeBinary()) && workerSourceCandidates().some((p) => fs.existsSync(p));
+  try {
+    ensureWorkerScriptPath();
+  } catch {
+    return false;
+  }
+  return Boolean(resolveNodeBinary());
 }
 
+/** На Bun in-process Pyodide часто роняет процесс (HTML 500) — только Node-worker. */
 export function shouldUseNodeWorkerFirst() {
   if (process.env.FONT_GEN_FORCE_NODE_WORKER === '1') return true;
-  if (!isBunRuntime()) return false;
-  return canRunNodeWorker();
+  return isBunRuntime();
+}
+
+export function mustUseNodeWorkerOnly() {
+  return isBunRuntime();
 }
 
 export function describeWebAlchemyRuntime() {

@@ -6,6 +6,7 @@
 
 import { formatFontVariationSettings } from './fontVariationSettings';
 import { getOrCreateGuestQuotaId } from './freeStaticGenerationQuota';
+import { generateStaticFontInBrowser } from './staticFontBrowserAlchemy';
 
 /**
  * @param {ArrayBuffer} fontBuffer
@@ -118,13 +119,35 @@ export const generateStaticFont = async (fontBuffer, variableSettings, options =
       };
     } catch (e) {
       if (e?.code === 'QUOTA_EXCEEDED') throw e;
-      if (!allowPseudoStatic) throw e;
-      /* fallback */
+      if (typeof window !== 'undefined') {
+        try {
+          const browser = await generateStaticFontInBrowser(fontBuffer, variableSettings, format);
+          return {
+            buffer: browser.buffer,
+            method: 'browser',
+            isRealStatic: true,
+            engine: browser.engine,
+            renameApplied: false,
+            warning:
+              'Сервер недоступен — шрифт собран в браузере (Pyodide). Первый раз может занять 1–2 мин.',
+          };
+        } catch (browserErr) {
+          console.warn('[generateStaticFont] browser fallback failed:', browserErr);
+          if (!allowPseudoStatic) {
+            throw new Error(
+              `${e?.message || 'Серверная генерация не удалась'}. Браузер: ${browserErr?.message || browserErr}`,
+            );
+          }
+        }
+      } else if (!allowPseudoStatic) {
+        throw e;
+      }
+      /* pseudo-static fallback */
     }
   }
 
   if (!allowPseudoStatic) {
-    throw new Error('Серверная генерация недоступна. Попробуйте позже.');
+    throw new Error('Серверная генерация недоступна. Откройте сайт в браузере и повторите.');
   }
 
   const result = generatePseudoStatic(fontBuffer, variableSettings, fontName);

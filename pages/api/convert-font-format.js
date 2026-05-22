@@ -6,6 +6,7 @@ import { promisify } from 'util';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import {
   canRunNodeWorker,
+  mustUseNodeWorkerOnly,
   runWebAlchemyWorker,
   shouldUseNodeWorkerFirst,
 } from '../../utils/webAlchemyFonttoolsServer';
@@ -134,6 +135,12 @@ async function convertWithWebAlchemyViaNodeWorker(buffer, targetFormat) {
 }
 
 async function convertWithWebAlchemy(buffer, targetFormat) {
+  if (mustUseNodeWorkerOnly()) {
+    if (!canRunNodeWorker()) {
+      throw new Error('На Bun нужен Node.js (FONT_GEN_NODE_PATH) для конвертации.');
+    }
+    return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+  }
   if (shouldUseNodeWorkerFirst()) {
     try {
       return await convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);

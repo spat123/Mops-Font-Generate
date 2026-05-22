@@ -7,6 +7,7 @@ import {
   describeWebAlchemyRuntime,
   finalizeWebAlchemyOutput,
   instantiateVariableFontInProcess,
+  mustUseNodeWorkerOnly,
   runWebAlchemyWorker,
   shouldUseNodeWorkerFirst,
 } from '../../utils/webAlchemyFonttoolsServer';
@@ -264,6 +265,15 @@ async function generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, for
  * На Bun (ONREZA COMPUTE) — отдельный процесс Node, т.к. Pyodide в Bun часто падает.
  */
 async function generateWithWebAlchemy(buffer, variableSettings, format) {
+  if (mustUseNodeWorkerOnly()) {
+    if (!canRunNodeWorker()) {
+      throw new Error(
+        'На сервере Bun нет Node.js для Pyodide. Задайте FONT_GEN_NODE_PATH или используйте генерацию в браузере.',
+      );
+    }
+    return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+  }
+
   if (shouldUseNodeWorkerFirst()) {
     try {
       return await generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
@@ -285,6 +295,14 @@ async function generateWithWebAlchemy(buffer, variableSettings, format) {
   }
 }
 
+function safeRuntimeInfo() {
+  try {
+    return describeWebAlchemyRuntime();
+  } catch (e) {
+    return { runtimeProbeError: e?.message || String(e) };
+  }
+}
+
 function resolveWebAlchemyEngineLabel() {
   return shouldUseNodeWorkerFirst() ? 'web-alchemy-node' : 'web-alchemy';
 }
@@ -298,7 +316,22 @@ export default async function handler(req, res) {
     return jsonMethodNotAllowed(res, 'POST');
   }
 
-  const { fontData, variableSettings, format = 'woff2', probe, rename } = req.body;
+  try {
+    return await handleGenerateStaticFont(req, res);
+  } catch (error) {
+    console.error('[generate-static-font] unhandled:', error);
+    const msg = error?.message || 'Unknown error';
+    return res.status(500).json({
+      error: 'Failed to generate static font',
+      message: msg,
+      details: msg,
+      runtime: safeRuntimeInfo(),
+    });
+  }
+}
+
+async function handleGenerateStaticFont(req, res) {
+  const { fontData, variableSettings, format = 'woff2', probe, rename } = req.body || {};
   const outFormat = String(format || 'woff2').toLowerCase();
   const fontToolsPython = resolveFontToolsPython();
 
@@ -309,7 +342,10 @@ export default async function handler(req, res) {
       engine: fontToolsPython ? 'python' : resolveWebAlchemyEngineLabel(),
       internalRename: Boolean(fontToolsPython),
       formats: [...ALLOWED_FORMATS],
-      runtime: describeWebAlchemyRuntime(),
+      runtime: safeRuntimeInfo(),
+      hint: mustUseNodeWorkerOnly() && !canRunNodeWorker()
+        ? 'Задайте FONT_GEN_NODE_PATH или используйте браузерную генерацию (fallback).'
+        : undefined,
     });
   }
 
@@ -321,8 +357,22 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing fontData or variableSettings' });
   }
 
-  const actor = await resolveGenerationQuotaActor(req);
-  const quotaCheck = await consumeStaticGenerationQuota(req, { ...actor, dryRun: true });
+  let actor;
+  try {
+    actor = await resolveGenerationQuotaActor(req);
+  } catch (authErr) {
+    console.warn('[generate-static-font] quota actor:', authErr?.message);
+    actor = { userId: null, isPro: false, guestQuotaId: String(req.headers['x-guest-quota-id'] || '').trim() };
+  }
+
+  let quotaCheck;
+  try {
+    quotaCheck = await consumeStaticGenerationQuota(req, { ...actor, dryRun: true });
+  } catch (quotaErr) {
+    console.warn('[generate-static-font] quota dry-run:', quotaErr?.message);
+    quotaCheck = { ok: true };
+  }
+
   if (!quotaCheck.ok) {
     return res.status(quotaCheck.status || 429).json({
       error: 'QUOTA_EXCEEDED',
@@ -408,7 +458,7 @@ export default async function handler(req, res) {
       error: 'Failed to generate static font',
       message: msg,
       details: msg,
-      runtime: describeWebAlchemyRuntime(),
+      runtime: safeRuntimeInfo(),
     });
   }
 }

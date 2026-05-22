@@ -28,6 +28,8 @@ curl -s -X POST https://dynamicfont.ru/api/generate-static-font \
 FONT_GEN_NODE_PATH=/usr/bin/node
 ```
 
+Если сервер отдаёт **HTTP 500** (HTML, без JSON) — Pyodide в Bun роняет процесс. После обновления приложение **повторит генерацию в браузере** (Pyodide у пользователя); первый раз может занять 1–2 мин.
+
 (точный путь уточните в shell контейнера: `which node`).
 
 ### Рекомендуемые настройки ONREZA

@@ -2,6 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  transpilePackages: ['@web-alchemy/fonttools'],
   // Pyodide (@web-alchemy/fonttools) подгружает .asm.js / .wasm динамически — без этого Vercel не кладёт их в serverless trace.
   experimental: {
     outputFileTracingIncludes: {
