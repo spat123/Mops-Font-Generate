@@ -2,6 +2,13 @@ import { spawn } from 'child_process';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import { consumeStaticGenerationQuota, resolveGenerationQuotaActor } from '../../lib/staticGenerationQuotaServer';
 import { sanitizeVariableSettingsForInstancer } from '../../utils/sanitizeVariableSettingsForInstancer';
+import {
+  describeWebAlchemyRuntime,
+  finalizeWebAlchemyOutput,
+  instantiateVariableFontInProcess,
+  runWebAlchemyWorker,
+  shouldUseNodeWorkerFirst,
+} from '../../utils/webAlchemyFonttoolsServer';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -46,11 +53,6 @@ function resolveFontToolsPython() {
     if (fs.existsSync(p)) return p;
   }
   return null;
-}
-
-function isWoff2Buffer(buf) {
-  const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-  return b.length >= 4 && b[0] === 0x77 && b[1] === 0x4f && b[2] === 0x46 && b[3] === 0x32;
 }
 
 function sanitizeNameString(raw, fallback, maxLen = 80) {
@@ -227,18 +229,56 @@ inst.save(out_path)
   }
 }
 
+async function generateWithWebAlchemyInProcess(buffer, variableSettings, format) {
+  const options = toInstancerOptions(variableSettings);
+  const { out, subset } = await instantiateVariableFontInProcess(buffer, options);
+  return finalizeWebAlchemyOutput(out, format, subset);
+}
+
+async function generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format) {
+  const tempDir = getTempDir();
+  const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+  const inputPath = path.join(tempDir, `wa-in-${stamp}.bin`);
+  const outputPath = path.join(tempDir, `wa-out-${stamp}.${String(format || 'woff2').toLowerCase()}`);
+  const options = toInstancerOptions(variableSettings);
+
+  await writeFile(inputPath, buffer);
+  try {
+    return await runWebAlchemyWorker(
+      tempDir,
+      'instantiate',
+      inputPath,
+      outputPath,
+      String(format || 'woff2').toLowerCase(),
+      JSON.stringify(options),
+    );
+  } finally {
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+  }
+}
+
 /**
- * Генерация через @web-alchemy/fonttools (Pyodide) — работает на Vercel без Python.
+ * Генерация через @web-alchemy/fonttools (Pyodide).
+ * На Bun (ONREZA COMPUTE) — отдельный процесс Node, т.к. Pyodide в Bun часто падает.
  */
 async function generateWithWebAlchemy(buffer, variableSettings, format) {
-  const { instantiateVariableFont, subset } = await import('@web-alchemy/fonttools');
-  const options = toInstancerOptions(variableSettings);
-  let out = await instantiateVariableFont(Buffer.from(buffer), options);
-  const want = (format || 'woff2').toLowerCase();
-  if (want === 'woff2' && !isWoff2Buffer(out)) {
-    out = await subset(Buffer.from(out), { '*': true, flavor: 'woff2' });
+  if (shouldUseNodeWorkerFirst()) {
+    return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
   }
-  return out;
+  try {
+    return await generateWithWebAlchemyInProcess(buffer, variableSettings, format);
+  } catch (inProcessError) {
+    console.warn(
+      '[generate-static-font] in-process web-alchemy failed, retry via node worker:',
+      inProcessError?.message,
+    );
+    return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+  }
+}
+
+function resolveWebAlchemyEngineLabel() {
+  return shouldUseNodeWorkerFirst() ? 'web-alchemy-node' : 'web-alchemy';
 }
 
 /**
@@ -258,9 +298,10 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       probe: true,
-      engine: fontToolsPython ? 'python' : 'web-alchemy',
+      engine: fontToolsPython ? 'python' : resolveWebAlchemyEngineLabel(),
       internalRename: Boolean(fontToolsPython),
       formats: [...ALLOWED_FORMATS],
+      runtime: describeWebAlchemyRuntime(),
     });
   }
 
@@ -339,7 +380,7 @@ export default async function handler(req, res) {
       data: Buffer.from(staticFontData).toString('base64'),
       size: staticFontData.length,
       format: outFormat,
-      engine: 'web-alchemy',
+      engine: resolveWebAlchemyEngineLabel(),
       renameApplied: false,
       quota: quotaAfter.ok
         ? { limit: quotaAfter.limit, used: quotaAfter.used, remaining: quotaAfter.remaining, period: quotaAfter.period }
@@ -357,6 +398,7 @@ export default async function handler(req, res) {
     return res.status(500).json({
       error: 'Failed to generate static font',
       details: error.message,
+      runtime: describeWebAlchemyRuntime(),
     });
   }
 }

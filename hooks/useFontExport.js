@@ -117,7 +117,9 @@ export function useFontExport(exportToCSSFromHook) {
         },
       });
 
-      // Предупреждения (fallback / ограничения) не спамим отдельными тостами — иначе будет “белый” тост + квадрат.
+      if (result.warning) {
+        toast.warn(result.warning);
+      }
 
       if (result.css && !skipPseudoCssPrompt && allowCssBundle) {
         const downloadCSS = window.confirm('Создан псевдо-статический шрифт с CSS. Скачать CSS файл?');

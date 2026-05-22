@@ -4,6 +4,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
+import { runWebAlchemyWorker, shouldUseNodeWorkerFirst } from '../../utils/webAlchemyFonttoolsServer';
 
 const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
@@ -100,7 +101,7 @@ font.save(out_path)
   }
 }
 
-async function convertWithWebAlchemy(buffer, targetFormat) {
+async function convertWithWebAlchemyInProcess(buffer, targetFormat) {
   const { subset } = await import('@web-alchemy/fonttools');
   const opts = { '*': true };
   if (targetFormat === 'woff' || targetFormat === 'woff2') {
@@ -111,6 +112,33 @@ async function convertWithWebAlchemy(buffer, targetFormat) {
     throw new Error('web-alchemy вернул пустой результат');
   }
   return Buffer.from(out);
+}
+
+async function convertWithWebAlchemyViaNodeWorker(buffer, targetFormat) {
+  const tempDir = getTempDir();
+  const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+  const inputPath = path.join(tempDir, `wa-in-${stamp}.bin`);
+  const outputPath = path.join(tempDir, `wa-out-${stamp}.${targetFormat}`);
+
+  await writeFile(inputPath, buffer);
+  try {
+    return await runWebAlchemyWorker(tempDir, 'subset', inputPath, outputPath, targetFormat);
+  } finally {
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+  }
+}
+
+async function convertWithWebAlchemy(buffer, targetFormat) {
+  if (shouldUseNodeWorkerFirst()) {
+    return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+  }
+  try {
+    return await convertWithWebAlchemyInProcess(buffer, targetFormat);
+  } catch (inProcessError) {
+    console.warn('[convert-font-format] in-process web-alchemy failed, retry via node worker:', inProcessError?.message);
+    return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+  }
 }
 
 function mimeForFormat(format) {
