@@ -33,14 +33,23 @@ const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2', re
   if (!response.ok) {
     let detail = 'Серверная генерация не удалась';
     let code = null;
+    const raw = await response.text().catch(() => '');
     try {
-      const err = await response.json();
-      detail = err.message || err.details || err.error || detail;
+      const err = raw ? JSON.parse(raw) : {};
+      detail = err.details || err.message || err.error || detail;
+      if (err.runtime && typeof err.runtime === 'object') {
+        if (!err.runtime.nodeWorkerBinary) {
+          detail += ' (Node.js не найден на сервере — задайте FONT_GEN_NODE_PATH)';
+        } else if (err.runtime.workerScriptExists === false) {
+          detail += ' (worker-скрипт не задеплоен)';
+        }
+      }
       if (response.status === 429 || err.error === 'QUOTA_EXCEEDED') {
         code = 'QUOTA_EXCEEDED';
       }
     } catch {
-      /* ignore */
+      if (raw && raw.length < 500) detail = `${detail} (HTTP ${response.status}: ${raw.trim()})`;
+      else if (response.status) detail = `${detail} (HTTP ${response.status})`;
     }
     const error = new Error(detail);
     if (code) error.code = code;

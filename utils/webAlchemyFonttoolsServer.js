@@ -1,13 +1,12 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { spawn, spawnSync } from 'child_process';
-import { promisify } from 'util';
 
-const writeFile = promisify(fs.writeFile);
-const unlink = promisify(fs.unlink);
-
-const WORKER_SCRIPT = path.join(process.cwd(), 'scripts', 'fonttools-webalchemy-worker.mjs');
+const WORKER_BASENAME = 'fonttoolsWebalchemyWorker.mjs';
 const DEFAULT_TIMEOUT_MS = Number(process.env.FONT_GEN_TIMEOUT_MS) || 120000;
+
+let cachedWorkerScriptPath = null;
 
 export function isBunRuntime() {
   return Boolean(process.versions?.bun);
@@ -29,9 +28,12 @@ export function resolveNodeBinary() {
     return fromEnv;
   }
 
+  const execDir = path.dirname(process.execPath || '');
   const candidates = [
     process.env.npm_node_execpath,
+    path.join(execDir, 'node'),
     '/usr/bin/node',
+    '/usr/bin/nodejs',
     '/usr/local/bin/node',
     'node',
   ].filter(Boolean);
@@ -43,6 +45,38 @@ export function resolveNodeBinary() {
   return null;
 }
 
+function workerSourceCandidates() {
+  const cwd = process.cwd();
+  return [
+    path.join(cwd, 'utils', WORKER_BASENAME),
+    path.join(cwd, 'scripts', 'fonttools-webalchemy-worker.mjs'),
+    path.join(cwd, '.next', 'standalone', 'utils', WORKER_BASENAME),
+    path.join(cwd, '.next', 'standalone', 'scripts', 'fonttools-webalchemy-worker.mjs'),
+  ];
+}
+
+/** Гарантирует путь к worker-скрипту (копия в /tmp, если в standalone его нет). */
+export function ensureWorkerScriptPath() {
+  if (cachedWorkerScriptPath && fs.existsSync(cachedWorkerScriptPath)) {
+    return cachedWorkerScriptPath;
+  }
+
+  for (const candidate of workerSourceCandidates()) {
+    if (fs.existsSync(candidate)) {
+      cachedWorkerScriptPath = candidate;
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `Worker ${WORKER_BASENAME} не найден (cwd=${process.cwd()}). Проверьте postbuild copy в standalone.`,
+  );
+}
+
+function resolveWorkerCwd() {
+  return process.env.FONT_GEN_CWD || process.cwd();
+}
+
 function isWoff2Buffer(buf) {
   const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
   return b.length >= 4 && b[0] === 0x77 && b[1] === 0x4f && b[2] === 0x46 && b[3] === 0x32;
@@ -52,20 +86,20 @@ async function runNodeWorker(tempDir, args) {
   const nodeBin = resolveNodeBinary();
   if (!nodeBin) {
     throw new Error(
-      'Node.js не найден для Pyodide. Укажите FONT_GEN_NODE_PATH (например /usr/bin/node) или запустите приложение на Node, не на Bun.',
+      'Node.js не найден для Pyodide. Задайте FONT_GEN_NODE_PATH (например /usr/bin/node) в env ONREZA.',
     );
   }
-  if (!fs.existsSync(WORKER_SCRIPT)) {
-    throw new Error(`Worker не найден: ${WORKER_SCRIPT}`);
-  }
+
+  const workerScript = ensureWorkerScriptPath();
+  const workerCwd = resolveWorkerCwd();
 
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
 
   await new Promise((resolve, reject) => {
-    const child = spawn(nodeBin, [WORKER_SCRIPT, ...args], {
-      cwd: process.cwd(),
+    const child = spawn(nodeBin, [workerScript, ...args], {
+      cwd: workerCwd,
       windowsHide: true,
       env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'production' },
     });
@@ -109,18 +143,36 @@ export async function finalizeWebAlchemyOutput(out, format, subsetFn) {
   return out;
 }
 
+export function canRunNodeWorker() {
+  return Boolean(resolveNodeBinary()) && workerSourceCandidates().some((p) => fs.existsSync(p));
+}
+
 export function shouldUseNodeWorkerFirst() {
-  return isBunRuntime() || process.env.FONT_GEN_FORCE_NODE_WORKER === '1';
+  if (process.env.FONT_GEN_FORCE_NODE_WORKER === '1') return true;
+  if (!isBunRuntime()) return false;
+  return canRunNodeWorker();
 }
 
 export function describeWebAlchemyRuntime() {
+  let workerScript = null;
+  let workerScriptExists = false;
+  try {
+    workerScript = ensureWorkerScriptPath();
+    workerScriptExists = true;
+  } catch {
+    workerScript = workerSourceCandidates().join(' | ');
+    workerScriptExists = false;
+  }
+
   return {
     bun: isBunRuntime(),
     nodeVersion: process.version,
     execPath: process.execPath,
+    cwd: process.cwd(),
     nodeWorkerBinary: resolveNodeBinary(),
-    workerScript: WORKER_SCRIPT,
-    workerScriptExists: fs.existsSync(WORKER_SCRIPT),
+    workerScript,
+    workerScriptExists,
     preferNodeWorker: shouldUseNodeWorkerFirst(),
+    canRunNodeWorker: canRunNodeWorker(),
   };
 }

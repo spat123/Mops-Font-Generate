@@ -4,7 +4,7 @@
 
 ONREZA **COMPUTE** часто запускает Next.js на **Bun**. Pyodide (`@web-alchemy/fonttools`) в Bun нестабилен — генерация падает с 500, хотя просмотр шрифтов работает.
 
-Проект автоматически вызывает **отдельный процесс Node** (`scripts/fonttools-webalchemy-worker.mjs`), если обнаружен Bun.
+Проект автоматически вызывает **отдельный процесс Node** (`utils/fonttoolsWebalchemyWorker.mjs`), если обнаружен Bun. После `next build` скрипт `scripts/copy-standalone-font-gen.mjs` копирует worker в `.next/standalone`.
 
 ### Проверка после деплоя
 

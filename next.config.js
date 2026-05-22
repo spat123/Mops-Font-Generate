@@ -8,6 +8,12 @@ const nextConfig = {
       '/api/generate-static-font': [
         './node_modules/pyodide/**/*',
         './node_modules/@web-alchemy/fonttools/**/*',
+        './utils/fonttoolsWebalchemyWorker.mjs',
+      ],
+      '/api/convert-font-format': [
+        './node_modules/pyodide/**/*',
+        './node_modules/@web-alchemy/fonttools/**/*',
+        './utils/fonttoolsWebalchemyWorker.mjs',
       ],
     },
   },

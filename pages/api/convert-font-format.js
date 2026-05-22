@@ -4,7 +4,11 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
-import { runWebAlchemyWorker, shouldUseNodeWorkerFirst } from '../../utils/webAlchemyFonttoolsServer';
+import {
+  canRunNodeWorker,
+  runWebAlchemyWorker,
+  shouldUseNodeWorkerFirst,
+} from '../../utils/webAlchemyFonttoolsServer';
 
 const writeFile = promisify(fs.writeFile);
 const unlink = promisify(fs.unlink);
@@ -131,13 +135,20 @@ async function convertWithWebAlchemyViaNodeWorker(buffer, targetFormat) {
 
 async function convertWithWebAlchemy(buffer, targetFormat) {
   if (shouldUseNodeWorkerFirst()) {
-    return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+    try {
+      return await convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+    } catch (workerErr) {
+      console.warn('[convert-font-format] node worker failed:', workerErr?.message);
+    }
   }
   try {
     return await convertWithWebAlchemyInProcess(buffer, targetFormat);
   } catch (inProcessError) {
-    console.warn('[convert-font-format] in-process web-alchemy failed, retry via node worker:', inProcessError?.message);
-    return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+    if (canRunNodeWorker()) {
+      console.warn('[convert-font-format] in-process failed, retry via node worker:', inProcessError?.message);
+      return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
+    }
+    throw inProcessError;
   }
 }
 

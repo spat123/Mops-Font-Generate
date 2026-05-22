@@ -3,6 +3,7 @@ import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import { consumeStaticGenerationQuota, resolveGenerationQuotaActor } from '../../lib/staticGenerationQuotaServer';
 import { sanitizeVariableSettingsForInstancer } from '../../utils/sanitizeVariableSettingsForInstancer';
 import {
+  canRunNodeWorker,
   describeWebAlchemyRuntime,
   finalizeWebAlchemyOutput,
   instantiateVariableFontInProcess,
@@ -264,16 +265,23 @@ async function generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, for
  */
 async function generateWithWebAlchemy(buffer, variableSettings, format) {
   if (shouldUseNodeWorkerFirst()) {
-    return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+    try {
+      return await generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+    } catch (workerErr) {
+      console.warn('[generate-static-font] node worker failed:', workerErr?.message);
+    }
   }
   try {
     return await generateWithWebAlchemyInProcess(buffer, variableSettings, format);
   } catch (inProcessError) {
-    console.warn(
-      '[generate-static-font] in-process web-alchemy failed, retry via node worker:',
-      inProcessError?.message,
-    );
-    return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+    if (canRunNodeWorker()) {
+      console.warn(
+        '[generate-static-font] in-process failed, retry via node worker:',
+        inProcessError?.message,
+      );
+      return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+    }
+    throw inProcessError;
   }
 }
 
@@ -395,9 +403,11 @@ export default async function handler(req, res) {
     }
 
     console.error('Static font generation error:', error);
+    const msg = error?.message || 'Unknown error';
     return res.status(500).json({
       error: 'Failed to generate static font',
-      details: error.message,
+      message: msg,
+      details: msg,
       runtime: describeWebAlchemyRuntime(),
     });
   }
