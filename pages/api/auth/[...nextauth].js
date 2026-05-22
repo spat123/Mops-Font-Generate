@@ -1,6 +1,6 @@
-import NextAuth from 'next-auth';
-import GoogleProvider from 'next-auth/providers/google';
-import CredentialsProvider from 'next-auth/providers/credentials';
+// Важно для ONREZA/Bun:
+// если `next-auth` или провайдеры падают на импорте, Next.js отдаёт HTML 500 до выполнения handler.
+// Поэтому импортируем их динамически внутри handler и возвращаем JSON с причиной.
 import { getMaxSavedLibrariesForUser } from '../../../utils/authLibraryLimits';
 import { upsertOAuthUser, verifyCredentialsUser, findUserByEmail, findUserById } from '../../../lib/auth/userStore';
 import { matchEnvCredentialsUser } from '../../../lib/auth/envCredentialsLogin';
@@ -154,33 +154,41 @@ function buildProviders() {
   return list;
 }
 
-function safeBuildProviders() {
+let cachedModules = null;
+let cachedNextAuthHandler = null;
+
+async function loadNextAuthModules() {
+  if (cachedModules) return cachedModules;
+  const out = {};
   try {
-    const providers = buildProviders();
-    if (Array.isArray(providers) && providers.length > 0) return providers;
+    const mod = await import('next-auth');
+    out.NextAuth = mod?.default || mod;
   } catch (e) {
-    console.error('[nextauth] buildProviders failed:', e);
+    e.__stage = 'import:next-auth';
+    throw e;
   }
-  // Минимальный fallback: не даём NextAuth упасть даже если env/провайдер сломан.
-  return [
-    CredentialsProvider({
-      name: 'Логин и пароль',
-      credentials: {
-        email: { label: 'Логин или email', type: 'text' },
-        password: { label: 'Пароль', type: 'password' },
-        loginToken: { label: 'Login token', type: 'text' },
-      },
-      async authorize() {
-        return null;
-      },
-    }),
-  ];
+  try {
+    const mod = await import('next-auth/providers/google');
+    out.GoogleProvider = mod?.default || mod;
+  } catch (e) {
+    e.__stage = 'import:provider:google';
+    throw e;
+  }
+  try {
+    const mod = await import('next-auth/providers/credentials');
+    out.CredentialsProvider = mod?.default || mod;
+  } catch (e) {
+    e.__stage = 'import:provider:credentials';
+    throw e;
+  }
+  cachedModules = out;
+  return out;
 }
 
 export const authOptions = {
   /** ONREZA / VPS за reverse proxy: без этого session → 500 и HTML вместо JSON. */
   trustHost: true,
-  providers: safeBuildProviders(),
+  // providers задаём динамически в handler после import'ов
   pages: {
     signIn: '/auth/signin',
   },
@@ -320,33 +328,135 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET?.trim() || undefined,
 };
 
-let cachedNextAuthHandler = null;
-
 export default async function handler(req, res) {
   try {
     if (!cachedNextAuthHandler) {
-      try {
-        cachedNextAuthHandler = NextAuth(authOptions);
-      } catch (err) {
-        console.error('[nextauth] fatal init error:', err);
-        const message = (err?.message || String(err)).slice(0, 800);
-        return res.status(500).json({
-          error: 'NEXTAUTH_INIT_FATAL',
-          message,
-          name: err?.name || null,
-          code: err?.code || null,
-          runtime: process.versions?.bun ? 'bun' : 'node',
-        });
+      const { NextAuth, GoogleProvider, CredentialsProvider } = await loadNextAuthModules();
+
+      // Провайдеры собираем уже после динамического импорта (чтобы поймать ошибки Bun).
+      const providers = [];
+
+      const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+      const googleClientSecret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+      if (googleClientId && googleClientSecret) {
+        providers.push(
+          GoogleProvider({
+            clientId: googleClientId,
+            clientSecret: googleClientSecret,
+          }),
+        );
       }
+
+      providers.push(
+        CredentialsProvider({
+          name: 'Логин и пароль',
+          credentials: {
+            email: { label: 'Логин или email', type: 'text' },
+            password: { label: 'Пароль', type: 'password' },
+            loginToken: { label: 'Login token', type: 'text' },
+          },
+          async authorize(credentials) {
+            const loginToken = String(credentials?.loginToken ?? '').trim();
+            if (loginToken) {
+              const userId = await consumeLoginToken(loginToken);
+              if (!userId) return null;
+              const user = await findUserById(userId);
+              if (!user) return null;
+              return {
+                id: user.id,
+                name: user.name || (user.email ? user.email.split('@')[0] : 'User'),
+                email: user.email || null,
+                image: user.image || null,
+              };
+            }
+
+            const login = String(credentials?.email ?? '').trim();
+            const password = String(credentials?.password ?? '');
+            if (!login || !password) return null;
+
+            if (!isStepUpLoginDisabled()) {
+              return null;
+            }
+
+            const user = await verifyCredentialsUser({ email: login, password });
+            if (user) {
+              return {
+                id: user.id,
+                name: user.name || (user.email ? user.email.split('@')[0] : 'User'),
+                email: user.email || null,
+                image: user.image || null,
+              };
+            }
+
+            const demoUser = matchEnvCredentialsUser({ email: login, password });
+            if (demoUser) {
+              return {
+                id: demoUser.id,
+                name: demoUser.name,
+                email: demoUser.email,
+                image: demoUser.image,
+              };
+            }
+
+            return null;
+          },
+        }),
+      );
+
+      // Яндекс оставляем как раньше (кастомный объект), но только если env заданы.
+      const yandexClientId = String(process.env.YANDEX_CLIENT_ID || '').trim();
+      const yandexClientSecret = String(process.env.YANDEX_CLIENT_SECRET || '').trim();
+      if (yandexClientId && yandexClientSecret) {
+        try {
+          providers.push({
+            id: 'yandex',
+            name: 'Яндекс',
+            type: 'oauth',
+            version: '2.0',
+            authorization: {
+              url: 'https://oauth.yandex.ru/authorize',
+              params: {
+                scope: 'login:info login:email',
+                response_type: 'code',
+              },
+            },
+            token: 'https://oauth.yandex.ru/token',
+            userinfo: 'https://login.yandex.ru/info?format=json',
+            client: {
+              token_endpoint_auth_method: 'client_secret_post',
+            },
+            clientId: yandexClientId,
+            clientSecret: yandexClientSecret,
+            profile(profile) {
+              const id = String(profile?.id ?? '');
+              return {
+                id,
+                name: profile.display_name || profile.real_name || profile.login || 'Yandex',
+                email: profile.default_email || null,
+                image:
+                  profile.is_avatar_empty || !profile.default_avatar_id
+                    ? null
+                    : `https://avatars.yandex.net/get-yapic/${profile.default_avatar_id}/islands-200`,
+              };
+            },
+          });
+        } catch (e) {
+          console.error('[nextauth] yandex provider init failed:', e);
+        }
+      }
+
+      const opts = { ...authOptions, providers };
+      cachedNextAuthHandler = NextAuth(opts);
     }
 
     return await cachedNextAuthHandler(req, res);
   } catch (err) {
     console.error('[nextauth] fatal handler error:', err);
     if (res.headersSent) return;
-    const message = (err?.message || String(err)).slice(0, 800);
+    const message = (err?.message || String(err)).slice(0, 1200);
     res.status(500).json({
-      error: 'NEXTAUTH_FATAL',
+      error: err?.__stage ? 'NEXTAUTH_IMPORT_FATAL' : 'NEXTAUTH_FATAL',
+      stage: err?.__stage || null,
       message,
       name: err?.name || null,
       code: err?.code || null,
