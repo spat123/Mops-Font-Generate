@@ -44,11 +44,13 @@ function applyDevProSimulation(session) {
 
 function buildProviders() {
   const list = [];
-  if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+  const googleClientSecret = String(process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  if (googleClientId && googleClientSecret) {
     list.push(
       GoogleProvider({
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        clientId: googleClientId,
+        clientSecret: googleClientSecret,
       }),
     );
   }
@@ -107,49 +109,94 @@ function buildProviders() {
       },
     }),
   );
-  if (process.env.YANDEX_CLIENT_ID && process.env.YANDEX_CLIENT_SECRET) {
-    list.push({
-      id: 'yandex',
-      name: 'Яндекс',
-      type: 'oauth',
-      version: '2.0',
-      authorization: {
-        url: 'https://oauth.yandex.ru/authorize',
-        params: {
-          scope: 'login:info login:email',
-          response_type: 'code',
+  const yandexClientId = String(process.env.YANDEX_CLIENT_ID || '').trim();
+  const yandexClientSecret = String(process.env.YANDEX_CLIENT_SECRET || '').trim();
+  if (yandexClientId && yandexClientSecret) {
+    // Кастомный провайдер: любая ошибка тут роняет NextAuth целиком (providers/csrf/session).
+    // Поэтому делаем максимально "безопасную" инициализацию.
+    try {
+      list.push({
+        id: 'yandex',
+        name: 'Яндекс',
+        type: 'oauth',
+        version: '2.0',
+        authorization: {
+          url: 'https://oauth.yandex.ru/authorize',
+          params: {
+            scope: 'login:info login:email',
+            response_type: 'code',
+          },
         },
-      },
-      token: 'https://oauth.yandex.ru/token',
-      userinfo: 'https://login.yandex.ru/info?format=json',
-      client: {
-        token_endpoint_auth_method: 'client_secret_post',
-      },
-      clientId: process.env.YANDEX_CLIENT_ID,
-      clientSecret: process.env.YANDEX_CLIENT_SECRET,
-      profile(profile) {
-        const id = String(profile?.id ?? '');
-        return {
-          id,
-          name: profile.display_name || profile.real_name || profile.login || 'Yandex',
-          email: profile.default_email || null,
-          image:
-            profile.is_avatar_empty || !profile.default_avatar_id
-              ? null
-              : `https://avatars.yandex.net/get-yapic/${profile.default_avatar_id}/islands-200`,
-        };
-      },
-    });
+        token: 'https://oauth.yandex.ru/token',
+        userinfo: 'https://login.yandex.ru/info?format=json',
+        client: {
+          token_endpoint_auth_method: 'client_secret_post',
+        },
+        clientId: yandexClientId,
+        clientSecret: yandexClientSecret,
+        profile(profile) {
+          const id = String(profile?.id ?? '');
+          return {
+            id,
+            name: profile.display_name || profile.real_name || profile.login || 'Yandex',
+            email: profile.default_email || null,
+            image:
+              profile.is_avatar_empty || !profile.default_avatar_id
+                ? null
+                : `https://avatars.yandex.net/get-yapic/${profile.default_avatar_id}/islands-200`,
+          };
+        },
+      });
+    } catch (e) {
+      console.error('[nextauth] yandex provider init failed:', e);
+    }
   }
   return list;
+}
+
+function safeBuildProviders() {
+  try {
+    const providers = buildProviders();
+    if (Array.isArray(providers) && providers.length > 0) return providers;
+  } catch (e) {
+    console.error('[nextauth] buildProviders failed:', e);
+  }
+  // Минимальный fallback: не даём NextAuth упасть даже если env/провайдер сломан.
+  return [
+    CredentialsProvider({
+      name: 'Логин и пароль',
+      credentials: {
+        email: { label: 'Логин или email', type: 'text' },
+        password: { label: 'Пароль', type: 'password' },
+        loginToken: { label: 'Login token', type: 'text' },
+      },
+      async authorize() {
+        return null;
+      },
+    }),
+  ];
 }
 
 export const authOptions = {
   /** ONREZA / VPS за reverse proxy: без этого session → 500 и HTML вместо JSON. */
   trustHost: true,
-  providers: buildProviders(),
+  providers: safeBuildProviders(),
   pages: {
     signIn: '/auth/signin',
+  },
+  debug: String(process.env.NEXTAUTH_DEBUG || '').trim() === '1',
+  logger: {
+    error(code, metadata) {
+      console.error('[nextauth][error]', code, metadata);
+    },
+    warn(code) {
+      console.warn('[nextauth][warn]', code);
+    },
+    debug(code, metadata) {
+      if (String(process.env.NEXTAUTH_DEBUG || '').trim() === '1') {
+        console.debug('[nextauth][debug]', code, metadata);
+      }
+    },
   },
   callbacks: {
     async jwt({ token, account, user }) {
@@ -273,4 +320,22 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET?.trim() || undefined,
 };
 
-export default NextAuth(authOptions);
+const nextAuthHandler = NextAuth(authOptions);
+
+export default async function handler(req, res) {
+  try {
+    return await nextAuthHandler(req, res);
+  } catch (err) {
+    console.error('[nextauth] fatal handler error:', err);
+    if (res.headersSent) return;
+    const message = (err?.message || String(err)).slice(0, 800);
+    res.status(500).json({
+      error: 'NEXTAUTH_FATAL',
+      message,
+      name: err?.name || null,
+      code: err?.code || null,
+      runtime: process.versions?.bun ? 'bun' : 'node',
+      path: req?.url || null,
+    });
+  }
+}
