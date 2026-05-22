@@ -145,6 +145,8 @@ function buildProviders() {
 }
 
 export const authOptions = {
+  /** ONREZA / VPS за reverse proxy: без этого session → 500 и HTML вместо JSON. */
+  trustHost: true,
   providers: buildProviders(),
   pages: {
     signIn: '/auth/signin',

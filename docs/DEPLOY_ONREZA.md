@@ -81,8 +81,29 @@ next build && node scripts/copy-standalone-font-gen.mjs
 | `NEXTAUTH_SECRET` | случайная строка ≥ 32 символа (`openssl rand -base64 32`) — **обязательна**, иначе `/api/auth/session` → **500** |
 | `NEXT_PUBLIC_SITE_URL` | `https://dynamicfont.ru` |
 | `DATABASE_URL` | Neon или Postgres |
+| `AUTH_TRUST_HOST` | `true` — **обязательно на ONREZA** (прокси; иначе `/api/auth/session` → **500**, в консоли `Unexpected token '<'` — приходит HTML-страница ошибки, не JSON) |
+
+`EMAIL_FROM` с пробелами и `<>` задавайте **в кавычках**:
+
+```env
+EMAIL_FROM="DINAMIC FONT <onboarding@resend.dev>"
+```
+
+Переменные должны быть **runtime** (перезапуск после сохранения), не только на этапе build.
 
 Проверка после деплоя: `GET https://dynamicfont.ru/api/auth/session` → **200** и JSON `{ user: null }` или объект пользователя (не 500).
+
+### Vercel после переезда на ONREZA
+
+Пока DNS указывает на ONREZA, **переменные на Vercel на `dynamicfont.ru` не используются** — удалять не обязательно, но можно:
+
+- отвязать домен `dynamicfont.ru` в Vercel (Settings → Domains),
+- оставить **Neon `DATABASE_URL`** — тот же URL нужен на ONREZA,
+- OAuth redirect в Google/Яндекс: только `https://dynamicfont.ru/api/auth/callback/...` (старые `*.vercel.app` можно убрать).
+
+### Ошибка `google-font-github-vf` 404 (Agu Display Uzo)
+
+Не ломает вход. Это fallback: полный VF с GitHub для превью; для Agu Display часто нет файла в `google/fonts` — используются woff2 с gstatic. На работу каталога не влияет.
 
 Если в Network видите `/_vercel/insights/script.js` или `/_vercel/speed-insights/script.js` с **404** на ONREZA — это нормально до обновления сборки; скрипты Vercel Analytics на ONREZA не нужны.
 
