@@ -1,7 +1,7 @@
 import { spawn } from 'child_process';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import { consumeStaticGenerationQuota, resolveGenerationQuotaActor } from '../../lib/staticGenerationQuotaServer';
-import { sanitizeVariableSettingsForInstancer } from '../../utils/sanitizeVariableSettingsForInstancer';
+import { sanitizeSettingsForFontBuffer } from '../../utils/extractFvarAxesFromBuffer';
 import {
   canRunWorker,
   describeWebAlchemyRuntime,
@@ -81,17 +81,22 @@ function buildPostScriptName(family, subfamily) {
   return safe || 'Font-Static';
 }
 
-/** Опции для fontTools.varLib.instancer / instantiateVariableFont */
-function toInstancerOptions(variableSettings) {
-  return sanitizeVariableSettingsForInstancer(variableSettings);
+function formatGenerationError(error) {
+  const raw = String(error?.message || error || 'Unknown error');
+  const keyMatch = raw.match(/KeyError:\s*'([^']+)'/);
+  if (keyMatch) {
+    return `Ось «${keyMatch[1]}» отсутствует в fvar этого файла (лишний параметр в настройках).`;
+  }
+  if (raw.length > 500) return `${raw.slice(0, 500)}…`;
+  return raw;
 }
 
-async function generateWithPythonFontTools(fontToolsPython, { inputPath, outputPath, variableSettings, format, rename }) {
+async function generateWithPythonFontTools(fontToolsPython, { inputPath, outputPath, instancerOptions, format, rename }) {
   const tempDir = getTempDir();
   const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
   const scriptPath = path.join(tempDir, `generate-static-${stamp}.py`);
 
-  const axes = toInstancerOptions(variableSettings || {});
+  const axes = instancerOptions || {};
   const renamePayload = rename && typeof rename === 'object' ? rename : {};
 
   const pyCode = `
@@ -232,18 +237,17 @@ inst.save(out_path)
   }
 }
 
-async function generateWithWebAlchemyInProcess(buffer, variableSettings, format) {
-  const options = toInstancerOptions(variableSettings);
-  const { out, subset } = await instantiateVariableFontInProcess(buffer, options);
+async function generateWithWebAlchemyInProcess(buffer, instancerOptions, format) {
+  const { out, subset } = await instantiateVariableFontInProcess(buffer, instancerOptions);
   return finalizeWebAlchemyOutput(out, format, subset);
 }
 
-async function generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format) {
+async function generateWithWebAlchemyViaNodeWorker(buffer, instancerOptions, format) {
   const tempDir = getTempDir();
   const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
   const inputPath = path.join(tempDir, `wa-in-${stamp}.bin`);
   const outputPath = path.join(tempDir, `wa-out-${stamp}.${String(format || 'woff2').toLowerCase()}`);
-  const options = toInstancerOptions(variableSettings);
+  const options = instancerOptions || {};
 
   await writeFile(inputPath, buffer);
   try {
@@ -265,32 +269,32 @@ async function generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, for
  * Генерация через @web-alchemy/fonttools (Pyodide).
  * На Bun (ONREZA COMPUTE) — отдельный процесс Node, т.к. Pyodide в Bun часто падает.
  */
-async function generateWithWebAlchemy(buffer, variableSettings, format) {
+async function generateWithWebAlchemy(buffer, instancerOptions, format) {
   if (mustUseSubprocessWorkerOnly()) {
     if (!canRunWorker()) {
       throw new Error(
         'Pyodide-worker недоступен: нет Node/Bun или worker-скрипта. Задайте FONT_GEN_NODE_PATH или проверьте bun run build.',
       );
     }
-    return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+    return generateWithWebAlchemyViaNodeWorker(buffer, instancerOptions, format);
   }
 
   if (shouldUseSubprocessWorkerFirst()) {
     try {
-      return await generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+      return await generateWithWebAlchemyViaNodeWorker(buffer, instancerOptions, format);
     } catch (workerErr) {
       console.warn('[generate-static-font] subprocess worker failed:', workerErr?.message);
     }
   }
   try {
-    return await generateWithWebAlchemyInProcess(buffer, variableSettings, format);
+    return await generateWithWebAlchemyInProcess(buffer, instancerOptions, format);
   } catch (inProcessError) {
     if (canRunWorker()) {
       console.warn(
         '[generate-static-font] in-process failed, retry via subprocess worker:',
         inProcessError?.message,
       );
-      return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
+      return generateWithWebAlchemyViaNodeWorker(buffer, instancerOptions, format);
     }
     throw inProcessError;
   }
@@ -317,7 +321,7 @@ export default async function handler(req, res) {
     return await handleGenerateStaticFont(req, res);
   } catch (error) {
     console.error('[generate-static-font] unhandled:', error);
-    const msg = error?.message || 'Unknown error';
+    const msg = formatGenerationError(error);
     return res.status(500).json({
       error: 'Failed to generate static font',
       message: msg,
@@ -392,6 +396,7 @@ async function handleGenerateStaticFont(req, res) {
     }
 
     const buffer = Buffer.from(fontData, 'base64');
+    const instancerOptions = await sanitizeSettingsForFontBuffer(variableSettings, buffer);
     await writeFile(inputPath, buffer);
 
     if (fontToolsPython) {
@@ -402,7 +407,7 @@ async function handleGenerateStaticFont(req, res) {
       await generateWithPythonFontTools(fontToolsPython, {
         inputPath,
         outputPath,
-        variableSettings,
+        instancerOptions,
         format: outFormat,
         rename: { family, subfamily, postScriptName },
       });
@@ -426,7 +431,7 @@ async function handleGenerateStaticFont(req, res) {
     }
 
     // Vercel / окружение без venv
-    const staticFontData = await generateWithWebAlchemy(buffer, variableSettings, outFormat);
+    const staticFontData = await generateWithWebAlchemy(buffer, instancerOptions, outFormat);
     await unlink(inputPath).catch(() => {});
 
     const quotaAfter = await consumeStaticGenerationQuota(req, actor);
@@ -450,7 +455,7 @@ async function handleGenerateStaticFont(req, res) {
     }
 
     console.error('Static font generation error:', error);
-    const msg = error?.message || 'Unknown error';
+    const msg = formatGenerationError(error);
     return res.status(500).json({
       error: 'Failed to generate static font',
       message: msg,
