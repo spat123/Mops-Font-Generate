@@ -75,6 +75,17 @@ next build && node scripts/copy-standalone-font-gen.mjs
 
 Обязательные — как на Vercel (`NEXTAUTH_*`, `DATABASE_URL`, OAuth, `RESEND_*`).
 
+| Переменная | Значение |
+|------------|----------|
+| `NEXTAUTH_URL` | `https://dynamicfont.ru` (без слэша в конце) |
+| `NEXTAUTH_SECRET` | случайная строка ≥ 32 символа (`openssl rand -base64 32`) — **обязательна**, иначе `/api/auth/session` → **500** |
+| `NEXT_PUBLIC_SITE_URL` | `https://dynamicfont.ru` |
+| `DATABASE_URL` | Neon или Postgres |
+
+Проверка после деплоя: `GET https://dynamicfont.ru/api/auth/session` → **200** и JSON `{ user: null }` или объект пользователя (не 500).
+
+Если в Network видите `/_vercel/insights/script.js` или `/_vercel/speed-insights/script.js` с **404** на ONREZA — это нормально до обновления сборки; скрипты Vercel Analytics на ONREZA не нужны.
+
 Для **серверной** генерации (опционально, если probe показывает `nodeWorkerBinary: null`):
 
 ```env
@@ -113,4 +124,4 @@ FONT_GEN_TIMEOUT_MS=120000
 
 ### Локальный Python (опционально)
 
-На VPS/Docker можно установить `fonttools` в venv — тогда используется движок `python` с переименованием таблиц `name`. На ONREZA без своего Dockerfile это обычно недоступно.
+На своём VPS можно установить `python3-fonttools` — тогда используется движок `python` с переименованием таблиц `name` (см. [DEPLOY_REG_RU_VPS.md](./DEPLOY_REG_RU_VPS.md)). На ONREZA это обычно недоступно — используется web-alchemy (Node/Pyodide).
