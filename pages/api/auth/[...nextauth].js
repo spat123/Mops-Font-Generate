@@ -3,6 +3,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getMaxSavedLibrariesForUser } from '../../../utils/authLibraryLimits';
 import { upsertOAuthUser, verifyCredentialsUser, findUserByEmail, findUserById } from '../../../lib/auth/userStore';
+import { matchEnvCredentialsUser } from '../../../lib/auth/envCredentialsLogin';
 import { consumeLoginToken, isStepUpLoginDisabled } from '../../../lib/auth/stepUpLogin';
 
 /** Только локальная разработка: поднять тариф до Pro без правки БД. */
@@ -92,19 +93,14 @@ function buildProviders() {
           };
         }
 
-        if (process.env.AUTH_CREDENTIALS_LOGIN && process.env.AUTH_CREDENTIALS_PASSWORD) {
-          if (
-            login === String(process.env.AUTH_CREDENTIALS_LOGIN) &&
-            password === String(process.env.AUTH_CREDENTIALS_PASSWORD)
-          ) {
-            const looksLikeEmail = login.includes('@');
-            return {
-              id: `credentials:${login}`,
-              name: looksLikeEmail ? login.split('@')[0] : login,
-              email: looksLikeEmail ? login : null,
-              image: null,
-            };
-          }
+        const demoUser = matchEnvCredentialsUser({ email: login, password });
+        if (demoUser) {
+          return {
+            id: demoUser.id,
+            name: demoUser.name,
+            email: demoUser.email,
+            image: demoUser.image,
+          };
         }
 
         return null;

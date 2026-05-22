@@ -1,3 +1,5 @@
+import { isDevUnlimitedStaticGeneration } from './devUnlimitedStaticGeneration';
+
 /** Лимит генераций VF → статик без входа (в месяц). */
 export const GUEST_STATIC_GENERATIONS_LIMIT = 3;
 
@@ -22,6 +24,7 @@ export function freeStaticGenerationsStorageKey(userId) {
 
 /** @param {string | null | undefined} userId */
 export function getStaticGenerationsLimit(userId) {
+  if (isDevUnlimitedStaticGeneration()) return Infinity;
   return String(userId || '').trim() ? FREE_STATIC_GENERATIONS_LIMIT : GUEST_STATIC_GENERATIONS_LIMIT;
 }
 

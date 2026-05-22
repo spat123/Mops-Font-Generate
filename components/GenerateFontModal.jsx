@@ -18,6 +18,7 @@ import {
   readFreeStaticGenerationsUsed,
   writeFreeStaticGenerationsUsed,
 } from '../utils/freeStaticGenerationQuota';
+import { isDevUnlimitedStaticGeneration } from '../utils/devUnlimitedStaticGeneration';
 import { guessSubfamilyForVariableFont, variableFontHasItalicAxis } from '../utils/guessStaticSubfamily';
 import { sanitizeVariableSettingsForInstancer } from '../utils/sanitizeVariableSettingsForInstancer';
 import { getBillingCopy } from '../utils/billingCopy';
@@ -224,14 +225,16 @@ export default function GenerateFontModal({
     onClose();
   };
 
-  const generationsLimit = isPro ? Infinity : getStaticGenerationsLimit(sessionUserId || null);
+  const devUnlimitedGenerations = isDevUnlimitedStaticGeneration();
+  const generationsLimit =
+    isPro || devUnlimitedGenerations ? Infinity : getStaticGenerationsLimit(sessionUserId || null);
 
   const handleGenerate = async () => {
     if (!selectedFont?.isVariableFont) {
       toast.error('Выберите вариативный шрифт');
       return;
     }
-    if (!isPro && freeGenerationsUsed >= generationsLimit) {
+    if (!isPro && !devUnlimitedGenerations && freeGenerationsUsed >= generationsLimit) {
       if (!isAuthenticated) {
         toast.info('Вы исчерпали лимит генераций. Войдите в аккаунт — на Free будет 50 генераций в месяц.');
         requestSignIn?.();
@@ -279,7 +282,7 @@ export default function GenerateFontModal({
             ? `${base}-${fileSubfamily}.${format}`
             : `${base}.${format}`;
         downloadFile(blob, filename, mimeForFormat(format));
-        if (!isPro) {
+        if (!isPro && !devUnlimitedGenerations) {
           const nextUsed = freeGenerationsUsed + 1;
           writeFreeStaticGenerationsUsed(sessionUserId || null, nextUsed);
           setFreeGenerationsUsed(nextUsed);
@@ -296,8 +299,10 @@ export default function GenerateFontModal({
   const vf = Boolean(selectedFont?.isVariableFont);
   const disabled = !vf || busy;
   const nameLockedByPlan = !isPro;
-  const freeRemaining = isPro ? Infinity : Math.max(0, generationsLimit - freeGenerationsUsed);
-  const freeLimitReached = !isPro && freeGenerationsUsed >= generationsLimit;
+  const freeRemaining =
+    isPro || devUnlimitedGenerations ? Infinity : Math.max(0, generationsLimit - freeGenerationsUsed);
+  const freeLimitReached =
+    !isPro && !devUnlimitedGenerations && freeGenerationsUsed >= generationsLimit;
   const inputInactive = disabled;
   const nameReadOnly = nameLockedByPlan;
 
@@ -495,7 +500,7 @@ export default function GenerateFontModal({
               />
             </div>
 
-            {!isPro ? (
+            {!isPro && !devUnlimitedGenerations ? (
               <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
                 {freeRemaining > 0 ? (
                   <p className="text-sm leading-relaxed text-gray-800">

@@ -1,4 +1,17 @@
-import { matchesSearch } from './searchMatching';
+import { compareFontFamilyName } from './fontSort';
+import { matchesCatalogFontSearch, scoreCatalogFontSearch } from './searchMatching';
+
+/** @param {Set<string>|string[]|null|undefined} preserveKeys */
+export function normalizePreserveKeysSet(preserveKeys) {
+  if (preserveKeys instanceof Set) return preserveKeys;
+  if (!Array.isArray(preserveKeys)) return null;
+  const out = new Set();
+  for (const key of preserveKeys) {
+    const k = String(key || '').trim();
+    if (k) out.add(k);
+  }
+  return out.size > 0 ? out : null;
+}
 
 export function buildCatalogFacets(items, { getCategory, getSubsets, compareCategory, compareSubset }) {
   const categories = new Set();
@@ -38,11 +51,14 @@ export function filterCatalogItems(
     isVariable,
     filterItalicOnly = false,
     hasItalic,
+    preserveKeys = null,
+    getPreserveKey = null,
   },
 ) {
   const list = Array.isArray(items) ? items : [];
   const subsetFilter = Array.isArray(filterSubset) ? filterSubset : [];
   const useSearch = String(searchQuery || '').trim().length > 0;
+  const preserveSet = normalizePreserveKeysSet(preserveKeys);
 
   const out = [];
   for (const item of list) {
@@ -68,8 +84,15 @@ export function filterCatalogItems(
     if (filterItalicOnly && !Boolean(hasItalic?.(item))) continue;
 
     if (useSearch) {
-      const tokens = Array.isArray(getSearchTokens?.(item)) ? getSearchTokens(item) : [];
-      if (!matchesSearch(tokens, searchQuery)) continue;
+      const pinKey =
+        preserveSet && typeof getPreserveKey === 'function'
+          ? String(getPreserveKey(item) || '').trim()
+          : '';
+      const pinned = pinKey && preserveSet.has(pinKey);
+      if (!pinned) {
+        const tokens = Array.isArray(getSearchTokens?.(item)) ? getSearchTokens(item) : [];
+        if (!matchesCatalogFontSearch(tokens, searchQuery)) continue;
+      }
     }
 
     out.push(item);
@@ -88,8 +111,33 @@ export function sortCatalogItems(items, sortMode, sorters, fallbackSorter) {
   return arr;
 }
 
+export function sortCatalogItemsBySearchRelevance(items, searchQuery, getSearchTokens) {
+  const q = String(searchQuery || '').trim();
+  if (!q) return Array.isArray(items) ? [...items] : [];
+  const arr = Array.isArray(items) ? items : [];
+  return [...arr]
+    .map((item) => ({
+      item,
+      score: scoreCatalogFontSearch(
+        Array.isArray(getSearchTokens?.(item)) ? getSearchTokens(item) : [],
+        q,
+      ),
+    }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const fa = String(a.item?.family || a.item?.label || '');
+      const fb = String(b.item?.family || b.item?.label || '');
+      return compareFontFamilyName(fa, fb);
+    })
+    .map((row) => row.item);
+}
+
 export function filterSortCatalogItems(items, filterOpts, sortMode, sorters, fallbackSorter) {
   const filtered = filterCatalogItems(items, filterOpts);
+  const q = String(filterOpts?.searchQuery || '').trim();
+  if (q) {
+    return sortCatalogItemsBySearchRelevance(filtered, q, filterOpts?.getSearchTokens);
+  }
   return sortCatalogItems(filtered, sortMode, sorters, fallbackSorter);
 }
 

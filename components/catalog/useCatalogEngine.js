@@ -24,6 +24,8 @@ export function useCatalogEngine({
   // pipeline
   exclusionOrder = 'afterFilterSort', // 'beforeFilterSort' | 'afterFilterSort'
   filterSortItems, // (items, controls) => filteredSortedItems
+  /** Set/array ключей выделенных карточек — пересчёт фильтра при смене выделения (поиск не скрывает их). */
+  filterPreserveKeys = null,
 
   // toolbar
   toolbar: {
@@ -109,6 +111,7 @@ export function useCatalogEngine({
     controls.filterSubset,
     controls.filterVariable,
     controls.filterItalicOnly,
+    filterPreserveKeys,
   ]);
 
   const itemsNotInSessionAfter = useCatalogSessionExclusion({

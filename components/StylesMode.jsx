@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import EditableText from './EditableText';
-import { findStyleInfoByWeightAndStyle } from '../utils/fontUtilsCommon';
+import { findStyleInfoByWeightAndStyle, shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
 import { useSettings } from '../contexts/SettingsContext';
 import { getPreviewChromeFromBackground } from '../utils/previewChromeTheme';
 import { generateVariationSettings } from '../utils/fontVariationSettings';
@@ -65,6 +65,7 @@ function StylesMode({
   const showStylesInfoTile = !hasStaticStyles && !hasVariableAxes;
   
   const safeFontFamily = fontFamilyValue || selectedFont.name || 'sans-serif';
+  const applyCssWeightStyle = shouldApplyCssWeightStyleForFont(selectedFont);
 
   const bgForStyleCells = previewBackgroundImage ? 'transparent' : (backgroundColor || 'transparent');
 
@@ -101,8 +102,7 @@ function StylesMode({
                         style={{
                           fontFamily: safeFontFamily,
                           fontSize: `${stylesFontSize}px`,
-                          fontWeight: style.weight,
-                          fontStyle: 'normal',
+                          ...(applyCssWeightStyle ? { fontWeight: style.weight, fontStyle: 'normal' } : {}),
                           letterSpacing: letterSpacingValue,
                           color: textColor,
                           backgroundColor: bgForStyleCells,
@@ -143,8 +143,7 @@ function StylesMode({
                         style={{
                           fontFamily: safeFontFamily,
                           fontSize: `${stylesFontSize}px`,
-                          fontWeight: style.weight,
-                          fontStyle: 'italic',
+                          ...(applyCssWeightStyle ? { fontWeight: style.weight, fontStyle: 'italic' } : {}),
                           letterSpacing: letterSpacingValue,
                           color: textColor,
                           backgroundColor: bgForStyleCells,

@@ -43,8 +43,7 @@ function GoogleFontsCatalogCardComponent({
   const family = entry?.family;
   const styleCount = Number(entry?.styleCount);
   const hasStyleCount = Number.isFinite(styleCount) && styleCount > 0;
-  const subsetCount = Array.isArray(entry?.subsets) ? entry.subsets.length : 0;
-  const languageCount = subsetCount;
+  const languageCount = Array.isArray(entry?.subsets) ? entry.subsets.length : 0;
   const isVariable = entry?.isVariable === true;
   const hasItalic = Boolean(entry?.hasItalic);
 
@@ -79,10 +78,9 @@ function GoogleFontsCatalogCardComponent({
       isVariable ? 'vf' : null,
       hasItalic ? 'italic' : null,
       languageCount > 0 ? `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}` : null,
-      subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
       hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
     ],
-    [entry?.category, hasItalic, isVariable, languageCount, hasStyleCount, styleCount, subsetCount],
+    [entry?.category, hasItalic, isVariable, languageCount, hasStyleCount, styleCount],
   );
 
   const footerLeftBadges = useMemo(
@@ -97,9 +95,8 @@ function GoogleFontsCatalogCardComponent({
   const footerRightBadges = useMemo(
     () => [
       hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
-      subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
     ],
-    [hasStyleCount, styleCount, subsetCount],
+    [hasStyleCount, styleCount],
   );
 
   if (!family) return null;

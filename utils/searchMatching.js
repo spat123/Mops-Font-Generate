@@ -81,3 +81,64 @@ export function matchesSearch(candidate, query) {
 
   return queryVariants.some((q) => candidateVariants.some((item) => item.includes(q)));
 }
+
+function catalogFamilyMatchesSearch(family, queryNorm, queryCompact) {
+  const fn = normalizeSearchText(family);
+  const fc = compactSearchText(fn);
+  if (!fn || !queryNorm) return false;
+  if (fn === queryNorm || fc === queryCompact) return true;
+  if (fn.startsWith(queryNorm)) return true;
+  if (fc.startsWith(queryCompact)) return true;
+  const words = fn.split(/\s+/).filter(Boolean);
+  return words.some((w) => {
+    const wc = compactSearchText(w);
+    return w.startsWith(queryNorm) || wc.startsWith(queryCompact) || w === queryNorm;
+  });
+}
+
+function matchesSearchLooseMetadata(text, queryNorm) {
+  const n = normalizeSearchText(text);
+  return Boolean(n && queryNorm && n.includes(queryNorm));
+}
+
+/**
+ * Поиск в каталоге: имя семейства — по словам (без ложных «agu» в Le**agu**e).
+ * Остальные поля (категория, subsets) — обычный подстрочный поиск.
+ * @param {string|string[]} candidate — getSearchTokens(): [family, ...meta]
+ */
+export function matchesCatalogFontSearch(candidate, query) {
+  const parts = (Array.isArray(candidate) ? candidate : [candidate]).map((v) => String(v || ''));
+  const family = parts[0] || '';
+  const queryNorm = normalizeSearchText(query);
+  if (!queryNorm) return true;
+  const queryCompact = compactSearchText(queryNorm);
+
+  if (catalogFamilyMatchesSearch(family, queryNorm, queryCompact)) return true;
+  for (let i = 1; i < parts.length; i += 1) {
+    if (matchesSearchLooseMetadata(parts[i], queryNorm)) return true;
+  }
+  return false;
+}
+
+/**
+ * Релевантность для сортировки результатов поиска в каталоге (больше = выше).
+ */
+export function scoreCatalogFontSearch(candidate, query) {
+  const parts = (Array.isArray(candidate) ? candidate : [candidate]).map((v) => String(v || ''));
+  const family = parts[0] || '';
+  const queryNorm = normalizeSearchText(query);
+  if (!queryNorm) return 0;
+  const queryCompact = compactSearchText(queryNorm);
+  const fn = normalizeSearchText(family);
+  const fc = compactSearchText(fn);
+
+  let score = 0;
+  if (fn === queryNorm || fc === queryCompact) score = Math.max(score, 1000);
+  else if (fn.startsWith(queryNorm) || fc.startsWith(queryCompact)) score = Math.max(score, 900);
+  else if (catalogFamilyMatchesSearch(family, queryNorm, queryCompact)) score = Math.max(score, 800);
+
+  for (let i = 1; i < parts.length; i += 1) {
+    if (matchesSearchLooseMetadata(parts[i], queryNorm)) score = Math.max(score, 200);
+  }
+  return score;
+}

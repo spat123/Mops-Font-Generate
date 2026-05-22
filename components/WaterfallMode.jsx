@@ -4,7 +4,11 @@ import { useFontContext } from '../contexts/FontContext';
 import EditableText from './EditableText';
 import { VirtualizedVariableList } from './ui/VirtualizedVariableList';
 import { FloatingTooltip } from './ui/Tooltip';
-import { PRESET_STYLES, clampPresetNameForVariableAxes } from '../utils/fontUtilsCommon';
+import {
+  PRESET_STYLES,
+  clampPresetNameForVariableAxes,
+  shouldApplyCssWeightStyleForFont,
+} from '../utils/fontUtilsCommon';
 
 // Fallback, если родитель не передал массив (должен совпадать с FontPreview.waterfallSizes)
 const DEFAULT_WATERFALL_SIZES = [180, 120, 96, 72, 60, 48, 36, 30, 24, 18, 14, 12, 10, 8];
@@ -268,7 +272,7 @@ const WaterfallMode = ({
           );
         }
         itemStyle.fontVariationSettings = stringifyFontVariationSettings(fvs);
-      } else {
+      } else if (shouldApplyCssWeightStyleForFont(selectedFont)) {
         itemStyle.fontWeight = presetInfo?.weight ?? 400;
         itemStyle.fontStyle = presetInfo?.style ?? 'normal';
       }

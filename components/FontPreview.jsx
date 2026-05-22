@@ -14,7 +14,7 @@ import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
 import { formatCatalogUnionAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
 import { ensureGoogleFontPreviewCss } from '../utils/googleFontPreviewCss';
-import { matchesSearch } from '../utils/searchMatching';
+import { matchesCatalogFontSearch, matchesSearch } from '../utils/searchMatching';
 import { SearchClearButton } from './ui/SearchClearButton';
 import { CatalogFontCard } from './catalog/CatalogFontCard';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
@@ -42,6 +42,7 @@ import {
   saveArchiveBlob,
 } from '../utils/catalogDownloadActions';
 import { GLYPH_COUNT_UNAVAILABLE } from './GlyphsMode';
+import { shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -308,8 +309,7 @@ export default function FontPreview({
       if (fontStyleValue && fontStyleValue !== 'normal') {
         styles.fontStyle = fontStyleValue;
       }
-    } else {
-      // Для НЕвариативных шрифтов используем font-weight и font-style
+    } else if (shouldApplyCssWeightStyleForFont(selectedFont)) {
       styles.fontStyle = fontStyleValue;
       styles.fontWeight = fontWeightValue;
     }
@@ -383,14 +383,14 @@ export default function FontPreview({
         ...(fontStyleValue && fontStyleValue !== 'normal' ? { fontStyle: fontStyleValue } : {}),
         color: textColor,
       };
-    } else {
-      // Для НЕвариативных шрифтов используем font-weight и font-style
+    } else if (shouldApplyCssWeightStyleForFont(selectedFont)) {
       return {
         fontStyle: fontStyleValue,
         fontWeight: fontWeightValue,
         color: textColor,
       };
     }
+    return { color: textColor };
   }, [fontStyleValue, fontWeightValue, selectedFont, variationSettingsValue, textColor]);
 
   const loadPresetFont = useCallback(async (fontName) => {
@@ -455,7 +455,7 @@ export default function FontPreview({
     return googleCatalogEntries
       .filter((entry) => entry?.family && entry.isVariable)
       .filter((entry) =>
-        matchesSearch(
+        matchesCatalogFontSearch(
           [
             entry.family,
             entry.category,

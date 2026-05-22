@@ -146,7 +146,7 @@ export function CatalogPanelToolbar({
       multiple
       clearable
       className={selectClass(Array.isArray(subsetValue) ? subsetValue.length === 0 : !subsetValue)}
-      aria-label="Языки / наборы"
+      aria-label="Языки"
       clearAriaLabel="Очистить фильтр языков"
       placeholder="Языки"
       searchable

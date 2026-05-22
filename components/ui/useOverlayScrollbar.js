@@ -5,7 +5,9 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
   /** Нужен в зависимостях эффектов: область появляется после загрузки/фильтров, иначе scroll-слушатель не навесится. */
   const [scrollTarget, setScrollTarget] = useState(null);
   const hideTimerRef = useRef(null);
+  const dragStateRef = useRef(null);
   const [scrollbarVisible, setScrollbarVisible] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [scrollLayout, setScrollLayout] = useState({
     scrollTop: 0,
     scrollHeight: 0,
@@ -34,7 +36,9 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
     setScrollbarVisible(true);
     clearHideTimer();
     hideTimerRef.current = setTimeout(() => {
-      setScrollbarVisible(false);
+      if (!dragStateRef.current) {
+        setScrollbarVisible(false);
+      }
       hideTimerRef.current = null;
     }, hideDelayMs);
   }, [clearHideTimer, hideDelayMs, syncScrollLayout]);
@@ -47,6 +51,120 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
       syncScrollLayout();
     },
     [syncScrollLayout],
+  );
+
+  const getScrollMetrics = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return null;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    if (clientHeight < 1 || scrollHeight <= clientHeight + 1) return null;
+    const trackHeight = clientHeight - 2 * trackInsetPx;
+    if (trackHeight < 24) return null;
+    const thumbHeight = Math.max(24, Math.round((clientHeight / scrollHeight) * trackHeight));
+    const maxScroll = scrollHeight - clientHeight;
+    const maxThumbTravel = Math.max(0, trackHeight - thumbHeight);
+    return { el, scrollTop, scrollHeight, clientHeight, trackHeight, thumbHeight, maxScroll, maxThumbTravel };
+  }, [trackInsetPx]);
+
+  const applyScrollFromThumbTop = useCallback(
+    (thumbTop) => {
+      const metrics = getScrollMetrics();
+      if (!metrics || metrics.maxScroll <= 0) return;
+      const travel = metrics.maxThumbTravel;
+      const ratio = travel > 0 ? Math.min(1, Math.max(0, thumbTop / travel)) : 0;
+      metrics.el.scrollTop = ratio * metrics.maxScroll;
+      syncScrollLayout();
+    },
+    [getScrollMetrics, syncScrollLayout],
+  );
+
+  const endDrag = useCallback(
+    (target, pointerId) => {
+      if (!dragStateRef.current) return;
+      dragStateRef.current = null;
+      setIsDragging(false);
+      if (target?.releasePointerCapture) {
+        try {
+          target.releasePointerCapture(pointerId);
+        } catch {
+          /* already released */
+        }
+      }
+      showScrollbarTemporarily();
+    },
+    [showScrollbarTemporarily],
+  );
+
+  const onThumbPointerDown = useCallback(
+    (event) => {
+      if (event.button !== 0) return;
+      const metrics = getScrollMetrics();
+      if (!metrics?.el) return;
+      event.preventDefault();
+      event.stopPropagation();
+      dragStateRef.current = {
+        startY: event.clientY,
+        startScrollTop: metrics.el.scrollTop,
+      };
+      setIsDragging(true);
+      setScrollbarVisible(true);
+      clearHideTimer();
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [clearHideTimer, getScrollMetrics],
+  );
+
+  const onTrackPointerDown = useCallback(
+    (event) => {
+      if (event.button !== 0) return;
+      if (event.target !== event.currentTarget) return;
+      const metrics = getScrollMetrics();
+      if (!metrics?.el) return;
+      event.preventDefault();
+      const trackRect = event.currentTarget.getBoundingClientRect();
+      const yInTrack = event.clientY - trackRect.top - trackInsetPx;
+      const thumbTop = Math.min(
+        metrics.maxThumbTravel,
+        Math.max(0, yInTrack - metrics.thumbHeight / 2),
+      );
+      applyScrollFromThumbTop(thumbTop);
+      dragStateRef.current = {
+        startY: event.clientY,
+        startScrollTop: metrics.el.scrollTop,
+      };
+      setIsDragging(true);
+      setScrollbarVisible(true);
+      clearHideTimer();
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [applyScrollFromThumbTop, clearHideTimer, getScrollMetrics, trackInsetPx],
+  );
+
+  const onScrollbarPointerMove = useCallback(
+    (event) => {
+      const drag = dragStateRef.current;
+      if (!drag) return;
+      const metrics = getScrollMetrics();
+      if (!metrics?.el) return;
+      const deltaY = event.clientY - drag.startY;
+      const scrollDelta =
+        metrics.maxThumbTravel > 0 ? (deltaY / metrics.maxThumbTravel) * metrics.maxScroll : 0;
+      metrics.el.scrollTop = Math.min(
+        metrics.maxScroll,
+        Math.max(0, drag.startScrollTop + scrollDelta),
+      );
+      syncScrollLayout();
+      setScrollbarVisible(true);
+      clearHideTimer();
+    },
+    [clearHideTimer, getScrollMetrics, syncScrollLayout],
+  );
+
+  const onScrollbarPointerUp = useCallback(
+    (event) => {
+      endDrag(event.currentTarget, event.pointerId);
+    },
+    [endDrag],
   );
 
   useLayoutEffect(() => {
@@ -105,7 +223,13 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 } = {}
   return {
     overlayThumb,
     scrollbarVisible,
+    isDragging,
     setScrollElement,
     syncScrollLayout,
+    onTrackPointerDown,
+    onThumbPointerDown,
+    onScrollbarPointerMove,
+    onScrollbarPointerUp,
+    trackInsetPx,
   };
 }

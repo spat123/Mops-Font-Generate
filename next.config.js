@@ -2,6 +2,9 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  env: {
+    NEXT_PUBLIC_DEV_PRO_SIMULATION: process.env.DEV_PRO_SIMULATION || process.env.NEXT_PUBLIC_DEV_PRO_SIMULATION || '',
+  },
   // Pyodide (@web-alchemy/fonttools) только на сервере (API routes), не в клиентском бандле.
   experimental: {
     outputFileTracingIncludes: {

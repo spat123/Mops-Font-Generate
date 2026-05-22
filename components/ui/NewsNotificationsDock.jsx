@@ -10,6 +10,12 @@ import {
   formatEditorNewsDate,
   getLatestUpdateId,
 } from '../../data/editorNewsFeed';
+import {
+  isEditorNewsImageCached,
+  prefetchEditorNewsFeedImages,
+  prefetchEditorNewsImage,
+  scheduleEditorNewsFeedPrefetch,
+} from '../../utils/editorNewsImageCache';
 
 const EDITOR_NOTIFICATIONS_SEEN_KEY = 'mfg-editor-notifications-seen';
 const EDITOR_UPDATES_LAST_SEEN_ID_KEY = 'mfg-editor-updates-last-seen-id';
@@ -64,20 +70,54 @@ function UpdatesTabLabel({ showDot }) {
   );
 }
 
-function NewsCard({ item }) {
+function NewsCard({ item, eagerImage }) {
   const imagePlaceholder =
     item.kind === 'updates' ? 'Превью обновления' : 'Изображение';
+  const imageUrl = item.imageUrl ? String(item.imageUrl) : '';
+  const [imageReady, setImageReady] = useState(
+    () => !imageUrl || isEditorNewsImageCached(imageUrl),
+  );
+
+  useEffect(() => {
+    if (!imageUrl) {
+      setImageReady(false);
+      return undefined;
+    }
+    if (isEditorNewsImageCached(imageUrl)) {
+      setImageReady(true);
+      return undefined;
+    }
+    let cancelled = false;
+    void prefetchEditorNewsImage(imageUrl).then(() => {
+      if (!cancelled) setImageReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl]);
 
   return (
     <article className="overflow-hidden rounded-md border border-gray-200 bg-white">
-      <div className="aspect-[21/9] min-h-[7rem] w-full border-b border-gray-100 bg-gray-50">
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.title ? String(item.title) : ''}
-            className="h-full w-full object-cover object-center"
-            loading="lazy"
-          />
+      <div className="relative aspect-[21/9] min-h-[7rem] w-full overflow-hidden border-b border-gray-100 bg-gray-50">
+        {imageUrl ? (
+          <>
+            {!imageReady ? (
+              <div
+                className="absolute inset-0 animate-pulse bg-gray-100"
+                aria-hidden
+              />
+            ) : null}
+            <img
+              src={imageUrl}
+              alt={item.title ? String(item.title) : ''}
+              className={`h-full w-full object-cover object-center transition-opacity duration-200 ${
+                imageReady ? 'opacity-100' : 'opacity-0'
+              }`}
+              loading={eagerImage ? 'eager' : 'lazy'}
+              decoding="async"
+              fetchPriority={eagerImage ? 'high' : 'auto'}
+            />
+          </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase tracking-wider text-gray-400">{imagePlaceholder}</div>
         )}
@@ -120,10 +160,13 @@ export function NewsNotificationsDock() {
   const [hasUnread, setHasUnread] = useState(false);
   const [hasUnreadUpdates, setHasUnreadUpdates] = useState(false);
   const [activeKind, setActiveKind] = useState('news');
+  /** После первого открытия панели держим обе вкладки в DOM — картинки не перезагружаются при переключении. */
+  const [panelContentMounted, setPanelContentMounted] = useState(false);
 
   const close = useCallback(() => setOpen(false), []);
 
-  const visibleFeed = useMemo(() => getEditorFeedByKind(activeKind), [activeKind]);
+  const newsFeed = useMemo(() => getEditorFeedByKind('news'), []);
+  const updatesFeed = useMemo(() => getEditorFeedByKind('updates'), []);
 
   const kindOptions = useMemo(
     () => [
@@ -157,7 +200,14 @@ export function NewsNotificationsDock() {
     setHasUnread(
       (EDITOR_NEWS_FEED.length > 0 && !readNotificationsSeen()) || computeHasUnreadUpdates(),
     );
+    scheduleEditorNewsFeedPrefetch(EDITOR_NEWS_FEED);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    setPanelContentMounted(true);
+    void prefetchEditorNewsFeedImages(EDITOR_NEWS_FEED);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -178,9 +228,11 @@ export function NewsNotificationsDock() {
   }, [open, activeKind, markUpdatesSeen]);
 
   const handleOpen = () => {
+    setPanelContentMounted(true);
     setOpen(true);
     setHasUnread(false);
     persistNotificationsSeen();
+    void prefetchEditorNewsFeedImages(EDITOR_NEWS_FEED);
     if (activeKind === 'updates') markUpdatesSeen();
   };
 
@@ -225,13 +277,34 @@ export function NewsNotificationsDock() {
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                <div className="space-y-4">
-                  {visibleFeed.length > 0 ? (
-                    visibleFeed.map((item) => <NewsCard key={item.id} item={item} />)
-                  ) : (
-                    <NotificationsEmpty kind={activeKind} />
-                  )}
-                </div>
+                {panelContentMounted ? (
+                  <>
+                    <div
+                      className={activeKind === 'news' ? 'space-y-4' : 'hidden'}
+                      aria-hidden={activeKind !== 'news'}
+                    >
+                      {newsFeed.length > 0 ? (
+                        newsFeed.map((item) => (
+                          <NewsCard key={item.id} item={item} eagerImage />
+                        ))
+                      ) : (
+                        <NotificationsEmpty kind="news" />
+                      )}
+                    </div>
+                    <div
+                      className={activeKind === 'updates' ? 'space-y-4' : 'hidden'}
+                      aria-hidden={activeKind !== 'updates'}
+                    >
+                      {updatesFeed.length > 0 ? (
+                        updatesFeed.map((item) => (
+                          <NewsCard key={item.id} item={item} eagerImage />
+                        ))
+                      ) : (
+                        <NotificationsEmpty kind="updates" />
+                      )}
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           </>,

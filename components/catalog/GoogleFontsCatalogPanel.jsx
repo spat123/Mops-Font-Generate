@@ -36,6 +36,7 @@ import { CatalogPanelToolbar } from './CatalogPanelToolbar';
 import { filterSortCatalogItems } from '../../utils/catalogFilterSort';
 import { useSelectionActionsEffect } from '../ui/useSelectionActionsEffect';
 import { useCatalogEngine } from './useCatalogEngine';
+import { OverlayScrollbar } from '../ui/OverlayScrollbar';
 import { useOverlayScrollbar } from '../ui/useOverlayScrollbar';
 import {
   buildArchiveBlobFromEntries,
@@ -113,8 +114,13 @@ export default function GoogleFontsCatalogPanel({
   const {
     overlayThumb,
     scrollbarVisible,
+    isDragging,
     setScrollElement,
     syncScrollLayout,
+    onTrackPointerDown,
+    onThumbPointerDown,
+    onScrollbarPointerMove,
+    onScrollbarPointerUp,
   } = useOverlayScrollbar();
   const { set: recentlyAddedFamilies, mark: markFamilyRecentlyAdded } =
     useStickyTimedSet(RECENT_ADD_VISIBLE_MS);
@@ -150,6 +156,16 @@ export default function GoogleFontsCatalogPanel({
   );
 
   const {
+    selectedKeys: selectedFamilies,
+    setSelectedKeys: setSelectedFamilies,
+    toggleSelectedKey: toggleSelectedFamily,
+    startLongPress: startCardLongPress,
+    onCardClick,
+    clearLongPressTimer,
+    pruneSelection,
+  } = useLongPressMultiSelect({ longPressMs: CARD_LONG_PRESS_MS, isInteractiveTarget });
+
+  const {
     controls,
     filteredSortedItems,
     itemsNotInSession: catalogItemsNotInSession,
@@ -169,6 +185,7 @@ export default function GoogleFontsCatalogPanel({
     addingKey: addingFamily,
     recentlyAddedSet: recentlyAddedFamilies,
     exclusionOrder: 'afterFilterSort',
+    filterPreserveKeys: selectedFamilies,
     filterSortItems: (list, c) =>
       filterSortCatalogItems(
         list,
@@ -190,6 +207,8 @@ export default function GoogleFontsCatalogPanel({
           isVariable: (x) => x?.isVariable,
           filterItalicOnly: c.filterItalicOnly,
           hasItalic: (x) => x?.hasItalic,
+          preserveKeys: selectedFamilies,
+          getPreserveKey: (x) => x?.family,
         },
         c.sortMode,
         sorters,
@@ -207,7 +226,7 @@ export default function GoogleFontsCatalogPanel({
         variableFilterId: 'gf-filter-var',
         subsetFilterId: 'gf-filter-subset',
       },
-      searchPlaceholder: 'Имя, категория, наборы…',
+      searchPlaceholder: 'Имя, категория…',
       sortOptions: [
         { value: 'catalog', label: 'Популярное' },
         { value: 'name-asc', label: 'А -> Я' },
@@ -233,15 +252,6 @@ export default function GoogleFontsCatalogPanel({
   });
   /** Режим ROW: один образец для всех строк (null — у каждой строки имя семейства). */
   const [googleRowGlobalSample, setGoogleRowGlobalSample] = useState(null);
-  const {
-    selectedKeys: selectedFamilies,
-    setSelectedKeys: setSelectedFamilies,
-    toggleSelectedKey: toggleSelectedFamily,
-    startLongPress: startCardLongPress,
-    onCardClick,
-    clearLongPressTimer,
-    pruneSelection,
-  } = useLongPressMultiSelect({ longPressMs: CARD_LONG_PRESS_MS, isInteractiveTarget });
 
   useEffect(() => {
     onTotalItemsChange?.(items.length);
@@ -586,26 +596,22 @@ export default function GoogleFontsCatalogPanel({
                       rowCatalogPreviewText={googleRowGlobalSample == null ? undefined : googleRowGlobalSample}
                       onRowGlobalSampleCommit={commitGoogleRowGlobalSample}
                       previewText="AaBbCcDdEe"
-                      footerRightTooltipContent="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
+                      footerRightTooltipContent="По метаданным Google Fonts: число статических начертаний в семействе"
                     />
                   );
                 }}
               />
             ) : null}
           </div>
-          {overlayThumb ? (
-            <div className="pointer-events-none absolute right-0 top-2 bottom-2 z-20 w-2" aria-hidden>
-              <div
-                className={`absolute right-1 w-1.5 rounded-full bg-gray-400 transition-opacity duration-200 ${
-                  scrollbarVisible ? 'opacity-90' : 'opacity-0'
-                }`}
-                style={{
-                  top: `${overlayThumb.top}px`,
-                  height: `${overlayThumb.thumbHeight}px`,
-                }}
-              />
-            </div>
-          ) : null}
+          <OverlayScrollbar
+            overlayThumb={overlayThumb}
+            scrollbarVisible={scrollbarVisible}
+            isDragging={isDragging}
+            onTrackPointerDown={onTrackPointerDown}
+            onThumbPointerDown={onThumbPointerDown}
+            onScrollbarPointerMove={onScrollbarPointerMove}
+            onScrollbarPointerUp={onScrollbarPointerUp}
+          />
         </div>
       )}
     </div>

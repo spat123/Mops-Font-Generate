@@ -1,5 +1,13 @@
 // Общие вспомогательные функции для работы со шрифтами
 
+/**
+ * Статический файл (в т.ч. сгенерированный из VF) — одно начертание уже «вшито» в глифы.
+ * Дополнительный font-weight / font-style в CSS даёт синтетическое утолщение/наклон.
+ */
+export function shouldApplyCssWeightStyleForFont(font) {
+  return Boolean(font?.isVariableFont);
+}
+
 // Константы пресетов стилей
 export const PRESET_STYLES = [
   { name: 'Thin', weight: 100, style: 'normal' },
@@ -53,6 +61,17 @@ export function variableFontAllowsItalicPresets(variableAxes, italicMode) {
   return false;
 }
 
+/** Пресет для VF без оси wght (только Morph, wdth и т.п.) — не подставляем фиктивные Bold/Light. */
+export const VARIABLE_FONT_DEFAULT_PRESET = { name: 'Regular', weight: 400, style: 'normal' };
+
+export function variableFontHasWeightAxis(variableAxes) {
+  if (!variableAxes || typeof variableAxes !== 'object') return false;
+  const wght = variableAxes.wght;
+  const wMin = wght && Number.isFinite(Number(wght.min)) ? Number(wght.min) : null;
+  const wMax = wght && Number.isFinite(Number(wght.max)) ? Number(wght.max) : null;
+  return wMin != null && wMax != null;
+}
+
 /**
  * Оставляет только пресеты, совместимые с осями вариативного шрифта (в первую очередь wght).
  * @param {Record<string, { min?: number, max?: number, default?: number }>|null|undefined} variableAxes
@@ -65,23 +84,25 @@ export function filterPresetStylesForVariableAxes(variableAxes, presets = PRESET
     return [...list];
   }
 
+  if (!variableFontHasWeightAxis(variableAxes)) {
+    return [{ ...VARIABLE_FONT_DEFAULT_PRESET }];
+  }
+
   const wght = variableAxes.wght;
-  const wMin = wght && Number.isFinite(Number(wght.min)) ? Number(wght.min) : null;
-  const wMax = wght && Number.isFinite(Number(wght.max)) ? Number(wght.max) : null;
-  const hasWght = wMin != null && wMax != null;
-  const lo = hasWght ? Math.min(wMin, wMax) : null;
-  const hi = hasWght ? Math.max(wMin, wMax) : null;
+  const wMin = Number(wght.min);
+  const wMax = Number(wght.max);
+  const lo = Math.min(wMin, wMax);
+  const hi = Math.max(wMin, wMax);
 
   const allowItalic = variableFontAllowsItalicPresets(variableAxes, options?.italicMode);
 
   const filtered = list.filter((p) => {
     if (!p || typeof p.weight !== 'number') return false;
     if (p.style === 'italic' && !allowItalic) return false;
-    if (!hasWght) return true;
     return p.weight >= lo && p.weight <= hi;
   });
 
-  return filtered.length > 0 ? filtered : [...list];
+  return filtered.length > 0 ? filtered : [{ ...VARIABLE_FONT_DEFAULT_PRESET }];
 }
 
 /**

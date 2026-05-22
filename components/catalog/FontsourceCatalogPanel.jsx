@@ -28,6 +28,7 @@ import { CatalogPanelToolbar } from './CatalogPanelToolbar';
 import { useSelectionActionsEffect } from '../ui/useSelectionActionsEffect';
 import { filterCatalogItems, sortCatalogItems } from '../../utils/catalogFilterSort';
 import { useCatalogEngine } from './useCatalogEngine';
+import { OverlayScrollbar } from '../ui/OverlayScrollbar';
 import { useOverlayScrollbar } from '../ui/useOverlayScrollbar';
 import { addLibraryEntryToLibrary } from '../../utils/libraryEntryActions';
 import {
@@ -153,8 +154,13 @@ export default function FontsourceCatalogPanel({
   const {
     overlayThumb,
     scrollbarVisible,
+    isDragging,
     setScrollElement,
     syncScrollLayout,
+    onTrackPointerDown,
+    onThumbPointerDown,
+    onScrollbarPointerMove,
+    onScrollbarPointerUp,
   } = useOverlayScrollbar();
 
   const handleDragStart = useCallback((event, item) => {
@@ -252,6 +258,7 @@ export default function FontsourceCatalogPanel({
     addingKey: addingSlug,
     recentlyAddedSet: recentlyAddedSlugs,
     exclusionOrder: 'beforeFilterSort',
+    filterPreserveKeys: selectedSlugs,
     filterSortItems: (list, c) => {
       const filtered = filterCatalogItems(list, {
         searchQuery: c.searchQueryTrimmed,
@@ -272,6 +279,8 @@ export default function FontsourceCatalogPanel({
         isVariable: (item) => item?.isVariable,
         filterItalicOnly: c.filterItalicOnly,
         hasItalic: (item) => item?.hasItalic,
+        preserveKeys: selectedSlugs,
+        getPreserveKey: (item) => item?.id || item?.slug,
       });
       return sortCatalogItems(filtered, c.sortMode, sorters, sorters['name-asc']);
     },
@@ -287,7 +296,7 @@ export default function FontsourceCatalogPanel({
         variableFilterId: 'fontsource-filter-var',
         subsetFilterId: 'fontsource-filter-subset',
       },
-      searchPlaceholder: 'Имя, категория, наборы…',
+      searchPlaceholder: 'Имя, категория…',
       sortOptions: [
         { value: 'popular', label: 'Популярное' },
         { value: 'name-asc', label: 'А -> Я' },
@@ -949,19 +958,15 @@ export default function FontsourceCatalogPanel({
               </div>
             ) : null}
           </div>
-          {overlayThumb ? (
-            <div className="pointer-events-none absolute right-0 top-2 bottom-2 z-20 w-2" aria-hidden>
-              <div
-                className={`absolute right-1 w-1.5 rounded-full bg-gray-400 transition-opacity duration-200 ${
-                  scrollbarVisible ? 'opacity-90' : 'opacity-0'
-                }`}
-                style={{
-                  top: `${overlayThumb.top}px`,
-                  height: `${overlayThumb.thumbHeight}px`,
-                }}
-              />
-            </div>
-          ) : null}
+          <OverlayScrollbar
+            overlayThumb={overlayThumb}
+            scrollbarVisible={scrollbarVisible}
+            isDragging={isDragging}
+            onTrackPointerDown={onTrackPointerDown}
+            onThumbPointerDown={onThumbPointerDown}
+            onScrollbarPointerMove={onScrollbarPointerMove}
+            onScrollbarPointerUp={onScrollbarPointerUp}
+          />
         </div>
       )}
       {loadError ? (

@@ -398,7 +398,7 @@ export function LibrarySharePage({ seo, initialPayload = null }) {
             rowPreviewEditorAriaLabel={SHARE_ROW_EDITOR_ARIA}
             pinPreviewColumnClassName="items-start"
             onRowGlobalSampleCommit={(text) => commitRowSample(row.rowKey, text)}
-            footerRightTooltipContent="По метаданным Google Fonts: статические начертания и поднаборы символов (subsets)"
+            footerRightTooltipContent="По метаданным Google Fonts: число статических начертаний в семействе"
           />
         </>
       );

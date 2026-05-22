@@ -8,6 +8,7 @@ import {
 } from '../utils/cssGenerator';
 import { formatFontVariationSettings } from '../utils/fontVariationSettings';
 import { slugifyFontKey } from '../utils/fontSlug';
+import { shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
 
 /** CSS для превью: font-family, variation-settings, FontFace, экспорт строки. */
 export function useFontCss(selectedFont, variableSettings, isSelectedFontVariable) {
@@ -91,8 +92,7 @@ export function useFontCss(selectedFont, variableSettings, isSelectedFontVariabl
       const isAxisItalActive = selectedFont?.italicMode === 'axis-ital' && Number.isFinite(italValueFromSettings) && italValueFromSettings >= 1;
       const wantsItalicStyle = selectedFont?.currentStyle === 'italic' || isAxisItalActive;
       properties.fontStyle = wantsItalicStyle ? 'italic' : 'normal';
-    } else {
-      // Для статических шрифтов добавляем weight и style
+    } else if (shouldApplyCssWeightStyleForFont(selectedFont)) {
       if (selectedFont.currentWeight) {
         properties.fontWeight = selectedFont.currentWeight;
       }

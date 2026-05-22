@@ -44,7 +44,7 @@ function FontsourceCatalogCardComponent({
   const styleCountNum = styleCountRaw == null || styleCountRaw === '' ? NaN : Number(styleCountRaw);
   const hasStyleCount = Number.isFinite(styleCountNum) && styleCountNum > 0;
   const styleCount = hasStyleCount ? styleCountNum : null;
-  const subsetCount = Array.isArray(item?.subsets) ? item.subsets.length : 0;
+  const languageCount = Array.isArray(item?.subsets) ? item.subsets.length : 0;
   const isVariable = Boolean(item?.isVariable);
   const hasItalic = Boolean(item?.hasItalic);
   const libraryEntry = createCatalogLibraryEntry({
@@ -77,9 +77,9 @@ function FontsourceCatalogCardComponent({
     getFontCategoryLabelRu(item?.category) || 'Fontsource',
     isVariable ? 'vf' : null,
     hasItalic ? 'italic' : null,
-    subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
+    languageCount > 0 ? `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}` : null,
     hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
-  ]), [hasItalic, hasStyleCount, isVariable, item?.category, styleCount, subsetCount]);
+  ]), [hasItalic, hasStyleCount, isVariable, item?.category, languageCount, styleCount]);
 
   const footerLeftBadges = useMemo(() => ([
     getFontCategoryLabelRu(item?.category) || 'Fontsource',
@@ -89,8 +89,7 @@ function FontsourceCatalogCardComponent({
 
   const footerRightBadges = useMemo(() => ([
     hasStyleCount ? `${styleCount} ${pluralRu(styleCount, 'начертание', 'начертания', 'начертаний')}` : null,
-    subsetCount > 0 ? `${subsetCount} ${pluralRu(subsetCount, 'набор', 'набора', 'наборов')}` : null,
-  ]), [hasStyleCount, styleCount, subsetCount]);
+  ]), [hasStyleCount, styleCount]);
 
   return (
     <CatalogSourceCard
