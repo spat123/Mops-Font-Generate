@@ -4,4 +4,4 @@ node_modules
 temp/
 fonttools-env/
 .env.local
-.env.production
+Logger.md
