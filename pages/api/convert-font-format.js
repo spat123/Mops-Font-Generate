@@ -5,10 +5,10 @@ import { spawn } from 'child_process';
 import { promisify } from 'util';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import {
-  canRunNodeWorker,
-  mustUseNodeWorkerOnly,
+  canRunWorker,
+  mustUseSubprocessWorkerOnly,
   runWebAlchemyWorker,
-  shouldUseNodeWorkerFirst,
+  shouldUseSubprocessWorkerFirst,
 } from '../../utils/webAlchemyFonttoolsServer';
 
 const writeFile = promisify(fs.writeFile);
@@ -135,13 +135,13 @@ async function convertWithWebAlchemyViaNodeWorker(buffer, targetFormat) {
 }
 
 async function convertWithWebAlchemy(buffer, targetFormat) {
-  if (mustUseNodeWorkerOnly()) {
-    if (!canRunNodeWorker()) {
-      throw new Error('На Bun нужен Node.js (FONT_GEN_NODE_PATH) для конвертации.');
+  if (mustUseSubprocessWorkerOnly()) {
+    if (!canRunWorker()) {
+      throw new Error('Pyodide-worker недоступен (Node/Bun).');
     }
     return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
   }
-  if (shouldUseNodeWorkerFirst()) {
+  if (shouldUseSubprocessWorkerFirst()) {
     try {
       return await convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
     } catch (workerErr) {
@@ -151,7 +151,7 @@ async function convertWithWebAlchemy(buffer, targetFormat) {
   try {
     return await convertWithWebAlchemyInProcess(buffer, targetFormat);
   } catch (inProcessError) {
-    if (canRunNodeWorker()) {
+    if (canRunWorker()) {
       console.warn('[convert-font-format] in-process failed, retry via node worker:', inProcessError?.message);
       return convertWithWebAlchemyViaNodeWorker(buffer, targetFormat);
     }

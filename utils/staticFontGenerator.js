@@ -38,8 +38,8 @@ const generateViaAPI = async (fontBuffer, variableSettings, format = 'woff2', re
       const err = raw ? JSON.parse(raw) : {};
       detail = err.details || err.message || err.error || detail;
       if (err.runtime && typeof err.runtime === 'object') {
-        if (!err.runtime.nodeWorkerBinary) {
-          detail += ' (Node.js не найден на сервере — задайте FONT_GEN_NODE_PATH)';
+        if (!err.runtime.canRunWorker && !err.runtime.workerBinary) {
+          detail += ' (на сервере нет Node/Bun для worker — FONT_GEN_NODE_PATH или bun run build)';
         } else if (err.runtime.workerScriptExists === false) {
           detail += ' (worker-скрипт не задеплоен)';
         }

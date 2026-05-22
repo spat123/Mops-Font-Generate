@@ -18,11 +18,12 @@ curl -s -X POST https://dynamicfont.ru/api/generate-static-font \
 
 Ожидаемо:
 
-- `engine`: `web-alchemy-node` (на Bun) или `web-alchemy` (на Node)
-- `runtime.nodeWorkerBinary`: путь к `node`, не `null`
+- `engine`: `web-alchemy-bun` или `web-alchemy-node`
+- `runtime.workerBinary`: путь к `bun` или `node`, не `null`
+- `runtime.canRunWorker`: `true`
 - `runtime.workerScriptExists`: `true`
 
-Если `nodeWorkerBinary` — `null`, в переменных окружения ONREZA задайте:
+Если `workerBinary` — `null`, в переменных окружения ONREZA задайте:
 
 ```env
 FONT_GEN_NODE_PATH=/usr/bin/node
@@ -78,6 +79,12 @@ next build && node scripts/copy-standalone-font-gen.mjs
 
 ```env
 FONT_GEN_NODE_PATH=/usr/bin/node
+```
+
+Если Node нет, worker запустится через **тот же Bun**, что и приложение (обычно достаточно без env).
+
+```env
+FONT_GEN_BUN_PATH=/usr/bin/bun
 FONT_GEN_CWD=/app
 ```
 

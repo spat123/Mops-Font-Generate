@@ -3,13 +3,14 @@ import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import { consumeStaticGenerationQuota, resolveGenerationQuotaActor } from '../../lib/staticGenerationQuotaServer';
 import { sanitizeVariableSettingsForInstancer } from '../../utils/sanitizeVariableSettingsForInstancer';
 import {
-  canRunNodeWorker,
+  canRunWorker,
   describeWebAlchemyRuntime,
   finalizeWebAlchemyOutput,
   instantiateVariableFontInProcess,
-  mustUseNodeWorkerOnly,
+  mustUseSubprocessWorkerOnly,
+  resolveWebAlchemyEngineLabel,
   runWebAlchemyWorker,
-  shouldUseNodeWorkerFirst,
+  shouldUseSubprocessWorkerFirst,
 } from '../../utils/webAlchemyFonttoolsServer';
 import fs from 'fs';
 import os from 'os';
@@ -265,28 +266,28 @@ async function generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, for
  * На Bun (ONREZA COMPUTE) — отдельный процесс Node, т.к. Pyodide в Bun часто падает.
  */
 async function generateWithWebAlchemy(buffer, variableSettings, format) {
-  if (mustUseNodeWorkerOnly()) {
-    if (!canRunNodeWorker()) {
+  if (mustUseSubprocessWorkerOnly()) {
+    if (!canRunWorker()) {
       throw new Error(
-        'На сервере Bun нет Node.js для Pyodide. Задайте FONT_GEN_NODE_PATH или используйте генерацию в браузере.',
+        'Pyodide-worker недоступен: нет Node/Bun или worker-скрипта. Задайте FONT_GEN_NODE_PATH или проверьте bun run build.',
       );
     }
     return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
   }
 
-  if (shouldUseNodeWorkerFirst()) {
+  if (shouldUseSubprocessWorkerFirst()) {
     try {
       return await generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
     } catch (workerErr) {
-      console.warn('[generate-static-font] node worker failed:', workerErr?.message);
+      console.warn('[generate-static-font] subprocess worker failed:', workerErr?.message);
     }
   }
   try {
     return await generateWithWebAlchemyInProcess(buffer, variableSettings, format);
   } catch (inProcessError) {
-    if (canRunNodeWorker()) {
+    if (canRunWorker()) {
       console.warn(
-        '[generate-static-font] in-process failed, retry via node worker:',
+        '[generate-static-font] in-process failed, retry via subprocess worker:',
         inProcessError?.message,
       );
       return generateWithWebAlchemyViaNodeWorker(buffer, variableSettings, format);
@@ -301,10 +302,6 @@ function safeRuntimeInfo() {
   } catch (e) {
     return { runtimeProbeError: e?.message || String(e) };
   }
-}
-
-function resolveWebAlchemyEngineLabel() {
-  return shouldUseNodeWorkerFirst() ? 'web-alchemy-node' : 'web-alchemy';
 }
 
 /**
@@ -343,8 +340,8 @@ async function handleGenerateStaticFont(req, res) {
       internalRename: Boolean(fontToolsPython),
       formats: [...ALLOWED_FORMATS],
       runtime: safeRuntimeInfo(),
-      hint: mustUseNodeWorkerOnly() && !canRunNodeWorker()
-        ? 'Задайте FONT_GEN_NODE_PATH или используйте браузерную генерацию (fallback).'
+      hint: mustUseSubprocessWorkerOnly() && !canRunWorker()
+        ? 'Задайте FONT_GEN_NODE_PATH или убедитесь, что Bun доступен (FONT_GEN_BUN_PATH).'
         : undefined,
     });
   }
