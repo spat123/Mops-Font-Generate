@@ -142,8 +142,24 @@ export function ensureWorkerScriptPath() {
   return cached;
 }
 
+function hasFonttoolsPackage(dir) {
+  return fs.existsSync(path.join(dir, 'node_modules', '@web-alchemy', 'fonttools', 'package.json'));
+}
+
 function resolveWorkerCwd() {
-  return process.env.FONT_GEN_CWD || process.cwd();
+  if (process.env.FONT_GEN_CWD && hasFonttoolsPackage(process.env.FONT_GEN_CWD)) {
+    return process.env.FONT_GEN_CWD;
+  }
+  const cwd = process.cwd();
+  const candidates = [
+    cwd,
+    path.join(cwd, '.next', 'standalone'),
+    path.dirname(process.execPath || cwd),
+  ];
+  for (const dir of candidates) {
+    if (hasFonttoolsPackage(dir)) return dir;
+  }
+  return process.env.FONT_GEN_CWD || cwd;
 }
 
 function isWoff2Buffer(buf) {
@@ -151,7 +167,34 @@ function isWoff2Buffer(buf) {
   return b.length >= 4 && b[0] === 0x77 && b[1] === 0x4f && b[2] === 0x46 && b[3] === 0x32;
 }
 
-async function runSubprocessWorker(tempDir, args) {
+function formatWorkerFailure(runtime, code, signal, stderr, outputPath) {
+  const prefix = runtime.runtime === 'bun' ? '[bun worker] ' : '[node worker] ';
+  const errText = stderr.trim();
+
+  if (outputPath && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+    return null;
+  }
+
+  if (code === null && signal) {
+    return (
+      `${prefix}процесс остановлен сигналом ${signal}` +
+      (signal === 'SIGKILL' || signal === 'SIGTERM'
+        ? ' (лимит памяти/времени ONREZA — попробуйте меньший шрифт или FONT_GEN_NODE_PATH=/usr/bin/node)'
+        : '') +
+      (errText ? `: ${errText.slice(0, 200)}` : '')
+    );
+  }
+  if (code === null) {
+    return (
+      `${prefix}процесс аварийно завершён (часто OOM или Pyodide не загрузился).` +
+      ` cwd=${resolveWorkerCwd()}.` +
+      (errText ? ` ${errText.slice(0, 200)}` : ' Задайте FONT_GEN_NODE_PATH или FONT_GEN_CWD.')
+    );
+  }
+  return prefix + (errText || `exit ${code}`);
+}
+
+async function runSubprocessWorker(tempDir, args, outputPath) {
   const runtime = resolveWorkerRuntime();
   if (!runtime) {
     throw new Error(
@@ -161,6 +204,7 @@ async function runSubprocessWorker(tempDir, args) {
 
   const workerScript = ensureWorkerScriptPath();
   const workerCwd = resolveWorkerCwd();
+  const nodeModules = path.join(workerCwd, 'node_modules');
 
   if (!fs.existsSync(tempDir)) {
     fs.mkdirSync(tempDir, { recursive: true });
@@ -170,9 +214,14 @@ async function runSubprocessWorker(tempDir, args) {
     const child = spawn(runtime.bin, [workerScript, ...args], {
       cwd: workerCwd,
       windowsHide: true,
-      env: { ...process.env, NODE_ENV: process.env.NODE_ENV || 'production' },
+      env: {
+        ...process.env,
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        NODE_PATH: fs.existsSync(nodeModules) ? nodeModules : process.env.NODE_PATH,
+      },
     });
     let stderr = '';
+    let stdout = '';
     const timer = setTimeout(() => {
       child.kill('SIGTERM');
       reject(new Error(`Таймаут генерации (${DEFAULT_TIMEOUT_MS} мс)`));
@@ -182,16 +231,17 @@ async function runSubprocessWorker(tempDir, args) {
       clearTimeout(timer);
       reject(err);
     });
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
     });
-    child.on('close', (code) => {
+    child.on('close', (code, signal) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
-      else {
-        const prefix = runtime.runtime === 'bun' ? '[bun worker] ' : '[node worker] ';
-        reject(new Error(prefix + (stderr.trim() || `exit ${code}`)));
-      }
+      const failMsg = formatWorkerFailure(runtime, code, signal, stderr || stdout, outputPath);
+      if (failMsg) reject(new Error(failMsg));
+      else resolve();
     });
   });
 
@@ -199,7 +249,11 @@ async function runSubprocessWorker(tempDir, args) {
 }
 
 export async function runWebAlchemyWorker(tempDir, command, inputPath, outputPath, arg3, arg4) {
-  await runSubprocessWorker(tempDir, [command, inputPath, outputPath, arg3, arg4].filter((v) => v !== undefined));
+  const workerArgs = [command, inputPath, outputPath, arg3, arg4].filter((v) => v !== undefined);
+  await runSubprocessWorker(tempDir, workerArgs, outputPath);
+  if (!fs.existsSync(outputPath) || !fs.statSync(outputPath).size) {
+    throw new Error('Worker не создал выходной файл шрифта');
+  }
   return fs.readFileSync(outputPath);
 }
 
@@ -274,11 +328,15 @@ export function describeWebAlchemyRuntime() {
 
   const workerRuntime = resolveWorkerRuntime();
 
+  const workerCwd = resolveWorkerCwd();
+
   return {
     bun: isBunRuntime(),
     nodeVersion: process.version,
     execPath: process.execPath,
     cwd: process.cwd(),
+    workerCwd,
+    fonttoolsInWorkerCwd: hasFonttoolsPackage(workerCwd),
     nodeWorkerBinary: resolveNodeBinary(),
     bunWorkerBinary: resolveBunBinary(),
     workerRuntime: workerRuntime?.runtime || null,

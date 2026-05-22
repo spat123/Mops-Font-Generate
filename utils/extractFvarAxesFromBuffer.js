@@ -62,5 +62,12 @@ export async function extractFvarAxesFromBuffer(fontBuffer) {
  */
 export async function sanitizeSettingsForFontBuffer(variableSettings, fontBuffer) {
   const knownAxes = fontBuffer ? await extractFvarAxesFromBuffer(fontBuffer) : null;
-  return sanitizeVariableSettingsForInstancer(variableSettings, knownAxes);
+  const sanitized = sanitizeVariableSettingsForInstancer(variableSettings, knownAxes);
+  if (knownAxes && Object.keys(sanitized).length === 0) {
+    for (const [tag, axis] of Object.entries(knownAxes)) {
+      const def = Number(axis?.default);
+      if (Number.isFinite(def)) sanitized[tag] = def;
+    }
+  }
+  return sanitized;
 }

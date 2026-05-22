@@ -85,7 +85,15 @@ function formatGenerationError(error) {
   const raw = String(error?.message || error || 'Unknown error');
   const keyMatch = raw.match(/KeyError:\s*'([^']+)'/);
   if (keyMatch) {
-    return `Ось «${keyMatch[1]}» отсутствует в fvar этого файла (лишний параметр в настройках).`;
+    return `Ось «${keyMatch[1]}» отсутствует в fvar этого файла. Откройте «Параметры» и задайте только оси этого шрифта.`;
+  }
+  if (raw.includes('exit null') || raw.includes('SIGKILL') || raw.includes('аварийно завершён')) {
+    return (
+      'Генерация прервана сервером (память или таймаут). Попробуйте WOFF2, меньший VF или добавьте в ONREZA: FONT_GEN_NODE_PATH=/usr/bin/node'
+    );
+  }
+  if (raw.startsWith('[bun worker]') || raw.startsWith('[node worker]')) {
+    return raw.replace(/^\[(bun|node) worker\]\s*/i, '').trim() || raw;
   }
   if (raw.length > 500) return `${raw.slice(0, 500)}…`;
   return raw;

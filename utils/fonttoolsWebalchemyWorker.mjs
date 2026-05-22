@@ -41,6 +41,7 @@ async function cmdSubset(inputPath, outputPath, targetFormat) {
 }
 
 async function main() {
+  console.error('[fonttoolsWebalchemyWorker] cwd=', process.cwd());
   const [cmd, inputPath, outputPath, arg3, arg4] = process.argv.slice(2);
   if (!cmd || !inputPath || !outputPath) {
     throw new Error('usage: fonttoolsWebalchemyWorker.mjs <instantiate|subset> ...');
