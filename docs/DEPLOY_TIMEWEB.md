@@ -18,12 +18,28 @@ apt-get install -y curl bun install
 
 | Параметр | Значение |
 |----------|----------|
-| Сборка | **Dockerfile** из репозитория (не автогенерация с Bun) |
+| Сборка | **только Dockerfile из репозитория** (без шаблона Timeweb) |
 | Контекст | корень репозитория |
 | Порт контейнера | **3000** |
 | Переменные | см. `.env.example` (runtime) |
 
 **Не задавайте** в Install/Build команды с `bun install` — всё уже в Dockerfile.
+
+### Как понять, что Timeweb взял НЕ наш Dockerfile
+
+В логе сборки **плохо** (шаблон Timeweb):
+
+- `node:24-slim`, шаги `[1/7]` … `[7/7]`
+- `Dockerfile:70` и длинный `RUN if [ -f yarn.lock ]... npm ci`
+- ошибка `lock file's jose@4.15.9 does not satisfy jose@6.2.3`
+
+В логе **хорошо** (наш `Dockerfile` из `main`):
+
+- `node:20-bookworm-slim`
+- `FROM ... AS deps` → `RUN npm ci` → `RUN npm run build`
+- строка `[copy-standalone-font-gen] node_modules/jose -> ...`
+
+Если видите шаблон — в панели отключите «автогенерацию» / «дополнить Dockerfile» и оставьте **только файл из Git**.
 
 ---
 
