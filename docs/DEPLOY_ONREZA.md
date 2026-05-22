@@ -39,7 +39,7 @@ ONREZA сама включает `NEXT_PRIVATE_STANDALONE=1` для Next.js — 
 
 | Поле в ONREZA | Рекомендуемое значение | Зачем |
 |---------------|------------------------|--------|
-| **Install** | `bun install` *(или оставить авто)* | Зависимости |
+| **Install** | `bun install` *(или оставить авто)* | Зависимости; в репозитории должен быть актуальный `bun.lock` с `jose` |
 | **Build** | `bun run build` | **Обязательно полный скрипт из `package.json`**, не голый `next build` |
 | **Start** | оставить **авто** (standalone `server.js`) | Обычно ONREZA сама подставляет запуск из манифеста |
 
@@ -69,6 +69,10 @@ next build && node scripts/copy-standalone-font-gen.mjs
 
 ```text
 [copy-standalone-font-gen] utils/fonttoolsWebalchemyWorker.mjs -> .next/standalone/utils/...
+[copy-standalone-font-gen] node_modules/jose -> .next/standalone/node_modules/jose
+```
+
+Если в логе auth `Cannot find package 'jose'` — пересоберите после `bun install` (обновлённый `bun.lock`) или временно в **Build**: `bun run build && cp -r node_modules/jose .next/standalone/node_modules/jose`.
 ```
 
 ### Переменные окружения (ONREZA → Environment)

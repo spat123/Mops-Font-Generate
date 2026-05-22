@@ -18,6 +18,12 @@ const nextConfig = {
         './node_modules/@web-alchemy/fonttools/**/*',
         './utils/fonttoolsWebalchemyWorker.mjs',
       ],
+      // next-auth / openid-client на ONREZA (Bun standalone): без jose → MODULE_NOT_FOUND
+      '/api/auth/[...nextauth]': [
+        './node_modules/jose/**/*',
+        './node_modules/openid-client/**/*',
+        './node_modules/next-auth/**/*',
+      ],
     },
   },
 };
