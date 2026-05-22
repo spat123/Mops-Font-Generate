@@ -18,9 +18,8 @@ import {
   readFreeStaticGenerationsUsed,
   writeFreeStaticGenerationsUsed,
 } from '../utils/freeStaticGenerationQuota';
-import { guessSubfamilyForVariableFont } from '../utils/guessStaticSubfamily';
+import { guessSubfamilyForVariableFont, variableFontHasItalicAxis } from '../utils/guessStaticSubfamily';
 import { sanitizeVariableSettingsForInstancer } from '../utils/sanitizeVariableSettingsForInstancer';
-import { variableFontAllowsItalicPresets } from '../utils/fontUtilsCommon';
 import { getBillingCopy } from '../utils/billingCopy';
 
 const SUBFAMILY_CUSTOM_VALUE = '__custom__';
@@ -199,10 +198,7 @@ export default function GenerateFontModal({
   }, [genSettings, hasWght, selectedFont?.variableAxes]);
 
   const subfamilyPresetOptions = useMemo(() => {
-    const allowItalic = variableFontAllowsItalicPresets(
-      selectedFont?.variableAxes,
-      selectedFont?.italicMode,
-    );
+    const allowItalic = variableFontHasItalicAxis(selectedFont?.variableAxes);
     return [
       ...SUBFAMILY_PRESETS.filter((label) => {
         if (!allowItalic && /italic/i.test(label)) return false;
@@ -210,7 +206,7 @@ export default function GenerateFontModal({
       }).map((label) => ({ value: label, label })),
       { value: SUBFAMILY_CUSTOM_VALUE, label: 'Своё значение…' },
     ];
-  }, [selectedFont?.italicMode, selectedFont?.variableAxes]);
+  }, [selectedFont?.variableAxes]);
 
   useEffect(() => {
     if (!isOpen || !selectedFont) return;

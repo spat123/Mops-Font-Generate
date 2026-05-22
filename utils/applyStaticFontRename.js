@@ -3,6 +3,7 @@
  * На Vercel это делает Python; на ONREZA — opentype.js.
  */
 import opentype from 'opentype.js';
+import { compress } from 'woff2-encoder';
 import decompress from 'woff2-encoder/decompress';
 
 function isWoff2Buffer(buf) {
@@ -58,6 +59,10 @@ function applyOs2Style(font, subfamily, weightClass) {
 async function encodeToFormat(ttfBuffer, format) {
   const want = String(format || 'woff2').toLowerCase();
   if (want === 'ttf' || want === 'otf') return ttfBuffer;
+  if (want === 'woff2') {
+    const out = await compress(Buffer.from(ttfBuffer));
+    return Buffer.from(out.buffer, out.byteOffset, out.byteLength);
+  }
   try {
     const { subset } = await import('@web-alchemy/fonttools');
     const opts = { '*': true };
