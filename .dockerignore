@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+Logger.md
+deploy-logs-*.txt
+.cursor
+terminals
+agent-transcripts
+mcps
+coverage
+.DS_Store
