@@ -158,55 +158,72 @@ export const authOptions = {
       }
       if (account && user) {
         if (account.provider === 'credentials') {
-          const rec = user.email ? await findUserByEmail(user.email) : null;
-          token.provider = 'credentials';
-          token.userId = rec?.id || user.id || token.sub;
-          token.accountCreatedAt = rec?.createdAt || null;
+          try {
+            const rec = user.email ? await findUserByEmail(user.email) : null;
+            token.provider = 'credentials';
+            token.userId = rec?.id || user.id || token.sub;
+            token.accountCreatedAt = rec?.createdAt || null;
+          } catch (err) {
+            console.error('[nextauth] jwt credentials db:', err);
+            token.provider = 'credentials';
+            token.userId = user.id || token.sub;
+            token.accountCreatedAt = null;
+          }
           token.needsLink = false;
           token.pendingLink = null;
         } else {
-          const email = user.email || null;
-          const existing = email ? await findUserByEmail(email) : null;
-          const alreadyLinked =
-            existing &&
-            Array.isArray(existing?.accounts) &&
-            existing.accounts.some(
-              (a) =>
-                String(a?.provider || '').trim() === String(account.provider || '').trim() &&
-                String(a?.providerAccountId || '').trim() === String(account.providerAccountId || '').trim(),
-            );
+          try {
+            const email = user.email || null;
+            const existing = email ? await findUserByEmail(email) : null;
+            const alreadyLinked =
+              existing &&
+              Array.isArray(existing?.accounts) &&
+              existing.accounts.some(
+                (a) =>
+                  String(a?.provider || '').trim() === String(account.provider || '').trim() &&
+                  String(a?.providerAccountId || '').trim() === String(account.providerAccountId || '').trim(),
+              );
 
-          if (existing && !alreadyLinked && String(existing?.provider || '') === 'credentials') {
-            token.needsLink = true;
-            token.pendingLink = {
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-              email: email,
-              name: user.name || null,
-              image: user.image || null,
-            };
-            token.userId = `pending:${account.provider}:${account.providerAccountId}`;
-            token.accountCreatedAt = existing.createdAt || null;
-          } else {
-            token.needsLink = false;
-            token.pendingLink = null;
-            try {
-              const rec = await upsertOAuthUser({
+            if (existing && !alreadyLinked && String(existing?.provider || '') === 'credentials') {
+              token.needsLink = true;
+              token.pendingLink = {
                 provider: account.provider,
                 providerAccountId: account.providerAccountId,
-                email: user.email,
-                name: user.name,
-                image: user.image,
-              });
-              token.userId = rec?.id || user.id || token.sub;
-              token.accountCreatedAt = rec?.createdAt || null;
-            } catch (err) {
-              console.error('[nextauth] upsertOAuthUser failed:', err);
-              const provider = String(account.provider || 'oauth').trim();
-              const accountId = String(account.providerAccountId || user.id || token.sub || '').trim();
-              token.userId = accountId ? `${provider}:${accountId}` : token.sub;
-              token.accountCreatedAt = new Date().toISOString();
+                email: email,
+                name: user.name || null,
+                image: user.image || null,
+              };
+              token.userId = `pending:${account.provider}:${account.providerAccountId}`;
+              token.accountCreatedAt = existing.createdAt || null;
+            } else {
+              token.needsLink = false;
+              token.pendingLink = null;
+              try {
+                const rec = await upsertOAuthUser({
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                  email: user.email,
+                  name: user.name,
+                  image: user.image,
+                });
+                token.userId = rec?.id || user.id || token.sub;
+                token.accountCreatedAt = rec?.createdAt || null;
+              } catch (err) {
+                console.error('[nextauth] upsertOAuthUser failed:', err);
+                const provider = String(account.provider || 'oauth').trim();
+                const accountId = String(account.providerAccountId || user.id || token.sub || '').trim();
+                token.userId = accountId ? `${provider}:${accountId}` : token.sub;
+                token.accountCreatedAt = new Date().toISOString();
+              }
             }
+          } catch (err) {
+            console.error('[nextauth] jwt oauth db:', err);
+            const provider = String(account.provider || 'oauth').trim();
+            const accountId = String(account.providerAccountId || user.id || token.sub || '').trim();
+            token.userId = accountId ? `${provider}:${accountId}` : token.sub;
+            token.accountCreatedAt = new Date().toISOString();
+            token.needsLink = false;
+            token.pendingLink = null;
           }
         }
       }

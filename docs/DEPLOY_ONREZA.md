@@ -81,6 +81,7 @@ next build && node scripts/copy-standalone-font-gen.mjs
 | `NEXTAUTH_SECRET` | случайная строка ≥ 32 символа (`openssl rand -base64 32`) — **обязательна**, иначе `/api/auth/session` → **500** |
 | `NEXT_PUBLIC_SITE_URL` | `https://dynamicfont.ru` |
 | `DATABASE_URL` | Neon или Postgres |
+| `DATABASE_DRIVER` | на ONREZA (Bun) лучше **`postgres`** — TCP-драйвер; без переменной код сам выберет `postgres` на Bun |
 | `AUTH_TRUST_HOST` | `true` — **обязательно на ONREZA** (прокси; иначе `/api/auth/session` → **500**, в консоли `Unexpected token '<'` — приходит HTML-страница ошибки, не JSON) |
 
 `EMAIL_FROM` с пробелами и `<>` задавайте **в кавычках**:
@@ -91,7 +92,12 @@ EMAIL_FROM="DINAMIC FONT <onboarding@resend.dev>"
 
 Переменные должны быть **runtime** (перезапуск после сохранения), не только на этапе build.
 
-Проверка после деплоя: `GET https://dynamicfont.ru/api/auth/session` → **200** и JSON `{ user: null }` или объект пользователя (не 500).
+Проверка после деплоя:
+
+1. `GET https://dynamicfont.ru/api/auth/ping` → JSON с `hasNextAuthSecret: true`, `database.ok: true`
+2. `GET https://dynamicfont.ru/api/auth/session` → **200** и JSON `{ user: null }` или объект пользователя (не 500)
+
+Если Google открывается, но после выбора аккаунта снова **500** / `error=Callback` — чаще всего нет связи с Neon (`database.error` в ping) или не задеплоена сборка с `trustHost: true` в `pages/api/auth/[...nextauth].js`.
 
 ### Vercel после переезда на ONREZA
 
