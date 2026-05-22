@@ -89,7 +89,7 @@ function formatGenerationError(error) {
   }
   if (raw.includes('exit null') || raw.includes('SIGKILL') || raw.includes('аварийно завершён')) {
     return (
-      'Генерация прервана сервером (память или таймаут). Попробуйте WOFF2, меньший VF или добавьте в ONREZA: FONT_GEN_NODE_PATH=/usr/bin/node'
+      'Генерация прервана сервером (память или таймаут). Попробуйте WOFF2, меньший VF; опционально FONT_GEN_NODE_PATH=/usr/bin/node'
     );
   }
   if (raw.startsWith('[bun worker]') || raw.startsWith('[node worker]')) {

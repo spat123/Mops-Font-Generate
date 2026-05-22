@@ -85,10 +85,23 @@ FONT_GEN_NODE_PATH=/usr/bin/node
 
 ```env
 FONT_GEN_BUN_PATH=/usr/bin/bun
-FONT_GEN_CWD=/app
 ```
 
-`FONT_GEN_CWD` — каталог, где лежит `node_modules` и `server.js` (часто корень standalone, уточните в shell: `pwd`).
+**`FONT_GEN_CWD` задавать не обязательно** — код сам ищет каталог с `node_modules/@web-alchemy` (вверх от `process.cwd()`, плюс `/workspace`, `/app`).
+
+На ONREZA в логах сборки путь **`/workspace`**, не `/app`. Если в панели env переменная «не сохраняется» — это нормально: **ничего не нужно**, проверьте probe:
+
+```javascript
+fetch('/api/generate-static-font', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ probe: true }),
+}).then(r => r.json()).then(console.log)
+```
+
+Смотрите `runtime.workerCwd` и `runtime.fonttoolsInWorkerCwd: true`.
+
+Ручной `FONT_GEN_CWD` — только если probe показывает `fonttoolsInWorkerCwd: false` (подставьте значение `runtime.cwd` из probe).
 
 Таймаут тяжёлой генерации (мс):
 

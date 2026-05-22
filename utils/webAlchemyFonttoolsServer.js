@@ -146,20 +146,43 @@ function hasFonttoolsPackage(dir) {
   return fs.existsSync(path.join(dir, 'node_modules', '@web-alchemy', 'fonttools', 'package.json'));
 }
 
-function resolveWorkerCwd() {
-  if (process.env.FONT_GEN_CWD && hasFonttoolsPackage(process.env.FONT_GEN_CWD)) {
-    return process.env.FONT_GEN_CWD;
+function findProjectRootWithFonttools(startDir) {
+  let dir = path.resolve(startDir || process.cwd());
+  for (let i = 0; i < 8; i += 1) {
+    if (hasFonttoolsPackage(dir)) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
+  return null;
+}
+
+/**
+ * Каталог с node_modules/@web-alchemy (без ручного FONT_GEN_CWD на ONREZA).
+ * Сборка ONREZA идёт из /workspace — не /app.
+ */
+function resolveWorkerCwd() {
+  const fromEnv = String(process.env.FONT_GEN_CWD || '').trim();
+  if (fromEnv && hasFonttoolsPackage(fromEnv)) return fromEnv;
+
   const cwd = process.cwd();
+  const execDir = path.dirname(process.execPath || cwd);
   const candidates = [
     cwd,
+    execDir,
     path.join(cwd, '.next', 'standalone'),
-    path.dirname(process.execPath || cwd),
+    path.join(execDir, '.next', 'standalone'),
+    '/workspace',
+    '/app',
+    '/opt/app',
   ];
+
   for (const dir of candidates) {
-    if (hasFonttoolsPackage(dir)) return dir;
+    const hit = findProjectRootWithFonttools(dir);
+    if (hit) return hit;
   }
-  return process.env.FONT_GEN_CWD || cwd;
+
+  return cwd;
 }
 
 function isWoff2Buffer(buf) {
