@@ -18,7 +18,9 @@ import {
   readFreeStaticGenerationsUsed,
   writeFreeStaticGenerationsUsed,
 } from '../utils/freeStaticGenerationQuota';
+import { guessSubfamilyForVariableFont } from '../utils/guessStaticSubfamily';
 import { sanitizeVariableSettingsForInstancer } from '../utils/sanitizeVariableSettingsForInstancer';
+import { variableFontAllowsItalicPresets } from '../utils/fontUtilsCommon';
 import { getBillingCopy } from '../utils/billingCopy';
 
 const SUBFAMILY_CUSTOM_VALUE = '__custom__';
@@ -88,27 +90,6 @@ function mimeForFormat(format) {
   }
 }
 
-function guessWeightName(wght) {
-  const n = typeof wght === 'number' ? wght : Number(wght);
-  if (!Number.isFinite(n)) return 'Regular';
-  if (n <= 150) return 'Thin';
-  if (n <= 250) return 'ExtraLight';
-  if (n <= 350) return 'Light';
-  if (n <= 450) return 'Regular';
-  if (n <= 550) return 'Medium';
-  if (n <= 650) return 'SemiBold';
-  if (n <= 750) return 'Bold';
-  if (n <= 850) return 'ExtraBold';
-  return 'Black';
-}
-
-function guessSubfamily({ wght, ital, slnt }) {
-  const base = guessWeightName(wght);
-  const isItalic = ital === 1 || ital === true || (typeof slnt === 'number' && slnt < 0);
-  if (!isItalic) return base;
-  return base === 'Regular' ? 'Italic' : `${base} Italic`;
-}
-
 /**
  * Генерация статического файла из VF: имя, формат, при необходимости правка веса (wght).
  */
@@ -169,10 +150,10 @@ export default function GenerateFontModal({
     wasOpenRef.current = isOpen;
     if (justOpened && selectedFont) {
       setOutputName(defaultOutputName);
-      const wght = variableSettings?.wght ?? selectedFont?.variableAxes?.wght?.default ?? 400;
-      const ital = variableSettings?.ital;
-      const slnt = variableSettings?.slnt;
-      const guessed = guessSubfamily({ wght, ital, slnt });
+      const guessed = guessSubfamilyForVariableFont(
+        variableSettings && typeof variableSettings === 'object' ? variableSettings : {},
+        selectedFont,
+      );
       const preset = SUBFAMILY_PRESETS.includes(guessed) ? guessed : SUBFAMILY_CUSTOM_VALUE;
       setSubfamilyPreset(preset);
       setCustomSubfamily(preset === SUBFAMILY_CUSTOM_VALUE ? guessed : '');
@@ -216,6 +197,29 @@ export default function GenerateFontModal({
       })
       .sort((a, b) => a.tag.localeCompare(b.tag));
   }, [genSettings, hasWght, selectedFont?.variableAxes]);
+
+  const subfamilyPresetOptions = useMemo(() => {
+    const allowItalic = variableFontAllowsItalicPresets(
+      selectedFont?.variableAxes,
+      selectedFont?.italicMode,
+    );
+    return [
+      ...SUBFAMILY_PRESETS.filter((label) => {
+        if (!allowItalic && /italic/i.test(label)) return false;
+        return true;
+      }).map((label) => ({ value: label, label })),
+      { value: SUBFAMILY_CUSTOM_VALUE, label: 'Своё значение…' },
+    ];
+  }, [selectedFont?.italicMode, selectedFont?.variableAxes]);
+
+  useEffect(() => {
+    if (!isOpen || !selectedFont) return;
+    if (subfamilyPreset === SUBFAMILY_CUSTOM_VALUE) return;
+    const guessed = guessSubfamilyForVariableFont(genSettings, selectedFont);
+    const preset = SUBFAMILY_PRESETS.includes(guessed) ? guessed : SUBFAMILY_CUSTOM_VALUE;
+    setSubfamilyPreset(preset);
+    if (preset === SUBFAMILY_CUSTOM_VALUE) setCustomSubfamily(guessed);
+  }, [genSettings, isOpen, selectedFont, subfamilyPreset]);
 
   const handleBackdropMouseDown = (e) => {
     /** Только реальный клик по затемнению: не закрываем при отпускании кнопки мыши после выделения текста в инпуте (mouseup на оверлее). */
@@ -388,10 +392,7 @@ export default function GenerateFontModal({
                 onChange={(v) => setSubfamilyPreset(v)}
                 disabled={inputInactive || nameReadOnly}
                 aria-label="Начертание (Subfamily)"
-                options={[
-                  ...SUBFAMILY_PRESETS.map((label) => ({ value: label, label })),
-                  { value: SUBFAMILY_CUSTOM_VALUE, label: 'Своё значение…' },
-                ]}
+                options={subfamilyPresetOptions}
               />
             </div>
 

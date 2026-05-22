@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 import { consumeStaticGenerationQuota, resolveGenerationQuotaActor } from '../../lib/staticGenerationQuotaServer';
+import { applyStaticFontRename } from '../../utils/applyStaticFontRename';
 import { sanitizeSettingsForFontBuffer } from '../../utils/extractFvarAxesFromBuffer';
 import {
   canRunWorker,
@@ -89,7 +90,7 @@ function formatGenerationError(error) {
   }
   if (raw.includes('exit null') || raw.includes('SIGKILL') || raw.includes('аварийно завершён')) {
     return (
-      'Генерация прервана сервером (память или таймаут). Попробуйте WOFF2, меньший VF; опционально FONT_GEN_NODE_PATH=/usr/bin/node'
+      'Генерация прервана сервером (память или таймаут). Попробуйте WOFF2, меньший VF или добавьте в ONREZA: FONT_GEN_NODE_PATH=/usr/bin/node'
     );
   }
   if (raw.startsWith('[bun worker]') || raw.startsWith('[node worker]')) {
@@ -438,8 +439,27 @@ async function handleGenerateStaticFont(req, res) {
       });
     }
 
-    // Vercel / окружение без venv
-    const staticFontData = await generateWithWebAlchemy(buffer, instancerOptions, outFormat);
+    const family = sanitizeNameString(rename?.family, 'Font');
+    const subfamily = sanitizeNameString(rename?.subfamily, 'Regular');
+    const postScriptName = sanitizeNameString(rename?.postScriptName, buildPostScriptName(family, subfamily), 63);
+    const weightClass =
+      rename?.weightClass != null && Number.isFinite(Number(rename.weightClass))
+        ? Math.round(Number(rename.weightClass))
+        : undefined;
+
+    let staticFontData = await generateWithWebAlchemy(buffer, instancerOptions, outFormat);
+    let renameApplied = false;
+    try {
+      staticFontData = await applyStaticFontRename(staticFontData, {
+        family,
+        subfamily,
+        postScriptName,
+        weightClass,
+      }, outFormat);
+      renameApplied = true;
+    } catch (renameErr) {
+      console.warn('[generate-static-font] opentype rename failed:', renameErr?.message);
+    }
     await unlink(inputPath).catch(() => {});
 
     const quotaAfter = await consumeStaticGenerationQuota(req, actor);
@@ -449,7 +469,7 @@ async function handleGenerateStaticFont(req, res) {
       size: staticFontData.length,
       format: outFormat,
       engine: resolveWebAlchemyEngineLabel(),
-      renameApplied: false,
+      renameApplied,
       quota: quotaAfter.ok
         ? { limit: quotaAfter.limit, used: quotaAfter.used, remaining: quotaAfter.remaining, period: quotaAfter.period }
         : undefined,
