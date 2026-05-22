@@ -320,11 +320,27 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET?.trim() || undefined,
 };
 
-const nextAuthHandler = NextAuth(authOptions);
+let cachedNextAuthHandler = null;
 
 export default async function handler(req, res) {
   try {
-    return await nextAuthHandler(req, res);
+    if (!cachedNextAuthHandler) {
+      try {
+        cachedNextAuthHandler = NextAuth(authOptions);
+      } catch (err) {
+        console.error('[nextauth] fatal init error:', err);
+        const message = (err?.message || String(err)).slice(0, 800);
+        return res.status(500).json({
+          error: 'NEXTAUTH_INIT_FATAL',
+          message,
+          name: err?.name || null,
+          code: err?.code || null,
+          runtime: process.versions?.bun ? 'bun' : 'node',
+        });
+      }
+    }
+
+    return await cachedNextAuthHandler(req, res);
   } catch (err) {
     console.error('[nextauth] fatal handler error:', err);
     if (res.headersSent) return;
