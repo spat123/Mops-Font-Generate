@@ -7,7 +7,11 @@ const ROOT = path.resolve(__dirname, '..');
 
 // Timeweb/прокси должны подключаться снаружи контейнера.
 // Если слушать localhost, платформа будет видеть "таймаут" и убивать процесс.
-if (!process.env.HOSTNAME) process.env.HOSTNAME = '0.0.0.0';
+// На некоторых платформах переменная HOSTNAME уже задана (имя контейнера),
+// и Next standalone начинает слушать только этот адрес, из-за чего healthcheck по localhost не проходит.
+// Поэтому принудительно слушаем все интерфейсы.
+process.env.HOSTNAME = '0.0.0.0';
+process.env.HOST = '0.0.0.0';
 if (!process.env.PORT) process.env.PORT = '3000';
 
 const standaloneDir = path.join(ROOT, '.next', 'standalone');
