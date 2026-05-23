@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build && node scripts/copy-standalone-font-gen.mjs",
-    "start": "next start",
+    "start": "node scripts/start-standalone.mjs",
     "lint": "next lint",
     "format": "prettier --write ."
   },
