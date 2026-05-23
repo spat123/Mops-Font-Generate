@@ -1,6 +1,7 @@
 /**
- * Копирует worker и pyodide-трейс в .next/standalone после next build.
- * ONREZA/Vercel standalone не включает scripts/ автоматически.
+ * После `next build` (output: 'standalone'):
+ * - public и .next/static → .next/standalone (иначе 404 на /_next/static/*)
+ * - worker / jose для API генерации и NextAuth
  */
 import fs from 'fs';
 import path from 'path';
@@ -23,6 +24,22 @@ function copyDirRecursive(src, dest) {
     if (ent.isDirectory()) copyDirRecursive(from, to);
     else fs.copyFileSync(from, to);
   }
+}
+
+const staticSrc = path.join(ROOT, '.next', 'static');
+const staticDest = path.join(STANDALONE, '.next', 'static');
+if (fs.existsSync(staticSrc)) {
+  copyDirRecursive(staticSrc, staticDest);
+  console.log('[copy-standalone-font-gen] .next/static -> .next/standalone/.next/static');
+} else {
+  console.warn('[copy-standalone-font-gen] skip: no .next/static (run next build first)');
+}
+
+const publicSrc = path.join(ROOT, 'public');
+const publicDest = path.join(STANDALONE, 'public');
+if (fs.existsSync(publicSrc)) {
+  copyDirRecursive(publicSrc, publicDest);
+  console.log('[copy-standalone-font-gen] public -> .next/standalone/public');
 }
 
 const copies = [['utils/fonttoolsWebalchemyWorker.mjs', 'utils/fonttoolsWebalchemyWorker.mjs']];

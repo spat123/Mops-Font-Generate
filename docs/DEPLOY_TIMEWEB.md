@@ -61,6 +61,17 @@ EMAIL_FROM="DINAMIC FONT <onboarding@resend.dev>"
 
 1. `GET https://ваш-домен/api/auth/ping` → `database.ok: true`
 2. `GET https://ваш-домен/api/auth/session` → **200** JSON
+3. В Network **нет** красных **404** на `/_next/static/chunks/*.js` и `/_next/static/css/*.css`
+
+### Белая страница / 404 на `/_next/static/*`
+
+При `output: 'standalone'` Next **не кладёт** CSS/JS в `standalone` автоматически. Нужны каталоги:
+
+- `.next/standalone/.next/static` ← из `.next/static`
+- `.next/standalone/public` ← из `public`
+
+Сборка `npm run build` уже копирует их через `scripts/copy-standalone-font-gen.mjs`.  
+**Build в Timeweb:** `npm run build`, **Start:** `npm start` (не `next start`).
 
 ---
 
