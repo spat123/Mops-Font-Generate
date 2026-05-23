@@ -10,12 +10,23 @@ const ROOT = path.resolve(__dirname, '..');
 if (!process.env.HOSTNAME) process.env.HOSTNAME = '0.0.0.0';
 if (!process.env.PORT) process.env.PORT = '3000';
 
-const standaloneServer = path.join(ROOT, '.next', 'standalone', 'server.js');
+const standaloneDir = path.join(ROOT, '.next', 'standalone');
+const standaloneServer = path.join(standaloneDir, 'server.js');
 
 if (!fs.existsSync(standaloneServer)) {
   console.error('[start-standalone] Missing .next/standalone/server.js. Did you run `npm run build`?');
   process.exit(1);
 }
+
+// В standalone Next ожидает запуск из каталога `.next/standalone`.
+// Иначе могут ломаться относительные пути и резолв модулей.
+process.chdir(standaloneDir);
+
+console.log(
+  `[start-standalone] cwd=${process.cwd()} HOSTNAME=${process.env.HOSTNAME} PORT=${process.env.PORT} runtime=${
+    process.versions?.bun ? 'bun' : 'node'
+  }`,
+);
 
 // Standalone server запускается побочным эффектом при импорте.
 await import(pathToFileURL(standaloneServer).href);
