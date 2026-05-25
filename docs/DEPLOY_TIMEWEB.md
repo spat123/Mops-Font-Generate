@@ -52,6 +52,8 @@ NEXT_PUBLIC_SITE_URL=https://dynamicfont.ru
 DATABASE_URL=<Neon или Postgres>
 AUTH_TRUST_HOST=true
 DATABASE_DRIVER=postgres
+# Опционально: отключить код на почту при каждом входе (только пароль)
+# LOGIN_STEP_UP_DISABLED=1
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 EMAIL_FROM="DINAMIC FONT <onboarding@resend.dev>"

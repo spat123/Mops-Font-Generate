@@ -140,6 +140,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
       const res = await fetch('/api/auth/verify-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ email, code: digits }),
       });
       const data = await res.json().catch(() => ({}));

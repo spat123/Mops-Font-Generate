@@ -251,6 +251,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                 const initRes = await fetch('/api/auth/login-init', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
+                  credentials: 'same-origin',
                   body: JSON.stringify({ email: trimmedLogin, password: trimmedPassword }),
                 });
                 const initData = await initRes.json().catch(() => ({}));
@@ -414,7 +415,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
             {stepUpEmail ? (
               <p className="text-center text-xs text-gray-600">
                 На <span className="font-semibold text-gray-900">{stepUpEmail}</span> пришло письмо{' '}
-                <span className="font-semibold">«Код для входа»</span> (не «Подтвердите email»). Код действует 15 минут.
+                <span className="font-semibold">«Код для входа»</span> — код действует 15 минут (не письмо «Подтвердите email»).
                 {' '}
                 Если писем несколько — берите код только из <span className="font-semibold">последнего</span> такого
                 письма.
