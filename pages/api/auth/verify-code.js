@@ -28,13 +28,29 @@ export default async function handler(req, res) {
       return;
     }
     const user = await confirmEmailByCode(email, code);
-    const { newDeviceId } = await trustDeviceForRequest(req, user.id);
-    res.setHeader('Set-Cookie', deviceCookieHeader(newDeviceId));
+
+    // Почта уже подтверждена в БД — дальше только сессия/устройство.
+    // Ошибки trustDevice/loginToken не должны превращаться в «неверный код».
     let loginToken = null;
-    if (isStepUpLoginAvailable()) {
-      loginToken = await issueLoginToken(user.id);
+    try {
+      const { newDeviceId } = await trustDeviceForRequest(req, user.id);
+      res.setHeader('Set-Cookie', deviceCookieHeader(newDeviceId));
+    } catch (trustErr) {
+      console.error('[verify-code] trustDevice', trustErr);
     }
-    res.status(200).json({ ok: true, loginToken });
+    try {
+      if (isStepUpLoginAvailable()) {
+        loginToken = await issueLoginToken(user.id);
+      }
+    } catch (tokenErr) {
+      console.error('[verify-code] issueLoginToken', tokenErr);
+    }
+
+    res.status(200).json({
+      ok: true,
+      loginToken,
+      needsPasswordSignIn: !loginToken,
+    });
   } catch (e) {
     if (e?.code === 'INVALID_CODE') {
       res.status(400).json({ error: 'Неверный код', code: 'INVALID_CODE' });

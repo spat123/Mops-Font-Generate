@@ -193,6 +193,9 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
           return;
         }
       }
+      if (data?.needsPasswordSignIn) {
+        setMessage('Почта подтверждена. Войдите с email и паролем, которые указали при регистрации.');
+      }
       redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
     } finally {
       setVerifyBusy(false);

@@ -159,10 +159,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                     return;
                   }
                 }
-                void router.replace({
-                  pathname: '/auth/check-email',
-                  query: { email: pendingEmail, callbackUrl },
-                });
+                redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
               } finally {
                 submittingRef.current = false;
                 setSubmitting(false);
