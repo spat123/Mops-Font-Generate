@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { signIn, useSession } from 'next-auth/react';
 import { markHasSignedInBefore } from '../../utils/authReturningUser';
+import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
@@ -73,11 +74,11 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
   useEffect(() => {
     if (status !== 'authenticated') return;
     if (session?.user?.needsLink) {
-      void router.replace({ pathname: '/auth/link', query: { callbackUrl } });
+      redirectAfterAuthQuery('/auth/link', { callbackUrl });
       return;
     }
-    void router.replace(callbackUrl);
-  }, [status, session?.user?.needsLink, router, callbackUrl]);
+    redirectAfterAuth(callbackUrl);
+  }, [status, session?.user?.needsLink, callbackUrl]);
 
   return (
     <>
@@ -154,7 +155,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                   });
                   if (!signInRes?.error) {
                     markHasSignedInBefore();
-                    void router.replace(callbackUrl);
+                    redirectAfterAuth(callbackUrl);
                     return;
                   }
                 }

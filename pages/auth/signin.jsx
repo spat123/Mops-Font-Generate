@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import { hasSignedInBefore, markHasSignedInBefore } from '../../utils/authReturningUser';
+import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
 import { formatRecoveryDeadlineRu } from '../../lib/auth/accountDeletion';
 import {
   AUTH_CODE_INPUT_CLASS,
@@ -114,11 +115,11 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   useEffect(() => {
     if (status !== 'authenticated') return;
     if (session?.user?.needsLink) {
-      void router.replace({ pathname: '/auth/link', query: { callbackUrl } });
+      redirectAfterAuthQuery('/auth/link', { callbackUrl });
       return;
     }
-    void router.replace(callbackUrl);
-  }, [status, session?.user?.needsLink, router, callbackUrl]);
+    redirectAfterAuth(callbackUrl);
+  }, [status, session?.user?.needsLink, callbackUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +144,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
     }
     markHasSignedInBefore();
     const nextUrl = typeof res?.url === 'string' ? res.url : callbackUrl;
-    void router.replace(nextUrl);
+    redirectAfterAuth(nextUrl);
     return true;
   };
 
@@ -153,12 +154,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
       typeof router.query?.loginToken === 'string' ? router.query.loginToken.trim() : '';
     if (!loginToken || autoLoginRef.current) return;
     autoLoginRef.current = true;
-    void (async () => {
-      await finishWithLoginToken(loginToken);
-      const nextQuery = { ...router.query };
-      delete nextQuery.loginToken;
-      void router.replace({ pathname: '/auth/signin', query: nextQuery }, undefined, { shallow: true });
-    })();
+    void finishWithLoginToken(loginToken);
   }, [router.isReady, router.query.loginToken, status]);
 
   return (

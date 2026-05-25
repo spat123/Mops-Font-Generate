@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { markHasSignedInBefore } from '../../utils/authReturningUser';
+import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_CODE_INPUT_CLASS,
@@ -44,6 +45,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
   const [alreadyVerified, setAlreadyVerified] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(Boolean(email));
   const [resendCooldown, setResendCooldown] = useState(0);
+  const skipStatusRedirectRef = React.useRef(false);
 
   const signInHref = {
     pathname: '/auth/signin',
@@ -64,13 +66,10 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (cancelled) return;
+        if (cancelled || skipStatusRedirectRef.current) return;
         if (data?.status === 'verified') {
           setAlreadyVerified(true);
-          void router.replace({
-            pathname: '/auth/signin',
-            query: { verified: '1', callbackUrl },
-          });
+          redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
           return;
         }
         if (data?.status === 'not_found') {
@@ -87,7 +86,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, email, router, callbackUrl]);
+  }, [router.isReady, email, callbackUrl]);
 
   useEffect(() => {
     if (!router.isReady || !email || alreadyVerified) return;
@@ -124,7 +123,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
       }
       if (data?.alreadyVerified) {
         setMessage('Почта уже подтверждена. Переходим ко входу…');
-        void router.replace(signInHref);
+        redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
         return;
       }
       setMessage('Новый код отправлен. Проверьте входящие и спам.');
@@ -151,6 +150,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
       return;
     }
     setVerifyBusy(true);
+    skipStatusRedirectRef.current = true;
     setError('');
     setMessage('');
     try {
@@ -189,13 +189,14 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         });
         if (!signInRes?.error) {
           markHasSignedInBefore();
-          void router.replace(callbackUrl);
+          redirectAfterAuth(callbackUrl);
           return;
         }
       }
-      void router.replace(signInHref);
+      redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
     } finally {
       setVerifyBusy(false);
+      skipStatusRedirectRef.current = false;
     }
   };
 
