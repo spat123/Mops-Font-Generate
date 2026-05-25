@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { markHasSignedInBefore } from '../../utils/authReturningUser';
 import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
+import { completeRegistrationSignIn } from '../../utils/completeRegistrationSignIn';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_CODE_INPUT_CLASS,
@@ -181,21 +181,21 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         setError('Не удалось подтвердить код. Попробуйте ещё раз.');
         return;
       }
-      if (data?.loginToken) {
-        const signInRes = await signIn('credentials', {
-          redirect: false,
-          loginToken: data.loginToken,
-          callbackUrl,
-        });
-        if (!signInRes?.error) {
-          markHasSignedInBefore();
-          redirectAfterAuth(callbackUrl);
-          return;
-        }
+      const signInResult = await completeRegistrationSignIn({
+        email,
+        password: '',
+        loginToken: data?.loginToken,
+        callbackUrl,
+      });
+      if (signInResult.ok) {
+        markHasSignedInBefore();
+        redirectAfterAuth(callbackUrl);
+        return;
       }
-      if (data?.needsPasswordSignIn) {
-        setMessage('Почта подтверждена. Войдите с email и паролем, которые указали при регистрации.');
-      }
+      setMessage(
+        data?.hint ||
+          'Почта подтверждена. Войдите с email и паролем, которые указывали при регистрации.',
+      );
       redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
     } finally {
       setVerifyBusy(false);

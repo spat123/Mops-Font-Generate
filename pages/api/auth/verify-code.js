@@ -46,10 +46,17 @@ export default async function handler(req, res) {
       console.error('[verify-code] issueLoginToken', tokenErr);
     }
 
+    const needsPasswordSignIn = !loginToken;
     res.status(200).json({
       ok: true,
       loginToken,
-      needsPasswordSignIn: !loginToken,
+      needsPasswordSignIn,
+      ...(needsPasswordSignIn && !isPostgresEnabled()
+        ? {
+            hint:
+              'Почта подтверждена. Для автоматического входа на сервере нужен DATABASE_URL (Neon/Postgres). Пока войдите с паролем на странице входа.',
+          }
+        : {}),
     });
   } catch (e) {
     if (e?.code === 'INVALID_CODE') {

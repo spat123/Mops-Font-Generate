@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { markHasSignedInBefore } from '../../utils/authReturningUser';
 import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
+import { completeRegistrationSignIn } from '../../utils/completeRegistrationSignIn';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
@@ -147,17 +148,26 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                   setFormError('Не удалось подтвердить код. Попробуйте ещё раз.');
                   return;
                 }
-                if (data?.loginToken) {
-                  const signInRes = await signIn('credentials', {
-                    redirect: false,
-                    loginToken: data.loginToken,
-                    callbackUrl,
-                  });
-                  if (!signInRes?.error) {
-                    markHasSignedInBefore();
-                    redirectAfterAuth(callbackUrl);
-                    return;
-                  }
+                const signInResult = await completeRegistrationSignIn({
+                  email: pendingEmail,
+                  password,
+                  loginToken: data?.loginToken,
+                  callbackUrl,
+                });
+                if (signInResult.ok) {
+                  markHasSignedInBefore();
+                  redirectAfterAuth(callbackUrl);
+                  return;
+                }
+                if (signInResult.reason === 'step-up') {
+                  setFormError(
+                    'Почта подтверждена. На сервере включён код при входе с нового устройства — войдите с паролем (может прийти «Код для входа»).',
+                  );
+                } else {
+                  setFormError(
+                    data?.hint ||
+                      'Почта подтверждена, но автоматический вход не удался. Войдите с тем же email и паролем.',
+                  );
                 }
                 redirectAfterAuthQuery('/auth/signin', { verified: '1', callbackUrl });
               } finally {
