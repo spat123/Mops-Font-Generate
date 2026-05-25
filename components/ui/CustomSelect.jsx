@@ -272,21 +272,26 @@ export const CustomSelect = forwardRef(function CustomSelect(
             const isSelected = multiple
               ? selectedValues.includes(String(opt.value))
               : String(opt.value) === String(value);
+            const isOptionDisabled = Boolean(opt.disabled);
             return (
               <li
                 key={`${opt.value}-${i}`}
                 role="option"
                 aria-selected={isSelected}
+                aria-disabled={isOptionDisabled || undefined}
                 style={opt.style}
                 className={[
-                  'group break-words cursor-pointer border-b border-gray-200 p-3 text-left text-sm font-semibold uppercase text-gray-900 transition-colors last:border-b-0',
-                  'hover:bg-accent hover:text-white',
-                  isSelected ? 'bg-accent text-white' : '',
+                  'group break-words border-b border-gray-200 p-3 text-left text-sm font-semibold uppercase text-gray-900 transition-colors last:border-b-0',
+                  isOptionDisabled
+                    ? 'cursor-not-allowed opacity-45'
+                    : 'cursor-pointer hover:bg-accent hover:text-white',
+                  isSelected && !isOptionDisabled ? 'bg-accent text-white' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
                 onMouseDown={(e) => {
                   e.preventDefault();
+                  if (isOptionDisabled) return;
                   handlePick(opt.value);
                 }}
               >

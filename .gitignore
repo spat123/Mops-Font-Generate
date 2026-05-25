@@ -3,5 +3,7 @@ node_modules
 .next
 temp/
 fonttools-env/
+.env
 .env.local
+.env*.local
 Logger.md

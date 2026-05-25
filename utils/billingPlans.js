@@ -75,6 +75,7 @@ export function getFreePlanFeatures(locale = 'RU') {
       `Up to ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} font libraries`,
       'Google Fonts, Fontsource, and local uploads',
       'Preview modes: Plain, Waterfall, Glyphs, Styles',
+      'Waterfall: preset scale ratios (custom scale — Pro)',
       'CSS export with @font-face (.css / .txt)',
       `${FREE_STATIC_GENERATIONS_LIMIT} variable→static exports per month`,
       `Share links (up to ${MAX_SHARE_FONTS_FREE} fonts per link) and ZIP download`,
@@ -84,6 +85,7 @@ export function getFreePlanFeatures(locale = 'RU') {
     `До ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} библиотек`,
     'Google Fonts, Fontsource и локальные файлы',
     'Режимы превью: Plain, Waterfall, Glyphs, Styles',
+    'Waterfall: готовые шкалы (своё значение — Pro)',
     'Экспорт CSS с @font-face (.css / .txt)',
     `${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц`,
     `Ссылки «Поделиться» (до ${MAX_SHARE_FONTS_FREE} шрифтов в ссылке) и архив`,
@@ -97,6 +99,7 @@ export function getProPlanFeatures(locale = 'RU') {
     return [
       `Up to ${MAX_SAVED_LIBRARIES_PRO_ACCOUNT} libraries (Free: ${MAX_SAVED_LIBRARIES_PER_ACCOUNT})`,
       'Unlimited variable→static exports',
+      'Waterfall: custom scale ratio (any value 1.001–3)',
       'Your own font name and style when exporting static files from VF',
       'Priority updates and early access to new features',
       'Unlimited fonts per «Share» link',
@@ -105,6 +108,7 @@ export function getProPlanFeatures(locale = 'RU') {
   return [
     `До ${MAX_SAVED_LIBRARIES_PRO_ACCOUNT} библиотек (на Free — ${MAX_SAVED_LIBRARIES_PER_ACCOUNT})`,
     'Без лимита генераций VF → статик',
+    'Waterfall: своё значение шкалы (коэффициент 1.001–3)',
     'Своё имя и стиль шрифта при экспорте статики из VF',
     'Приоритетные обновления и ранний доступ к новым фичам',
     'Неограниченное число шрифтов в ссылке «Поделиться»',

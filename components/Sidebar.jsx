@@ -22,6 +22,13 @@ import { customSelectTriggerClass } from './ui/nativeSelectFieldClasses';
 import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
 import { AppButton } from './ui/AppButton';
+import { useLibraryAuth } from '../contexts/LibraryAuthContext';
+import {
+  WATERFALL_SCALE_PRESETS,
+  DEFAULT_WATERFALL_SCALE_PRESET,
+  getWaterfallScaleSelectKeyForRatio,
+  isWaterfallCustomScaleRatio,
+} from '../utils/waterfallScalePresets';
 
 const sidebarSelectClass = customSelectTriggerClass({ compact: true });
 
@@ -39,17 +46,6 @@ const GLYPH_QUICK_PRESETS = [
   { key: 'windows1252', label: 'Windows' },
   { key: 'latin_extended', label: 'Latin Ext. A' },
   { key: 'latin_supplement', label: 'Latin-1 доп.' },
-];
-
-const WATERFALL_SCALE_PRESETS = [
-  { key: 'minor-second', ratio: 1.067, label: '1.067 - Minor Second' },
-  { key: 'major-second', ratio: 1.125, label: '1.125 - Major Second' },
-  { key: 'minor-third', ratio: 1.2, label: '1.200 - Minor Third' },
-  { key: 'major-third', ratio: 1.25, label: '1.250 - Major Third' },
-  { key: 'perfect-fourth', ratio: 1.333, label: '1.333 - Perfect Fourth' },
-  { key: 'augmented-fourth', ratio: 1.414, label: '1.414 - Augmented Fourth' },
-  { key: 'perfect-fifth', ratio: 1.5, label: '1.500 - Perfect Fifth' },
-  { key: 'golden-ratio', ratio: 1.618, label: '1.618 - Golden Ratio' },
 ];
 
 function getSidebarFontSizeControl({
@@ -841,6 +837,7 @@ export default function Sidebar({
     setViewMode,
 } = useSettings();
 
+  const { isPro, openPlans } = useLibraryAuth();
   const { resetSelectedFontState, fonts: sessionFonts } = useFontContext();
   const isGlyphsView = viewMode === 'glyphs';
   const isStylesView = viewMode === 'styles';
@@ -893,12 +890,10 @@ export default function Sidebar({
     setLineHeight,
   });
 
-  const waterfallScaleKey = useMemo(() => {
-    const r = Number(waterfallScaleRatio);
-    if (!Number.isFinite(r)) return 'custom';
-    const hit = WATERFALL_SCALE_PRESETS.find((p) => Math.abs(p.ratio - r) <= 0.0005);
-    return hit ? hit.key : 'custom';
-  }, [waterfallScaleRatio]);
+  const waterfallScaleKey = useMemo(
+    () => getWaterfallScaleSelectKeyForRatio(waterfallScaleRatio),
+    [waterfallScaleRatio],
+  );
   const [waterfallScaleSelectKey, setWaterfallScaleSelectKey] = useState(waterfallScaleKey);
   const quickPresetSections = [
     { kind: 'sample', presets: SAMPLE_QUICK_PRESETS },
@@ -908,6 +903,13 @@ export default function Sidebar({
   useEffect(() => {
     setWaterfallScaleSelectKey((prev) => (prev === 'custom' ? prev : waterfallScaleKey));
   }, [waterfallScaleKey]);
+
+  useEffect(() => {
+    if (isPro) return;
+    if (waterfallScaleSelectKey !== 'custom' && !isWaterfallCustomScaleRatio(waterfallScaleRatio)) return;
+    setWaterfallScaleSelectKey(DEFAULT_WATERFALL_SCALE_PRESET.key);
+    setWaterfallScaleRatio(DEFAULT_WATERFALL_SCALE_PRESET.ratio);
+  }, [isPro, waterfallScaleSelectKey, waterfallScaleRatio, setWaterfallScaleRatio]);
 
   /** Выбранный быстрый пресет: `sample:*` или `glyph:*` (`glyph:entire` по умолчанию). */
   const [sidebarTextPreset, setSidebarTextPreset] = useState('glyph:entire');
@@ -1878,6 +1880,10 @@ export default function Sidebar({
                   value={waterfallScaleSelectKey}
                   onChange={(v) => {
                     if (v === 'custom') {
+                      if (!isPro) {
+                        openPlans?.();
+                        return;
+                      }
                       setWaterfallScaleSelectKey('custom');
                       return;
                     }
@@ -1889,12 +1895,17 @@ export default function Sidebar({
                   }}
                   options={[
                     ...WATERFALL_SCALE_PRESETS.map((p) => ({ value: p.key, label: p.label })),
-                    { value: 'custom', label: 'Своё значение', rightLabel: 'Pro' },
+                    {
+                      value: 'custom',
+                      label: 'Своё значение',
+                      rightLabel: 'Pro',
+                      disabled: !isPro,
+                    },
                   ]}
                   className={sidebarSelectClass}
                   aria-label="Waterfall: шкала"
                 />
-                {waterfallScaleSelectKey === 'custom' ? (
+                {isPro && waterfallScaleSelectKey === 'custom' ? (
                   <div className="flex min-w-0 items-center gap-2">
                     <input
                       type="number"

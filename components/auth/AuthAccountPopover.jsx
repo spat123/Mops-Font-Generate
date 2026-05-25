@@ -220,10 +220,10 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
     typeof librariesCount === 'number' && typeof librariesLimit === 'number' ? librariesCount >= librariesLimit : false;
 
   const planBlurb = isPro
-    ? 'Расширенные лимиты. В ссылке «Поделиться» — без ограничения по числу шрифтов.'
+    ? 'Расширенные лимиты, своё значение шкалы Waterfall и без лимита шрифтов в «Поделиться».'
     : typeof librariesLimit === 'number'
-      ? `До ${librariesLimit} библиотек, ${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц и до ${MAX_SHARE_FONTS_FREE} шрифтов в одной ссылке «Поделиться».`
-      : 'Лимиты тарифа Free: библиотеки, генерации и «Поделиться».';
+      ? `До ${librariesLimit} библиотек, ${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц, до ${MAX_SHARE_FONTS_FREE} шрифтов в ссылке «Поделиться». Waterfall — только пресеты шкалы.`
+      : 'Лимиты тарифа Free: библиотеки, генерации, «Поделиться», Waterfall — пресеты шкалы.';
 
   const accountTriggerTooltip = loading
     ? 'Загрузка сессии…'
@@ -377,11 +377,13 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                                   Поделиться:{' '}
                                   <span className="tabular-nums text-gray-800">до {MAX_SHARE_FONTS_FREE} в ссылке</span>
                                 </span>
+                                <span className="text-gray-600">Waterfall: пресеты шкалы</span>
                               </>
                             ) : (
                               <>
                                 <span className="text-gray-600">Генерация: без лимита</span>
                                 <span className="text-gray-600">Поделиться: без лимита</span>
+                                <span className="text-gray-600">Waterfall: своё значение шкалы</span>
                               </>
                             )}
                           </>

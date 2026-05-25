@@ -243,7 +243,8 @@ function CollapsedLibraryRail({
   onOpenLibrary,
   onRequestCreateLibrary,
 }) {
-  const { openPlans, canCreateNewLibrary, libraryLimitReached, isAuthenticated, authLoading } = useLibraryAuth();
+  const { openPlans, canCreateNewLibrary, libraryLimitReached, isAuthenticated, authLoading, isPro } =
+    useLibraryAuth();
   const showLimitUpgrade = libraryLimitReached;
   const showAddLibrary = Boolean(onRequestCreateLibrary) && !showLimitUpgrade;
   const libs = Array.isArray(libraries) ? libraries : [];
@@ -1227,9 +1228,13 @@ export function CollapsedSidebarControls({
         <>
           <div ref={collapsedScalePopoverRef} className="relative flex w-full justify-center">
             <Tooltip
-              content={`Waterfall scale: ${
-                activeWaterfallScalePreset?.label || 'Custom'
-              }`}
+              content={
+                activeWaterfallScalePreset?.label
+                  ? `Waterfall scale: ${activeWaterfallScalePreset.label}`
+                  : isPro
+                    ? `Waterfall scale: ${Number(waterfallScaleRatio).toFixed(3)} (своё)`
+                    : 'Своё значение шкалы — только Pro. Выберите пресет из списка.'
+              }
               as="div"
               className="w-full"
             >
