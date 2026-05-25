@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
+import { markHasSignedInBefore } from '../../utils/authReturningUser';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
+  AUTH_CODE_INPUT_CLASS,
   AUTH_INPUT_CLASS,
   AUTH_FORM_ERROR_CLASS,
   AUTH_FORM_SUCCESS_CLASS,
@@ -33,6 +35,9 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
   const [formError, setFormError] = React.useState('');
   const [deletedRecover, setDeletedRecover] = React.useState(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [phase, setPhase] = React.useState('form');
+  const [pendingEmail, setPendingEmail] = React.useState('');
+  const [verifyCode, setVerifyCode] = React.useState('');
   const submittingRef = React.useRef(false);
 
   const restoreDeletedAccount = async () => {
@@ -92,6 +97,84 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
           <AuthDividerOr />
         </div>
 
+        {phase === 'verify' ? (
+          <form
+            className="mt-6 flex flex-col gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (submittingRef.current || !pendingEmail) return;
+              submittingRef.current = true;
+              setFormError('');
+              setSubmitting(true);
+              try {
+                const digits = String(verifyCode || '').replace(/\D/g, '');
+                if (digits.length !== 6) {
+                  setFormError('Введите 6 цифр из письма «Подтвердите email».');
+                  return;
+                }
+                const res = await fetch('/api/auth/verify-code', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ email: pendingEmail, code: digits }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 400 && data?.code === 'TOKEN_EXPIRED') {
+                  setFormError('Код устарел. Запросите новое письмо.');
+                  return;
+                }
+                if (!res.ok) {
+                  setFormError('Неверный код. Проверьте письмо или запросите новый на странице почты.');
+                  return;
+                }
+                if (data?.loginToken) {
+                  const signInRes = await signIn('credentials', {
+                    redirect: false,
+                    loginToken: data.loginToken,
+                    callbackUrl,
+                  });
+                  if (!signInRes?.error) {
+                    markHasSignedInBefore();
+                    void router.replace(callbackUrl);
+                    return;
+                  }
+                }
+                void router.replace({
+                  pathname: '/auth/check-email',
+                  query: { email: pendingEmail, callbackUrl },
+                });
+              } finally {
+                submittingRef.current = false;
+                setSubmitting(false);
+              }
+            }}
+          >
+            <p className="text-center text-sm text-gray-600">
+              Код отправлен на <span className="font-semibold text-gray-900">{pendingEmail}</span>. Введите его ниже —
+              после подтверждения вы сразу войдёте в аккаунт.
+            </p>
+            <input
+              value={verifyCode}
+              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              placeholder="000000"
+              className={AUTH_CODE_INPUT_CLASS}
+              disabled={submitting}
+            />
+            {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
+            <AuthSubmitButton loading={submitting}>Подтвердить и войти</AuthSubmitButton>
+            <Link
+              href={{
+                pathname: '/auth/check-email',
+                query: { email: pendingEmail, callbackUrl },
+              }}
+              className="text-center text-xs font-medium text-gray-600 underline underline-offset-2"
+            >
+              Отправить код снова
+            </Link>
+          </form>
+        ) : (
         <form
           className="mt-6 flex flex-col gap-3"
           onSubmit={async (e) => {
@@ -161,10 +244,9 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                 return;
               }
 
-              void router.replace({
-                pathname: '/auth/check-email',
-                query: { email: emailForCheck, callbackUrl },
-              });
+              setPendingEmail(emailForCheck);
+              setVerifyCode('');
+              setPhase('verify');
             } finally {
               submittingRef.current = false;
               setSubmitting(false);
@@ -236,6 +318,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
             </>
           )}
         </form>
+        )}
 
         <p className="mt-8 text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-900">
           Уже есть аккаунт?{' '}

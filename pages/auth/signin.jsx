@@ -53,6 +53,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
   const [submitting, setSubmitting] = React.useState(false);
   const [deletedRecover, setDeletedRecover] = React.useState(null);
   const submittingRef = React.useRef(false);
+  const autoLoginRef = React.useRef(false);
 
   const restoreDeletedAccount = async () => {
     if (submittingRef.current) return;
@@ -146,6 +147,20 @@ export default function AuthSignInPage({ isRuGeo = false }) {
     return true;
   };
 
+  useEffect(() => {
+    if (!router.isReady || status === 'loading' || status === 'authenticated') return;
+    const loginToken =
+      typeof router.query?.loginToken === 'string' ? router.query.loginToken.trim() : '';
+    if (!loginToken || autoLoginRef.current) return;
+    autoLoginRef.current = true;
+    void (async () => {
+      await finishWithLoginToken(loginToken);
+      const nextQuery = { ...router.query };
+      delete nextQuery.loginToken;
+      void router.replace({ pathname: '/auth/signin', query: nextQuery }, undefined, { shallow: true });
+    })();
+  }, [router.isReady, router.query.loginToken, status]);
+
   return (
     <>
       <Head>
@@ -163,7 +178,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
               : 'Добро пожаловать!'}
         </p>
 
-        {verifiedStatus === '1' ? (
+        {verifiedStatus === '1' && !router.query?.loginToken ? (
           <p className={`mt-6 ${AUTH_FORM_SUCCESS_CLASS}`}>Регистрация и подтверждение завершены. Теперь можно войти.</p>
         ) : null}
         {passwordResetDone ? (
@@ -373,7 +388,7 @@ export default function AuthSignInPage({ isRuGeo = false }) {
                 }
                 if (verifyRes.status === 400 && verifyData?.code === 'INVALID_CODE') {
                   setFormError(
-                    'Неверный код. Используйте последнее письмо (все 6 цифр, ведущие нули тоже). Или войдите снова для нового кода.',
+                    'Неверный код. Нужен код из письма «Код для входа», не из регистрации. Все 6 цифр, ведущие нули тоже. Или нажмите «Назад к паролю» и войдите снова — придёт новый код.',
                   );
                   return;
                 }
@@ -398,16 +413,18 @@ export default function AuthSignInPage({ isRuGeo = false }) {
           >
             {stepUpEmail ? (
               <p className="text-center text-xs text-gray-600">
-                Код отправлен на <span className="font-semibold text-gray-900">{stepUpEmail}</span>.
+                На <span className="font-semibold text-gray-900">{stepUpEmail}</span> пришло письмо{' '}
+                <span className="font-semibold">«Код для входа»</span> (не «Подтвердите email»). Код действует 15 минут.
                 {' '}
-                Если писем несколько — введите код только из <span className="font-semibold">последнего</span>.
+                Если писем несколько — берите код только из <span className="font-semibold">последнего</span> такого
+                письма.
               </p>
             ) : null}
             <label
               htmlFor="login-code"
               className="text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500"
             >
-              Код из письма
+              Код для входа
             </label>
             <input
               id="login-code"

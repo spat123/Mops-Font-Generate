@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { markHasSignedInBefore } from '../../utils/authReturningUser';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_CODE_INPUT_CLASS,
@@ -146,8 +148,20 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         return;
       }
       if (!res.ok) {
-        setError('Неверный код. Проверьте письмо или запросите новый.');
+        setError('Неверный код. Проверьте письмо «Подтвердите email» или запросите новый.');
         return;
+      }
+      if (data?.loginToken) {
+        const signInRes = await signIn('credentials', {
+          redirect: false,
+          loginToken: data.loginToken,
+          callbackUrl,
+        });
+        if (!signInRes?.error) {
+          markHasSignedInBefore();
+          void router.replace(callbackUrl);
+          return;
+        }
       }
       void router.replace(signInHref);
     } finally {
@@ -187,8 +201,8 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
             )
           ) : email ? (
             <>
-              На <span className="font-semibold text-gray-900">{email}</span> отправлен 6-значный код и ссылка для
-              подтверждения. Введите код ниже или перейдите по ссылке в письме.
+              На <span className="font-semibold text-gray-900">{email}</span> отправлен код из письма{' '}
+              <span className="font-semibold">«Подтвердите email»</span>. После ввода вы сразу войдёте в аккаунт.
             </>
           ) : (
             <>В письме — 6-значный код и ссылка. Введите код ниже или откройте ссылку из письма.</>
@@ -207,7 +221,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
           <>
             <form className="mt-8 flex flex-col gap-3" onSubmit={verifyByCode}>
               <label htmlFor="verify-code" className="text-center text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-500">
-                Код из письма
+                Код подтверждения регистрации
               </label>
               <input
                 id="verify-code"
@@ -220,7 +234,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
                 className={AUTH_CODE_INPUT_CLASS}
                 disabled={verifyBusy}
               />
-              <AuthSubmitButton loading={verifyBusy}>Подтвердить</AuthSubmitButton>
+              <AuthSubmitButton loading={verifyBusy}>Подтвердить и войти</AuthSubmitButton>
             </form>
 
             <div className="mt-6">

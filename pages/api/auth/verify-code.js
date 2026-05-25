@@ -1,6 +1,11 @@
 import { confirmEmailByCode } from '../../../lib/auth/userStore';
 import { isPostgresEnabled } from '../../../lib/auth/db';
-import { deviceCookieHeader, trustDeviceForRequest } from '../../../lib/auth/loginStepUp';
+import {
+  deviceCookieHeader,
+  trustDeviceForRequest,
+  issueLoginToken,
+  isStepUpLoginAvailable,
+} from '../../../lib/auth/loginStepUp';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -20,7 +25,11 @@ export default async function handler(req, res) {
     const user = await confirmEmailByCode(email, code);
     const { newDeviceId } = await trustDeviceForRequest(req, user.id);
     res.setHeader('Set-Cookie', deviceCookieHeader(newDeviceId));
-    res.status(200).json({ ok: true });
+    let loginToken = null;
+    if (isStepUpLoginAvailable()) {
+      loginToken = await issueLoginToken(user.id);
+    }
+    res.status(200).json({ ok: true, loginToken });
   } catch (e) {
     if (e?.code === 'INVALID_CODE') {
       res.status(400).json({ error: 'Неверный код', code: 'INVALID_CODE' });
