@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true });
   } catch (e) {
     if (e?.code === 'ALREADY_VERIFIED') {
-      res.status(200).json({ ok: true });
+      res.status(200).json({ ok: true, alreadyVerified: true });
       return;
     }
     if (e?.code === 'NOT_FOUND') {

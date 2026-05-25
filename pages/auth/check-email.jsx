@@ -113,13 +113,18 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         if (res.status === 404 && data?.code === 'NOT_FOUND') {
           setError(data?.error || 'Аккаунт не найден на сервере. Настройте DATABASE_URL и зарегистрируйтесь заново.');
           return;
         }
         setError('Не удалось отправить письмо. Попробуйте позже.');
+        return;
+      }
+      if (data?.alreadyVerified) {
+        setMessage('Почта уже подтверждена. Переходим ко входу…');
+        void router.replace(signInHref);
         return;
       }
       setMessage('Новый код отправлен. Проверьте входящие и спам.');
@@ -165,7 +170,15 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         return;
       }
       if (!res.ok) {
-        setError('Неверный код. Проверьте письмо «Подтвердите email» или запросите новый.');
+        if (res.status >= 500) {
+          setError('Ошибка сервера при проверке кода. Обновите страницу и попробуйте снова — почта могла уже подтвердиться.');
+          return;
+        }
+        if (data?.code === 'INVALID_CODE') {
+          setError('Неверный код. Проверьте письмо «Подтвердите email» или запросите новый.');
+          return;
+        }
+        setError('Не удалось подтвердить код. Попробуйте ещё раз.');
         return;
       }
       if (data?.loginToken) {

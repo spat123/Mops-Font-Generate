@@ -133,8 +133,17 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                   return;
                 }
                 if (!res.ok) {
-                  setFormError('Неверный код. Проверьте письмо или запросите новый на странице почты.');
-                  setFormMessage('Важно: если вы нажали «Отправить код снова», используйте код только из последнего письма.');
+                  if (res.status >= 500) {
+                    setFormError(
+                      'Ошибка сервера при проверке кода. Обновите страницу — почта могла уже подтвердиться, тогда войдите с паролем.',
+                    );
+                    return;
+                  }
+                  if (data?.code === 'INVALID_CODE') {
+                    setFormError('Неверный код. Проверьте письмо «Подтвердите email» или запросите новый.');
+                    return;
+                  }
+                  setFormError('Не удалось подтвердить код. Попробуйте ещё раз.');
                   return;
                 }
                 if (data?.loginToken) {

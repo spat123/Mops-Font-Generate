@@ -24,6 +24,10 @@ const nextConfig = {
         './node_modules/openid-client/**/*',
         './node_modules/next-auth/**/*',
       ],
+      '/api/auth/verify-code': ['./lib/auth/**/*'],
+      '/api/auth/verify-email': ['./lib/auth/**/*'],
+      '/api/auth/login-init': ['./lib/auth/**/*'],
+      '/api/auth/login-verify': ['./lib/auth/**/*'],
     },
   },
 };

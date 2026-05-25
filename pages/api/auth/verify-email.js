@@ -1,10 +1,6 @@
 import { confirmEmailByToken } from '../../../lib/auth/userStore';
-import {
-  deviceCookieHeader,
-  trustDeviceForRequest,
-  issueLoginToken,
-  isStepUpLoginAvailable,
-} from '../../../lib/auth/loginStepUp';
+import { deviceCookieHeader, trustDeviceForRequest } from '../../../lib/auth/loginStepUp';
+import { issueLoginToken, isStepUpLoginAvailable } from '../../../lib/auth/stepUpLogin';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
