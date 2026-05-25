@@ -25,8 +25,17 @@ export default async function handler(req, res) {
     });
     res.status(200).json({ ok: true });
   } catch (e) {
-    if (e?.code === 'NOT_FOUND' || e?.code === 'ALREADY_VERIFIED') {
+    if (e?.code === 'ALREADY_VERIFIED') {
       res.status(200).json({ ok: true });
+      return;
+    }
+    if (e?.code === 'NOT_FOUND') {
+      res.status(404).json({
+        ok: false,
+        code: 'NOT_FOUND',
+        error:
+          'Аккаунт не найден на сервере. На Timeweb без DATABASE_URL регистрация может не сохраняться. Настройте DATABASE_URL и зарегистрируйтесь заново.',
+      });
       return;
     }
     if (e?.code === 'EMAIL_FAILED') {

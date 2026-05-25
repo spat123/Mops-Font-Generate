@@ -65,12 +65,19 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled) return;
-        if (data && !data.needsVerification) {
+        if (data?.status === 'verified') {
           setAlreadyVerified(true);
           void router.replace({
             pathname: '/auth/signin',
             query: { verified: '1', callbackUrl },
           });
+          return;
+        }
+        if (data?.status === 'not_found') {
+          setError(
+            'Аккаунт не найден. Такое бывает, если сервер перезапустился и регистрация без DATABASE_URL не сохранилась. Попробуйте зарегистрироваться ещё раз.',
+          );
+          return;
         }
       })
       .catch(() => {})
@@ -107,6 +114,11 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
         body: JSON.stringify({ email }),
       });
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 404 && data?.code === 'NOT_FOUND') {
+          setError(data?.error || 'Аккаунт не найден на сервере. Настройте DATABASE_URL и зарегистрируйтесь заново.');
+          return;
+        }
         setError('Не удалось отправить письмо. Попробуйте позже.');
         return;
       }
@@ -146,6 +158,10 @@ export default function AuthCheckEmailPage({ isRuGeo = false }) {
       const data = await res.json().catch(() => ({}));
       if (res.status === 400 && data?.code === 'TOKEN_EXPIRED') {
         setError('Код устарел. Запросите новое письмо.');
+        return;
+      }
+      if (res.status === 404 && data?.code === 'NOT_FOUND') {
+        setError(data?.error || 'Аккаунт не найден на сервере. Настройте DATABASE_URL и зарегистрируйтесь заново.');
         return;
       }
       if (!res.ok) {

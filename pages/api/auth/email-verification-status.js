@@ -10,6 +10,7 @@ export default async function handler(req, res) {
   const email = typeof req.body?.email === 'string' ? req.body.email : '';
   const status = await getCredentialsVerificationStatus(email);
   res.status(200).json({
+    status: status.status,
     needsVerification: status.status === 'pending',
   });
 }

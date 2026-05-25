@@ -33,6 +33,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
   const [password, setPassword] = React.useState('');
   const [passwordRepeat, setPasswordRepeat] = React.useState('');
   const [formError, setFormError] = React.useState('');
+  const [formMessage, setFormMessage] = React.useState('');
   const [deletedRecover, setDeletedRecover] = React.useState(null);
   const [submitting, setSubmitting] = React.useState(false);
   const [phase, setPhase] = React.useState('form');
@@ -105,6 +106,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
               if (submittingRef.current || !pendingEmail) return;
               submittingRef.current = true;
               setFormError('');
+              setFormMessage('');
               setSubmitting(true);
               try {
                 const digits = String(verifyCode || '').replace(/\D/g, '');
@@ -123,8 +125,16 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
                   setFormError('Код устарел. Запросите новое письмо.');
                   return;
                 }
+                if (res.status === 404 && data?.code === 'NOT_FOUND') {
+                  setFormError(
+                    data?.error ||
+                      'Аккаунт не найден на сервере. На Timeweb без DATABASE_URL регистрация может не сохраняться. Настройте DATABASE_URL и зарегистрируйтесь заново.',
+                  );
+                  return;
+                }
                 if (!res.ok) {
                   setFormError('Неверный код. Проверьте письмо или запросите новый на странице почты.');
+                  setFormMessage('Важно: если вы нажали «Отправить код снова», используйте код только из последнего письма.');
                   return;
                 }
                 if (data?.loginToken) {
@@ -164,6 +174,7 @@ export default function AuthSignUpPage({ isRuGeo = false }) {
               disabled={submitting}
             />
             {formError ? <p className={AUTH_FORM_ERROR_CLASS}>{formError}</p> : null}
+            {formMessage ? <p className={AUTH_FORM_SUCCESS_CLASS}>{formMessage}</p> : null}
             <AuthSubmitButton loading={submitting}>Подтвердить и войти</AuthSubmitButton>
             <Link
               href={{

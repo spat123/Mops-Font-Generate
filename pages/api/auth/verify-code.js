@@ -1,4 +1,4 @@
-import { confirmEmailByCode } from '../../../lib/auth/userStore';
+import { confirmEmailByCode, getCredentialsVerificationStatus } from '../../../lib/auth/userStore';
 import { isPostgresEnabled } from '../../../lib/auth/db';
 import {
   deviceCookieHeader,
@@ -22,6 +22,15 @@ export default async function handler(req, res) {
   try {
     const email = typeof req.body?.email === 'string' ? req.body.email : '';
     const code = typeof req.body?.code === 'string' ? req.body.code : String(req.body?.code ?? '');
+    const status = await getCredentialsVerificationStatus(email);
+    if (status?.status === 'not_found') {
+      res.status(404).json({
+        error:
+          'Аккаунт не найден на сервере. На Timeweb без DATABASE_URL регистрация может не сохраняться (несколько контейнеров/перезапуск). Настройте DATABASE_URL и повторите регистрацию.',
+        code: 'NOT_FOUND',
+      });
+      return;
+    }
     const user = await confirmEmailByCode(email, code);
     const { newDeviceId } = await trustDeviceForRequest(req, user.id);
     res.setHeader('Set-Cookie', deviceCookieHeader(newDeviceId));
