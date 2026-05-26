@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { PlusIcon } from '../ui/CommonIcons';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { Tooltip } from '../ui/Tooltip';
