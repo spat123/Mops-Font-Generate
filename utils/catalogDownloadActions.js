@@ -194,6 +194,191 @@ export async function downloadGoogleVariableVariant(entry, { silent = false } = 
   }
 }
 
+async function fetchGoogleStaticSliceBlob(entry, { weight, style }) {
+  const family = entry?.family;
+  if (!family) return null;
+  const subsetList = Array.isArray(entry.subsets) ? entry.subsets : [];
+  const slices = await fetchGoogleStaticFontSlicesAll(family, {
+    weight: Number(weight) || 400,
+    italic: style === 'italic',
+    subsets: subsetList,
+  });
+  const first = Array.isArray(slices) ? slices.find((s) => s?.blob?.size > 0) : null;
+  return first?.blob || null;
+}
+
+function buildGoogleStyleFileBase(entry, variant) {
+  const familyBase = buildSafeFileBase(entry?.family, 'google-font');
+  const stylePart = String(variant?.style || 'normal') === 'italic' ? 'italic' : 'normal';
+  const weightPart = Number(variant?.weight) || 400;
+  return `${familyBase}-${stylePart}-${weightPart}`;
+}
+
+/**
+ * Скачать одно или несколько статических начертаний Google (не VF).
+ * @param {object} entry — запись каталога Google
+ * @param {Array<{ weight: number, style: string, label?: string }>} variants
+ * @param {string} format
+ */
+export async function downloadGoogleStylesAsFormat(entry, variants, format, { silent = false } = {}) {
+  const family = entry?.family;
+  const list = Array.isArray(variants) ? variants : [];
+  if (!family || list.length === 0) return false;
+
+  const targetFormat = String(format || 'woff2').toLowerCase();
+
+  try {
+    if (list.length === 1) {
+      const [variant] = list;
+      const blob = await fetchGoogleStaticSliceBlob(entry, variant);
+      if (!blob) throw new Error('Пустой файл');
+      const outBlob =
+        targetFormat === 'woff2' ? blob : await convertBlobToFormat(blob, targetFormat);
+      const base = buildGoogleStyleFileBase(entry, variant);
+      saveBlobAsFile(outBlob, `${base}.${targetFormat}`);
+      if (!silent) toast.success(`Скачан ${variant.label || family} (${targetFormat.toUpperCase()})`);
+      return true;
+    }
+
+    const files = [];
+    const usedNames = new Set();
+    for (const variant of list) {
+      // eslint-disable-next-line no-await-in-loop
+      const blob = await fetchGoogleStaticSliceBlob(entry, variant);
+      if (!blob) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const outBlob =
+        targetFormat === 'woff2' ? blob : await convertBlobToFormat(blob, targetFormat);
+      const base = buildGoogleStyleFileBase(entry, variant);
+      files.push({
+        name: uniqueFileName(`${base}.${targetFormat}`, usedNames),
+        data: outBlob,
+      });
+    }
+    if (files.length === 0) throw new Error('Нет файлов');
+    const stamp = new Date().toISOString().slice(0, 10);
+    const zipBlob = await createZipBlob(files);
+    const zipBase = buildSafeFileBase(family, 'google-font');
+    saveArchiveBlob(zipBlob, `${zipBase}-styles-${stamp}.zip`);
+    if (!silent) {
+      toast.success(
+        files.length === 1
+          ? `Скачано 1 начертание (${targetFormat.toUpperCase()})`
+          : `Скачано ${files.length} начертаний (${targetFormat.toUpperCase()})`,
+      );
+    }
+    return true;
+  } catch {
+    if (!silent) toast.error(`Не удалось скачать начертания ${family}`);
+    return false;
+  }
+}
+
+async function fetchFontsourceStaticSliceBlob(item, variant) {
+  const slug = item?.id || item?.slug;
+  if (!slug) return null;
+  const { payload, fontBufferBase64 } = await fetchFontsourcePayload(
+    getFontsourceStaticApiUrl(slug, variant?.weight, variant?.style),
+  );
+  const sourceFileName = String(payload?.fileName || payload?.actualFileName || `${slug}.woff2`);
+  return fontBlobFromBase64(fontBufferBase64, sourceFileName).blob;
+}
+
+export async function downloadFontsourceStylesAsFormat(item, variants, format, { silent = false } = {}) {
+  const slug = item?.id || item?.slug;
+  const family = item?.family || slug;
+  const list = Array.isArray(variants) ? variants : [];
+  if (!slug || list.length === 0) return false;
+
+  const targetFormat = String(format || 'woff2').toLowerCase();
+
+  try {
+    if (list.length === 1) {
+      const [variant] = list;
+      const blob = await fetchFontsourceStaticSliceBlob(item, variant);
+      if (!blob) throw new Error('Пустой файл');
+      const converted =
+        targetFormat === 'woff2' ? blob : await convertBlobToFormat(blob, targetFormat);
+      const base = buildSafeFileBase(`${family}-${variant.style}-${variant.weight}`, slug);
+      saveBlobAsFile(converted, `${base}.${targetFormat}`);
+      if (!silent) toast.success(`Скачан ${variant.label || family} (${targetFormat.toUpperCase()})`);
+      return true;
+    }
+
+    const files = [];
+    const usedNames = new Set();
+    for (const variant of list) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const blob = await fetchFontsourceStaticSliceBlob(item, variant);
+        if (!blob) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const converted =
+          targetFormat === 'woff2' ? blob : await convertBlobToFormat(blob, targetFormat);
+        const base = buildSafeFileBase(`${family}-${variant.style}-${variant.weight}`, slug);
+        files.push({
+          name: uniqueFileName(`${base}.${targetFormat}`, usedNames),
+          data: converted,
+        });
+      } catch {
+        // skip failed variant
+      }
+    }
+    if (files.length === 0) throw new Error('Нет файлов');
+    const stamp = new Date().toISOString().slice(0, 10);
+    const zipBlob = await createZipBlob(files);
+    const zipBase = buildSafeFileBase(family, slug);
+    saveArchiveBlob(zipBlob, `${zipBase}-styles-${stamp}.zip`);
+    if (!silent) {
+      toast.success(
+        files.length === 1
+          ? `Скачано 1 начертание (${targetFormat.toUpperCase()})`
+          : `Скачано ${files.length} начертаний (${targetFormat.toUpperCase()})`,
+      );
+    }
+    return true;
+  } catch {
+    if (!silent) toast.error(`Не удалось скачать начертания ${family}`);
+    return false;
+  }
+}
+
+export async function downloadLocalStylesAsFormat(
+  sessionFont,
+  variants,
+  format,
+  label,
+  { silent = false } = {},
+) {
+  const list = Array.isArray(variants) ? variants : [];
+  const fileBlob = sessionFont?.file instanceof Blob ? sessionFont.file : null;
+  if (!fileBlob || list.length === 0) return false;
+
+  const originalName =
+    String(sessionFont?.originalName || '').trim() ||
+    String(sessionFont?.name || '').trim() ||
+    `${label || 'font'}.woff2`;
+  const sourceFormat = String(originalName).split('.').pop()?.toLowerCase() || 'woff2';
+  const targetFormat = String(format || 'woff2').toLowerCase();
+  const fileBase = buildSafeFileBase(label || originalName, 'local-font');
+
+  try {
+    const outBlob =
+      targetFormat === sourceFormat ? fileBlob : await convertBlobToFormat(fileBlob, targetFormat);
+    const variant = list[0];
+    const suffix =
+      list.length === 1 && variant
+        ? `-${variant.style === 'italic' ? 'italic' : 'normal'}-${variant.weight}`
+        : '';
+    saveBlobAsFile(outBlob, `${fileBase}${suffix}.${targetFormat}`);
+    if (!silent) toast.success(`Скачан ${label || originalName} (${targetFormat.toUpperCase()})`);
+    return true;
+  } catch {
+    if (!silent) toast.error(`Не удалось скачать ${label || originalName}`);
+    return false;
+  }
+}
+
 export async function downloadGooglePackageZip(entry, { silent = false } = {}) {
   const family = entry?.family;
   if (!family) return false;
@@ -211,8 +396,10 @@ export async function downloadGooglePackageZip(entry, { silent = false } = {}) {
   }
 }
 
-function getFontsourceStaticApiUrl(slug) {
-  return `/api/fontsource/${encodeURIComponent(slug)}?weight=400&style=normal&subset=latin`;
+function getFontsourceStaticApiUrl(slug, weight = 400, style = 'normal') {
+  const w = Number.isFinite(Number(weight)) ? Number(weight) : 400;
+  const st = String(style || 'normal').trim() === 'italic' ? 'italic' : 'normal';
+  return `/api/fontsource/${encodeURIComponent(slug)}?weight=${w}&style=${st}&subset=latin`;
 }
 
 function getFontsourceVariableApiUrl(slug) {

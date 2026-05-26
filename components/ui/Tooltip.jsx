@@ -172,20 +172,24 @@ export function Tooltip({
     }, delay);
   }, [clearTimers, openDelayMs]);
 
+  const forceClose = useCallback(() => {
+    clearTimers();
+    setOpen(false);
+    setPos((p) => ({ ...p, ready: false }));
+  }, [clearTimers]);
+
   const onClose = useCallback(() => {
     clearTimers();
     const delay = Math.max(0, Number(closeDelayMs) || 0);
     if (delay === 0) {
-      setOpen(false);
-      setPos((p) => ({ ...p, ready: false }));
+      forceClose();
       return;
     }
     closeTimerRef.current = setTimeout(() => {
       closeTimerRef.current = null;
-      setOpen(false);
-      setPos((p) => ({ ...p, ready: false }));
+      forceClose();
     }, delay);
-  }, [clearTimers, closeDelayMs]);
+  }, [clearTimers, closeDelayMs, forceClose]);
 
   useIsomorphicLayoutEffect(() => {
     if (!open) return;
@@ -219,6 +223,36 @@ export function Tooltip({
 
   useEffect(() => () => clearTimers(), [clearTimers]);
 
+  /** Alt+Tab / сворачивание: mouseleave не приходит, тултип «залипает». */
+  useEffect(() => {
+    const onHide = () => forceClose();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') onHide();
+    };
+    window.addEventListener('blur', onHide);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('blur', onHide);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [forceClose]);
+
+  /** Возврат в окно: если курсор уже не над кнопкой — не показывать «залипший» hover. */
+  useEffect(() => {
+    const onWinFocus = () => {
+      if (!open) return;
+      const el = triggerRef.current;
+      if (!(el instanceof HTMLElement)) return;
+      requestAnimationFrame(() => {
+        if (!el.matches(':hover') && !el.matches(':focus-visible')) {
+          forceClose();
+        }
+      });
+    };
+    window.addEventListener('focus', onWinFocus);
+    return () => window.removeEventListener('focus', onWinFocus);
+  }, [open, forceClose]);
+
   const {
     onMouseEnter: restOnMouseEnter,
     onMouseLeave: restOnMouseLeave,
@@ -241,7 +275,10 @@ export function Tooltip({
       },
       onFocus: (e) => {
         restOnFocus?.(e);
-        onOpen();
+        // Не открывать при возврате Alt+Tab (фокус без :focus-visible); только клавиатура.
+        if (e.currentTarget?.matches?.(':focus-visible')) {
+          onOpen();
+        }
       },
       onBlur: (e) => {
         restOnBlur?.(e);

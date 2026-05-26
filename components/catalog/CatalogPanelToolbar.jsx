@@ -87,7 +87,7 @@ export function CatalogPanelToolbar({
   const sortGapClass = isLg ? 'gap-x-3 gap-y-1.5' : 'gap-4';
   const afterActionsGapClass = isLg ? 'gap-2' : 'gap-4';
   const sortItemPaddingClass = isLg ? 'px-0.5' : 'px-1';
-  const clearFiltersClass = `${clearFiltersButtonClassName} ${isLg ? 'px-1.5' : ''}`.trim();
+  const clearFiltersClass = `${clearFiltersButtonClassName} ${isLg ? 'pr-2' : ''}`.trim();
   const isXlCompactSort = isXl && viewportW <= 2005;
   const xlActionsProbeRowRef = useRef(null);
   const xlAfterActionsRef = useRef(null);

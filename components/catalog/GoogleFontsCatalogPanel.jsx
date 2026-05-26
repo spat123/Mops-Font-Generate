@@ -237,7 +237,7 @@ export default function GoogleFontsCatalogPanel({
         { value: 'subsets-desc', label: 'Больше символов' },
       ],
       clearFiltersButtonClassName:
-        'box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm uppercase font-semibold text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900',
+        'box-border h-10 shrink-0 whitespace-nowrap text-sm uppercase font-semibold text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900',
       facetItemsResolver: ({ rawItems }) => rawItems,
       getCategory: (x) => x?.category,
       getSubsets: (x) => x?.subsets,

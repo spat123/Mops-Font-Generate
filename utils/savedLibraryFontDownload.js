@@ -18,6 +18,11 @@ import {
 } from './catalogDownloadActions';
 import { convertBlobToFormat } from './fontFormatConvertClient';
 import { buildSafeFileBase, saveBlobAsFile } from './fileDownloadUtils';
+import {
+  buildFontsourceStylePickerProps,
+  buildGoogleStylePickerProps,
+  buildLocalStylePickerProps,
+} from './fontDownloadStylePicker';
 const LOCAL_DOWNLOAD_FORMATS = ['ttf', 'otf', 'woff', 'woff2'];
 
 function normalizeLocalFormat(fileName, fallback = 'woff2') {
@@ -74,6 +79,7 @@ export function buildSavedLibraryDownloadSplitButtonProps(fontEntry, sessionFont
       primaryLabel: 'Скачать',
       primaryAriaLabel: `Скачать ${name}`,
       onPrimaryClick: () => downloadGooglePackageZip(entry),
+      stylePicker: buildGoogleStylePickerProps(entry),
       menuItems: [
         { key: 'zip', label: 'ZIP (по умолчанию)', onSelect: () => downloadGooglePackageZip(entry) },
         { key: 'ttf', label: 'TTF', onSelect: () => downloadGoogleAsFormat(entry, 'ttf') },
@@ -122,6 +128,7 @@ export function buildSavedLibraryDownloadSplitButtonProps(fontEntry, sessionFont
       primaryLabel: 'Скачать',
       primaryAriaLabel: `Скачать ${display}`,
       onPrimaryClick: () => downloadFontsourcePackageZip(item),
+      stylePicker: buildFontsourceStylePickerProps(item),
       menuItems: [
         { key: 'zip', label: 'ZIP (по умолчанию)', onSelect: () => downloadFontsourcePackageZip(item) },
         { key: 'ttf', label: 'TTF', onSelect: () => downloadFontsourceAsFormat(item, 'ttf') },
@@ -171,6 +178,7 @@ export function buildSavedLibraryDownloadSplitButtonProps(fontEntry, sessionFont
         saveBlobAsFile(fileBlob, originalName);
         toast.success(`Скачан ${label || originalName}`);
       },
+      stylePicker: buildLocalStylePickerProps(sessionFont, label || originalName),
       menuItems: [
         {
           key: 'original',

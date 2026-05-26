@@ -2,6 +2,8 @@
 import { toast } from './appNotify';
 import { parseFontBuffer, isVariableFont, mergeFvarAxesFromFontInputs, normalizeFvarAxisTag } from './fontParser';
 import { filterPresetStylesForVariableAxes, findStyleInfoByWeightAndStyle, getFormatFromExtension } from './fontUtilsCommon';
+import { applyGoogleFontInstanceStylesToFont } from './googleFontInstanceStyles';
+import { applyFontInstanceStylesToFont, extractFvarInstanceStyles } from './fontInstanceStyles';
 import { buildVariationSettingsCssString } from './fontVariationSettings';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGenerator';
 
@@ -82,6 +84,23 @@ function resolveFontItalicMode(variableAxes, hasItalicStyles = false) {
   if (axes.slnt && typeof axes.slnt === 'object') return 'axis-slnt';
   if (hasItalicStyles) return 'separate-style';
   return 'none';
+}
+
+function applyVariableFontPresetStyles(fontObj, parsedFontData, externalInstanceStyles) {
+  if (Array.isArray(externalInstanceStyles) && externalInstanceStyles.length > 0) {
+    applyGoogleFontInstanceStylesToFont(fontObj, externalInstanceStyles);
+    return;
+  }
+
+  const fvarInstances = parsedFontData ? extractFvarInstanceStyles(parsedFontData) : [];
+  if (fvarInstances.length > 0) {
+    applyFontInstanceStylesToFont(fontObj, fvarInstances);
+    return;
+  }
+
+  fontObj.availableStyles = filterPresetStylesForVariableAxes(fontObj.variableAxes, undefined, {
+    italicMode: fontObj.italicMode,
+  });
 }
 
 /**
@@ -225,10 +244,31 @@ export const processLocalFont = async (incomingFontInput) => {
          }, {});
          fontObj.supportedAxes = Object.keys(cachedMetadata.supportedAxes);
          fontObj.variationSettings = buildVariationSettingsCssString(fontObj.variableAxes);
-         // Определяем начальные стили для вариативных шрифтов из кэша
-         // Пока оставляем заглушку или берём значения из дефолтных осей
-         // TODO: Уточнить логику availableStyles для вариативных шрифтов из кэша
-         fontObj.availableStyles = [{ name: 'Default', weight: 400, style: 'normal' }]; // Заглушка
+         fontObj.italicMode = resolveFontItalicMode(fontObj.variableAxes, fontObj.hasItalicStyles);
+         if (Array.isArray(cachedMetadata.instanceStyles) && cachedMetadata.instanceStyles.length > 0) {
+           applyFontInstanceStylesToFont(fontObj, cachedMetadata.instanceStyles);
+         } else {
+           try {
+             const buffer = await file.arrayBuffer();
+             const reparsed = await parseFontBuffer(buffer, cleanedName);
+             const fvarInstances = extractFvarInstanceStyles(reparsed);
+             if (fvarInstances.length > 0) {
+               applyFontInstanceStylesToFont(fontObj, fvarInstances);
+               if (cacheKey) {
+                 localFontCache[cacheKey] = { ...cachedMetadata, instanceStyles: fvarInstances };
+               }
+             } else {
+               fontObj.availableStyles = filterPresetStylesForVariableAxes(fontObj.variableAxes, undefined, {
+                 italicMode: fontObj.italicMode,
+               });
+             }
+           } catch (cacheInstanceError) {
+             console.warn('[localFontProcessor] fvar instances from cache miss:', cleanedName, cacheInstanceError);
+             fontObj.availableStyles = filterPresetStylesForVariableAxes(fontObj.variableAxes, undefined, {
+               italicMode: fontObj.italicMode,
+             });
+           }
+         }
       } else if (!fontObj.isVariableFont && cachedMetadata.names) {
          // Определяем стиль/вес для невариативных шрифтов из кэша
          let weight = 400;
@@ -366,9 +406,7 @@ export const processLocalFont = async (incomingFontInput) => {
          fontObj.supportedAxes = Object.keys(fontObj.variableAxes);
          fontObj.variationSettings = buildVariationSettingsCssString(fontObj.variableAxes);
          fontObj.italicMode = resolveFontItalicMode(fontObj.variableAxes, fontObj.hasItalicStyles);
-         fontObj.availableStyles = filterPresetStylesForVariableAxes(fontObj.variableAxes, undefined, {
-           italicMode: fontObj.italicMode,
-         });
+         applyVariableFontPresetStyles(fontObj, parsedFontData, fontInput.googleFontInstanceStyles);
 
         const gfSlices = fontInput.googleFontSlices;
         if (Array.isArray(gfSlices) && gfSlices.length > 1) {
@@ -386,9 +424,9 @@ export const processLocalFont = async (incomingFontInput) => {
                   return `\"${tag}\" ${num}`;
                 })
                 .join(', ');
-              fontObj.availableStyles = filterPresetStylesForVariableAxes(mergedAxes, undefined, {
-                italicMode: fontObj.italicMode,
-              });
+              if (!(Array.isArray(fontObj.fontInstanceStyles) && fontObj.fontInstanceStyles.length > 0)) {
+                applyVariableFontPresetStyles(fontObj, parsedFontData, fontInput.googleFontInstanceStyles);
+              }
             }
           } catch (e) {
             console.warn('[localFontProcessor] Объединение fvar по слайсам Google:', e);
@@ -400,6 +438,14 @@ export const processLocalFont = async (incomingFontInput) => {
          console.warn(`Variable font ${name} parsed without axes info.`);
          fontObj.isVariableFont = false; // Считаем невариативным
          fontObj.availableStyles = [{ name: 'Regular', weight: 400, style: 'normal' }];
+      } else if (Array.isArray(fontInput.googleFontInstanceStyles) && fontInput.googleFontInstanceStyles.length > 0) {
+        applyGoogleFontInstanceStylesToFont(fontObj, fontInput.googleFontInstanceStyles);
+        const regular =
+          fontObj.availableStyles.find((s) => s?.name === 'Regular') || fontObj.availableStyles[0];
+        if (regular) {
+          fontObj.currentWeight = regular.weight;
+          fontObj.currentStyle = regular.style;
+        }
       } else {
         // НЕвариативный шрифт: определяем стиль по именам
         let weight = 400;
@@ -445,8 +491,11 @@ export const processLocalFont = async (incomingFontInput) => {
             supportedAxes: fontObj.isVariableFont ? parsedFontData.tables.fvar.axes.reduce((acc, axis) => {
                  acc[axis.tag] = { name: axis.name?.en, min: axis.minValue, max: axis.maxValue, default: axis.defaultValue };
                  return acc;
-                }, {}) : null, // Сохраняем null если шрифт не вариативный
-            // При необходимости добавить другие поля
+                }, {}) : null,
+            instanceStyles:
+              Array.isArray(fontObj.fontInstanceStyles) && fontObj.fontInstanceStyles.length > 0
+                ? fontObj.fontInstanceStyles
+                : null,
         };
         localFontCache[cacheKey] = metadataToCache;
       }

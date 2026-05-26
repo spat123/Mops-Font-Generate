@@ -12,7 +12,7 @@ export function CatalogTextSortControls({
   itemActiveClassName = 'text-accent',
   itemInactiveClassName = 'text-gray-800 hover:text-accent',
   resetLabel = 'Сбросить все',
-  resetButtonClassName = 'box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm uppercase font-semibold text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900',
+  resetButtonClassName = 'box-border h-10 shrink-0 whitespace-nowrap text-sm uppercase font-semibold text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900',
 }) {
   return (
     <div className={className}>

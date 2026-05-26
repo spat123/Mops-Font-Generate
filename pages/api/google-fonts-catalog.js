@@ -3,6 +3,7 @@
  * Источник: https://fonts.google.com/metadata/fonts
  */
 import { resolveGoogleMetadataItalicMode, slimGoogleMetadataAxes } from '../../utils/googleFontMetadataAxes';
+import { listGoogleDownloadStylesFromFontsObj } from '../../utils/googleFontDownloadStyles';
 import { jsonMethodNotAllowed } from '../../utils/apiResponse';
 
 const SOURCE = 'https://fonts.google.com/metadata/fonts';
@@ -42,6 +43,7 @@ function slimEntry(x) {
     hasItalicStyles,
     italicMode,
     primaryScript: typeof x.primaryScript === 'string' ? x.primaryScript : '',
+    downloadStyles: listGoogleDownloadStylesFromFontsObj(fontsObj),
   };
 }
 

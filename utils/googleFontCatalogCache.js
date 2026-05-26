@@ -1,6 +1,6 @@
 import { createSessionJsonCache } from './sessionJsonCache';
 
-export const GOOGLE_FONT_CATALOG_CACHE_KEY = 'dinamic-google-fonts-catalog-v6';
+export const GOOGLE_FONT_CATALOG_CACHE_KEY = 'dinamic-google-fonts-catalog-v7';
 
 export function isGoogleFontCatalogCacheValid(value) {
   return (
@@ -9,7 +9,8 @@ export function isGoogleFontCatalogCacheValid(value) {
     value[0] &&
     Array.isArray(value[0].subsets) &&
     value.some((row) => row && Array.isArray(row.axes)) &&
-    Object.prototype.hasOwnProperty.call(value[0], 'primaryScript')
+    Object.prototype.hasOwnProperty.call(value[0], 'primaryScript') &&
+    Array.isArray(value[0].downloadStyles)
   );
 }
 

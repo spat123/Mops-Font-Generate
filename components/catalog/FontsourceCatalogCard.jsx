@@ -65,6 +65,8 @@ function FontsourceCatalogCardComponent({
       buildCatalogDownloadButtonProps({
         family,
         item,
+        catalogEntry: item,
+        catalogSource: 'fontsource',
         onDownloadZip: onDownloadPackageZip,
         onDownloadAsFormat,
         onDownloadVariableVariant,

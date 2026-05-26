@@ -15,6 +15,11 @@ import {
 import { buildVariationSettingsCssString } from '../utils/googleFontCatalogAxes';
 import { parseFontBuffer, normalizeFvarAxisTag } from '../utils/fontParser';
 import { filterPresetStylesForVariableAxes } from '../utils/fontUtilsCommon';
+import {
+  applyGoogleFontInstanceStylesToFont,
+  resolveGoogleFontInstanceStyles,
+} from '../utils/googleFontInstanceStyles';
+import { applyFontInstanceStylesToFont, extractFvarInstanceStyles, getFontInstanceStyles } from '../utils/fontInstanceStyles';
 import { buildFontViewStateRestorePlan } from '../utils/fontViewStateRestore';
 import { previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 
@@ -74,9 +79,20 @@ async function enrichGoogleVfAxesFromGithubIfNeeded(font) {
 
         const variableAxes = font.variableAxes && typeof font.variableAxes === 'object' ? font.variableAxes : {};
         font.italicMode = variableAxes.ital ? 'axis-ital' : variableAxes.slnt ? 'axis-slnt' : (font.hasItalicStyles ? 'separate-style' : 'none');
-        font.availableStyles = filterPresetStylesForVariableAxes(variableAxes, undefined, {
+
+        if (!Array.isArray(font.googleFontInstanceStyles) || font.googleFontInstanceStyles.length === 0) {
+          const fromCatalog = resolveGoogleFontInstanceStyles(family);
+          if (fromCatalog.length > 0) {
+            applyGoogleFontInstanceStylesToFont(font, fromCatalog);
+          }
+        }
+        if (getFontInstanceStyles(font).length > 0) {
+          applyGoogleFontInstanceStylesToFont(font, getFontInstanceStyles(font));
+        } else {
+          font.availableStyles = filterPresetStylesForVariableAxes(variableAxes, undefined, {
             italicMode: font.italicMode,
-        });
+          });
+        }
 
         if (font.italicMode === 'separate-style' && font.hasItalicStyles && !(font.googleFontItalicFile instanceof Blob)) {
             try {
@@ -145,6 +161,22 @@ function stageFontFromRecord(font) {
     };
 }
 
+async function enrichLocalVfInstanceStylesIfNeeded(font) {
+    if (!font || font.source !== 'local' || !font.isVariableFont) return;
+    if (getFontInstanceStyles(font).length > 0) return;
+    if (!(font.file instanceof Blob) || font.file.size === 0) return;
+
+    try {
+        const parsed = await parseFontBuffer(await font.file.arrayBuffer(), font.name || font.id);
+        const instances = extractFvarInstanceStyles(parsed);
+        if (instances.length === 0) return;
+        applyFontInstanceStylesToFont(font, instances);
+        await saveFont(font);
+    } catch (e) {
+        console.warn('[DB] enrichLocalVfInstanceStylesIfNeeded:', font.id, e);
+    }
+}
+
 /**
  * Полная регистрация @font-face в браузере (после stage можно вызывать в фоне).
  * Ранее это ждало завершения по всем шрифтам + document.fonts.ready и тормозило открытие вкладок.
@@ -153,6 +185,7 @@ async function loadFontFacesForRestoredFont(font) {
     const working = { ...font };
     try {
         await enrichGoogleVfAxesFromGithubIfNeeded(working);
+        await enrichLocalVfInstanceStylesIfNeeded(working);
         await enrichFontsourceVfSubsetsIfNeeded(working);
 
         working.url = undefined;

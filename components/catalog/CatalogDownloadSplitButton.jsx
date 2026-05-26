@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { downloudIconUrl } from '../ui/editIconUrls';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
+import { FontStyleDownloadDialog } from './FontStyleDownloadDialog';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
@@ -73,8 +74,11 @@ export function CatalogDownloadSplitButton({
   heightClass = '',
   /** comfortable — выше кнопки и больше горизонтальные отступы (оверлей карточки каталога) */
   layout = 'compact',
+  /** Pop-up выбора начертаний: { familyLabel, styles, formats?, onDownload } */
+  stylePicker = null,
 }) {
   const [open, setOpen] = useState(false);
+  const [styleDialogOpen, setStyleDialogOpen] = useState(false);
   const rootRef = useRef(null);
   const menuRef = useRef(null);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, ready: false });
@@ -82,8 +86,8 @@ export function CatalogDownloadSplitButton({
   const doneTimeoutRef = useRef(null);
 
   useEffect(() => {
-    onMenuOpenChange?.(open);
-  }, [open, onMenuOpenChange]);
+    onMenuOpenChange?.(open || styleDialogOpen);
+  }, [open, styleDialogOpen, onMenuOpenChange]);
 
   useDismissibleLayer({
     open,
@@ -144,7 +148,13 @@ export function CatalogDownloadSplitButton({
     };
   }, [open, menuItems]);
 
-  const hasMenu = Array.isArray(menuItems) && menuItems.some((item) => !item?.hidden);
+  const visibleMenuItems = (menuItems || []).filter((item) => !item?.hidden);
+  const hasStylePicker =
+    stylePicker &&
+    Array.isArray(stylePicker.styles) &&
+    stylePicker.styles.length > 0 &&
+    typeof stylePicker.onDownload === 'function';
+  const hasMenu = visibleMenuItems.length > 0 || hasStylePicker;
   const isAccent = tone === 'accent';
   const roomy = layout === 'comfortable';
   const resolvedHeightClass = heightClass || (roomy ? 'h-9' : 'h-8');
@@ -211,9 +221,7 @@ export function CatalogDownloadSplitButton({
       role="menu"
       style={{ top: `${menuPosition.top}px`, left: `${menuPosition.left}px` }}
     >
-      {(menuItems || [])
-        .filter((item) => !item?.hidden)
-        .map((item, index) => (
+      {visibleMenuItems.map((item, index) => (
           <button
             key={item.key}
             type="button"
@@ -233,6 +241,25 @@ export function CatalogDownloadSplitButton({
             <span className="truncate">{item.label}</span>
           </button>
         ))}
+      {hasStylePicker ? (
+        <button
+          key="styles"
+          type="button"
+          role="menuitem"
+          data-no-card-select="true"
+          disabled={stylePicker.disabled}
+          onClick={(event) => {
+            event.stopPropagation();
+            setOpen(false);
+            setStyleDialogOpen(true);
+          }}
+          className={`flex w-full items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
+            roomy ? 'py-3.5' : 'py-2.5'
+          } ${visibleMenuItems.length > 0 ? 'border-t border-gray-200' : ''}`}
+        >
+          <span className="truncate">Начертания</span>
+        </button>
+      ) : null}
     </div>
   );
 
@@ -276,6 +303,14 @@ export function CatalogDownloadSplitButton({
         <ChevronDownIcon />
       </button>
       {open && typeof document !== 'undefined' ? createPortal(menuDropdownEl, document.body) : null}
+      <FontStyleDownloadDialog
+        open={styleDialogOpen}
+        onClose={() => setStyleDialogOpen(false)}
+        familyLabel={stylePicker?.familyLabel}
+        styles={stylePicker?.styles}
+        formats={stylePicker?.formats}
+        onDownload={stylePicker?.onDownload}
+      />
     </div>
   );
 }

@@ -64,6 +64,8 @@ function GoogleFontsCatalogCardComponent({
       buildCatalogDownloadButtonProps({
         family,
         item: entry,
+        catalogEntry: entry,
+        catalogSource: 'google',
         onDownloadZip: onDownloadPackageZip,
         onDownloadAsFormat,
         onDownloadVariableVariant,

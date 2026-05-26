@@ -6,8 +6,9 @@ import { getPreviewChromeFromBackground } from '../utils/previewChromeTheme';
 import { generateVariationSettings } from '../utils/fontVariationSettings';
 import {
   AXIS_RATIOS,
-  ITALIC_VARIATIONS,
-  WEIGHT_VARIATIONS,
+  getStylesModeItalicRows,
+  getStylesModeNamedPresetRows,
+  getStylesModeWeightRows,
 } from '../utils/stylesPreviewModel';
 import { alarmIconUrl, ideaIconUrl } from './ui/editIconUrls';
 
@@ -72,9 +73,28 @@ function StylesMode({
   /** Подписи и рамки под фон превью; rgba учитывается при смешивании с белой подложкой */
   const chrome = useMemo(() => getPreviewChromeFromBackground(backgroundColor), [backgroundColor]);
   const activeStyleName =
-    findStyleInfoByWeightAndStyle(selectedFont.currentWeight, selectedFont.currentStyle)?.name || 'Regular';
+    selectedFont.availableStyles?.find(
+      (style) =>
+        style?.weight === selectedFont.currentWeight &&
+        (style?.style || 'normal') === (selectedFont.currentStyle || 'normal'),
+    )?.name ||
+    findStyleInfoByWeightAndStyle(selectedFont.currentWeight, selectedFont.currentStyle)?.name ||
+    'Regular';
   const hasAnyStyleContent = Boolean(showStaticStyles || hasVariableAxes);
   const titleUnderlineClass = chrome.isDark ? 'border-white/25' : 'border-gray-900/35';
+
+  const weightPreviewRows = useMemo(
+    () => (hasVariableAxes ? getStylesModeWeightRows(selectedFont) : []),
+    [hasVariableAxes, selectedFont],
+  );
+  const italicPreviewRows = useMemo(
+    () => (hasVariableAxes ? getStylesModeItalicRows(selectedFont) : []),
+    [hasVariableAxes, selectedFont],
+  );
+  const namedPresetRows = useMemo(
+    () => (hasVariableAxes ? getStylesModeNamedPresetRows(selectedFont) : []),
+    [hasVariableAxes, selectedFont],
+  );
 
   return (
     <div className="relative flex h-full min-h-0 min-w-0 max-w-full flex-1 flex-col px-4 pb-8 pt-4 sm:px-6">
@@ -173,11 +193,11 @@ function StylesMode({
         <div className="min-w-0 max-w-full">
 
           {/* Группа Weight стилей */}
-          {selectedFont.variableAxes['wght'] !== undefined && (
+          {selectedFont.variableAxes['wght'] !== undefined && weightPreviewRows.length > 0 && (
             <div className="mb-8">
               <h4 className={`${chrome.subsectionTitle} mb-2`}>Вес (wght)</h4>
               <div className="space-y-4">
-                {WEIGHT_VARIATIONS.map((style, index) => (
+                {weightPreviewRows.map((style, index) => (
                   <div key={`var-weight-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
                     <div className="flex min-w-0 items-baseline justify-between gap-3">
                       <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
@@ -209,11 +229,12 @@ function StylesMode({
           )}
           
           {/* Группа Italic/Slant стилей */}
-          {(selectedFont.variableAxes['ital'] !== undefined || selectedFont.variableAxes['slnt'] !== undefined) && (
+          {(selectedFont.variableAxes['ital'] !== undefined || selectedFont.variableAxes['slnt'] !== undefined) &&
+            italicPreviewRows.length > 0 && (
             <div className="mb-8 ">
               <h4 className={`${chrome.subsectionTitle} mb-2`}>Курсив / наклон</h4>
               <div className="space-y-4">
-                {ITALIC_VARIATIONS.map((style, index) => (
+                {italicPreviewRows.map((style, index) => (
                   <div key={`var-italic-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
                     <div className="mb-2 flex min-w-0 items-baseline justify-between gap-3">
                       <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
@@ -241,6 +262,40 @@ function StylesMode({
                       }}
                       isStyles={true}
                       syncId={`styles-var-italic-${index}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {namedPresetRows.length > 0 && (
+            <div className="mb-8">
+              <h4 className={`${chrome.subsectionTitle} mb-2`}>Пресеты</h4>
+              <div className="space-y-4">
+                {namedPresetRows.map((style, index) => (
+                  <div key={`var-preset-${index}`} className={`min-w-0 border-t ${chrome.divider} pt-4`}>
+                    <div className="flex min-w-0 items-baseline justify-between gap-3">
+                      <div className={`min-w-0 truncate ${chrome.rowTitle}`}>{style.name}</div>
+                    </div>
+                    <EditableText
+                      style={{
+                        fontFamily: safeFontFamily,
+                        fontSize: `${stylesFontSize}px`,
+                        color: textColor,
+                        backgroundColor: bgForStyleCells,
+                        letterSpacing: letterSpacingValue,
+                        fontVariationSettings: generateVariationSettings(style, selectedFont.variableAxes),
+                        direction: textDirection,
+                        textAlign: textAlignment,
+                        textTransform: textCase,
+                        whiteSpace: 'nowrap',
+                        overflow: 'visible',
+                        maxWidth: '100%',
+                        scrollBehavior: 'auto',
+                      }}
+                      isStyles={true}
+                      syncId={`styles-var-preset-${index}`}
                     />
                   </div>
                 ))}

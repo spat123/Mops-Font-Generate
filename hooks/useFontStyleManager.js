@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { PRESET_STYLES } from '../utils/fontUtilsCommon';
 import { buildPresetViewStatePatch } from '../utils/fontViewStateWriter';
+import { findFontInstanceStyleByName } from '../utils/fontInstanceStyles';
 
 /** Пресеты вес/курсив, VF-оси, догрузка стилей Fontsource. */
 export function useFontStyleManager(
@@ -18,7 +19,6 @@ export function useFontStyleManager(
     if (!fontToApply) return;
 
     const customStyle =
-      !fontToApply.isVariableFont &&
       Array.isArray(fontToApply.availableStyles) &&
       fontToApply.availableStyles.find((s) => String(s?.name || '').trim() === String(presetName || '').trim());
 
@@ -28,6 +28,13 @@ export function useFontStyleManager(
       return;
     }
     const { weight, style } = presetInfo;
+    const instanceStyle = findFontInstanceStyleByName(fontToApply, presetName);
+    const instanceCoordinates =
+      customStyle?.coordinates && typeof customStyle.coordinates === 'object'
+        ? customStyle.coordinates
+        : instanceStyle?.coordinates && typeof instanceStyle.coordinates === 'object'
+          ? instanceStyle.coordinates
+          : null;
 
     // Внутренняя функция для обновления состояния selectedFont, если необходимо
     const updateSelectedFontStateIfNeeded = () => {
@@ -71,51 +78,62 @@ export function useFontStyleManager(
     else if (fontToApply.isVariableFont) {
       const currentAxes = fontToApply.variableAxes || {};
       const italicMode = typeof fontToApply.italicMode === 'string' ? fontToApply.italicMode : 'none';
-      // Используем актуальные настройки из variableSettings (переданные в хук)
-      const currentFontSettings = variableSettings; 
-      const newSettings = { ...currentFontSettings }; // Копируем текущие настройки
+      const currentFontSettings = variableSettings;
+      const newSettings = { ...currentFontSettings };
       let settingsChanged = false;
 
-      // Обновляем 'wght', если ось существует
-      if ('wght' in currentAxes) {
-        const wAxis = currentAxes.wght;
-        let w = weight;
-        if (wAxis && typeof wAxis === 'object' && Number.isFinite(Number(wAxis.min)) && Number.isFinite(Number(wAxis.max))) {
-          const a = Math.min(Number(wAxis.min), Number(wAxis.max));
-          const b = Math.max(Number(wAxis.min), Number(wAxis.max));
-          w = Math.min(b, Math.max(a, w));
+      if (instanceCoordinates && Object.keys(instanceCoordinates).length > 0) {
+        for (const [tag, rawValue] of Object.entries(instanceCoordinates)) {
+          if (!(tag in currentAxes)) continue;
+          const axis = currentAxes[tag];
+          let value = Number(rawValue);
+          if (!Number.isFinite(value)) continue;
+          if (axis && typeof axis === 'object' && Number.isFinite(Number(axis.min)) && Number.isFinite(Number(axis.max))) {
+            const a = Math.min(Number(axis.min), Number(axis.max));
+            const b = Math.max(Number(axis.min), Number(axis.max));
+            value = Math.min(b, Math.max(a, value));
+          }
+          if (newSettings[tag] !== value) {
+            newSettings[tag] = value;
+            settingsChanged = true;
+          }
         }
-        if (newSettings.wght !== w) {
-          newSettings.wght = w;
-          settingsChanged = true;
+      } else {
+        // Обновляем 'wght', если ось существует
+        if ('wght' in currentAxes) {
+          const wAxis = currentAxes.wght;
+          let w = weight;
+          if (wAxis && typeof wAxis === 'object' && Number.isFinite(Number(wAxis.min)) && Number.isFinite(Number(wAxis.max))) {
+            const a = Math.min(Number(wAxis.min), Number(wAxis.max));
+            const b = Math.max(Number(wAxis.min), Number(wAxis.max));
+            w = Math.min(b, Math.max(a, w));
+          }
+          if (newSettings.wght !== w) {
+            newSettings.wght = w;
+            settingsChanged = true;
+          }
+        }
+
+        const targetItal = style === 'italic' ? 1 : 0;
+        const slantAxis = typeof currentAxes.slnt === 'object' ? currentAxes.slnt : undefined;
+        const targetSlnt = style === 'italic' ? (slantAxis?.min ?? -15) : (slantAxis?.default ?? 0);
+
+        if (italicMode === 'axis-ital' && 'ital' in currentAxes) {
+          if (newSettings.ital !== targetItal) {
+            newSettings.ital = targetItal;
+            settingsChanged = true;
+            if ('slnt' in newSettings) delete newSettings.slnt;
+          }
+        } else if (italicMode === 'axis-slnt' && 'slnt' in currentAxes) {
+          if (newSettings.slnt !== targetSlnt) {
+            newSettings.slnt = targetSlnt;
+            settingsChanged = true;
+            if ('ital' in newSettings) delete newSettings.ital;
+          }
         }
       }
 
-      // Обновляем 'ital' или 'slnt' в зависимости от стиля пресета
-      const targetItal = style === 'italic' ? 1 : 0;
-      const slantAxis = typeof currentAxes.slnt === 'object' ? currentAxes.slnt : undefined;
-      // Определяем целевое значение 'slnt'. Если стиль 'italic', используем min оси (или -15), иначе default (или 0)
-      const targetSlnt = style === 'italic' ? (slantAxis?.min ?? -15) : (slantAxis?.default ?? 0);
-
-      if (italicMode === 'axis-ital' && 'ital' in currentAxes) { // Если есть ось 'ital'
-        if (newSettings.ital !== targetItal) {
-          newSettings.ital = targetItal;
-          settingsChanged = true;
-          // Если есть 'slnt', удаляем его, т.к. 'ital' имеет приоритет
-          if ('slnt' in newSettings) delete newSettings.slnt; 
-        }
-      } else if (italicMode === 'axis-slnt' && 'slnt' in currentAxes) { // Иначе, если есть ось 'slnt'
-        if (newSettings.slnt !== targetSlnt) {
-          newSettings.slnt = targetSlnt;
-          settingsChanged = true;
-           // Если есть 'ital', удаляем его (хотя не должно быть по логике выше)
-          if ('ital' in newSettings) delete newSettings.ital; 
-        }
-      }
-
-      // Если настройки осей изменились, вызываем applyVariableSettings
       if (settingsChanged) {
-        // Передаем isFinalUpdate = true, и сам объект шрифта fontToApply
         applyVariableSettings(newSettings, true, fontToApply);
       }
     }

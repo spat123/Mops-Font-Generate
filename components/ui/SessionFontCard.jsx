@@ -73,7 +73,7 @@ export function SessionFontCard({
   onDrop,
   onDragEnd,
 }) {
-  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [downloadUiOpen, setDownloadUiOpen] = useState(false);
 
   const base =
     `group relative rounded-lg bg-surface-card transition-all min-h-32 duration-200 ${
@@ -150,7 +150,7 @@ export function SessionFontCard({
             'absolute bottom-2 right-2 z-[11] max-w-[calc(100%-1rem)] opacity-0 transition-opacity duration-200',
             'pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100',
             'focus-within:pointer-events-auto focus-within:opacity-100',
-            downloadMenuOpen ? '!pointer-events-auto !opacity-100' : '',
+            downloadUiOpen ? '!pointer-events-auto !opacity-100' : '',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -159,7 +159,7 @@ export function SessionFontCard({
         >
           <CatalogDownloadSplitButton
             {...downloadSplitButtonProps}
-            onMenuOpenChange={setDownloadMenuOpen}
+            onMenuOpenChange={setDownloadUiOpen}
           />
         </div>
       ) : null}

@@ -82,13 +82,10 @@ export function matchesSearch(candidate, query) {
   return queryVariants.some((q) => candidateVariants.some((item) => item.includes(q)));
 }
 
-function catalogFamilyMatchesSearch(family, queryNorm, queryCompact) {
-  const fn = normalizeSearchText(family);
-  const fc = compactSearchText(fn);
+function familyVariantMatchesQueryVariant(fn, fc, queryNorm, queryCompact) {
   if (!fn || !queryNorm) return false;
   if (fn === queryNorm || fc === queryCompact) return true;
-  if (fn.startsWith(queryNorm)) return true;
-  if (fc.startsWith(queryCompact)) return true;
+  if (fn.startsWith(queryNorm) || fc.startsWith(queryCompact)) return true;
   const words = fn.split(/\s+/).filter(Boolean);
   return words.some((w) => {
     const wc = compactSearchText(w);
@@ -96,9 +93,26 @@ function catalogFamilyMatchesSearch(family, queryNorm, queryCompact) {
   });
 }
 
-function matchesSearchLooseMetadata(text, queryNorm) {
-  const n = normalizeSearchText(text);
-  return Boolean(n && queryNorm && n.includes(queryNorm));
+/** Имя семейства: по словам + транслит (робото → Roboto). */
+function catalogFamilyMatchesSearch(family, query) {
+  const queryVariants = buildSearchVariants(query);
+  if (queryVariants.length === 0) return true;
+
+  const familyVariants = buildSearchVariants(family);
+  for (const qv of queryVariants) {
+    const queryNorm = normalizeSearchText(qv);
+    const queryCompact = compactSearchText(qv);
+    for (const fv of familyVariants) {
+      const fn = normalizeSearchText(fv);
+      const fc = compactSearchText(fn);
+      if (familyVariantMatchesQueryVariant(fn, fc, queryNorm, queryCompact)) return true;
+    }
+  }
+  return false;
+}
+
+function matchesSearchLooseMetadata(text, query) {
+  return matchesSearch(text, query);
 }
 
 /**
@@ -111,11 +125,10 @@ export function matchesCatalogFontSearch(candidate, query) {
   const family = parts[0] || '';
   const queryNorm = normalizeSearchText(query);
   if (!queryNorm) return true;
-  const queryCompact = compactSearchText(queryNorm);
 
-  if (catalogFamilyMatchesSearch(family, queryNorm, queryCompact)) return true;
+  if (catalogFamilyMatchesSearch(family, query)) return true;
   for (let i = 1; i < parts.length; i += 1) {
-    if (matchesSearchLooseMetadata(parts[i], queryNorm)) return true;
+    if (matchesSearchLooseMetadata(parts[i], query)) return true;
   }
   return false;
 }
@@ -128,17 +141,24 @@ export function scoreCatalogFontSearch(candidate, query) {
   const family = parts[0] || '';
   const queryNorm = normalizeSearchText(query);
   if (!queryNorm) return 0;
-  const queryCompact = compactSearchText(queryNorm);
-  const fn = normalizeSearchText(family);
-  const fc = compactSearchText(fn);
 
   let score = 0;
-  if (fn === queryNorm || fc === queryCompact) score = Math.max(score, 1000);
-  else if (fn.startsWith(queryNorm) || fc.startsWith(queryCompact)) score = Math.max(score, 900);
-  else if (catalogFamilyMatchesSearch(family, queryNorm, queryCompact)) score = Math.max(score, 800);
+  const queryVariants = buildSearchVariants(query);
+  const familyVariants = buildSearchVariants(family);
+  for (const qv of queryVariants) {
+    const qn = normalizeSearchText(qv);
+    const qc = compactSearchText(qv);
+    for (const fv of familyVariants) {
+      const fn = normalizeSearchText(fv);
+      const fc = compactSearchText(fn);
+      if (fn === qn || fc === qc) score = Math.max(score, 1000);
+      else if (fn.startsWith(qn) || fc.startsWith(qc)) score = Math.max(score, 900);
+      else if (familyVariantMatchesQueryVariant(fn, fc, qn, qc)) score = Math.max(score, 800);
+    }
+  }
 
   for (let i = 1; i < parts.length; i += 1) {
-    if (matchesSearchLooseMetadata(parts[i], queryNorm)) score = Math.max(score, 200);
+    if (matchesSearchLooseMetadata(parts[i], query)) score = Math.max(score, 200);
   }
   return score;
 }

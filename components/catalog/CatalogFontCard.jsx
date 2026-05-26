@@ -28,6 +28,7 @@ export function CatalogFontCard({
   onDragEnd,
 }) {
   const [showHoverUi, setShowHoverUi] = useState(false);
+  const [downloadUiPinned, setDownloadUiPinned] = useState(false);
   const rootRef = useRef(null);
   const rootClassName = [
     `group relative flex flex-col rounded-lg bg-surface-card p-4 select-none transition-colors duration-100 ${
@@ -45,7 +46,8 @@ export function CatalogFontCard({
     }
   }, [selected]);
 
-  const showInteractiveUi = !selected && (busy || showHoverUi);
+  const hoverUiActive = showHoverUi || downloadUiPinned;
+  const showInteractiveUi = !selected && (busy || hoverUiActive);
   const actionsClassName =
     'absolute right-2 top-2 z-30 max-w-[min(100%,12rem)] transition-opacity duration-75 ' +
     (showInteractiveUi ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0');
@@ -82,6 +84,7 @@ export function CatalogFontCard({
   }, []);
 
   const handleRequestCloseHoverUi = useCallback(() => {
+    if (downloadUiPinned) return;
     if (typeof window === 'undefined') return;
     window.requestAnimationFrame(() => {
       const rootNode = rootRef.current;
@@ -91,17 +94,18 @@ export function CatalogFontCard({
       if (rootNode.matches(':hover') || focusInside) return;
       setShowHoverUi(false);
     });
-  }, []);
+  }, [downloadUiPinned]);
 
   const resolvedHoverOverlay = useMemo(() => {
     if (!hoverOverlay) return null;
     if (!React.isValidElement(hoverOverlay)) return hoverOverlay;
     return React.cloneElement(hoverOverlay, {
       onRequestCloseHoverUi: handleRequestCloseHoverUi,
+      onDownloadUiOpenChange: setDownloadUiPinned,
     });
   }, [hoverOverlay, handleRequestCloseHoverUi]);
 
-  const showHoverOverlay = Boolean(resolvedHoverOverlay) && !selected && showHoverUi;
+  const showHoverOverlay = Boolean(resolvedHoverOverlay) && !selected && hoverUiActive;
   // ВАЖНО: `will-change` и постоянные transforms на тысячах карточек могут разгонять Layerize/память/GC.
   // Для массового списка оставляем только opacity-переход.
   const hoverOverlayClassName =
@@ -153,7 +157,7 @@ export function CatalogFontCard({
         fadeFooterWithHoverUi ? (
           <div
             className={
-              !selected && showHoverUi && resolvedHoverOverlay
+              !selected && hoverUiActive && resolvedHoverOverlay
                 ? 'transition-opacity duration-100 opacity-0'
                 : 'transition-opacity duration-100'
             }

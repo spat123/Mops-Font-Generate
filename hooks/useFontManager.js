@@ -7,6 +7,7 @@ import {
   clampPresetNameForVariableAxes,
 } from '../utils/fontUtilsCommon';
 import { debouncedUpdateVariableFontSettings } from '../utils/cssGenerator';
+import { getFontInstanceStyles } from '../utils/fontInstanceStyles';
 import { deleteFontDB } from '../utils/db';
 import { revokeObjectURL } from '../utils/localFontProcessor';
 import { useFontPersistence } from './useFontPersistence';
@@ -368,8 +369,20 @@ export function useFontManager() {
   const availableStyles = useMemo(() => {
       if (!selectedFont) return [];
 
-      // Вариативный: только пресеты, попадающие в диапазон wght (и курсив — если есть ital/slnt)
+      // Вариативный: реальные начертания из metadata Google или срез по осям
       if (selectedFont.isVariableFont) {
+          if (Array.isArray(selectedFont.availableStyles) && selectedFont.availableStyles.length > 0) {
+            return selectedFont.availableStyles;
+          }
+          const instances = getFontInstanceStyles(selectedFont);
+          if (instances.length > 0) {
+            return instances.map((row) => ({
+              name: row.label,
+              weight: row.weight,
+              style: row.style === 'italic' ? 'italic' : 'normal',
+              coordinates: row.coordinates,
+            }));
+          }
           return filterPresetStylesForVariableAxes(selectedFont.variableAxes, undefined, {
             italicMode: selectedFont.italicMode,
           });

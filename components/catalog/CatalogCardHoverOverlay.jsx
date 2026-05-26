@@ -56,6 +56,8 @@ export function CatalogCardHoverOverlay({
   centered = false,
   onOpen,
   onRequestCloseHoverUi,
+  /** Пока открыт список форматов или pop-up «Начертания» — не гасить hover карточки */
+  onDownloadUiOpenChange,
   openAriaLabel,
   openLabel = 'Открыть',
   downloadButtonProps,
@@ -229,6 +231,7 @@ export function CatalogCardHoverOverlay({
     <CatalogDownloadSplitButton
       className="w-auto"
       hidePrimaryLabel={useCompactButtons || (centered && viewportW < 1024)}
+      onMenuOpenChange={onDownloadUiOpenChange}
       onActionComplete={onRequestCloseHoverUi}
       {...resolvedDownloadButtonProps}
       layout="comfortable"

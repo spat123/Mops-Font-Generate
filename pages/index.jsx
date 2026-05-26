@@ -37,6 +37,7 @@ import {
 } from '../utils/fontLibraryUtils';
 import { revokeObjectURL } from '../utils/localFontProcessor';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
+import { listGoogleCatalogDownloadStyles } from '../utils/googleFontDownloadStyles';
 import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
 import { formatCatalogAvailabilityShort, getCatalogUnionStats } from '../utils/catalogUnionStats';
 import {
@@ -1518,6 +1519,7 @@ export default function Home() {
                   ? catalogEntry.italicMode
                   : 'none',
               googleFontHasItalicStyles: catalogEntry.hasItalicStyles === true,
+              googleFontInstanceStyles: listGoogleCatalogDownloadStyles(catalogEntry),
               googleFontRecommendedSample,
             },
           ],
@@ -1675,6 +1677,7 @@ export default function Home() {
               googleFontItalicMode:
                 typeof catalogEntry.italicMode === 'string' && catalogEntry.italicMode ? catalogEntry.italicMode : 'none',
               googleFontHasItalicStyles: catalogEntry.hasItalicStyles === true,
+              googleFontInstanceStyles: listGoogleCatalogDownloadStyles(catalogEntry),
               googleFontRecommendedSample,
             },
           ], { silent: true });
@@ -2607,6 +2610,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
           ...buildCatalogDownloadButtonProps({
           family,
           item: entry,
+          catalogEntry: entry,
+          catalogSource: 'google',
           onDownloadZip: downloadGooglePackageZip,
           onDownloadAsFormat: (it, format) => downloadGoogleAsFormat(it, format),
           onDownloadVariableVariant: downloadGoogleVariableVariant,
@@ -2687,6 +2692,8 @@ ${Object.entries(variableSettings).map(([tag, value]) => `  --font-${tag}: ${val
         ...buildCatalogDownloadButtonProps({
         family,
         item,
+        catalogEntry: item,
+        catalogSource: 'fontsource',
         onDownloadZip: downloadFontsourcePackageZip,
         onDownloadAsFormat: (it, format) => downloadFontsourceAsFormat(it, format),
         onDownloadVariableVariant: downloadFontsourceVariableVariant,
