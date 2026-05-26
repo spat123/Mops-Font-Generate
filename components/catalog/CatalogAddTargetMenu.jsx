@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { PlusIcon } from '../ui/CommonIcons';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { Tooltip } from '../ui/Tooltip';
@@ -265,8 +264,22 @@ export function CatalogAddTargetMenu({
                     : 'text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                <PlusIcon className="h-4 w-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate text-center">Создать новую</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="h-4 w-4 shrink-0"
+                  aria-hidden
+                >
+                  <path
+                    d="M12 4.5v15m7.5-7.5h-15"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="min-w-0 flex-1 truncate text-center">Создать</span>
                 {isAuthenticated && !canCreateNewLibrary ? (
                   <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                     Pro

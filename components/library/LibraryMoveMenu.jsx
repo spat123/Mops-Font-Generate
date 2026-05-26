@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PlusIcon } from '../ui/CommonIcons';
 import CatalogSessionAddSpinner from '../ui/CatalogSessionAddSpinner';
 import { Tooltip } from '../ui/Tooltip';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
@@ -30,7 +29,7 @@ export function LibraryMoveMenu({
   onMoveToLibrary,
   onCreateLibrary,
 }) {
-  const { assertCanCreateNewLibrary, isAuthenticated } = useLibraryAuth();
+  const { assertCanCreateNewLibrary, isAuthenticated, canCreateNewLibrary, openPlans } = useLibraryAuth();
   const [open, setOpen] = useState(false);
   const [pendingTargetLibraryId, setPendingTargetLibraryId] = useState(null);
   const [progressActive, setProgressActive] = useState(false);
@@ -261,25 +260,57 @@ export function LibraryMoveMenu({
             </div>
           ) : null}
           <div className={`${libraries.length > 0 ? 'border-t border-gray-200' : ''} p-1`}>
-            <button
-              type="button"
-              role="menuitem"
-              disabled={busy || !hasSelection}
-              onClick={() => {
-                if (busy || !hasSelection) return;
-                setOpen(false);
-                if (!assertCanCreateNewLibrary()) return;
-                onCreateLibrary?.();
-              }}
-              className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors disabled:cursor-default disabled:opacity-50 ${
-                availableLibraries.length === 0
-                  ? 'bg-accent text-white hover:bg-accent-hover'
-                  : 'text-gray-900 hover:bg-gray-100'
-              }`}
+            <Tooltip
+              as="div"
+              className="block w-full"
+              content={!canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'}
+              openDelayMs={150}
             >
-              <PlusIcon className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 flex-1 truncate text-center">Добавить библиотеку</span>
-            </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={busy || !hasSelection || !canCreateNewLibrary}
+                onClick={() => {
+                  if (busy || !hasSelection) return;
+                  if (!canCreateNewLibrary) {
+                    openPlans?.();
+                    return;
+                  }
+                  setOpen(false);
+                  if (!assertCanCreateNewLibrary()) return;
+                  onCreateLibrary?.();
+                }}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
+                  !canCreateNewLibrary
+                    ? 'cursor-not-allowed text-gray-400'
+                    : busy || !hasSelection
+                      ? 'cursor-not-allowed opacity-50 text-gray-400'
+                      : 'text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="h-4 w-4 shrink-0"
+                  aria-hidden
+                >
+                  <path
+                    d="M12 4.5v15m7.5-7.5h-15"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="min-w-0 flex-1 truncate text-center">Создать</span>
+                {!canCreateNewLibrary ? (
+                  <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                    Pro
+                  </span>
+                ) : null}
+              </button>
+            </Tooltip>
           </div>
         </div>
       ) : null}

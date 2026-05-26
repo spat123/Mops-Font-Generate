@@ -202,7 +202,7 @@ export function FontLibraryStatusMenu({
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="min-w-0 flex-1 truncate text-center">Создать новую</span>
+                  <span className="min-w-0 flex-1 truncate text-center">Создать</span>
                   {isAuthenticated && !canCreateNewLibrary ? (
                     <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                       Pro
