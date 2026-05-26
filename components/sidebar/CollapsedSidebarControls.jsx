@@ -11,6 +11,7 @@ import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { updateIconUrl } from '../ui/editIconUrls';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../../utils/colorUtils';
 import { getBillingCopy } from '../../utils/billingCopy';
+import { getLibraryCreateActionHint } from '../../utils/libraryCreateLabels';
 
 function getNextCycleValue(options, currentValue) {
   const values = (Array.isArray(options) ? options : [])
@@ -248,6 +249,7 @@ function CollapsedLibraryRail({
   const showLimitUpgrade = libraryLimitReached;
   const showAddLibrary = Boolean(onRequestCreateLibrary) && !showLimitUpgrade;
   const libs = Array.isArray(libraries) ? libraries : [];
+  const createLibraryHint = getLibraryCreateActionHint(libs.length > 0);
   /** Как в FontLibrarySidebar: от 4 библиотек — скролл только списка, действие снизу колонки. */
   const pinAddToBottom = libs.length >= 4;
 
@@ -306,13 +308,13 @@ function CollapsedLibraryRail({
 
   const plusFooter = showAddLibrary ? (
     <div className="flex shrink-0 justify-center pb-1">
-      <Tooltip content="Добавить библиотеку" openDelayMs={200}>
+      <Tooltip content={createLibraryHint} openDelayMs={200}>
         <IconCircleButton
           variant="accent"
           size="md"
           disabled={authLoading}
           onClick={() => onRequestCreateLibrary?.()}
-          aria-label="Добавить библиотеку"
+          aria-label={createLibraryHint}
         >
           <PlusIcon />
         </IconCircleButton>

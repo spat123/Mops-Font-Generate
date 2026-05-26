@@ -3,6 +3,7 @@ import CatalogSessionAddSpinner from '../ui/CatalogSessionAddSpinner';
 import { Tooltip } from '../ui/Tooltip';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
+import { getLibraryCreateActionHint, getLibraryCreateMenuLabel } from '../../utils/libraryCreateLabels';
 
 const LIBRARY_MOVE_DELAY_MS = 1400;
 
@@ -116,6 +117,11 @@ export function LibraryMoveMenu({
     clearPendingMove();
   }, [clearPendingMove]);
   const isMoveDisabled = disabled || busy || !hasSelection;
+  const hasLibraries = libraries.length > 0;
+  const createMenuLabel = getLibraryCreateMenuLabel(hasLibraries);
+  const createActionHint = getLibraryCreateActionHint(hasLibraries, {
+    proLocked: !canCreateNewLibrary,
+  });
   const hideToolbarLabel = viewportW < 1024;
   const moveMenuWidthClass = hideToolbarLabel ? 'w-[5.5rem]' : 'w-[11.6rem]';
 
@@ -263,7 +269,7 @@ export function LibraryMoveMenu({
             <Tooltip
               as="div"
               className="block w-full"
-              content={!canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'}
+              content={createActionHint}
               openDelayMs={150}
             >
               <button
@@ -303,7 +309,7 @@ export function LibraryMoveMenu({
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span className="min-w-0 flex-1 truncate text-center">Создать</span>
+                <span className="min-w-0 flex-1 truncate text-center">{createMenuLabel}</span>
                 {!canCreateNewLibrary ? (
                   <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                     Pro

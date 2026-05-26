@@ -3,6 +3,7 @@ import { PlusIcon } from '../ui/CommonIcons';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { Tooltip } from '../ui/Tooltip';
+import { getLibraryCreateActionHint, getLibraryCreateMenuLabel } from '../../utils/libraryCreateLabels';
 
 function ChevronDownIcon({ className = 'h-3 w-3' }) {
   return (
@@ -54,6 +55,13 @@ export function CatalogAddTargetMenu({
   const { authLoading, isAuthenticated, canCreateNewLibrary, requestSignIn, assertCanCreateNewLibrary } =
     useLibraryAuth();
   const hasLibraries = libraries.length > 0;
+  const createMenuLabel = getLibraryCreateMenuLabel(hasLibraries);
+  const createActionHint = getLibraryCreateActionHint(hasLibraries, {
+    proLocked: !canCreateNewLibrary,
+  });
+  const createActionHintAuthenticated = getLibraryCreateActionHint(hasLibraries, {
+    proLocked: isAuthenticated && !canCreateNewLibrary,
+  });
   const isRowAppearance = appearance === 'row';
   const singleButtonClassName = isRowAppearance
     ? `inline-flex max-w-full items-center gap-2 rounded-md border-0 bg-transparent py-1 text-xs uppercase font-semibold leading-none text-black transition-colors hover:text-black group-hover:!text-white group-hover:hover:!text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 disabled:cursor-default disabled:opacity-100 ${className}`.trim()
@@ -152,12 +160,12 @@ export function CatalogAddTargetMenu({
       return null;
     }
     return (
-      <Tooltip content={!canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'} openDelayMs={150}>
+      <Tooltip content={createActionHint} openDelayMs={150}>
         <button
           type="button"
           disabled={busy || !canCreateNewLibrary}
           aria-busy={busy}
-          aria-label="Создать библиотеку"
+          aria-label={createActionHint}
           onClick={() => {
             if (!assertCanCreateNewLibrary()) return;
             void runAction(onCreateLibrary);
@@ -241,7 +249,7 @@ export function CatalogAddTargetMenu({
             <Tooltip
               as="div"
               className="block w-full"
-              content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'}
+              content={createActionHintAuthenticated}
               openDelayMs={150}
             >
               <button
@@ -280,7 +288,7 @@ export function CatalogAddTargetMenu({
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span className="min-w-0 flex-1 truncate text-center">Создать</span>
+                <span className="min-w-0 flex-1 truncate text-center">{createMenuLabel}</span>
                 {isAuthenticated && !canCreateNewLibrary ? (
                   <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                     Pro

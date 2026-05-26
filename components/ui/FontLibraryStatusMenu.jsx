@@ -9,6 +9,7 @@ import { useDismissibleLayer } from './useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { Tooltip } from './Tooltip';
 import { SelectChevronIcon } from './SelectChevronIcon';
+import { getLibraryCreateActionHint, getLibraryCreateMenuLabel } from '../../utils/libraryCreateLabels';
 
 const MENU_Z_INDEX_CLASS = 'z-[300]';
 
@@ -37,6 +38,11 @@ export function FontLibraryStatusMenu({
         .filter(Boolean)
     : [];
   const availableLibraries = Array.isArray(libraries) ? libraries : [];
+  const hasLibraries = availableLibraries.length > 0;
+  const createMenuLabel = getLibraryCreateMenuLabel(hasLibraries);
+  const createActionHint = getLibraryCreateActionHint(hasLibraries, {
+    proLocked: isAuthenticated && !canCreateNewLibrary,
+  });
   const attachedLibraryIds = useMemo(() => {
     if (!entryId && !entryLabel && candidateIds.length === 0 && candidateLabels.length === 0) return new Set();
     return new Set(
@@ -158,7 +164,7 @@ export function FontLibraryStatusMenu({
               <Tooltip
                 as="div"
                 className="block w-full"
-                content={isAuthenticated && !canCreateNewLibrary ? 'Доступно в Pro' : 'Создать библиотеку'}
+                content={createActionHint}
                 openDelayMs={150}
               >
                 <button
@@ -202,7 +208,7 @@ export function FontLibraryStatusMenu({
                       strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="min-w-0 flex-1 truncate text-center">Создать</span>
+                  <span className="min-w-0 flex-1 truncate text-center">{createMenuLabel}</span>
                   {isAuthenticated && !canCreateNewLibrary ? (
                     <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
                       Pro

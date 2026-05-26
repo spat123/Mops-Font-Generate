@@ -23,6 +23,7 @@ import { readLibraryFontDragData } from '../utils/libraryDragData';
 import { EditAssetIcon } from './ui/EditAssetIcon';
 import { downloudIconUrl, editIconUrl, updateIconUrl } from './ui/editIconUrls';
 import { downloadLibraryAsZip } from '../utils/libraryArchiveDownload';
+import { getLibraryCreateActionHint } from '../utils/libraryCreateLabels';
 import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import { PopupDialogHeader } from './ui/PopupDialogHeader';
 import { useLibraryAuth } from '../contexts/LibraryAuthContext';
@@ -358,7 +359,7 @@ export default function FontLibrarySidebar({
   const nameFieldClass = `box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-14 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${NATIVE_SELECT_FIELD_INTERACTIVE} focus:border-black/[0.14] focus:outline-none sm:pl-3`;
   const searchFieldClass = `box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${NATIVE_SELECT_FIELD_INTERACTIVE} focus:border-black/[0.14] focus:outline-none sm:pl-3`;
 
-  const dialogTitle = isEditMode ? 'Редактировать библиотеку' : 'Добавить библиотеку шрифтов';
+  const dialogTitle = isEditMode ? 'Редактировать библиотеку' : 'Создать библиотеку шрифтов';
   const submitLabel = isEditMode ? 'Сохранить' : 'Создать';
 
   const handleLibraryDrop = useCallback(
@@ -508,23 +509,25 @@ export default function FontLibrarySidebar({
         )
       : null;
 
+  const addLibraryCreateHint = getLibraryCreateActionHint(libraries.length > 0);
+
   const addLibraryPlusBlock = useMemo(
     () =>
       canCreateNewLibrary ? (
         <div className="flex justify-center">
-          <Tooltip content="Добавить библиотеку">
+          <Tooltip content={addLibraryCreateHint}>
             <IconCircleButton
               variant="accent"
               size="md"
               onClick={openCreateDialog}
-              aria-label="Добавить библиотеку"
+              aria-label={addLibraryCreateHint}
             >
               <PlusIcon />
             </IconCircleButton>
           </Tooltip>
         </div>
       ) : null,
-    [canCreateNewLibrary, openCreateDialog],
+    [addLibraryCreateHint, canCreateNewLibrary, openCreateDialog],
   );
 
   /** Всегда внизу левой колонки (отдельно от логики «плюса» под списком). */
@@ -828,7 +831,7 @@ export default function FontLibrarySidebar({
                     <IconCircleButton as="span" variant="accent" size="lg">
                       <PlusIcon className="h-5 w-5" />
                     </IconCircleButton>
-                    <span className="leading-5">Добавить библиотеку</span>
+                    <span className="leading-5">Создать библиотеку</span>
                   </button>
                   <p className="text-xs font-normal leading-5 text-gray-300 transition-colors hover:text-gray-600">
                     На данный момент у вас нет библиотек. Создайте библиотеку, чтобы собирать шрифты отдельно от каталога.

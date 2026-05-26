@@ -86,8 +86,8 @@ export function CatalogDownloadSplitButton({
   const doneTimeoutRef = useRef(null);
 
   useEffect(() => {
-    onMenuOpenChange?.(open || styleDialogOpen);
-  }, [open, styleDialogOpen, onMenuOpenChange]);
+    onMenuOpenChange?.(open || styleDialogOpen || actionState !== 'idle');
+  }, [open, styleDialogOpen, actionState, onMenuOpenChange]);
 
   useDismissibleLayer({
     open,
@@ -165,14 +165,14 @@ export function CatalogDownloadSplitButton({
       : 'gap-1.5 px-3';
   const rootClassName = `relative inline-flex ${resolvedHeightClass} w-40.5 items-stretch overflow-hidden rounded-sm ${className}`.trim();
   const primaryClassName = isAccent
-    ? `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${primaryContentClassName} rounded-l-sm bg-accent text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400`
-    : `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${hidePrimaryLabel ? 'justify-center px-3' : roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} rounded-l-sm bg-white text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:bg-gray-50 disabled:text-gray-400`;
+    ? `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${primaryContentClassName} rounded-l-sm bg-accent text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover active:bg-accent-hover disabled:cursor-default disabled:bg-accent/60 disabled:text-white/80`
+    : `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${hidePrimaryLabel ? 'justify-center px-3' : roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} rounded-l-sm bg-white text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:bg-white disabled:text-gray-400 disabled:opacity-60`;
   const secondaryClassName = `${
     isAccent
-      ? `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
+      ? `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover active:bg-accent-hover disabled:cursor-default disabled:border-white/20 disabled:bg-accent/60 disabled:text-white/80 ${
           open ? 'bg-accent-hover' : ''
         }`
-      : `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:border-gray-200 disabled:bg-gray-50 disabled:text-gray-400 ${
+      : `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:border-gray-200 disabled:bg-white disabled:text-gray-400 disabled:opacity-60 ${
           open ? 'bg-white' : ''
         }`
   } ${secondaryButtonClassName}`.trim();
@@ -202,6 +202,7 @@ export function CatalogDownloadSplitButton({
           return;
         }
         setActionState('done');
+        onActionComplete?.();
         doneTimeoutRef.current = window.setTimeout(() => {
           setActionState('idle');
           doneTimeoutRef.current = null;
@@ -232,7 +233,6 @@ export function CatalogDownloadSplitButton({
               event.stopPropagation();
               setOpen(false);
               runActionWithFeedback(item.onSelect);
-              onActionComplete?.();
             }}
             className={`flex w-full items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
               roomy ? 'py-3.5' : 'py-2.5'
@@ -272,7 +272,6 @@ export function CatalogDownloadSplitButton({
         onClick={(event) => {
           event.stopPropagation();
           runActionWithFeedback(onPrimaryClick);
-          onActionComplete?.();
         }}
         className={primaryClassName}
         aria-label={primaryAriaLabel}

@@ -206,7 +206,7 @@ export function CatalogCardHoverOverlay({
       data-no-card-select="true"
       onClick={runOpenWithFeedback}
       disabled={openState === 'loading'}
-      className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
+      className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70"
       aria-label={openAriaLabel}
     >
       {openIcon}
@@ -220,7 +220,7 @@ export function CatalogCardHoverOverlay({
       data-no-card-select="true"
       onClick={runOpenWithFeedback}
       disabled={openState === 'loading'}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70"
       aria-label={openAriaLabel}
     >
       {openIcon}
@@ -252,7 +252,7 @@ export function CatalogCardHoverOverlay({
               data-no-card-select="true"
               onClick={runOpenWithFeedback}
               disabled={openState === 'loading'}
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-70"
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-4 py-1 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70"
               aria-label={openAriaLabel}
             >
               {openIcon}
@@ -269,7 +269,7 @@ export function CatalogCardHoverOverlay({
                 data-no-card-select="true"
                 disabled={Boolean(item.disabled) || Boolean(rowDownloadState.busyKey)}
                 onClick={(event) => runRowDownloadWithFeedback(event, item)}
-                className="inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-md bg-white px-3 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white disabled:cursor-default disabled:opacity-50"
+                className="inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-md bg-white px-3 text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-50"
               >
                 {rowDownloadState.busyKey === item.key ? (
                   <SpinnerIcon className="h-4 w-4" />
