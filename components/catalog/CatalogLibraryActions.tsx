@@ -40,11 +40,14 @@ export function CatalogLibraryActions({
           ? addLibraryEntryToLibrary({ libraryId, libraryEntry, onAddFontToLibrary })
           : false
       }
-      onCreateLibrary={() =>
-        libraryEntry && onRequestCreateLibrary
-          ? requestCreateLibraryFromEntry({ libraryEntry, onRequestCreateLibrary })
-          : false
-      }
+      onCreateLibrary={() => {
+        if (typeof onRequestCreateLibrary !== 'function') return false;
+        if (libraryEntry) {
+          return requestCreateLibraryFromEntry({ libraryEntry, onRequestCreateLibrary });
+        }
+        onRequestCreateLibrary([]);
+        return true;
+      }}
     />
   );
 }

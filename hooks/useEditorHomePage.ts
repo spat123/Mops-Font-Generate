@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import type { NextRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useFontContext } from '../contexts/FontContext';
@@ -683,10 +683,8 @@ export function useEditorHomePage(router: NextRouter) {
       libraryAuthValue,
     });
 
-    
-  const layout: EditorHomeLayoutProps = useMemo(
-    () =>
-      buildEditorHomeLayoutProps({
+    // Не memo: openRequest диалога библиотеки и колбэки каталога должны обновляться на каждый рендер.
+  const layout: EditorHomeLayoutProps = buildEditorHomeLayoutProps({
         cssString,
         mainTab,
         fontsLibraryTab,
@@ -834,29 +832,7 @@ export function useEditorHomePage(router: NextRouter) {
         handleMoveLibraryFont,
         setFileUploadTarget,
         libraryStatusBar,
-      }),
-    [
-      cssString,
-      mainTab,
-      fontsLibraryTab,
-      activeSavedLibrary,
-      selectedFont,
-      fontLibraries,
-      catalogSelectionActions,
-      emptyTabSelectionActions,
-      selectedSavedLibraryFontIds,
-      isSavedLibraryMoveBusy,
-      libraryStatusBar,
-      isExportModalOpen,
-      isGenerateModalOpen,
-      plainPreviewOpen,
-      sidebarSelectedFont,
-      isAnimating,
-      liveWaterfallBaseSize,
-      activeSavedLibraryItems,
-      activeSavedLibraryCatalogItems,
-    ],
-  );
+      });
 
   return {
     libraryAuthValue,
