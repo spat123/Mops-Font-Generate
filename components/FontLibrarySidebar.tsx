@@ -150,6 +150,7 @@ export default function FontLibrarySidebar({
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
   const catalogFetchStartedRef = useRef(false);
+  const appliedSeedRequestIdRef = useRef(null);
   const [draggedLibraryId, setDraggedLibraryId] = useState(null);
   const [dragOverLibraryId, setDragOverLibraryId] = useState(null);
   const [dropTargetLibraryId, setDropTargetLibraryId] = useState(null);
@@ -173,9 +174,19 @@ export default function FontLibrarySidebar({
     }
   }, []);
 
+  const clearLibrarySeedRequest = useCallback(
+    (requestId = createLibrarySeedRequest?.requestId) => {
+      if (!requestId || typeof onCreateLibrarySeedHandled !== 'function') return;
+      onCreateLibrarySeedHandled(requestId);
+    },
+    [createLibrarySeedRequest?.requestId, onCreateLibrarySeedHandled],
+  );
+
   const closeDialog = useCallback(() => {
     setIsDialogOpen(false);
-  }, []);
+    appliedSeedRequestIdRef.current = null;
+    clearLibrarySeedRequest();
+  }, [clearLibrarySeedRequest]);
 
   const clearLibraryDragState = useCallback(() => {
     setDropTargetLibraryId(null);
@@ -292,12 +303,16 @@ export default function FontLibrarySidebar({
   }, [editingLibraryId, libraries, mode, resetDraft]);
 
   useEffect(() => {
-    if (!createLibrarySeedRequest?.requestId) return;
-
+    const requestId = createLibrarySeedRequest?.requestId;
+    if (!requestId) {
+      appliedSeedRequestIdRef.current = null;
+      return;
+    }
+    if (appliedSeedRequestIdRef.current === requestId) return;
+    appliedSeedRequestIdRef.current = requestId;
     setDraft(createDraftWithFonts(createLibrarySeedRequest.selectedFonts));
     setIsDialogOpen(true);
-    onCreateLibrarySeedHandled?.(createLibrarySeedRequest.requestId);
-  }, [createLibrarySeedRequest, onCreateLibrarySeedHandled]);
+  }, [createLibrarySeedRequest]);
 
   const availableEntries = useMemo(
     () => mergeLibraryEntries(mapSessionFontsToLibraryEntries(sessionFonts), catalogEntries),
@@ -353,7 +368,10 @@ export default function FontLibrarySidebar({
 
     resetDraft();
     setIsDialogOpen(false);
+    appliedSeedRequestIdRef.current = null;
+    clearLibrarySeedRequest();
   }, [
+    clearLibrarySeedRequest,
     editingLibraryId,
     libraryName,
     mode,

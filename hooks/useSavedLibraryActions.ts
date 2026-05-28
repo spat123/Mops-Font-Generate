@@ -230,6 +230,7 @@ export function useSavedLibraryActions({
   const requestCreateLibraryWithFonts = useCallback(
     (selectedFonts: LibraryFontEntry[]) => {
       if (!assertCanCreateNewLibrary()) return;
+      setMainTab('library');
       setCreateLibrarySeedRequest({
         requestId:
           typeof crypto !== 'undefined' && crypto.randomUUID
@@ -238,7 +239,7 @@ export function useSavedLibraryActions({
         selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
       });
     },
-    [assertCanCreateNewLibrary, setCreateLibrarySeedRequest],
+    [assertCanCreateNewLibrary, setCreateLibrarySeedRequest, setMainTab],
   );
 
   const openSavedLibrary = useCallback(
