@@ -9,6 +9,7 @@ import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
 import { matchesSearch } from '../utils/searchMatching';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
+import { readFontsourceCatalogCache } from '../utils/fontsourceCatalogCache';
 import {
   countRecentlyAddedLibraryFonts,
   getLibrarySourceLabel,
@@ -44,8 +45,11 @@ function librariesWordAfterDo(n) {
   return 'библиотек';
 }
 
-function readCachedGoogleCatalog() {
-  return mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache());
+function readCachedCatalogLibraryEntries() {
+  return mergeLibraryEntries(
+    mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache()),
+    mapFontsourceCatalogItemsToLibraryEntries(readFontsourceCatalogCache()),
+  );
 }
 
 function createEmptyDraft() {
@@ -142,9 +146,10 @@ export default function FontLibrarySidebar({
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [draft, setDraft] = useState(() => readStoredDraft());
-  const [catalogEntries, setCatalogEntries] = useState(() => readCachedGoogleCatalog());
+  const [catalogEntries, setCatalogEntries] = useState(() => readCachedCatalogLibraryEntries());
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
+  const catalogFetchStartedRef = useRef(false);
   const [draggedLibraryId, setDraggedLibraryId] = useState(null);
   const [dragOverLibraryId, setDragOverLibraryId] = useState(null);
   const [dropTargetLibraryId, setDropTargetLibraryId] = useState(null);
@@ -226,10 +231,16 @@ export default function FontLibrarySidebar({
   }, [closeDialog, isDialogOpen]);
 
   useEffect(() => {
-    if (catalogEntries.length > 0 || isCatalogLoading) return undefined;
+    if (!isDialogOpen) {
+      catalogFetchStartedRef.current = false;
+      return undefined;
+    }
+    if (catalogEntries.length > 0 || catalogFetchStartedRef.current) return undefined;
 
+    catalogFetchStartedRef.current = true;
     let cancelled = false;
     setIsCatalogLoading(true);
+    setCatalogError('');
 
     (async () => {
       try {
@@ -239,15 +250,15 @@ export default function FontLibrarySidebar({
         ]);
 
         const sessionEntries = mapSessionFontsToLibraryEntries(sessionFonts);
-        let googleItems = readCachedGoogleCatalog();
-        let fontsourceItems = [];
+        let googleItems = mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache());
+        let fontsourceItems = mapFontsourceCatalogItemsToLibraryEntries(readFontsourceCatalogCache());
 
         if (googleItems.length === 0 && googleRes.status === 'fulfilled' && googleRes.value.ok) {
           const data = await googleRes.value.json();
           googleItems = mapGoogleCatalogItemsToLibraryEntries(Array.isArray(data.items) ? data.items : []);
         }
 
-        if (fontsourceRes.status === 'fulfilled' && fontsourceRes.value.ok) {
+        if (fontsourceItems.length === 0 && fontsourceRes.status === 'fulfilled' && fontsourceRes.value.ok) {
           const data = await fontsourceRes.value.json();
           fontsourceItems = mapFontsourceCatalogItemsToLibraryEntries(
             Array.isArray(data.items) ? data.items : [],
@@ -271,7 +282,7 @@ export default function FontLibrarySidebar({
     return () => {
       cancelled = true;
     };
-  }, [isCatalogLoading, catalogEntries.length, sessionFonts]);
+  }, [isDialogOpen, catalogEntries.length, sessionFonts]);
 
   useEffect(() => {
     if (mode !== 'edit' || !editingLibraryId) return;
@@ -478,10 +489,12 @@ export default function FontLibrarySidebar({
                           ))}
                         </div>
                       </>
-                    ) : availableEntries.length === 0 ? (
+                    ) : availableEntries.length === 0 && selectedFonts.length === 0 ? (
                       <p className="text-sm text-gray-500">
                         {isCatalogLoading ? 'Загружаю список шрифтов...' : 'Список шрифтов пока пуст.'}
                       </p>
+                    ) : availableEntries.length === 0 && isCatalogLoading ? (
+                      <p className="text-sm text-gray-500">Догружаю полный список шрифтов...</p>
                     ) : (
                       <p className="text-sm text-gray-500">По запросу ничего не найдено.</p>
                     )}

@@ -479,7 +479,7 @@ export function CatalogPanelToolbar({
   /** 4-я карточка 3-й строки — курсив + сортировка (селект «Популярное» и др.). */
   const wideDesktopItalicSortSlot = (
     <div
-      className="flex h-10 min-w-0 shrink-0 items-center gap-2"
+      className="flex h-10 min-w-0 shrink-0 items-center gap-4"
       style={cardWidthStyle}
     >
       {italicControlNode}

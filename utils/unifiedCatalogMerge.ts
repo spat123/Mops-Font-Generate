@@ -1,4 +1,5 @@
 import { slugifyFontKey } from './fontSlug';
+import { pickCatalogPopularityScore } from './catalogPopularityScore';
 import { resolveMergedCatalogCategory } from './fontCategoryLabels';
 import { CATALOG_FEELING_FILTER_ORDER } from './catalogFeelingFilter';
 import { CATALOG_SHAPE_FILTER_ORDER } from './catalogShapeFilter';
@@ -271,6 +272,81 @@ export function bestDownloadSourceId(item: MergedCatalogItem | CatalogUnifiedIte
   const demo = sources.find((s) => s?.id === 'demo');
   if (demo) return 'demo';
   return sources[0]?.id || '';
+}
+
+/**
+ * Порядок источников в каталоге: 0 — Google/Fontsource (в приложении),
+ * 1 — Fontshare с локальной загрузкой, 2 — только внешний источник (trial / ITF и т.п.).
+ */
+export function catalogItemSourceTier(item: MergedCatalogItem | CatalogUnifiedItem): number {
+  const sources = Array.isArray(item?.sources) ? item.sources : [];
+  if (sources.some((s) => s?.id === 'google' || s?.id === 'fontsource')) return 0;
+  if (sources.some((s) => s?.id === 'fontshare' && (s as UnifiedCatalogSource).canDownloadHere)) return 1;
+  return 2;
+}
+
+export function getCatalogSourcePopularityForSort(
+  source: CatalogSourceLike | UnifiedCatalogSource,
+): number {
+  const raw = (source?.raw || {}) as CatalogRow;
+  const id = source?.id;
+  if (id === 'google') {
+    const defaultSort = Number(raw.defaultSort);
+    if (Number.isFinite(defaultSort) && defaultSort > 0) {
+      return Math.max(0, 1_000_000 - defaultSort);
+    }
+    const pop = Number(raw.popularity);
+    if (Number.isFinite(pop) && pop > 0) return pop;
+    return 0;
+  }
+  if (id === 'fontsource') {
+    const picked = pickCatalogPopularityScore(raw as Record<string, unknown>);
+    if (picked > 0) return picked;
+    const score = Number(raw.popularityScore);
+    if (Number.isFinite(score) && score > 0) return score;
+    return 0;
+  }
+  if (id === 'fontshare' || id === 'demo') {
+    const score = Number(raw.popularityScore);
+    if (Number.isFinite(score) && score > 0) return score;
+    return pickCatalogPopularityScore(raw as Record<string, unknown>);
+  }
+  return 0;
+}
+
+/** Популярность для сортировки: не смешиваем просмотры Fontshare с рангом Google/Fontsource. */
+export function catalogItemPopularityForSort(item: MergedCatalogItem | CatalogUnifiedItem): number {
+  const sources = Array.isArray(item?.sources) ? item.sources : [];
+  const primaryPool = sources.filter((s) => s?.id === 'google' || s?.id === 'fontsource');
+  const pool = primaryPool.length > 0 ? primaryPool : sources;
+  let max = 0;
+  for (const s of pool) {
+    max = Math.max(max, getCatalogSourcePopularityForSort(s));
+  }
+  return max;
+}
+
+export function compareUnifiedCatalogByPopular(
+  a: MergedCatalogItem | CatalogUnifiedItem,
+  b: MergedCatalogItem | CatalogUnifiedItem,
+): number {
+  const tierDiff = catalogItemSourceTier(a) - catalogItemSourceTier(b);
+  if (tierDiff !== 0) return tierDiff;
+
+  const byPopularity = catalogItemPopularityForSort(b) - catalogItemPopularityForSort(a);
+  if (byPopularity !== 0) return byPopularity;
+
+  const byStyleCount = (Number(b?.styleCount) || 0) - (Number(a?.styleCount) || 0);
+  if (byStyleCount !== 0) return byStyleCount;
+
+  const bySubsets =
+    (Array.isArray(b?.subsets) ? b.subsets.length : 0) -
+    (Array.isArray(a?.subsets) ? a.subsets.length : 0);
+  if (bySubsets !== 0) return bySubsets;
+
+  return String(a.displayName || '').localeCompare(String(b.displayName || ''), 'ru', {
+    sensitivity: 'base',
+  });
 }
 
 /** Превью на карточке: Google CSS быстрее, чем woff2 через Fontsource API. */

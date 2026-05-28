@@ -64,6 +64,7 @@ import {
   bestDownloadSourceId,
   bestPreviewSourceId,
   buildUnifiedLibraryEntry,
+  compareUnifiedCatalogByPopular,
   isUnifiedCatalogItemFullyInSession,
 } from '../../utils/unifiedCatalogMerge';
 import {
@@ -273,25 +274,7 @@ export default function UnifiedCatalogPanel({
 
   const sorters = useMemo(
     () => ({
-      popular: (a, b) => {
-        const aPop = Math.max(
-          0,
-          ...((a?.sources || []).map((s) => Number(s?.raw?.popularityScore || s?.raw?.popularity || 0) || 0)),
-        );
-        const bPop = Math.max(
-          0,
-          ...((b?.sources || []).map((s) => Number(s?.raw?.popularityScore || s?.raw?.popularity || 0) || 0)),
-        );
-        const byPopularity = bPop - aPop;
-        if (byPopularity !== 0) return byPopularity;
-        const byStyleCount = (Number(b?.styleCount) || 0) - (Number(a?.styleCount) || 0);
-        if (byStyleCount !== 0) return byStyleCount;
-        const bySubsets =
-          (Array.isArray(b?.subsets) ? b.subsets.length : 0) -
-          (Array.isArray(a?.subsets) ? a.subsets.length : 0);
-        if (bySubsets !== 0) return bySubsets;
-        return String(a.displayName || '').localeCompare(String(b.displayName || ''), 'ru', { sensitivity: 'base' });
-      },
+      popular: compareUnifiedCatalogByPopular,
       'name-asc': (a, b) =>
         String(a.displayName || '').localeCompare(String(b.displayName || ''), 'ru', { sensitivity: 'base' }),
       'name-desc': (a, b) =>
