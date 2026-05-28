@@ -12,6 +12,7 @@ import {
 import type {
   CatalogRow,
   CatalogSourceId,
+  CatalogSourceLike,
   CatalogSourceRef,
   CatalogUnifiedItem,
   MergedCatalogItem,
@@ -289,7 +290,7 @@ export function bestPreviewSourceId(item: MergedCatalogItem | CatalogUnifiedItem
 export function getCatalogSourceRef(
   item: MergedCatalogItem | CatalogUnifiedItem,
   sourceId: string,
-): UnifiedCatalogSource | null {
+): CatalogSourceLike | null {
   const sources = Array.isArray(item?.sources) ? item.sources : [];
   return sources.find((s) => s?.id === sourceId) || sources[0] || null;
 }

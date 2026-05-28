@@ -24,6 +24,9 @@ export type UnifiedCatalogSource = {
   canDownloadHere: boolean;
 };
 
+/** Источник каталога в карточке (до или после merge). */
+export type CatalogSourceLike = CatalogSourceRef | UnifiedCatalogSource;
+
 export type CatalogRow = Record<string, unknown>;
 
 /** Элемент каталога с полями для поиска и фильтрации. */
