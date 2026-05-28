@@ -327,7 +327,7 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
       .map((r) => {
         const item = r.shareItem as ShareCatalogItem;
         const slug = String(item?.key || '').trim();
-        const label = String(item?.label || item?.family || slug).trim();
+        const label = String(item?.family || slug).trim();
         return slug ? { slug, label } : null;
       })
       .filter((job): job is { slug: string; label: string } => Boolean(job));
