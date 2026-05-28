@@ -8,7 +8,7 @@ import {
   isValidElement,
   type CSSProperties,
   type DragEvent,
-  type PointerEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -34,11 +34,11 @@ export type CatalogFontCardProps = {
   pinPreviewToBottom?: boolean;
   pinPreviewColumnClassName?: string;
   titleClassName?: string;
-  onClick?: (event: PointerEvent<HTMLDivElement>) => void;
-  onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void;
-  onPointerUp?: (event: PointerEvent<HTMLDivElement>) => void;
-  onPointerLeave?: (event: PointerEvent<HTMLDivElement>) => void;
-  onPointerCancel?: (event: PointerEvent<HTMLDivElement>) => void;
+  onClick?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerLeave?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerCancel?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   draggable?: boolean;
   onDragStart?: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd?: (event: DragEvent<HTMLDivElement>) => void;
@@ -130,7 +130,7 @@ export function CatalogFontCard({
 
   useEffect(() => {
     if (!touchUiPinned || downloadUiPinned || openUiPinned) return undefined;
-    const onDocumentPointerDown = (event: PointerEvent) => {
+    const onDocumentPointerDown = (event: globalThis.PointerEvent) => {
       const rootNode = rootRef.current;
       if (!rootNode) return;
       if (rootNode.contains(event.target as Node)) return;
@@ -152,7 +152,7 @@ export function CatalogFontCard({
   }, [selected]);
 
   const handlePointerDown = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       if (
         !selected &&
         (prefersCoarsePointer || event.pointerType === 'touch') &&
@@ -167,7 +167,7 @@ export function CatalogFontCard({
   );
 
   const handlePointerLeave = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       if (!touchUiPinned) {
         setShowHoverUi(false);
       }
@@ -177,7 +177,7 @@ export function CatalogFontCard({
   );
 
   const handlePointerCancel = useCallback(
-    (event: PointerEvent<HTMLDivElement>) => {
+    (event: ReactPointerEvent<HTMLDivElement>) => {
       setShowHoverUi(false);
       setTouchUiPinned(false);
       onPointerCancel?.(event);
