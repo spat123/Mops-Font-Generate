@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { toast } from '../utils/appNotify';
 import { getMaxSavedLibrariesForUser } from '../utils/authLibraryLimits';
 import { getBillingCopy } from '../utils/billingCopy';
+import { resolveLibraryAuthState } from '../utils/libraryAuthState';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 
 type UseLibraryAuthParams = {
@@ -29,36 +30,45 @@ export function useLibraryAuth({ authStatus, session, needsLink, fontLibraries }
     void signIn(undefined, { callbackUrl });
   }, []);
 
+  const authState = resolveLibraryAuthState(authStatus, session);
+  const needsLinkActive = authState.needsLink;
+
   useEffect(() => {
-    if (!needsLink) {
+    if (!needsLinkActive) {
       needsLinkToastShownRef.current = false;
       return;
     }
+    if (authState.authLoading) return;
     if (typeof window === 'undefined') return;
     const path = router.pathname || '';
     if (path === '/auth/link' || path.startsWith('/auth/')) return;
     if (!needsLinkToastShownRef.current) {
       needsLinkToastShownRef.current = true;
-      toast.info('Подтвердите привязку аккаунта');
+      const reason = session?.user?.canCreateLibrariesReason;
+      toast.info(
+        reason ||
+          'Вы вошли через Google, но нужно подтвердить привязку к существующему аккаунту с этим email.',
+      );
     }
-    if (path !== '/auth/link') {
-      void router.push('/auth/link');
-    }
-  }, [needsLink, router.pathname, router]);
+  }, [authState.authLoading, needsLinkActive, router.pathname, session?.user?.canCreateLibrariesReason]);
 
   const assertCanCreateNewLibrary = useCallback(() => {
-    if (authStatus === 'loading') {
+    if (authState.authLoading) {
       toast.info('Проверка входа…');
       return false;
     }
-    if (authStatus !== 'authenticated') {
+    if (!authState.isAuthenticated) {
       toast.info('Войдите, чтобы создавать библиотеки');
       requestSignIn();
       return false;
     }
-    if (needsLink) {
-      toast.info('Подтвердите привязку аккаунта');
-      void router.push('/auth/link');
+    if (needsLinkActive || !authState.canCreateFromSession) {
+      const reason = session?.user?.canCreateLibrariesReason;
+      toast.info(
+        reason ||
+          'Подтвердите привязку аккаунта (вход через Google и пароль на один email).',
+      );
+      if (needsLinkActive) void router.push('/auth/link');
       return false;
     }
     const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
@@ -69,12 +79,15 @@ export function useLibraryAuth({ authStatus, session, needsLink, fontLibraries }
     }
     return true;
   }, [
-    authStatus,
+    authState.authLoading,
+    authState.canCreateFromSession,
+    authState.isAuthenticated,
     fontLibraries.length,
+    needsLinkActive,
     requestSignIn,
-    session?.user?.isPro,
-    needsLink,
     router,
+    session?.user?.canCreateLibrariesReason,
+    session?.user?.isPro,
     openPlans,
   ]);
 
@@ -83,30 +96,35 @@ export function useLibraryAuth({ authStatus, session, needsLink, fontLibraries }
     const maxLibs = getMaxSavedLibrariesForUser(isPro);
     const librariesCount = fontLibraries.length;
     const libraryLimitReached =
-      authStatus === 'authenticated' && librariesCount >= maxLibs;
+      authState.isAuthenticated && librariesCount >= maxLibs;
     return {
-      authLoading: authStatus === 'loading',
-      isAuthenticated: authStatus === 'authenticated',
+      authLoading: authState.authLoading,
+      isAuthenticated: authState.isAuthenticated,
       isPro,
       planName: session?.user?.plan === 'pro' ? 'Pro' : 'Free',
       librariesCount,
       librariesLimit: maxLibs,
       libraryLimitReached,
       canCreateNewLibrary:
-        authStatus === 'authenticated' && !needsLink && !libraryLimitReached,
+        authState.isAuthenticated &&
+        !needsLinkActive &&
+        authState.canCreateFromSession &&
+        !libraryLimitReached,
       requestSignIn,
       openPlans,
       assertCanCreateNewLibrary,
     };
   }, [
-    authStatus,
-    fontLibraries.length,
-    requestSignIn,
     assertCanCreateNewLibrary,
+    authState.authLoading,
+    authState.canCreateFromSession,
+    authState.isAuthenticated,
+    fontLibraries.length,
+    needsLinkActive,
+    openPlans,
+    requestSignIn,
     session?.user?.isPro,
     session?.user?.plan,
-    needsLink,
-    openPlans,
   ]);
 
   return {

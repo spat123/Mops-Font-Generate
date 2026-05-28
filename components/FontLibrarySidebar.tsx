@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { CardActionsMenu } from './ui/CardActionsMenu';
 import { PlusIcon, TrashIcon, ShareIcon } from './ui/CommonIcons';
 import { Tooltip } from './ui/Tooltip';
@@ -17,7 +17,6 @@ import { addLibraryEntryToLibrary } from '../utils/libraryEntryActions';
 import { useLibraryAuth } from '../contexts/LibraryAuthContext';
 import { AppButton } from './ui/AppButton';
 import { getBillingCopy } from '../utils/billingCopy';
-import type { SavedLibraryRecord } from '../types/editorFonts';
 
 /** Род. после «до N …»: до 1 библиотеки, до 3 библиотек, до 21 библиотеки. */
 function librariesWordAfterDo(n) {
@@ -35,9 +34,9 @@ export default function FontLibrarySidebar({
   onOpenLibrary,
   onDeleteLibrary,
   onReorderLibraries,
+  onAddFontToLibrary,
   onRequestOpenCreateLibrary,
   onRequestOpenEditLibrary,
-  onAddFontToLibrary,
   onShareLibrary,
 }) {
   const {
@@ -63,9 +62,9 @@ export default function FontLibrarySidebar({
   /** От 4 библиотек — скролл только списка, блок «Добавить» закреплён снизу панели. */
   const pinLibraryAddToBottom = libraries.length >= 4;
 
-  const [draggedLibraryId, setDraggedLibraryId] = useState<string | null>(null);
-  const [dragOverLibraryId, setDragOverLibraryId] = useState<string | null>(null);
-  const [dropTargetLibraryId, setDropTargetLibraryId] = useState<string | null>(null);
+  const [draggedLibraryId, setDraggedLibraryId] = useState(null);
+  const [dragOverLibraryId, setDragOverLibraryId] = useState(null);
+  const [dropTargetLibraryId, setDropTargetLibraryId] = useState(null);
 
   const clearLibraryDragState = useCallback(() => {
     setDropTargetLibraryId(null);
@@ -74,11 +73,12 @@ export default function FontLibrarySidebar({
   }, []);
 
   const openCreateDialog = useCallback(() => {
+    if (!assertCanCreateNewLibrary()) return;
     onRequestOpenCreateLibrary?.();
-  }, [onRequestOpenCreateLibrary]);
+  }, [assertCanCreateNewLibrary, onRequestOpenCreateLibrary]);
 
   const openEditDialog = useCallback(
-    (library: SavedLibraryRecord) => {
+    (library) => {
       onRequestOpenEditLibrary?.(library);
     },
     [onRequestOpenEditLibrary],
@@ -105,7 +105,6 @@ export default function FontLibrarySidebar({
     },
     [clearLibraryDragState, draggedLibraryId, onAddFontToLibrary, onReorderLibraries],
   );
-
 
   const addLibraryCreateHint = getLibraryCreateActionHint(libraries.length > 0);
 

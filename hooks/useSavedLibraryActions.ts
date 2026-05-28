@@ -13,14 +13,10 @@ import {
   findCanonicalLibraryFontEntry,
 } from '../utils/savedLibraryFontEntryMatch';
 import { useLibraryEntryPrefetch } from './useLibraryEntryPrefetch';
+import type { LibraryCreateDialogRequest } from '../types/libraryCreateDialog';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 
 type LibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
-
-import {
-  newLibraryCreateDialogRequestId,
-  type LibraryCreateDialogRequest,
-} from '../components/library/LibraryCreateDialog';
 
 type UseSavedLibraryActionsParams = {
   fontLibraries: SavedLibraryRecord[];
@@ -232,8 +228,11 @@ export function useSavedLibraryActions({
       if (!assertCanCreateNewLibrary()) return;
       setMainTab('library');
       setLibraryCreateDialogRequest({
-        requestId: newLibraryCreateDialogRequestId(),
-        mode: 'seed',
+        requestId:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `library-dialog:${Date.now()}`,
+        mode: 'create',
         selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
       });
     },

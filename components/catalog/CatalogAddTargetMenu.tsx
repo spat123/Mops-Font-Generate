@@ -163,17 +163,17 @@ export function CatalogAddTargetMenu({
   }, [stateKey]);
 
   if (!hasLibraries) {
-    if (authLoading) {
-      return (
-        <span
-          className={`inline-flex h-5 min-w-[1.25rem] items-center justify-center text-gray-400 ${className}`.trim()}
-          aria-hidden
-        >
-          <span className="h-3 w-3 animate-pulse rounded-full bg-gray-300" />
-        </span>
-      );
-    }
     if (!isAuthenticated) {
+      if (authLoading) {
+        return (
+          <span
+            className={`inline-flex h-5 min-w-[1.25rem] items-center justify-center text-gray-400 ${className}`.trim()}
+            aria-hidden
+          >
+            <span className="h-3 w-3 animate-pulse rounded-full bg-gray-300" />
+          </span>
+        );
+      }
       return null;
     }
     return (

@@ -77,7 +77,7 @@ export default function MyApp({
         />
       ) : null}
 
-      <SessionProvider session={session}>
+      <SessionProvider session={session} refetchOnWindowFocus={false}>
         <AuthReturningUserMarker />
         <SettingsProvider>
           <FontProvider>

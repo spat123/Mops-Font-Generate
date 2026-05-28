@@ -30,6 +30,8 @@ export type CatalogFontCardProps = {
   hoverOverlay?: ReactNode;
   /** Фон при наведении / touch-активации: `accent` — как ROW-режим. */
   hoverSurface?: CatalogFontCardHoverSurface;
+  /** Показывать кнопки действий без предварительного hover (например, «+» в пустой библиотеке). */
+  pinActionsVisible?: boolean;
   fadeFooterWithHoverUi?: boolean;
   pinPreviewToBottom?: boolean;
   pinPreviewColumnClassName?: string;
@@ -58,6 +60,7 @@ export function CatalogFontCard({
   selectionOverlay = null,
   hoverOverlay = null,
   hoverSurface = 'neutral',
+  pinActionsVisible = false,
   /** Плитка: при наведении (оверлей «Открыть»/«Скачать») скрывать строку метаданных внизу карточки */
   fadeFooterWithHoverUi = false,
   /** Превью внизу оставшейся высоты карточки (режим ROW) */
@@ -141,7 +144,7 @@ export function CatalogFontCard({
     return () => document.removeEventListener('pointerdown', onDocumentPointerDown, true);
   }, [touchUiPinned, downloadUiPinned, openUiPinned]);
 
-  const showInteractiveUi = !selected && (busy || hoverUiActive);
+  const showInteractiveUi = !selected && (busy || hoverUiActive || pinActionsVisible);
   const actionsClassName =
     'absolute right-2 top-2 z-30 max-w-[min(100%,12rem)] transition-opacity duration-75 ' +
     (showInteractiveUi ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0');

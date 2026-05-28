@@ -23,9 +23,9 @@ export function useSavedLibrarySearchQuery() {
 
   const openSavedLibrarySearch = useCallback(() => {
     setIsSavedLibrarySearchExpanded(true);
-    requestAnimationFrame(() => {
+    window.setTimeout(() => {
       savedLibrarySearchInputRef.current?.focus();
-    });
+    }, 320);
   }, []);
 
   const resetSavedLibrarySearch = useCallback(() => {

@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useIsomorphicLayoutEffect } from '../../hooks/useIsomorphicLayoutEffect';
 import { formatFontVariationSettings } from '../../utils/fontVariationSettings';
 
 const FAMILY = 'Roboto Flex';
@@ -249,7 +250,7 @@ export function AuthAnimatedLetters({ isRuGeo = false }) {
   }, []);
 
   // Сразу после смены буквы — только заглавная (до paint), без кадра «обе буквы».
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (reducedMotion) {
       setCenterPhase('lower');
       return;
@@ -258,7 +259,7 @@ export function AuthAnimatedLetters({ isRuGeo = false }) {
   }, [centerIndex, reducedMotion, alphabet.length]);
 
   // Пока только заглавная — дефолты для обеих ячеек (строчная скрыта, но FVS уже «своё» — без скачка).
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (reducedMotion) return;
     if (centerPhase !== 'upper') return;
     setCenterUpperFvs(stableDefaultUpperFvs);

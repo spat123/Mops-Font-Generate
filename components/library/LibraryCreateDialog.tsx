@@ -1,17 +1,14 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-  type PointerEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { SavedLibraryRecord, SessionFontRecord } from '../../types/editorFonts';
+import type { LibraryCreateDialogRequest } from '../../types/libraryCreateDialog';
+import type { SavedLibraryFontEntry } from '../../types/savedLibrary';
 import { SelectableChip } from '../ui/SelectableChip';
 import { SearchIcon } from '../ui/CommonIcons';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from '../ui/nativeSelectFieldClasses';
 import { SearchClearButton } from '../ui/SearchClearButton';
+import { PopupDialogHeader } from '../ui/PopupDialogHeader';
+import { AppButton } from '../ui/AppButton';
 import { matchesSearch } from '../../utils/searchMatching';
 import { readGoogleFontCatalogCache } from '../../utils/googleFontCatalogCache';
 import { readFontsourceCatalogCache } from '../../utils/fontsourceCatalogCache';
@@ -22,21 +19,14 @@ import {
   mergeLibraryEntries,
   normalizeLibraryText,
 } from '../../utils/fontLibraryUtils';
-import { PopupDialogHeader } from '../ui/PopupDialogHeader';
-import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
-import { AppButton } from '../ui/AppButton';
 import {
-  createDraftWithFonts,
-  createEditDraft,
-  createEmptyDraft,
-  FONT_LIBRARY_DRAFT_STORAGE_KEY,
-  LIBRARY_NAME_MAX_LENGTH,
-  readStoredLibraryCreateDraft,
-  type LibraryCreateDialogDraft,
-} from './libraryCreateDialogDraft';
-import type { SavedLibraryRecord, SessionFontRecord } from '../../types/editorFonts';
-import type { SavedLibraryFontEntry } from '../../types/savedLibrary';
+  createEmptyLibraryDraft,
+  createLibraryDraftWithFonts,
+  createLibraryEditDraft,
+  type LibraryCreateDraft,
+} from '../../utils/libraryCreateDraft';
 
+const LIBRARY_NAME_MAX_LENGTH = 32;
 const SEARCH_RESULTS_LIMIT = 24;
 
 function readCachedCatalogLibraryEntries() {
@@ -46,22 +36,8 @@ function readCachedCatalogLibraryEntries() {
   );
 }
 
-export function newLibraryCreateDialogRequestId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : `library-dialog:${Date.now()}`;
-}
-
-export type LibraryCreateDialogRequest = {
-  requestId: string;
-  mode: 'create' | 'edit' | 'seed';
-  library?: SavedLibraryRecord | null;
-  selectedFonts?: SavedLibraryFontEntry[];
-};
-
 export type LibraryCreateDialogProps = {
   sessionFonts?: SessionFontRecord[];
-  libraries?: SavedLibraryRecord[];
   openRequest?: LibraryCreateDialogRequest | null;
   onOpenRequestHandled?: (requestId: string) => void;
   openCreateLibrarySignal?: number;
@@ -72,7 +48,6 @@ export type LibraryCreateDialogProps = {
 
 export function LibraryCreateDialog({
   sessionFonts = [],
-  libraries = [],
   openRequest = null,
   onOpenRequestHandled,
   openCreateLibrarySignal = 0,
@@ -80,88 +55,80 @@ export function LibraryCreateDialog({
   onUpdateLibrary,
   onOpenLibrary,
 }: LibraryCreateDialogProps) {
-  const { assertCanCreateNewLibrary } = useLibraryAuth();
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [draft, setDraft] = useState<LibraryCreateDialogDraft>(() => readStoredLibraryCreateDraft());
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<LibraryCreateDraft>(() => createEmptyLibraryDraft());
   const [catalogEntries, setCatalogEntries] = useState(() => readCachedCatalogLibraryEntries());
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
-
   const catalogFetchStartedRef = useRef(false);
-  const appliedOpenRequestIdRef = useRef<string | null>(null);
-  const backdropCloseGuardUntilRef = useRef(0);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const appliedRequestIdRef = useRef<string | null>(null);
   const lastOpenCreateLibrarySignalRef = useRef(openCreateLibrarySignal);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const { mode, editingLibraryId, libraryName, searchQuery, selectedFonts } = draft;
 
-  const patchDraft = useCallback((patch: Partial<LibraryCreateDialogDraft>) => {
+  const patchDraft = useCallback((patch: Partial<LibraryCreateDraft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
   }, []);
 
   const resetDraft = useCallback(() => {
-    setDraft(createEmptyDraft());
-    if (typeof window !== 'undefined') {
-      try {
-        window.localStorage.removeItem(FONT_LIBRARY_DRAFT_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
-    }
+    setDraft(createEmptyLibraryDraft());
   }, []);
 
-  const clearOpenRequest = useCallback(
-    (requestId = openRequest?.requestId) => {
-      if (!requestId || typeof onOpenRequestHandled !== 'function') return;
-      onOpenRequestHandled(requestId);
+  const closeDialog = useCallback(
+    (requestId?: string | null) => {
+      setOpen(false);
+      appliedRequestIdRef.current = null;
+      catalogFetchStartedRef.current = false;
+      resetDraft();
+      const id = requestId || openRequest?.requestId;
+      if (id && typeof onOpenRequestHandled === 'function') {
+        onOpenRequestHandled(id);
+      }
     },
-    [onOpenRequestHandled, openRequest?.requestId],
+    [onOpenRequestHandled, openRequest?.requestId, resetDraft],
   );
 
-  const scheduleOpenDialog = useCallback(() => {
-    backdropCloseGuardUntilRef.current = Date.now() + 450;
-    if (typeof window === 'undefined') {
-      setIsDialogOpen(true);
-      return;
-    }
-    window.requestAnimationFrame(() => {
-      setIsDialogOpen(true);
-    });
+  const openWithDraft = useCallback((nextDraft: LibraryCreateDraft) => {
+    setDraft(nextDraft);
+    setOpen(true);
   }, []);
 
-  const closeDialog = useCallback(() => {
-    setIsDialogOpen(false);
-    appliedOpenRequestIdRef.current = null;
-    clearOpenRequest();
-  }, [clearOpenRequest]);
-
-  const openCreateDialog = useCallback(() => {
-    if (!assertCanCreateNewLibrary()) return;
-    setDraft((prev) => (prev.mode === 'create' ? prev : createEmptyDraft()));
-    scheduleOpenDialog();
-  }, [assertCanCreateNewLibrary, scheduleOpenDialog]);
-
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(FONT_LIBRARY_DRAFT_STORAGE_KEY, JSON.stringify(draft));
-    } catch {
-      /* ignore */
+    const requestId = openRequest?.requestId;
+    if (!requestId) {
+      appliedRequestIdRef.current = null;
+      return;
     }
-  }, [draft]);
+    if (appliedRequestIdRef.current === requestId) return;
+    appliedRequestIdRef.current = requestId;
+
+    if (openRequest.mode === 'edit' && openRequest.library) {
+      openWithDraft(createLibraryEditDraft(openRequest.library));
+      return;
+    }
+    openWithDraft(createLibraryDraftWithFonts(openRequest.selectedFonts || []));
+  }, [openRequest, openWithDraft]);
 
   useEffect(() => {
-    if (!isDialogOpen) return undefined;
+    if (typeof openCreateLibrarySignal !== 'number' || openCreateLibrarySignal < 1) return;
+    if (openCreateLibrarySignal === lastOpenCreateLibrarySignalRef.current) return;
+    lastOpenCreateLibrarySignalRef.current = openCreateLibrarySignal;
+    appliedRequestIdRef.current = `signal:${openCreateLibrarySignal}`;
+    openWithDraft(createEmptyLibraryDraft());
+  }, [openCreateLibrarySignal, openWithDraft]);
+
+  useEffect(() => {
+    if (!open) return undefined;
     const timeoutId = window.setTimeout(() => {
       nameInputRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [isDialogOpen]);
+  }, [open]);
 
   useEffect(() => {
-    if (!isDialogOpen) return undefined;
+    if (!open) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         closeDialog();
@@ -169,10 +136,10 @@ export function LibraryCreateDialog({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [closeDialog, isDialogOpen]);
+  }, [closeDialog, open]);
 
   useEffect(() => {
-    if (!isDialogOpen) {
+    if (!open) {
       catalogFetchStartedRef.current = false;
       return undefined;
     }
@@ -183,7 +150,7 @@ export function LibraryCreateDialog({
     setIsCatalogLoading(true);
     setCatalogError('');
 
-    void (async () => {
+    (async () => {
       try {
         const [googleRes, fontsourceRes] = await Promise.allSettled([
           fetch('/api/google-fonts-catalog'),
@@ -196,16 +163,10 @@ export function LibraryCreateDialog({
 
         if (googleItems.length === 0 && googleRes.status === 'fulfilled' && googleRes.value.ok) {
           const data = await googleRes.value.json();
-          googleItems = mapGoogleCatalogItemsToLibraryEntries(
-            Array.isArray(data.items) ? data.items : [],
-          );
+          googleItems = mapGoogleCatalogItemsToLibraryEntries(Array.isArray(data.items) ? data.items : []);
         }
 
-        if (
-          fontsourceItems.length === 0 &&
-          fontsourceRes.status === 'fulfilled' &&
-          fontsourceRes.value.ok
-        ) {
+        if (fontsourceItems.length === 0 && fontsourceRes.status === 'fulfilled' && fontsourceRes.value.ok) {
           const data = await fontsourceRes.value.json();
           fontsourceItems = mapFontsourceCatalogItemsToLibraryEntries(
             Array.isArray(data.items) ? data.items : [],
@@ -229,42 +190,7 @@ export function LibraryCreateDialog({
     return () => {
       cancelled = true;
     };
-  }, [isDialogOpen, catalogEntries.length, sessionFonts]);
-
-  useEffect(() => {
-    if (mode !== 'edit' || !editingLibraryId) return;
-    if (libraries.some((item) => item.id === editingLibraryId)) return;
-    resetDraft();
-    setIsDialogOpen(false);
-    appliedOpenRequestIdRef.current = null;
-    clearOpenRequest();
-  }, [clearOpenRequest, editingLibraryId, libraries, mode, resetDraft]);
-
-  useEffect(() => {
-    const requestId = openRequest?.requestId;
-    if (!requestId) {
-      appliedOpenRequestIdRef.current = null;
-      return;
-    }
-    if (appliedOpenRequestIdRef.current === requestId) return;
-    appliedOpenRequestIdRef.current = requestId;
-
-    if (openRequest.mode === 'seed') {
-      setDraft(createDraftWithFonts(openRequest.selectedFonts));
-    } else if (openRequest.mode === 'edit' && openRequest.library) {
-      setDraft(createEditDraft(openRequest.library));
-    } else {
-      setDraft(createEmptyDraft());
-    }
-    scheduleOpenDialog();
-  }, [openRequest, scheduleOpenDialog]);
-
-  useEffect(() => {
-    if (typeof openCreateLibrarySignal !== 'number' || openCreateLibrarySignal < 1) return;
-    if (openCreateLibrarySignal === lastOpenCreateLibrarySignalRef.current) return;
-    lastOpenCreateLibrarySignalRef.current = openCreateLibrarySignal;
-    openCreateDialog();
-  }, [openCreateLibrarySignal, openCreateDialog]);
+  }, [catalogEntries.length, open, sessionFonts]);
 
   const availableEntries = useMemo(
     () => mergeLibraryEntries(mapSessionFontsToLibraryEntries(sessionFonts), catalogEntries),
@@ -317,39 +243,18 @@ export function LibraryCreateDialog({
       }
     }
 
-    resetDraft();
-    setIsDialogOpen(false);
-    appliedOpenRequestIdRef.current = null;
-    clearOpenRequest();
+    closeDialog(openRequest?.requestId);
   }, [
-    clearOpenRequest,
+    closeDialog,
     editingLibraryId,
     libraryName,
     mode,
     onCreateLibrary,
     onOpenLibrary,
     onUpdateLibrary,
-    resetDraft,
+    openRequest?.requestId,
     selectedFonts,
   ]);
-
-  const handleBackdropPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
-      if (event.target !== event.currentTarget) return;
-      if (Date.now() < backdropCloseGuardUntilRef.current) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    },
-    [],
-  );
-
-  const handleBackdropClick = useCallback((event: MouseEvent<HTMLDivElement>) => {
-      if (event.target !== event.currentTarget) return;
-      if (Date.now() < backdropCloseGuardUntilRef.current) return;
-      closeDialog();
-    },
-    [closeDialog],
-  );
 
   const isSubmitDisabled = normalizeLibraryText(libraryName).length === 0;
   const hasSearchInput = searchQuery.trim().length > 0;
@@ -360,9 +265,7 @@ export function LibraryCreateDialog({
   const dialogTitle = isEditMode ? 'Редактировать библиотеку' : 'Создать библиотеку шрифтов';
   const submitLabel = isEditMode ? 'Сохранить' : 'Создать';
 
-  if (!isDialogOpen || typeof document === 'undefined') {
-    return null;
-  }
+  if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
@@ -370,15 +273,13 @@ export function LibraryCreateDialog({
       role="dialog"
       aria-modal="true"
       aria-label={dialogTitle}
-      onPointerDown={handleBackdropPointerDown}
-      onClick={handleBackdropClick}
+      onClick={() => closeDialog()}
     >
       <div
         className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-none border border-gray-200 bg-white"
         onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
       >
-        <PopupDialogHeader title={dialogTitle} onClose={closeDialog} closeAriaLabel="Закрыть окно" />
+        <PopupDialogHeader title={dialogTitle} onClose={() => closeDialog()} closeAriaLabel="Закрыть окно" />
 
         <div className="min-h-0 flex-1 overflow-y-auto p-6">
           <div className="relative">
@@ -392,7 +293,7 @@ export function LibraryCreateDialog({
               placeholder="Например, Гротески"
               className={nameFieldClass}
             />
-            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold tabular-nums text-gray-400">
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-semibold tabular-nums text-gray-400">
               {libraryName.length}/{LIBRARY_NAME_MAX_LENGTH}
             </span>
           </div>
@@ -472,16 +373,10 @@ export function LibraryCreateDialog({
         </div>
 
         <div className="flex shrink-0 items-stretch gap-3 border-t border-gray-200 bg-white px-6 py-4">
-          <AppButton type="button" fullWidth onClick={closeDialog}>
+          <AppButton type="button" fullWidth onClick={() => closeDialog()}>
             Отмена
           </AppButton>
-          <AppButton
-            type="button"
-            variant="accent"
-            fullWidth
-            onClick={handleSubmit}
-            disabled={isSubmitDisabled}
-          >
+          <AppButton type="button" variant="accent" fullWidth onClick={handleSubmit} disabled={isSubmitDisabled}>
             {submitLabel}
           </AppButton>
         </div>

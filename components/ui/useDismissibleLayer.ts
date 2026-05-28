@@ -13,12 +13,7 @@ export function useDismissibleLayer({
   refs = [],
   onDismiss,
   closeOnEscape = true,
-  /**
-   * ВАЖНО: используем `click`, а не `mousedown`.
-   * Если закрывать слой на `mousedown`, первый клик по элементу под ним может "теряться":
-   * слой размонтируется до того, как сработает `onClick` цели.
-   */
-  pointerEventName = 'click',
+  pointerEventName = 'mousedown',
 }: UseDismissibleLayerOptions) {
   useEffect(() => {
     if (!open) return undefined;
@@ -29,7 +24,7 @@ export function useDismissibleLayer({
         return Boolean(node?.contains?.(target as Node));
       });
 
-    const handleOutsideEvent = (event: Event) => {
+    const handlePointerDown = (event: Event) => {
       if (isInsideLayer(event.target)) return;
       onDismiss?.();
     };
@@ -39,11 +34,11 @@ export function useDismissibleLayer({
       onDismiss?.();
     };
 
-    document.addEventListener(pointerEventName, handleOutsideEvent);
+    document.addEventListener(pointerEventName, handlePointerDown);
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      document.removeEventListener(pointerEventName, handleOutsideEvent);
+      document.removeEventListener(pointerEventName, handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [closeOnEscape, onDismiss, open, pointerEventName, refs]);
