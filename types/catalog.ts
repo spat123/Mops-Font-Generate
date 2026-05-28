@@ -52,11 +52,14 @@ export type CatalogSearchableItem = {
 /** Unified-элемент каталога (семейство + sources) — минимальная форма. */
 export type CatalogUnifiedItem = {
   family?: string;
-  sources?: CatalogSourceRef[];
+  sources?: CatalogSourceRef[] | UnifiedCatalogSource[];
   displayName?: string;
   familyKey?: string;
   primarySource?: string;
   isVariable?: boolean;
+  hasItalic?: boolean;
+  styleCount?: number;
+  subsets?: string[];
 };
 
 /** Семейство после mergeCatalogSources. */
