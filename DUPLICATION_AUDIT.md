@@ -3,8 +3,173 @@
 ## Статус
 
 - Дата старта: 2026-04-24
+- **Обновление: 2026-05-27** — unified-каталог, cleanup пакет 1–5 (см. ниже)
 - Цель: искать дублирование между файлами, мусорный код и функции с разными именами, но одинаковой логикой
 - Формат: идем частями по смысловым группам и фиксируем, что уже проверено
+
+## Обновление 2026-05-27 (выполнено)
+
+### Unified-каталог
+
+- Удалены per-source панели: `components/catalog/GoogleFontsCatalogPanel.jsx`, `FontsourceCatalogPanel.jsx`, `GoogleFontsCatalogCard.jsx`, `FontsourceCatalogCard.jsx`
+- Единая точка UI: `UnifiedCatalogPanel`, `UnifiedCatalogCard`, `CatalogSourceCard`
+- Битых импортов удалённых файлов нет
+
+### Cleanup (пакеты 1–5)
+
+- [x] Удалён неиспользуемый `pages/api/fontsource/[fontFamily]/metadata.js`
+- [x] `nodeBufferToBase64` / `base64ToUint8Array` в `utils/base64Utils.js` (API Fontsource + preview cache)
+- [x] `utils/createSlugFamilyCatalogCache.js` — fontshare и fontfabric trial cache
+- [x] `getCatalogUnionStats` / `formatCatalogUnionAvailabilityShort` удалены; везде `getUnifiedCatalogStats` + `formatUnifiedCatalogAvailabilityShort`
+- [x] Удалены неиспользуемые `@deprecated` exports: `googleFontFamilyTags`, `catalogPreviewSample`, `webAlchemyFonttoolsServer`, `previewExportArtifacts`, `fontfabricStyleCount`
+
+### Cleanup (пакеты 6–8, 2026-05-27)
+
+- [x] `utils/createCatalogProxyHandler.js` — `fontshare-catalog.js`, `fontfabric-trial-catalog.js`
+- [x] `utils/createPreviewFamilyLoader.js` — fontshare/fontsource preview runtime cache
+- [x] `utils/buildEditorExportCssCode.js` — вынесено из `pages/index.jsx` (~65 строк)
+
+### Cleanup (пакет 9, 2026-05-27)
+
+- [x] `hooks/useSavedLibraryActions.js` — CRUD, drag на вкладки, move между библиотеками
+- [x] `hooks/useSavedLibraryDerivedState.js` — lookup, фильтры, catalog search, meta карточек
+- [x] `hooks/useSavedLibraryToolbarLayout.js` — breakpoints тулбара
+- [x] `utils/savedLibraryCatalogLookup.js`, `savedLibraryCatalogFontMeta.js`, `filterSavedLibraryFonts.js`, `searchSavedLibraryCatalog.js`, `savedLibraryFontEntryMatch.js`
+- [x] `utils/selectionToolbarActionsState.js` — единая нормализация selection actions
+
+### Cleanup (пакет 10, 2026-05-27)
+
+- [x] `hooks/useCatalogOpenInEditor.js` + `hooks/useEditorFontNav.js` — открытие из каталога
+- [x] `hooks/useOpenLibraryFontEntry.js` — открытие из сохранённой библиотеки
+- [x] `hooks/useSavedLibraryCardItems.jsx` — `activeSavedLibraryItems` / `activeSavedLibraryCatalogItems`
+- [x] `components/library/SavedLibraryCatalogAddCorner.jsx` — кнопка «добавить в библиотеку»
+
+### Cleanup (пакет 11, 2026-05-27)
+
+- [x] `hooks/useSavedLibrarySelection.js` — multi-select, share, download, move
+- [x] `utils/savedLibraryFontMove.js` — общая логика переноса между библиотеками
+- [x] Убран дублирующий state `savedLibrarySelectionCount` → `selectedSavedLibraryFontIds.size`
+
+### Cleanup (пакет 12, 2026-05-27)
+
+- [x] `utils/libraryFontSessionLookup.js` — build keys, session lookup, resolve, isStored
+- [x] `hooks/useLibraryFontSessionLookup.js`
+
+### Cleanup (пакет 13, 2026-05-27)
+
+- [x] `utils/sessionFontCardPreview.js` — `getSessionFontCardPreviewStyle` (Google + session card)
+- [x] `utils/editorTabNavigation.js` — `resolveEditorTabAfterFontClose`
+- [x] `hooks/useEditorFontTabActions.js` — `pickFont`, `closeFontTab`, `removeFontFromSession`
+- [x] `components/editor/EditorTabBarEndActions.jsx` — правая часть таббара (каталог / библиотека / empty / редактор)
+- [x] `hooks/useLibraryStatusBar.js` — статус-бар «Все шрифты»
+- [x] `useSavedLibraryCardItems` — превью-стиль без пропа из `index.jsx`
+- `pages/index.jsx` ~1654 строк (−~160 от пакета 12)
+
+### Cleanup (пакет 14, 2026-05-27)
+
+- [x] `hooks/useLibraryAuth.js` — auth, лимиты, needsLink, Plans
+- [x] `hooks/useSavedLibrarySearchQuery.js` + `hooks/useSavedLibrarySearchControls.jsx`
+- [x] `hooks/useEditorCatalogDeepLink.js` — openGoogle / openFontsource из query
+- [x] `hooks/useEditorExportActions.js` — export / generate / waterfall meta
+- [x] `hooks/useEditorTabBarModel.js` — sidebar font, placeholders, tab bar fonts
+- [x] `hooks/useEmptyPreviewSlots.js` — empty slots + preview cleanup
+- [x] `constants/editorSampleTexts.js`
+- `pages/index.jsx` ~1210 строк (−~440 от пакета 13)
+
+### Cleanup (пакет 15, 2026-05-27)
+
+- [x] `hooks/useEditorFileUpload.js`
+- [x] `hooks/useEditorPreviewOrchestrator.js` + `utils/fontsourcePrewarmFlag.js`
+- [x] `hooks/useEditorShellEffects.js` — валидация вкладок, selection reset, plain preview
+- [x] `hooks/useEditorWaterfallLiveSize.js`
+- [x] `hooks/useShareRouteRedirect.js`
+- [x] `hooks/useSavedLibraryFilters.js` — вкладки, scope, фильтры библиотеки
+- [x] Удалены неиспользуемые импорты в `index.jsx`
+- `pages/index.jsx` ~992 строк (−~220 от пакета 14)
+
+### Cleanup (пакет 16, 2026-05-27)
+
+- [x] `components/editor/EditorHomeLayout.jsx` — head, модалки, сайдбар, таббар, FontPreview, библиотека
+- `pages/index.jsx` ~880 строк (логика + prop wiring; JSX в layout)
+
+### Следующие кандидаты
+
+- `useFontCss.exportToCSS` vs `buildEditorExportCssCode` — разные сценарии (класс vs полный export modal)
+- `hooks/useEditorHomePage.js` — собрать все хуки страницы в один orchestrator (опционально)
+- Миграция JS → TS (см. ниже) — отдельный эпик, не смешивать с рефакторингом
+
+### Cleanup (пакет 19, 2026-05-27) — Google CSS pipeline
+
+- [x] `fetchGoogleCssFaces` в `googleFontsCssShared.ts`; `fetchWoff2BufferFromGoogleCss` строится поверх него
+- [x] `buildGoogleFontsCss2UrlForFaces` / `ForWoff2Download` / `buildGoogleStaticFallbackCssUrl` в `googleApiRouteHelpers.ts`
+- [x] `fetchGoogleFontCssFacesForFamily` — единый pipeline для `google-font-faces`
+- [x] `google-font.ts`, `google-font-faces.ts` — тонкие handlers
+
+### Cleanup (пакет 23, 2026-05-27) — preset / axes recovery
+
+- [x] `applyFontViewStateRestorePlan` — единое применение плана (`safeSelectFont` + persistence boot)
+- [x] `resolveDefaultStaticPresetName`, `resolveRestorablePresetName`, `getFontAvailableStyles` → `fontUtilsCommon`
+- [x] `resolveSelectedPresetDisplayName` — UI-имя пресета (из `useFontManager` useMemo)
+- [x] `buildVariableSettingsForPresetApply` — VF-оси при `applyPresetStyle`
+- [x] Удалён дубль `resolveResetPresetName` ≡ `resolveDefaultStaticPresetName`
+
+### Cleanup (пакет 22, 2026-05-27) — export / font-variation
+
+- [x] `mimeTypeForFontExt` — единый MIME для `ExportModal`, `GenerateFontModal`, `useFontExport`
+- [x] `utils/editorTypography.ts` — `letterSpacingPercentToEm` (ExportModal + buildEditorExportCssCode)
+- [x] `utils/staticFontExportUtils.ts` — `buildVariableSettingsFilenameSuffix` из `useFontExport`
+- [x] `buildEditorExportCssCode` — общий typography block, пресеты wght через `formatFontVariationSettings`
+- [x] `fontVariationSettings` — `parseFontVariationSettingsString`, `stringifyFontVariationEntries`, `upsertFontVariationEntry` (из WaterfallMode)
+- Ложная тревога: `useFontCss.exportToCSS` (класс) vs `buildEditorExportCssCode` (полный modal) — разные сценарии
+
+### Cleanup (пакет 21, 2026-05-27) — download utils
+
+- [x] `utils/catalogCacheLookup.ts` — lookup Google/Fontsource в session/IDB кэше каталога
+- [x] `utils/fontsourceDownloadClient.ts` — API URL, fetch payload, blob из base64
+- [x] `utils/catalogStyleDownload.ts` — `downloadCatalogStylesAsFormat` (Google + Fontsource styles zip)
+- [x] `fileDownloadUtils.uniqueDownloadFileName`, `fontFormatConvertClient.ensureFontBlobFormat` / `blobFromBase64FontData`
+- [x] `savedLibraryFontDownload` → `buildCatalogDownloadButtonProps` (убран дубль menuItems google/fontsource)
+- [x] `libraryArchiveDownload` → `catalogCacheLookup`
+- Кандидат: общий orchestrator single-file download (google vs fontsource current/zip) — пока разный transport
+
+### Cleanup (пакет 20, 2026-05-27) — cache / catalog utils (старт)
+
+- [x] `utils/catalogPopularityScore.ts` ← inline `pickPopularityScore` в `fontsource-catalog.ts`
+- [x] `utils/fetchJsonWithTimeout.ts` ← AbortController-блок в `fontsource-catalog.ts`
+- Уже унифицировано ранее: `createSlugFamilyCatalogCache` (Fontshare + Fontfabric), `createPreviewFamilyLoader` (Fontshare + Fontsource preview)
+- Ложная тревога: `fontsource-catalog` **не** на `createCatalogProxyHandler` — нужны disk fallback + package.json fallback
+- Кандидат пакет 21: `createJsonDiskCatalogCache` для disk read/write в `fontsource-catalog`; IDB-слой Google как у Fontsource (опционально)
+
+### Cleanup (пакет 18, 2026-05-27) — Google API
+
+- [x] `utils/googleApiRouteHelpers.ts` — `apiQueryString`, `parseGoogleFontStyleQuery`, lookup семейства, `resolveGoogleVariableCssContext`
+- [x] `utils/googleFontsCatalogSlim.ts` — `buildGoogleCatalogItems` (бывший inline `slimEntry` в catalog route)
+- [x] `fetchWoff2BufferFromGoogleCss` → `utils/googleFontsCssShared.ts` (был дубль только в `google-font.ts`)
+- [x] `google-fonts-catalog.ts` использует `getGoogleFontsMetadataFamilyList()` — **один** серверный кэш metadata вместо второго fetch
+- [x] `google-font.ts`, `google-font-faces.ts`, `google-font-family-axes.ts`, `google-font-github-vf.ts` — общие хелперы
+- Ложная тревога: `google-font-proxy.ts` остаётся отдельным (прямой URL gstatic, не CSS2 pipeline)
+- ~~Кандидат на пакет 19~~ → сделано
+
+### Cleanup (пакет 17, 2026-05-27)
+
+- [x] `hooks/useEditorHomePage.ts` — orchestrator всей логики страницы
+- [x] `hooks/buildEditorHomeLayoutProps.tsx` — сборка пропсов layout
+- [x] `types/editorHome.ts`, `types/next-auth.d.ts`
+- [x] `pages/index.jsx` ~45 строк (только shell + `getServerSideProps`)
+
+### Миграция JavaScript → TypeScript (старт, 2026-05-27)
+
+- [x] `tsconfig.json` (`allowJs: true`, `strict: false`)
+- [x] `typescript`, `@types/react`, `@types/node` (bun)
+- [x] Пилот TS: `utils/fontsourcePrewarmFlag.ts`, `hooks/useShareRouteRedirect.ts`, `constants/editorSampleTexts.ts`
+- [x] `hooks/useEditorHomePage.ts`, `hooks/buildEditorHomeLayoutProps.tsx`
+
+**Дальше по TS (пакеты 18+):**
+
+1. Перевести в `.ts` хуки редактора из пакетов 13–15 (`useLibraryAuth`, `useEditorExportActions`, …)
+2. `components/editor/*.tsx`
+3. `utils/catalog*` и кэши
+4. `strict: true` — в самом конце
 
 ## Метод
 
@@ -66,9 +231,10 @@
 
 ## Находки
 
-### 1. Сильное дублирование каркаса каталожных панелей
+### 1. Сильное дублирование каркаса каталожных панелей — **ЗАКРЫТО (Unified)**
 
-- Файлы: `components/GoogleFontsCatalogPanel.jsx`, `components/FontsourceCatalogPanel.jsx`
+- Было: `components/GoogleFontsCatalogPanel.jsx`, `components/FontsourceCatalogPanel.jsx`
+- Сейчас: `components/catalog/UnifiedCatalogPanel.jsx`
 - Тип: частичный дубль архитектуры
 - Совпадает:
   - инициализация layout через `useCatalogToolbarLayout`
@@ -141,7 +307,7 @@
   - `[fontFamily].js` умеет `?meta=true`, remote fallback и сразу отдает данные шрифта
   - `metadata.js` проще, но логически пересекается с тем же use case
 - Проверка использования: по коду найден вызов только `?meta=true` у `[fontFamily].js`
-- Вывод: `pages/api/fontsource/[fontFamily]/metadata.js` похож на неиспользуемый legacy-endpoint и кандидат на удаление после точечной проверки runtime
+- Статус (2026-05-27): endpoint **удалён** — клиентских вызовов не было; metadata читается в `[fontFamily].js`
 
 ### 7. Повторяющийся dropdown-state и outside-click logic в меню
 
@@ -484,26 +650,29 @@
 
 ## Предварительный приоритет
 
-- Высокий: объединение download-логики Google/Fontsource
-- Высокий: вынос общего card renderer для каталогов
-- Высокий: централизовать восстановление preset/axes state шрифта
-- Высокий: вынести общие download actions из catalog panels и saved library
-- Средний: вынести общий Google metadata/family lookup pipeline
+- ~~Высокий: объединение download-логики Google/Fontsource~~ → `catalogDownloadActions.js` + `buildCatalogSourceDownloadProps`
+- ~~Высокий: вынос общего card renderer для каталогов~~ → `CatalogSourceCard` / `UnifiedCatalogCard`
+- ~~Высокий: централизовать восстановление preset/axes state шрифта~~ → пакет 23
+- ~~Высокий: вынести общие download actions из catalog panels~~ → сделано ранее
+- ~~Средний: вынести общий Google metadata/family lookup pipeline~~ → `googleApiRouteHelpers` + единый кэш в catalog (пакет 18)
 - Средний: общий dropdown/menu primitive для action-меню
 - Средний: общий dismiss-hook для dropdown/menu/select
 - Средний: общий adapter для library entry actions
 - Средний: cleanup крупных режимных тернарников и mode-switch логики в `Sidebar` / `FontPreview`
 - Средний: helpers для alignment/layout mapping в `FontPreview`
 - Средний: общий resolver для Fontsource API endpoints
-- Средний: удалить или слить `pages/api/fontsource/[fontFamily]/metadata.js`
-- Средний: один formatter для `font-variation-settings`
+- ~~Средний: удалить `pages/api/fontsource/[fontFamily]/metadata.js`~~ → удалён 2026-05-27
+- ~~Средний: один formatter для `font-variation-settings`~~ → `fontVariationSettings.ts` + parse/stringify (пакет 22); остаётся preset/axes recovery
 - Средний: слить `CSSModal` в `ExportModal` или удалить legacy-версию
 - Низкий: косметически унифицировать пустые loader-компоненты и grid cols helpers
 
 ## Следующие пакеты
 
-- `pages/api/google-*` на предмет повторяющихся fetch/cache/proxy паттернов
-- `utils/*cache*`, `utils/*download*`, `utils/*google*`, `utils/*fontsource*`
-- `components/ExportModal.jsx`, `components/CSSModal.jsx`, `hooks/useFontExport.js`
+- ~~`pages/api/google-*`~~ → пакет 18 (2026-05-27)
+- `utils/*cache*` — пакет 20; disk cache Fontsource — кандидат
+- ~~`utils/*download*` (основное)~~ → пакет 21
+- ~~`utils/*google*` (API)~~ → пакеты 18–19
+- ~~`components/ExportModal`, `hooks/useFontExport`, `buildEditorExportCssCode`~~ → пакет 22 (частично)
+- ~~`components/CSSModal.jsx`~~ — удалён ранее
 - `utils/fileDownloadUtils.js`, `utils/fontFormatConvertClient.js`, `utils/savedLibraryFontDownload.js`
 - `components/ui/*Toolbar*`, `components/ui/*Search*`, `components/ui/*Select*`

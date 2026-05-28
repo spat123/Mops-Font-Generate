@@ -2,6 +2,17 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  webpack: (config) => {
+    // После миграции на TS: extensionless import иначе находит удалённый .jsx раньше .tsx.
+    config.resolve.extensionAlias = {
+      '.js': ['.ts', '.tsx', '.js', '.jsx'],
+      '.jsx': ['.tsx', '.jsx'],
+      '.mjs': ['.mts', '.mjs'],
+      '.cjs': ['.cts', '.cjs'],
+    };
+    config.resolve.extensions = ['.tsx', '.ts', '.jsx', '.js', '.json'];
+    return config;
+  },
   env: {
     NEXT_PUBLIC_DEV_PRO_SIMULATION: process.env.DEV_PRO_SIMULATION || process.env.NEXT_PUBLIC_DEV_PRO_SIMULATION || '',
   },
