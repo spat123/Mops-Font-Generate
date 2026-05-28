@@ -113,7 +113,8 @@ export function useEditorHomePage(router: NextRouter) {
     const { set: savedLibraryCatalogRecentlyAddedSet, mark: markSavedLibraryCatalogRecentlyAdded } =
       useStickyTimedSet(900);
     const [fileUploadTarget, setFileUploadTarget] = useState('editor');
-    const [createLibrarySeedRequest, setCreateLibrarySeedRequest] = useState(null);
+    const [libraryCreateDialogRequest, setLibraryCreateDialogRequest] = useState(null);
+    const [openCreateLibrarySignal, setOpenCreateLibrarySignal] = useState(0);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
     const [plainPreviewOpen, setPlainPreviewOpen] = useState(false);
@@ -207,8 +208,36 @@ export function useEditorHomePage(router: NextRouter) {
       removeFontsByIds,
       safeSelectFont,
       assertCanCreateNewLibrary,
-      setCreateLibrarySeedRequest,
+      setLibraryCreateDialogRequest,
     });
+
+    const handleLibraryCreateDialogHandled = useCallback((requestId: string) => {
+      setLibraryCreateDialogRequest((prev) =>
+        prev?.requestId === requestId ? null : prev,
+      );
+    }, []);
+
+    const requestOpenCreateLibrary = useCallback(() => {
+      if (!assertCanCreateNewLibrary()) return;
+      setLibraryCreateDialogRequest({
+        requestId:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `library-dialog:${Date.now()}`,
+        mode: 'create',
+      });
+    }, [assertCanCreateNewLibrary, setLibraryCreateDialogRequest]);
+
+    const requestOpenEditLibrary = useCallback((library) => {
+      setLibraryCreateDialogRequest({
+        requestId:
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `library-dialog:${Date.now()}`,
+        mode: 'edit',
+        library,
+      });
+    }, []);
 
     // Добавляем ref для input загрузки файлов
     const fileInputRef = useRef(null);
@@ -705,11 +734,13 @@ export function useEditorHomePage(router: NextRouter) {
         handleDeleteSavedLibrary,
         reorderFontLibraries,
         addFontEntryToLibrary,
-        createLibrarySeedRequest,
-        onCreateLibrarySeedHandled: (requestId: string) =>
-          setCreateLibrarySeedRequest((prev) =>
-            prev?.requestId === requestId ? null : prev,
-          ),
+        fonts,
+        libraryCreateDialogRequest,
+        onLibraryCreateDialogHandled: handleLibraryCreateDialogHandled,
+        openCreateLibrarySignal,
+        setOpenCreateLibrarySignal,
+        requestOpenCreateLibrary,
+        requestOpenEditLibrary,
         openLibraryShareDialog,
         handleVariableSettingsChange,
         availableStyles,
@@ -751,7 +782,6 @@ export function useEditorHomePage(router: NextRouter) {
         handleLibraryTabDrop,
         libraryDropTargetTabId,
         setLibraryDropTargetTabId,
-        fonts,
         openGoogleCatalogEntryInEditorTab,
         openFontsourceSlugInEditorTab,
         openFontshareSlugInEditorTab,

@@ -16,4 +16,5 @@ export type EditorHomeLayoutProps = {
   tabBar: Record<string, unknown> & { tabBarEndActions: ReactNode };
   preview: Record<string, unknown>;
   libraryScreenProps: Record<string, unknown>;
+  libraryCreateDialog: Record<string, unknown>;
 };

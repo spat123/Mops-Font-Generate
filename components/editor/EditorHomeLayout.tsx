@@ -7,6 +7,7 @@ import GenerateFontModal from '../GenerateFontModal';
 import { EditorTabBar, EMPTY_PREFIX } from '../ui/EditorTabBar';
 import { LibraryShareDialog } from '../ui/LibraryShareDialog';
 import { FontsLibraryHomeScreen } from '../library/FontsLibraryHomeScreen';
+import { LibraryCreateDialog } from '../library/LibraryCreateDialog';
 import { EDITOR_MAIN_TAB_PENDING } from '../../utils/editorShellStorage';
 import { EDITOR_SAMPLE_TEXTS } from '../../constants/editorSampleTexts';
 import type { EditorHomeLayoutProps } from '../../types/editorHome';
@@ -63,8 +64,10 @@ type SidebarLayoutSlice = {
   onDeleteFontLibrary?: unknown;
   onReorderFontLibraries?: unknown;
   onAddFontToLibrary?: unknown;
-  createLibrarySeedRequest?: unknown;
-  onCreateLibrarySeedHandled?: unknown;
+  requestOpenCreateLibrary?: () => void;
+  requestOpenEditLibrary?: (library: unknown) => void;
+  openCreateLibrarySignal?: number;
+  setOpenCreateLibrarySignal?: Dispatch<SetStateAction<number>>;
   onShareLibrary?: unknown;
   pickFont?: unknown;
   handleVariableSettingsChange?: unknown;
@@ -87,6 +90,7 @@ export function EditorHomeLayout({
   tabBar,
   preview,
   libraryScreenProps,
+  libraryCreateDialog,
 }: EditorHomeLayoutProps) {
   const sidebarSlice = sidebar as SidebarLayoutSlice;
   const {
@@ -175,6 +179,9 @@ export function EditorHomeLayout({
       <ExportModal {...(modals.export as unknown as Parameters<typeof ExportModal>[0])} />
       <GenerateFontModal {...(modals.generate as unknown as Parameters<typeof GenerateFontModal>[0])} />
       <LibraryShareDialog {...(modals.libraryShare as unknown as Parameters<typeof LibraryShareDialog>[0])} />
+      <LibraryCreateDialog
+        {...(libraryCreateDialog as unknown as Parameters<typeof LibraryCreateDialog>[0])}
+      />
 
       <input
         type="file"
@@ -198,8 +205,10 @@ export function EditorHomeLayout({
           onDeleteFontLibrary={sidebarSlice.onDeleteFontLibrary}
           onReorderFontLibraries={sidebarSlice.onReorderFontLibraries}
           onAddFontToLibrary={sidebarSlice.onAddFontToLibrary}
-          createLibrarySeedRequest={sidebarSlice.createLibrarySeedRequest}
-          onCreateLibrarySeedHandled={sidebarSlice.onCreateLibrarySeedHandled}
+          requestOpenCreateLibrary={sidebarSlice.requestOpenCreateLibrary}
+          requestOpenEditLibrary={sidebarSlice.requestOpenEditLibrary}
+          openCreateLibrarySignal={sidebarSlice.openCreateLibrarySignal}
+          setOpenCreateLibrarySignal={sidebarSlice.setOpenCreateLibrarySignal}
           onShareLibrary={sidebarSlice.onShareLibrary}
           onLogoClick={openAllFontsTab}
           setSelectedFont={sidebarSlice.pickFont}

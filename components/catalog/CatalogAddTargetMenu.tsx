@@ -183,7 +183,9 @@ export function CatalogAddTargetMenu({
           disabled={busy || !canCreateNewLibrary}
           aria-busy={busy}
           aria-label={createActionHint}
-          onClick={() => {
+          onClick={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
             if (!assertCanCreateNewLibrary()) return;
             void runAction(onCreateLibrary);
           }}
@@ -272,7 +274,9 @@ export function CatalogAddTargetMenu({
               <button
                 type="button"
                 disabled={isAuthenticated && !canCreateNewLibrary}
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
+                  event.preventDefault();
                   setOpen(false);
                   if (!isAuthenticated) {
                     requestSignIn();

@@ -768,8 +768,10 @@ export default function Sidebar({
   onDeleteFontLibrary,
   onReorderFontLibraries,
   onAddFontToLibrary,
-  createLibrarySeedRequest = null,
-  onCreateLibrarySeedHandled,
+  requestOpenCreateLibrary,
+  requestOpenEditLibrary,
+  openCreateLibrarySignal = 0,
+  setOpenCreateLibrarySignal,
   onShareLibrary,
   onLogoClick,
   setSelectedFont,
@@ -1349,19 +1351,12 @@ export default function Sidebar({
   const sidebarScrollRef = useRef(null);
   const sidebarScrollIdleTimerRef = useRef(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [libraryOpenCreateSignal, setLibraryOpenCreateSignal] = useState(0);
   const [sidebarScrollbarVisible, setSidebarScrollbarVisible] = useState(false);
   const [sidebarScrollLayout, setSidebarScrollLayout] = useState({
     scrollTop: 0,
     scrollHeight: 0,
     clientHeight: 0,
   });
-
-  useEffect(() => {
-    if (!isLibraryTab) {
-      setLibraryOpenCreateSignal(0);
-    }
-  }, [isLibraryTab]);
 
   const syncSidebarScrollLayout = useCallback(() => {
     const el = sidebarScrollRef.current;
@@ -1517,19 +1512,15 @@ export default function Sidebar({
               className="editor-sidebar-scroll flex min-h-0 flex-1 flex-col overflow-y-auto"
             >
               <FontLibrarySidebar
-                sessionFonts={sessionFonts}
                 libraries={fontLibraries}
                 activeLibraryId={activeLibraryId}
                 onOpenLibrary={onOpenFontLibrary}
-                onCreateLibrary={onCreateFontLibrary}
-                onUpdateLibrary={onUpdateFontLibrary}
                 onDeleteLibrary={onDeleteFontLibrary}
                 onReorderLibraries={onReorderFontLibraries}
                 onAddFontToLibrary={onAddFontToLibrary}
-                createLibrarySeedRequest={createLibrarySeedRequest}
-                onCreateLibrarySeedHandled={onCreateLibrarySeedHandled}
+                onRequestOpenCreateLibrary={requestOpenCreateLibrary}
+                onRequestOpenEditLibrary={requestOpenEditLibrary}
                 onShareLibrary={onShareLibrary}
-                openCreateLibrarySignal={libraryOpenCreateSignal}
               />
             </div>
             {!isSidebarCollapsed && sidebarOverlayThumb ? (
@@ -1558,7 +1549,8 @@ export default function Sidebar({
                     libraries: fontLibraries,
                     activeLibraryId,
                     onOpenLibrary: onOpenFontLibrary,
-                    onRequestCreateLibrary: () => setLibraryOpenCreateSignal((n) => n + 1),
+                    onRequestCreateLibrary: () =>
+                      setOpenCreateLibrarySignal?.((n: number) => n + 1),
                   }}
                   options={{
                     viewModeOptions: VIEW_MODE_OPTIONS,

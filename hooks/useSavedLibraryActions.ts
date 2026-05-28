@@ -17,10 +17,10 @@ import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts
 
 type LibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
 
-type CreateLibrarySeedRequest = {
-  requestId: string;
-  selectedFonts: LibraryFontEntry[];
-};
+import {
+  newLibraryCreateDialogRequestId,
+  type LibraryCreateDialogRequest,
+} from '../components/library/LibraryCreateDialog';
 
 type UseSavedLibraryActionsParams = {
   fontLibraries: SavedLibraryRecord[];
@@ -40,7 +40,7 @@ type UseSavedLibraryActionsParams = {
   removeFontsByIds: (ids: string[]) => void;
   safeSelectFont: (font: SessionFontRecord) => void;
   assertCanCreateNewLibrary: () => boolean;
-  setCreateLibrarySeedRequest: Dispatch<SetStateAction<CreateLibrarySeedRequest | null>>;
+  setLibraryCreateDialogRequest: Dispatch<SetStateAction<LibraryCreateDialogRequest | null>>;
 };
 
 /**
@@ -64,7 +64,7 @@ export function useSavedLibraryActions({
   removeFontsByIds,
   safeSelectFont,
   assertCanCreateNewLibrary,
-  setCreateLibrarySeedRequest,
+  setLibraryCreateDialogRequest,
 }: UseSavedLibraryActionsParams) {
   const [libraryDropTargetTabId, setLibraryDropTargetTabId] = useState<string | null>(null);
   const prefetchLibraryEntry = useLibraryEntryPrefetch();
@@ -231,15 +231,13 @@ export function useSavedLibraryActions({
     (selectedFonts: LibraryFontEntry[]) => {
       if (!assertCanCreateNewLibrary()) return;
       setMainTab('library');
-      setCreateLibrarySeedRequest({
-        requestId:
-          typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `library-seed:${Date.now()}`,
+      setLibraryCreateDialogRequest({
+        requestId: newLibraryCreateDialogRequestId(),
+        mode: 'seed',
         selectedFonts: (Array.isArray(selectedFonts) ? selectedFonts : []).filter(Boolean),
       });
     },
-    [assertCanCreateNewLibrary, setCreateLibrarySeedRequest, setMainTab],
+    [assertCanCreateNewLibrary, setLibraryCreateDialogRequest, setMainTab],
   );
 
   const openSavedLibrary = useCallback(
