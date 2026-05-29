@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MergedCatalogItem } from '../../types/catalog';
+import type { GoogleFontCatalogRow } from '../../utils/googleFontCatalogCache';
+import type { FontsourceCatalogRow } from '../../utils/fontsourceCatalogCache';
+import type { SlugFamilyCatalogRow } from '../../utils/createSlugFamilyCatalogCache';
 import type { SavedLibraryRecord, SessionFontRecord } from '../../types/editorFonts';
 import type { SavedLibraryFontEntry } from '../../types/savedLibrary';
 import type { SelectionToolbarActions } from '../../types/savedLibrary';
@@ -120,6 +123,14 @@ const FONTSHARE_MIN_FULL_CATALOG_SIZE = 80;
 
 // Сессионная защёлка: не перезапрашивать каталоги при каждом ремоунте/возврате.
 let hasFetchedUnifiedCatalogNetworkThisSession = false;
+
+type CatalogCachesSnapshot = {
+  google: GoogleFontCatalogRow[];
+  fontsource: FontsourceCatalogRow[];
+  fontshare: SlugFamilyCatalogRow[];
+  trial: SlugFamilyCatalogRow[];
+  hasCached: boolean;
+};
 
 function unifiedCatalogGridCols(viewportWidth) {
   if (viewportWidth <= 0) return 2;
@@ -252,13 +263,13 @@ export default function UnifiedCatalogPanel({
     [setGridWidthMeasureContainer],
   );
 
-  const readCaches = () => {
+  const readCaches = (): CatalogCachesSnapshot => {
     if (typeof window === 'undefined') {
       return {
-        google: [] as unknown[],
-        fontsource: [] as unknown[],
-        fontshare: [] as unknown[],
-        trial: [] as unknown[],
+        google: [],
+        fontsource: [],
+        fontshare: [],
+        trial: [],
         hasCached: false,
       };
     }
@@ -279,10 +290,10 @@ export default function UnifiedCatalogPanel({
 
   const initialCaches = readCaches();
 
-  const [googleItems, setGoogleItems] = useState(initialCaches.google);
-  const [fontsourceItems, setFontsourceItems] = useState(initialCaches.fontsource);
-  const [fontshareItems, setFontshareItems] = useState(initialCaches.fontshare);
-  const [trialItems, setTrialItems] = useState(initialCaches.trial);
+  const [googleItems, setGoogleItems] = useState<GoogleFontCatalogRow[]>(initialCaches.google);
+  const [fontsourceItems, setFontsourceItems] = useState<FontsourceCatalogRow[]>(initialCaches.fontsource);
+  const [fontshareItems, setFontshareItems] = useState<SlugFamilyCatalogRow[]>(initialCaches.fontshare);
+  const [trialItems, setTrialItems] = useState<SlugFamilyCatalogRow[]>(initialCaches.trial);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isInitialCatalogLoading, setIsInitialCatalogLoading] = useState(!initialCaches.hasCached);
   const [areCardsVisible, setAreCardsVisible] = useState(initialCaches.hasCached);
@@ -889,15 +900,15 @@ export default function UnifiedCatalogPanel({
     let didFinalizeInitialLoading = false;
 
     const caches = readCaches();
-    let cachedFontsource = caches.fontsource as unknown[];
-    const cachedFontshare = caches.fontshare as unknown[];
-    const cachedTrial = caches.trial as unknown[];
+    let cachedFontsource = caches.fontsource;
+    const cachedFontshare = caches.fontshare;
+    const cachedTrial = caches.trial;
     const hasCached = caches.hasCached;
 
-    if ((caches.google as unknown[]).length > 0) setGoogleItems(caches.google as unknown[]);
-    if ((caches.fontsource as unknown[]).length > 0) setFontsourceItems(caches.fontsource as unknown[]);
-    if ((caches.fontshare as unknown[]).length > 0) setFontshareItems(caches.fontshare as unknown[]);
-    if ((caches.trial as unknown[]).length > 0) setTrialItems(caches.trial as unknown[]);
+    if (caches.google.length > 0) setGoogleItems(caches.google);
+    if (caches.fontsource.length > 0) setFontsourceItems(caches.fontsource);
+    if (caches.fontshare.length > 0) setFontshareItems(caches.fontshare);
+    if (caches.trial.length > 0) setTrialItems(caches.trial);
 
     void readFontsourceCatalogCacheAsync().then((idbList) => {
       if (cancelled) return;
