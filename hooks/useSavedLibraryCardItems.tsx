@@ -93,6 +93,7 @@ export function useSavedLibraryCardItems({
       const sessionFont = resolveSessionFontForLibraryEntry(font);
       return {
         id: font.id,
+        variant: 'catalog',
         selected: sessionFont ? mainTab === sessionFont.id : false,
         batchSelected: selectedSavedLibraryFontIds.has(font.id),
         title: font.label,
@@ -239,6 +240,7 @@ export function useSavedLibraryCardItems({
         };
         return {
           id: row.id,
+          variant: 'catalog',
           selected: false,
           title: family,
           subtitleParts: buildSavedLibraryCardMetaParts({
@@ -277,6 +279,7 @@ export function useSavedLibraryCardItems({
       };
       return {
         id: row.id,
+        variant: 'catalog',
         selected: false,
         title: family,
         subtitleParts: buildSavedLibraryCardMetaParts({

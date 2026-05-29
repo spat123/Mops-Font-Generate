@@ -16,7 +16,7 @@ export type SortableFontCardGridProps = {
 export function SortableFontCardGrid({
   items = [],
   onMoveItem,
-  gridClassName = 'grid max-w-full shrink-0 grid-cols-2 gap-4 pb-6 lg:grid-cols-4 xl:grid-cols-5',
+  gridClassName = 'grid max-w-full shrink-0 grid-cols-2 gap-4 pb-6 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5',
   renderAfter = null,
   draggable = true,
 }: SortableFontCardGridProps) {

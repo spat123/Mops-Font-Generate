@@ -7,7 +7,7 @@ export function getSessionFontCardPreviewStyle(font: SessionFontRecord | null | 
   if (!font) return undefined;
   if (font.source === 'google') {
     const family = font.displayName || font.name;
-    return { fontFamily: `'${family}', sans-serif`, fontSize: '20px' };
+    return { fontFamily: `'${family}', sans-serif`, fontSize: '32px' };
   }
   return sessionFontCardPreviewStyle(font);
 }

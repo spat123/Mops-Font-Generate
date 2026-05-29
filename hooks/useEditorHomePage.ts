@@ -219,7 +219,6 @@ export function useEditorHomePage(router: NextRouter) {
 
     const requestOpenCreateLibrary = useCallback(() => {
       if (!assertCanCreateNewLibrary()) return;
-      setMainTab('library');
       setLibraryCreateDialogRequest({
         requestId:
           typeof crypto !== 'undefined' && crypto.randomUUID
@@ -228,7 +227,7 @@ export function useEditorHomePage(router: NextRouter) {
         mode: 'create',
         selectedFonts: [],
       });
-    }, [assertCanCreateNewLibrary, setLibraryCreateDialogRequest, setMainTab]);
+    }, [assertCanCreateNewLibrary, setLibraryCreateDialogRequest]);
 
     const requestOpenEditLibrary = useCallback((library) => {
       setLibraryCreateDialogRequest({

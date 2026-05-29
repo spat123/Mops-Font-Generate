@@ -28,7 +28,7 @@ export type SavedLibraryCardViewItem = {
   downloadSplitButtonProps?: Record<string, unknown> | null;
   menuItems?: SavedLibraryCardMenuItem[];
   cornerAction?: ReactNode;
-  variant?: string;
+  variant?: 'default' | 'tall' | 'catalog';
   previewClassName?: string;
 };
 

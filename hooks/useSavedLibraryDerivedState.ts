@@ -1,6 +1,5 @@
 import { useCallback, useMemo } from 'react';
 import { buildGroupedFontSubsetOptions } from '../utils/fontSubsetLabels';
-import { getLibraryFontShortSourceLabel } from '../utils/fontLibraryUtils';
 import { buildSavedLibraryCatalogLookup } from '../utils/savedLibraryCatalogLookup';
 import {
   applySessionFontMetaHints,
@@ -64,10 +63,9 @@ export function useSavedLibraryDerivedState({
         resolveSavedLibraryFontCatalogMeta(font, catalogLookup),
         sessionFont,
       );
-      const sourceLabel = getLibraryFontShortSourceLabel(String(font?.source || 'session'));
-      const parts = [sourceLabel];
-      if (isVariable) parts.push('VF');
-      if (hasItalic) parts.push('ITALIC');
+      const parts: string[] = [];
+      if (isVariable) parts.push('vf');
+      if (hasItalic) parts.push('italic');
       return parts;
     },
     [catalogLookup],
