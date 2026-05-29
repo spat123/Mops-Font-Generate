@@ -42,7 +42,7 @@ export function buildCatalogSubsetSelectOptions(subsets: string[] | null | undef
 }
 
 export function readCatalogSubsetsFromFont(
-  font: { catalogSubsets?: unknown; subsets?: unknown } | null | undefined,
+  font: { catalogSubsets?: unknown; subsets?: unknown; [key: string]: unknown } | null | undefined,
 ): string[] {
   if (!font) return [];
   const fromCatalog = normalizeCatalogSubsets(font.catalogSubsets as string[] | undefined);

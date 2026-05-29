@@ -18,6 +18,7 @@ import { normalizeFontLicenseId } from '../../utils/fontLicenseNormalize';
 import {
   fetchFontsourceCatalogFromFontlist,
   isFontsourceCatalogComplete,
+  type FontsourceCatalogRow,
 } from '../../utils/fontsourceCatalogCache';
 
 const FONTSOURCE_API_URL = 'https://api.fontsource.org/v1/fonts';
@@ -94,6 +95,28 @@ function normalizeRemoteItem(row: Record<string, unknown>): FontsourceCatalogIte
     source: 'fontsource',
     license: normalizeFontLicenseId(row.license),
   };
+}
+
+function fontlistRowsToCatalogItems(rows: FontsourceCatalogRow[]): FontsourceCatalogItem[] {
+  return rows.map((row) => ({
+    id: String(row.id || row.slug || ''),
+    slug: String(row.slug || row.id || ''),
+    family: String(row.family || row.label || ''),
+    label: String(row.label || row.family || ''),
+    category: String(row.category || ''),
+    primaryScript: String(row.primaryScript || 'fontlist'),
+    subsets: Array.isArray(row.subsets) ? row.subsets.map(String) : [],
+    weights: Array.isArray(row.weights)
+      ? row.weights.map((w) => Number(w)).filter((n) => Number.isFinite(n))
+      : [],
+    styles: Array.isArray(row.styles) ? row.styles.map(String) : [],
+    isVariable: Boolean(row.isVariable),
+    hasItalic: Boolean(row.hasItalic),
+    styleCount: Math.max(1, Number(row.styleCount) || 1),
+    popularityScore: Number(row.popularityScore) || 0,
+    source: String(row.source || 'fontsource'),
+    license: normalizeFontLicenseId(row.license),
+  }));
 }
 
 function normalizeRemoteItems(rows: unknown[]): FontsourceCatalogItem[] {
@@ -280,7 +303,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         try {
           console.warn('[fontsource-catalog] remote failed, trying fontlist API');
-          items = await fetchFontsourceCatalogFromFontlist();
+          items = fontlistRowsToCatalogItems(await fetchFontsourceCatalogFromFontlist());
           source = 'fontlist';
         } catch (fontlistErr) {
           const fontlistMessage = fontlistErr instanceof Error ? fontlistErr.message : String(fontlistErr);

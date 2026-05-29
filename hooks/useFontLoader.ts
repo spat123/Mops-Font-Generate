@@ -428,7 +428,10 @@ export function useFontLoader(
           // Важно: при повторных загрузках/сменах алгоритма подбора VF-файла удаляем старые @font-face,
           // иначе браузер может продолжать использовать первый (ошибочно подобранный) face.
           removeFontsourceInjectedStyles(fontFamily);
-          const normalPayloads: Array<{ subset: string; payload: { blob: Blob; fileExtension: string; blobUrl: string } }> = [];
+          const normalPayloads: Array<{
+            subset: string;
+            payload: { blob: Blob; fileExtension: string; blobUrl: string; fileName: string };
+          }> = [];
           for (const s of subsetPlan) {
             // eslint-disable-next-line no-await-in-loop
             const p = await loadVariableStylePayload('normal', s, false);
@@ -490,7 +493,10 @@ export function useFontLoader(
 
           if (italicMode === 'separate-style' && hasItalicStyles) {
             try {
-              const italicPayloads: Array<{ subset: string; payload: { blob: Blob; fileExtension: string; blobUrl: string } }> = [];
+              const italicPayloads: Array<{
+                subset: string;
+                payload: { blob: Blob; fileExtension: string; blobUrl: string; fileName: string };
+              }> = [];
               for (const s of subsetPlan) {
                 // eslint-disable-next-line no-await-in-loop
                 const p = await loadVariableStylePayload('italic', s, false);

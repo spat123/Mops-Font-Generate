@@ -1,3 +1,5 @@
+import type { ReactElement } from 'react';
+
 /** SVG-иконки для OpenType-фич (не зависят от загруженного шрифта). */
 const ICON_CLASS = 'h-5 w-5';
 
@@ -137,7 +139,7 @@ function LnumIcon() {
   );
 }
 
-const ICON_BY_TAG: Record<string, () => JSX.Element> = {
+const ICON_BY_TAG: Record<string, () => ReactElement> = {
   frac: FracIcon,
   numr: NumrIcon,
   dnom: DnomIcon,
