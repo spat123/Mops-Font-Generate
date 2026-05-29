@@ -13,11 +13,12 @@ import {
 import { applyFontsourceCatalogCacheHeaders } from '../../utils/fontsourceApiCache';
 import { pickCatalogPopularityScore } from '../../utils/catalogPopularityScore';
 import { fetchJsonWithTimeout } from '../../utils/fetchJsonWithTimeout';
+import { resolveServerDiskCacheFile } from '../../utils/serverDiskCachePath';
 
 const FONTSOURCE_API_URL = 'https://api.fontsource.org/v1/fonts';
 const SERVER_CACHE_TTL_MS = 1000 * 60 * 60;
 const REMOTE_FETCH_TIMEOUT_MS = 30_000;
-const DISK_CACHE_PATH = path.join(process.cwd(), '.cache', 'fontsource-catalog-v1.json');
+const DISK_CACHE_PATH = resolveServerDiskCacheFile('fontsource-catalog-v1.json');
 const DISK_CACHE_MIN_ITEMS = 500;
 
 type FontsourceCatalogItem = {
