@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { buildCatalogCardMetaParts } from '../utils/buildCatalogCardMetaParts';
 import { buildGroupedFontSubsetOptions } from '../utils/fontSubsetLabels';
 import { buildSavedLibraryCatalogLookup } from '../utils/savedLibraryCatalogLookup';
 import {
@@ -59,14 +60,15 @@ export function useSavedLibraryDerivedState({
 
   const buildSavedLibraryCardMetaParts = useCallback(
     (font: SavedLibraryFontEntry, sessionFont: SessionFontRecord | null = null) => {
-      const { isVariable, hasItalic } = applySessionFontMetaHints(
-        resolveSavedLibraryFontCatalogMeta(font, catalogLookup),
-        sessionFont,
-      );
-      const parts: string[] = [];
-      if (isVariable) parts.push('vf');
-      if (hasItalic) parts.push('italic');
-      return parts;
+      const meta = resolveSavedLibraryFontCatalogMeta(font, catalogLookup);
+      const { isVariable, hasItalic } = applySessionFontMetaHints(meta, sessionFont);
+      return buildCatalogCardMetaParts({
+        category: meta.category,
+        subsets: meta.subsets,
+        isVariable,
+        hasItalic,
+        styleCount: meta.styleCount,
+      });
     },
     [catalogLookup],
   );

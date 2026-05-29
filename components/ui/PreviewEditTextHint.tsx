@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { DEFAULT_PREVIEW_TEXT, useSettings } from '../../contexts/SettingsContext';
+import { useSettings } from '../../contexts/SettingsContext';
 import { toast } from '../../utils/appNotify';
 
 export type PreviewEditTextHintProps = {
@@ -9,14 +9,14 @@ export type PreviewEditTextHintProps = {
 
 /** Подсказка + сброс текста: нижняя полоса превью. */
 export function PreviewEditTextHint({ className = '', overlay = false }: PreviewEditTextHintProps) {
-  const { text, setText } = useSettings();
-  const isDefaultText = text === DEFAULT_PREVIEW_TEXT;
+  const { text, textResetBaseline, resetText } = useSettings();
+  const isDefaultText = text === textResetBaseline;
 
   const handleResetText = useCallback(() => {
     if (isDefaultText) return;
-    setText(DEFAULT_PREVIEW_TEXT);
+    resetText();
     toast.success('Текст сброшен');
-  }, [isDefaultText, setText]);
+  }, [isDefaultText, resetText]);
 
   return (
     <div

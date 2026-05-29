@@ -53,10 +53,22 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 }: Use
   const syncScrollLayout = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setScrollLayout({
-      scrollTop: el.scrollTop,
-      scrollHeight: el.scrollHeight,
-      clientHeight: el.clientHeight,
+    const nextScrollTop = el.scrollTop;
+    const nextScrollHeight = el.scrollHeight;
+    const nextClientHeight = el.clientHeight;
+    setScrollLayout((prev) => {
+      if (
+        prev.scrollTop === nextScrollTop &&
+        prev.scrollHeight === nextScrollHeight &&
+        prev.clientHeight === nextClientHeight
+      ) {
+        return prev;
+      }
+      return {
+        scrollTop: nextScrollTop,
+        scrollHeight: nextScrollHeight,
+        clientHeight: nextClientHeight,
+      };
     });
   }, []);
 
@@ -229,7 +241,9 @@ export function useOverlayScrollbar({ hideDelayMs = 700, trackInsetPx = 8 }: Use
         syncScrollLayout();
       }, 64);
     });
-    mo.observe(scrollTarget, { subtree: true, childList: true, attributes: true, characterData: true });
+    // Не слушаем attributes/characterData: hover-UI меняет data-атрибуты/классы тысяч раз и
+    // это не должно триггерить пересчёт скролл-метрик и ререндер каталога.
+    mo.observe(scrollTarget, { subtree: true, childList: true });
     return () => {
       if (timerId != null) {
         window.clearTimeout(timerId);

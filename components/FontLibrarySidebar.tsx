@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { CardActionsMenu } from './ui/CardActionsMenu';
+import { KnowledgeBaseNavButton } from './library/KnowledgeBaseNavButton';
 import { PlusIcon, TrashIcon, ShareIcon } from './ui/CommonIcons';
 import { Tooltip } from './ui/Tooltip';
 import { IconCircleButton } from './ui/IconCircleButton';
@@ -128,6 +129,8 @@ export default function FontLibrarySidebar({
   );
 
   /** Всегда внизу левой колонки (отдельно от логики «плюса» под списком). */
+  const knowledgeBaseLink = <KnowledgeBaseNavButton />;
+
   const libraryLimitReachedPanel = useMemo(
     () =>
       libraryLimitReached ? (
@@ -400,12 +403,14 @@ export default function FontLibrarySidebar({
                 <div className="shrink-0 bg-white">{addLibraryPlusBlock}</div>
               ) : null}
               </div>
+              <div className="mt-3 shrink-0 border-t border-gray-100 pt-3">{knowledgeBaseLink}</div>
               {libraryLimitReachedPanel ? (
                 <div className="mt-3 shrink-0 bg-white">{libraryLimitReachedPanel}</div>
               ) : null}
             </div>
           </>
         ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 items-center justify-center">
             <div className="flex max-w-[16rem] flex-col items-center gap-4 text-center">
               {authLoading ? (
@@ -439,6 +444,11 @@ export default function FontLibrarySidebar({
                 </>
               )}
             </div>
+          </div>
+          <div className="mt-3 shrink-0  pt-3">{knowledgeBaseLink}</div>
+          {libraryLimitReachedPanel ? (
+            <div className="mt-3 shrink-0">{libraryLimitReachedPanel}</div>
+          ) : null}
           </div>
         )}
       </div>

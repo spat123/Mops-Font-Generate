@@ -11,6 +11,7 @@ import {
   hasGoogleScriptGlyphSample,
 } from '../utils/googleFontCatalogSampleText';
 import { listGoogleCatalogDownloadStyles } from '../utils/googleFontDownloadStyles';
+import { resolveDefaultCatalogSubset } from '../utils/catalogActiveSubset';
 import { useEditorFontNav, type EditorFontUploadInput } from './useEditorFontNav';
 import type { SessionFontRecord } from '../types/editorFonts';
 
@@ -71,13 +72,15 @@ export function useCatalogOpenInEditor({
       const family = String(catalogEntry.family);
       try {
         const subsetList = Array.isArray(catalogEntry.subsets) ? catalogEntry.subsets : [];
+        const defaultSubset = resolveDefaultCatalogSubset(subsetList);
+        const loadSubsets = subsetList.length > 0 ? [defaultSubset] : undefined;
         const googleFontRecommendedSample = hasGoogleScriptGlyphSample(catalogEntry)
           ? buildGoogleFontGlyphSampleText(catalogEntry)
           : undefined;
         const useVariable = catalogEntry.isVariable === true;
         const slices = useVariable
           ? await fetchGoogleVariableFontSlicesAll(family, {
-              subsets: subsetList,
+              subsets: loadSubsets,
               ...(catalogEntry.wghtMin != null && catalogEntry.wghtMax != null
                 ? { wghtMin: catalogEntry.wghtMin, wghtMax: catalogEntry.wghtMax }
                 : {}),
@@ -85,7 +88,7 @@ export function useCatalogOpenInEditor({
           : await fetchGoogleStaticFontSlicesAll(family, {
               weight: 400,
               italic: false,
-              subsets: subsetList,
+              subsets: loadSubsets,
             });
         const firstBlob = slices?.[0]?.blob;
         if (!(firstBlob instanceof Blob) || firstBlob.size === 0) throw new Error('Пустой файл');
@@ -107,6 +110,8 @@ export function useCatalogOpenInEditor({
                 catalogEntry as Parameters<typeof listGoogleCatalogDownloadStyles>[0],
               ),
               googleFontRecommendedSample,
+              catalogSubsets: subsetList,
+              activeSubset: defaultSubset,
             },
           ],
           { silent: true },
@@ -120,7 +125,9 @@ export function useCatalogOpenInEditor({
 
   const openFontsourceSlugInEditorTab = useCallback(
     (slug: string, isVariable?: boolean) =>
-      selectOrAddFontsourceFontWithNav(slug, Boolean(isVariable), { silent: true }),
+      // Предпочитаем VF, если он доступен у семейства.
+      // Если у семейства нет variable-пакета, загрузчик корректно упадёт обратно в static.
+      selectOrAddFontsourceFontWithNav(slug, true, { silent: true }),
     [selectOrAddFontsourceFontWithNav],
   );
 

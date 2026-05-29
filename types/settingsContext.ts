@@ -16,6 +16,12 @@ export type PreviewSettingsSnapshot = {
   lineHeight: number;
   letterSpacing: number;
   stylesLetterSpacing: number;
+  /**
+   * Явные переопределения OpenType-фич (CSS `font-feature-settings`).
+   * Ключ — 4-символьный тег (e.g. "ss01"), значение 0/1.
+   * Пустой объект означает `font-feature-settings: normal`.
+   */
+  openTypeFeatureOverrides: Record<string, 0 | 1>;
   textColor: string;
   backgroundColor: string;
   viewMode: string;
@@ -48,12 +54,24 @@ export type PreviewSettingsSnapshot = {
 
 export type SettingsContextValue = PreviewSettingsSnapshot & {
   setText: Dispatch<SetStateAction<string>>;
+  /** Базовый текст для кнопки “Сбросить текст” (зависит от выбранного пресета/сабсета). */
+  textResetBaseline: string;
+  setTextResetBaseline: Dispatch<SetStateAction<string>>;
+  /** Сбросить текст к `textResetBaseline`. */
+  resetText: () => void;
+  /**
+   * Сигнал “сбросили настройки превью”.
+   * Нужен для UI, который не должен угадывать состояние по `text`, но должен очищаться при Reset.
+   */
+  previewResetSignal: number;
+  signalPreviewReset: () => void;
   setFontSize: Dispatch<SetStateAction<number>>;
   setGlyphsFontSize: Dispatch<SetStateAction<number>>;
   setStylesFontSize: Dispatch<SetStateAction<number>>;
   setLineHeight: Dispatch<SetStateAction<number>>;
   setLetterSpacing: Dispatch<SetStateAction<number>>;
   setStylesLetterSpacing: Dispatch<SetStateAction<number>>;
+  setOpenTypeFeatureOverrides: Dispatch<SetStateAction<Record<string, 0 | 1>>>;
   setTextColor: Dispatch<SetStateAction<string>>;
   setBackgroundColor: Dispatch<SetStateAction<string>>;
   setViewMode: Dispatch<SetStateAction<string>>;

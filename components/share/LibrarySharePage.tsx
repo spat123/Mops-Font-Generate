@@ -6,7 +6,10 @@ import type { LibrarySharePageProps } from '../../types/libraryScreens';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useSession, signIn } from 'next-auth/react';
-import { decodeLibrarySharePayloadFromQueryParam } from '../../utils/libraryShareLink';
+import {
+  decodeLibrarySharePayloadFromQueryParam,
+  type LibrarySharePayload,
+} from '../../utils/libraryShareLink';
 import {
   buildShareViewRows,
   libraryDraftFromSharePayload,
@@ -210,11 +213,47 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
         ? router.query.share[0]
         : '';
 
+  const shareId =
+    typeof router.query.id === 'string'
+      ? router.query.id.trim()
+      : Array.isArray(router.query.id)
+        ? String(router.query.id[0] || '').trim()
+        : '';
+
+  const [fetchedPayload, setFetchedPayload] = useState<LibrarySharePayload | null>(null);
+  const [shortShareFetchDone, setShortShareFetchDone] = useState(false);
+
+  useEffect(() => {
+    if (!router.isReady || initialPayload || rawShare || !shareId) {
+      setShortShareFetchDone(true);
+      return undefined;
+    }
+    let cancelled = false;
+    setShortShareFetchDone(false);
+    (async () => {
+      try {
+        const res = await fetch(`/api/share/${encodeURIComponent(shareId)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { payload?: LibrarySharePayload };
+        if (!cancelled && data?.payload) setFetchedPayload(data.payload);
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setShortShareFetchDone(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, initialPayload, rawShare, shareId]);
+
   const payload = useMemo(() => {
     if (initialPayload) return initialPayload;
-    if (!router.isReady || !rawShare) return null;
-    return decodeLibrarySharePayloadFromQueryParam(rawShare);
-  }, [initialPayload, router.isReady, rawShare]);
+    if (fetchedPayload) return fetchedPayload;
+    if (!router.isReady) return null;
+    if (rawShare) return decodeLibrarySharePayloadFromQueryParam(rawShare);
+    return null;
+  }, [initialPayload, fetchedPayload, router.isReady, rawShare]);
 
   const rows = useMemo(() => (payload ? buildShareViewRows(payload) : []), [payload]);
 
@@ -444,8 +483,12 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
   }, []);
 
   const pageReady = router.isReady;
-  const invalid = Boolean(pageReady && rawShare && !payload);
-  const missingShare = Boolean(pageReady && !rawShare);
+  const hasShareRef = Boolean(rawShare || shareId || initialPayload);
+  const shortShareLoading = Boolean(
+    pageReady && shareId && !rawShare && !initialPayload && !shortShareFetchDone,
+  );
+  const invalid = Boolean(pageReady && hasShareRef && !payload && !shortShareLoading);
+  const missingShare = Boolean(pageReady && !hasShareRef);
 
   const headTitle = invalid
     ? 'Ссылка недействительна — DINAMIC FONT'
@@ -462,7 +505,7 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
       };
 
   const emptyStateCard =
-    'mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm';
+    'mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center';
 
   const handleSignInForImport = useCallback(() => {
     const callbackUrl =
@@ -507,6 +550,10 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
           <main className="flex min-h-screen items-center justify-center px-4 py-12">
             <div className={`${emptyStateCard} text-sm text-gray-600`}>Загрузка…</div>
           </main>
+        ) : shortShareLoading ? (
+          <main className="flex min-h-screen items-center justify-center px-4 py-12">
+            <div className={`${emptyStateCard} text-sm text-gray-600`}>Загрузка списка шрифтов…</div>
+          </main>
         ) : missingShare || invalid ? (
           <main className="flex min-h-screen items-center justify-center px-4 py-12">
             {missingShare ? (
@@ -514,6 +561,7 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
                 <h1 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Нет данных в ссылке</h1>
                 <p className="mt-3 text-sm leading-relaxed text-gray-600">
                   Откройте полную ссылку «Поделиться» из редактора — в адресе должен быть параметр{' '}
+                  <code className="rounded-sm bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800">id=</code> или{' '}
                   <code className="rounded-sm bg-gray-50 px-1.5 py-0.5 font-mono text-xs text-gray-800">share=</code>.
                 </p>
                 <Link

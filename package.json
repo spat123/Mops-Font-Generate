@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "typecheck:js": "tsc --noEmit -p jsconfig.json",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "myskotom:gap": "bun run scripts/build-myskotom-gap-list.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.5",

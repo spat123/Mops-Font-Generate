@@ -7,6 +7,8 @@ import {
   downloadGoogleVariableVariant,
 } from './catalogDownloadActions';
 import type { CatalogUnifiedItem } from '../types/catalog';
+import { catalogOpenDbg } from './catalogOpenDebugLog';
+import { slugifyFontKey } from './fontSlug';
 
 type CatalogRaw = Record<string, unknown>;
 
@@ -85,17 +87,88 @@ export async function openCatalogItemInEditor(
 
   if (fsRaw && typeof onOpenFontsource === 'function') {
     const slug = String(fsRaw.id || fsRaw.slug || '');
+    catalogOpenDbg('try fontsource', {
+      familyKey: (item as any)?.familyKey,
+      displayName: (item as any)?.displayName,
+      slug,
+      isVariable: Boolean((fsRaw as any)?.isVariable),
+      hasGoogleFallback: Boolean(googleRaw),
+    });
     if (slug) {
-      const opened = await onOpenFontsource(slug, Boolean(fsRaw.isVariable));
-      if (opened) return true;
+      try {
+        const opened = await onOpenFontsource(slug, Boolean((fsRaw as any).isVariable));
+        // `onOpenFontsource` может вернуть:
+        // - `void/undefined` (успешно, но без результата),
+        // - объект (успешно),
+        // - `null`/`false` (не удалось).
+        const ok = opened !== false && opened !== null;
+        catalogOpenDbg(ok ? 'fontsource opened' : 'fontsource open returned null/false', {
+          slug,
+          openedType: opened === null ? 'null' : typeof opened,
+        });
+        if (ok) return true;
+      } catch (e) {
+        catalogOpenDbg('fontsource open threw, fallback to google', {
+          slug,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    } else {
+      catalogOpenDbg('fontsource raw present but slug empty, fallback to google', {
+        familyKey: (item as any)?.familyKey,
+        displayName: (item as any)?.displayName,
+        fsRawKeys: fsRaw && typeof fsRaw === 'object' ? Object.keys(fsRaw as any).slice(0, 12) : null,
+      });
+    }
+  }
+
+  // Если карточка пришла как "google-only", всё равно пробуем открыть через Fontsource по slug из family.
+  // Это нужно, когда Fontsource-каталог в DEV неполный/временно не загрузился, но сам Fontsource API доступен.
+  if (!fsRaw && googleRaw && typeof onOpenFontsource === 'function') {
+    const family =
+      String((googleRaw as any)?.family || (item as any)?.family || (item as any)?.displayName || '')
+        .trim();
+    const derivedSlug = family ? slugifyFontKey(family) : '';
+    if (derivedSlug) {
+      catalogOpenDbg('no fontsource raw; try derived fontsource slug from google family', {
+        familyKey: (item as any)?.familyKey,
+        displayName: (item as any)?.displayName,
+        family,
+        derivedSlug,
+      });
+      try {
+        const opened = await onOpenFontsource(derivedSlug, Boolean((googleRaw as any)?.isVariable));
+        const ok = opened !== false && opened !== null;
+        catalogOpenDbg(ok ? 'derived fontsource opened' : 'derived fontsource returned null/false', {
+          derivedSlug,
+          openedType: opened === null ? 'null' : typeof opened,
+        });
+        if (ok) return true;
+      } catch (e) {
+        catalogOpenDbg('derived fontsource threw; fallback to google', {
+          derivedSlug,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
     }
   }
 
   if (googleRaw && typeof onOpenGoogle === 'function') {
+    catalogOpenDbg('open google fallback', {
+      familyKey: (item as any)?.familyKey,
+      displayName: (item as any)?.displayName,
+      hasFontsourceRaw: Boolean(fsRaw),
+    });
     await onOpenGoogle(googleRaw);
     return true;
   }
 
+  catalogOpenDbg('no open handler succeeded', {
+    familyKey: (item as any)?.familyKey,
+    displayName: (item as any)?.displayName,
+    hasFontsourceRaw: Boolean(fsRaw),
+    hasGoogleRaw: Boolean(googleRaw),
+  });
   return false;
 }
 

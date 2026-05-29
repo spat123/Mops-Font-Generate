@@ -9,7 +9,7 @@ import { prepareCatalogSearchQuery } from '../../utils/searchMatching';
 import {
   buildCatalogLicenseFilterOptions,
   buildCatalogLicenseFacets,
-  CATALOG_LICENSE_FILTER_ORDER,
+  collectCatalogLicenseKeysFromItems,
 } from '../../utils/catalogLicenseFilter';
 import {
   buildCatalogFeelingFilterOptions,
@@ -164,13 +164,12 @@ export function useCatalogToolbarProps<T extends CatalogSearchableItem = Catalog
   const licenses = useMemo(() => buildCatalogLicenseFacets(facetItems), [facetItems]);
 
   const licenseOptions = useMemo(() => {
-    const present = new Set(CATALOG_LICENSE_FILTER_ORDER);
-    for (const key of licenses) present.add(key as (typeof CATALOG_LICENSE_FILTER_ORDER)[number]);
+    const present = collectCatalogLicenseKeysFromItems(facetItems);
     return withOptionCountRightLabel(
       buildCatalogLicenseFilterOptions(present),
       facetCountMaps?.licenseCounts,
     );
-  }, [licenses, facetCountMaps?.licenseCounts]);
+  }, [facetItems, facetCountMaps?.licenseCounts]);
 
   const feelings = useMemo(() => buildCatalogFeelingFacets(facetItems), [facetItems]);
 

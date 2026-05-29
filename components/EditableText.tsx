@@ -39,6 +39,14 @@ const EditableText = memo(({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const localTextRef = useRef(text);
   const hasModificationsRef = useRef(false);
+  const pendingReflowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevFontStyleKeyRef = useRef({
+    fontFamily: '',
+    fontWeight: '',
+    fontStyle: '',
+    fontFeatureSettings: '',
+    fontVariationSettings: '',
+  });
 
   const resetHorizontalScroll = useCallback((el: HTMLElement | null) => {
     if (!el) return;
@@ -64,7 +72,40 @@ const EditableText = memo(({
     if (skipMetricReflowWhileVfAnimating) return;
     const el = contentRef.current;
     if (!el || !style) return;
-    void el.offsetHeight;
+
+    const nextKey = {
+      fontFamily: String((style as any)?.fontFamily ?? ''),
+      fontWeight: String((style as any)?.fontWeight ?? ''),
+      fontStyle: String((style as any)?.fontStyle ?? ''),
+      fontFeatureSettings: String((style as any)?.fontFeatureSettings ?? ''),
+      fontVariationSettings: String((style as any)?.fontVariationSettings ?? ''),
+    };
+    const prevKey = prevFontStyleKeyRef.current;
+    prevFontStyleKeyRef.current = nextKey;
+
+    const nonVariationChanged =
+      prevKey.fontFamily !== nextKey.fontFamily ||
+      prevKey.fontWeight !== nextKey.fontWeight ||
+      prevKey.fontStyle !== nextKey.fontStyle ||
+      prevKey.fontFeatureSettings !== nextKey.fontFeatureSettings;
+    const variationOnlyChanged =
+      !nonVariationChanged && prevKey.fontVariationSettings !== nextKey.fontVariationSettings;
+
+    // Менять оси можно очень часто (drag). Чтобы не ломать логику “доглифовки”,
+    // делаем reflow с небольшим debounce: один раз после паузы.
+    const debounceMs = variationOnlyChanged ? 140 : 0;
+
+    if (pendingReflowTimerRef.current) {
+      clearTimeout(pendingReflowTimerRef.current);
+      pendingReflowTimerRef.current = null;
+    }
+
+    pendingReflowTimerRef.current = setTimeout(() => {
+      pendingReflowTimerRef.current = null;
+      const node = contentRef.current;
+      if (!node) return;
+      void node.offsetHeight;
+    }, debounceMs);
   }, [
     skipMetricReflowWhileVfAnimating,
     style?.fontFamily,
@@ -73,6 +114,15 @@ const EditableText = memo(({
     style?.fontStyle,
     style?.fontFeatureSettings,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingReflowTimerRef.current) {
+        clearTimeout(pendingReflowTimerRef.current);
+        pendingReflowTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Синхронизируем локальный текст с глобальным при изменении текста извне или смене режима
   useEffect(() => {

@@ -71,6 +71,8 @@ const DEFAULT_SETTINGS = {
   LINE_HEIGHT: 1.05,
   LETTER_SPACING: 0,
   STYLES_LETTER_SPACING: 0,
+  /** OpenType-фичи (CSS `font-feature-settings`): пусто = normal. */
+  OPEN_TYPE_FEATURE_OVERRIDES: {} as Record<string, 0 | 1>,
   TEXT_COLOR: '#000000',
   BACKGROUND_COLOR: '#FFFFFF',
   VIEW_MODE: 'plain',
@@ -157,6 +159,7 @@ export function getDefaultPreviewSettingsSnapshot(): PreviewSettingsSnapshot {
     lineHeight: DEFAULT_SETTINGS.LINE_HEIGHT,
     letterSpacing: DEFAULT_SETTINGS.LETTER_SPACING,
     stylesLetterSpacing: DEFAULT_SETTINGS.STYLES_LETTER_SPACING,
+    openTypeFeatureOverrides: {},
     textColor: DEFAULT_SETTINGS.TEXT_COLOR,
     backgroundColor: DEFAULT_SETTINGS.BACKGROUND_COLOR,
     viewMode: DEFAULT_SETTINGS.VIEW_MODE,
@@ -247,12 +250,15 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
   const [text, setText] = useState(DEFAULT_SETTINGS.TEXT);
+  const [textResetBaseline, setTextResetBaseline] = useState(DEFAULT_SETTINGS.TEXT);
+  const [previewResetSignal, setPreviewResetSignal] = useState(0);
   const [fontSize, setFontSize] = useState(DEFAULT_SETTINGS.FONT_SIZE);
   const [glyphsFontSize, setGlyphsFontSize] = useState(DEFAULT_SETTINGS.GLYPHS_FONT_SIZE);
   const [stylesFontSize, setStylesFontSize] = useState(DEFAULT_SETTINGS.STYLES_FONT_SIZE);
   const [lineHeight, setLineHeight] = useState(DEFAULT_SETTINGS.LINE_HEIGHT);
   const [letterSpacing, setLetterSpacing] = useState(DEFAULT_SETTINGS.LETTER_SPACING);
   const [stylesLetterSpacing, setStylesLetterSpacing] = useState(DEFAULT_SETTINGS.STYLES_LETTER_SPACING);
+  const [openTypeFeatureOverrides, setOpenTypeFeatureOverrides] = useState<Record<string, 0 | 1>>({});
   const [textColor, setTextColor] = useState(DEFAULT_SETTINGS.TEXT_COLOR);
   const [backgroundColor, setBackgroundColor] = useState(DEFAULT_SETTINGS.BACKGROUND_COLOR);
   const [viewMode, setViewMode] = useState(DEFAULT_SETTINGS.VIEW_MODE);
@@ -294,6 +300,10 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     },
     [darkTheme],
   );
+
+  const signalPreviewReset = useCallback(() => {
+    setPreviewResetSignal((n) => (Number(n) || 0) + 1);
+  }, []);
 
   useEffect(() => {
     setIsClient(true);
@@ -524,12 +534,14 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 
   const resetSettings = useCallback(() => {
     setText(DEFAULT_SETTINGS.TEXT);
+    setTextResetBaseline(DEFAULT_SETTINGS.TEXT);
     setFontSize(DEFAULT_SETTINGS.FONT_SIZE);
     setGlyphsFontSize(DEFAULT_SETTINGS.GLYPHS_FONT_SIZE);
     setStylesFontSize(DEFAULT_SETTINGS.STYLES_FONT_SIZE);
     setLineHeight(DEFAULT_SETTINGS.LINE_HEIGHT);
     setLetterSpacing(DEFAULT_SETTINGS.LETTER_SPACING);
     setStylesLetterSpacing(DEFAULT_SETTINGS.STYLES_LETTER_SPACING);
+    setOpenTypeFeatureOverrides({});
     setTextColor(DEFAULT_SETTINGS.TEXT_COLOR);
     setBackgroundColor(DEFAULT_SETTINGS.BACKGROUND_COLOR);
     setViewMode(DEFAULT_SETTINGS.VIEW_MODE);
@@ -565,9 +577,20 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const resetText = useCallback(() => {
+    setText(textResetBaseline);
+    // Снять подсветку «Панграмма» / glyph-пресетов в сайдбаре (см. Sidebar previewResetSignal).
+    signalPreviewReset();
+  }, [setText, textResetBaseline, signalPreviewReset]);
+
   const value: SettingsContextValue = {
     text,
     setText,
+    textResetBaseline,
+    setTextResetBaseline,
+    resetText,
+    previewResetSignal,
+    signalPreviewReset,
     fontSize,
     setFontSize,
     glyphsFontSize,
@@ -580,6 +603,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     setLetterSpacing,
     stylesLetterSpacing,
     setStylesLetterSpacing,
+    openTypeFeatureOverrides,
+    setOpenTypeFeatureOverrides,
     textColor,
     setTextColor,
     backgroundColor,

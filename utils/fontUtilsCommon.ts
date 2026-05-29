@@ -6,7 +6,10 @@ import { getFontInstanceStyles } from './fontInstanceStyles';
  * Дополнительный font-weight / font-style в CSS даёт синтетическое утолщение/наклон.
  */
 export function shouldApplyCssWeightStyleForFont(font: SessionFontRecord | null | undefined): boolean {
-  return Boolean(font?.isVariableFont);
+  // В нашем редакторе для статических семейств (Google/Fontsource и т.п.)
+  // разные начертания выбираются браузером по CSS font-weight/font-style.
+  // Для VF вес/курсив управляются осями (см. отдельную ветку в useFontCss).
+  return Boolean(font) && !Boolean(font?.isVariableFont);
 }
 
 export type FontPresetStyle = {

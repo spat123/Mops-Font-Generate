@@ -374,11 +374,21 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     const newSettings = { ...settings, [tag]: roundedValue };
     
     // For dragging mode, apply threshold to reduce update frequency.
-    const isSignificant = !isDragging || hasSignificantChanges(prevSettingsRef.current, newSettings, 3);
+    const isSignificant =
+      !isDragging ||
+      tag === 'wght' ||
+      hasSignificantChanges(prevSettingsRef.current, newSettings, 3);
     
     // In drag mode with minor changes, update local state only.
     if (isDragging && !isSignificant) {
       setSettings(newSettings);
+      // Но всё равно обновляем глобальные оси “лёгким” способом,
+      // чтобы превью и нижний статус-бар менялись во время drag.
+      isUpdatingFromExternal.current = true;
+      handleVariableSettingsChange(newSettings, false, null, { skipSideEffects: true });
+      if (typeof onSettingsChangeRef.current === 'function') {
+        onSettingsChangeRef.current(newSettings);
+      }
       return roundedValue;
     }
     
@@ -393,7 +403,7 @@ export default function VariableFontControls({ font, onSettingsChange, isAnimati
     // While dragging, use lightweight updates.
     if (isDragging) {
       // Lightweight update during drag (without full rerender).
-      handleVariableSettingsChange(newSettings, false);
+      handleVariableSettingsChange(newSettings, false, null, { skipSideEffects: true });
     } else {
       // For regular clicks, run full update with rerender.
       handleVariableSettingsChange(newSettings, true);

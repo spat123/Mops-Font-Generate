@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import Head from 'next/head';
 import Sidebar from '../Sidebar';
 import FontPreview from '../FontPreview';
@@ -74,6 +74,9 @@ type SidebarLayoutSlice = {
   availableStyles?: unknown;
   selectedPresetName?: unknown;
   applyPresetStyle?: unknown;
+  catalogSubsetOptions?: unknown;
+  activeCatalogSubset?: unknown;
+  onCatalogSubsetChange?: unknown;
   getVariableAxes?: unknown;
   variableSettings?: unknown;
   resetVariableSettings?: unknown;
@@ -119,6 +122,8 @@ export function EditorHomeLayout({
     handleFontsUploadedWithNav,
     selectOrAddFontsourceFontWithNav,
     fontCssProperties,
+    variableSettings,
+    exportedFont,
     fontLibraries,
     moveFontEntryToLibrary,
     requestCreateLibraryWithFonts,
@@ -129,6 +134,7 @@ export function EditorHomeLayout({
     handleWaterfallBaseSizeLiveChange,
     handleWaterfallBaseSizeCommit,
     sidebarSelectedFont,
+    openGoogleCatalogEntryInEditorTab,
   } = preview;
 
   const renderTabContent = () => {
@@ -147,6 +153,8 @@ export function EditorHomeLayout({
 
     const fontPreviewProps = {
       selectedFont: sidebarSelectedFont,
+      variableSettings,
+      exportedFont,
       getFontFamily,
       getVariationSettings,
       handleFontsUploaded: handleFontsUploadedWithNav,
@@ -161,12 +169,20 @@ export function EditorHomeLayout({
       onSelectionActionsChange: handleEmptyTabSelectionActionsChange,
       selectionActionsActive: isEmptyTab,
       currentWaterfallBaseSize: liveWaterfallBaseSize,
+      openGoogleCatalogEntryInEditorTab,
     };
 
     return <FontPreview {...(fontPreviewProps as Parameters<typeof FontPreview>[0])} />;
   };
 
   const slots = catalogPreviewSlotsById as Record<string, SessionFontRecord | null> | undefined;
+
+  // Не перемонтируем библиотечный экран при каждом переключении вкладок —
+  // иначе каталог пересчитывается (facet maps / merge) каждый раз заново.
+  const [hasEverMountedLibraryScreen, setHasEverMountedLibraryScreen] = useState<boolean>(() => mainTab === 'library');
+  useEffect(() => {
+    if (mainTab === 'library') setHasEverMountedLibraryScreen(true);
+  }, [mainTab]);
 
   return (
     <div className="flex h-screen min-h-0 flex-row overflow-hidden bg-gray-50">
@@ -216,6 +232,9 @@ export function EditorHomeLayout({
           availableStyles={sidebarSlice.availableStyles}
           selectedPresetName={sidebarSlice.selectedPresetName}
           applyPresetStyle={sidebarSlice.applyPresetStyle}
+          catalogSubsetOptions={sidebarSlice.catalogSubsetOptions as { value: string; label: string }[]}
+          activeCatalogSubset={String(sidebarSlice.activeCatalogSubset || '')}
+          onCatalogSubsetChange={sidebarSlice.onCatalogSubsetChange as (subset: string) => void}
           getVariableAxes={sidebarSlice.getVariableAxes}
           variableSettings={sidebarSlice.variableSettings}
           resetVariableSettings={sidebarSlice.resetVariableSettings}
@@ -268,11 +287,21 @@ export function EditorHomeLayout({
         <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-hidden">
           {renderTabContent()}
           {mainTab === EDITOR_MAIN_TAB_PENDING && <EditorPendingContentSkeleton />}
-          {mainTab === 'library' && (
-            <FontsLibraryHomeScreen
-              {...(libraryScreenProps as unknown as Parameters<typeof FontsLibraryHomeScreen>[0])}
-            />
-          )}
+          {hasEverMountedLibraryScreen ? (
+            <div
+              className={
+                mainTab === 'library'
+                  ? 'flex min-h-0 flex-1 flex-col'
+                  : 'hidden'
+              }
+              aria-hidden={mainTab !== 'library'}
+            >
+              <FontsLibraryHomeScreen
+                screenActive={mainTab === 'library'}
+                {...(libraryScreenProps as unknown as Parameters<typeof FontsLibraryHomeScreen>[0])}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

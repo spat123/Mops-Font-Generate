@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-05-29T02:45:39.749Z",
+  "myskotomTotal": 1715,
+  "matchedTotal": 159,
+  "gapTotal": 1556,
+  "matchedBySource": {
+    "fontfabric-trial": 37,
+    "google": 109,
+    "fontsource": 11,
+    "fontshare": 2
+  },
+  "ourCatalogTotals": {
+    "google": 1934,
+    "fontsource": 2088,
+    "fontshare": 100,
+    "fontfabric-trial": 114,
+    "uniqueKeys": 2281
+  },
+  "gapCount": 1556
+}

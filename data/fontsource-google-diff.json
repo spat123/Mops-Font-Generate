@@ -1,0 +1,628 @@
+{
+  "fontsourceTotal": 2088,
+  "googleTotal": 1934,
+  "overlapByFamilyKey": 1934,
+  "fontsourceOnlyCount": 154,
+  "googleOnlyCount": 0,
+  "mergedUniqueKeys": 2088,
+  "note": "2111 in UI = likely partial v1 disk cache; fontlist API = 2088; target ~2264 = full v1/fonts when network OK",
+  "fontsourceOnly": [
+    {
+      "slug": "42dot-sans",
+      "family": "42dot Sans"
+    },
+    {
+      "slug": "adwaita-mono",
+      "family": "Adwaita Mono"
+    },
+    {
+      "slug": "adwaita-sans",
+      "family": "Adwaita Sans"
+    },
+    {
+      "slug": "aileron",
+      "family": "Aileron"
+    },
+    {
+      "slug": "apfel-grotezk",
+      "family": "Apfel Grotezk"
+    },
+    {
+      "slug": "argentum-sans",
+      "family": "Argentum Sans"
+    },
+    {
+      "slug": "arima-madurai",
+      "family": "Arima Madurai"
+    },
+    {
+      "slug": "bagnard",
+      "family": "Bagnard"
+    },
+    {
+      "slug": "bagnard-sans",
+      "family": "Bagnard Sans"
+    },
+    {
+      "slug": "bbh-sans-bartle",
+      "family": "BBH Sans Bartle"
+    },
+    {
+      "slug": "bbh-sans-bogle",
+      "family": "BBH Sans Bogle"
+    },
+    {
+      "slug": "bbh-sans-hegarty",
+      "family": "BBH Sans Hegarty"
+    },
+    {
+      "slug": "big-shoulders-display",
+      "family": "Big Shoulders Display"
+    },
+    {
+      "slug": "big-shoulders-inline-display",
+      "family": "Big Shoulders Inline Display"
+    },
+    {
+      "slug": "big-shoulders-inline-text",
+      "family": "Big Shoulders Inline Text"
+    },
+    {
+      "slug": "big-shoulders-stencil-display",
+      "family": "Big Shoulders Stencil Display"
+    },
+    {
+      "slug": "big-shoulders-stencil-text",
+      "family": "Big Shoulders Stencil Text"
+    },
+    {
+      "slug": "big-shoulders-text",
+      "family": "Big Shoulders Text"
+    },
+    {
+      "slug": "bj-cree",
+      "family": "BJ Cree"
+    },
+    {
+      "slug": "blackout-midnight",
+      "family": "Blackout Midnight"
+    },
+    {
+      "slug": "blackout-sunrise",
+      "family": "Blackout Sunrise"
+    },
+    {
+      "slug": "blackout-two-am",
+      "family": "Blackout Two AM"
+    },
+    {
+      "slug": "bluu-next",
+      "family": "Bluu Next"
+    },
+    {
+      "slug": "bravura",
+      "family": "Bravura"
+    },
+    {
+      "slug": "bravura-text",
+      "family": "Bravura Text"
+    },
+    {
+      "slug": "briem-hand",
+      "family": "Briem Hand"
+    },
+    {
+      "slug": "chunk-five",
+      "family": "Chunk Five"
+    },
+    {
+      "slug": "clear-sans",
+      "family": "Clear Sans"
+    },
+    {
+      "slug": "coda-caption",
+      "family": "Coda Caption"
+    },
+    {
+      "slug": "comic-mono",
+      "family": "Comic Mono"
+    },
+    {
+      "slug": "commit-mono",
+      "family": "Commit Mono"
+    },
+    {
+      "slug": "cooper-hewitt",
+      "family": "Cooper Hewitt"
+    },
+    {
+      "slug": "dejavu-math",
+      "family": "DejaVu Math"
+    },
+    {
+      "slug": "dejavu-mono",
+      "family": "DejaVu Mono"
+    },
+    {
+      "slug": "dejavu-sans",
+      "family": "DejaVu Sans"
+    },
+    {
+      "slug": "dejavu-serif",
+      "family": "DejaVu Serif"
+    },
+    {
+      "slug": "dseg-weather",
+      "family": "DSEG Weather"
+    },
+    {
+      "slug": "dseg14-classic",
+      "family": "DSEG14 Classic"
+    },
+    {
+      "slug": "dseg14-classic-mini",
+      "family": "DSEG14 Classic Mini"
+    },
+    {
+      "slug": "dseg14-modern",
+      "family": "DSEG14 Modern"
+    },
+    {
+      "slug": "dseg14-modern-mini",
+      "family": "DSEG14 Modern Mini"
+    },
+    {
+      "slug": "dseg7-classic",
+      "family": "DSEG7 Classic"
+    },
+    {
+      "slug": "dseg7-classic-mini",
+      "family": "DSEG7 Classic Mini"
+    },
+    {
+      "slug": "dseg7-modern",
+      "family": "DSEG7 Modern"
+    },
+    {
+      "slug": "dseg7-modern-mini",
+      "family": "DSEG7 Modern Mini"
+    },
+    {
+      "slug": "dseg7-segg-chan",
+      "family": "DSEG7 SEGG CHAN"
+    },
+    {
+      "slug": "dseg7-segg-chan-mini",
+      "family": "DSEG7 SEGG CHAN Mini"
+    },
+    {
+      "slug": "finlandica",
+      "family": "Finlandica"
+    },
+    {
+      "slug": "firago",
+      "family": "FiraGO"
+    },
+    {
+      "slug": "fredoka-one",
+      "family": "Fredoka One"
+    },
+    {
+      "slug": "fusion-kai-g",
+      "family": "Fusion Kai G"
+    },
+    {
+      "slug": "fusion-kai-j",
+      "family": "Fusion Kai J"
+    },
+    {
+      "slug": "fusion-kai-t",
+      "family": "Fusion Kai T"
+    },
+    {
+      "slug": "fusion-pixel-10px-monospaced-jp",
+      "family": "Fusion Pixel 10px Monospaced JP"
+    },
+    {
+      "slug": "fusion-pixel-10px-monospaced-kr",
+      "family": "Fusion Pixel 10px Monospaced KR"
+    },
+    {
+      "slug": "fusion-pixel-10px-monospaced-sc",
+      "family": "Fusion Pixel 10px Monospaced SC"
+    },
+    {
+      "slug": "fusion-pixel-10px-monospaced-tc",
+      "family": "Fusion Pixel 10px Monospaced TC"
+    },
+    {
+      "slug": "fusion-pixel-10px-proportional-jp",
+      "family": "Fusion Pixel 10px Proportional JP"
+    },
+    {
+      "slug": "fusion-pixel-10px-proportional-kr",
+      "family": "Fusion Pixel 10px Proportional KR"
+    },
+    {
+      "slug": "fusion-pixel-10px-proportional-sc",
+      "family": "Fusion Pixel 10px Proportional SC"
+    },
+    {
+      "slug": "fusion-pixel-10px-proportional-tc",
+      "family": "Fusion Pixel 10px Proportional TC"
+    },
+    {
+      "slug": "fusion-pixel-12px-monospaced-jp",
+      "family": "Fusion Pixel 12px Monospaced JP"
+    },
+    {
+      "slug": "fusion-pixel-12px-monospaced-kr",
+      "family": "Fusion Pixel 12px Monospaced KR"
+    },
+    {
+      "slug": "fusion-pixel-12px-monospaced-sc",
+      "family": "Fusion Pixel 12px Monospaced SC"
+    },
+    {
+      "slug": "fusion-pixel-12px-monospaced-tc",
+      "family": "Fusion Pixel 12px Monospaced TC"
+    },
+    {
+      "slug": "fusion-pixel-12px-proportional-jp",
+      "family": "Fusion Pixel 12px Proportional JP"
+    },
+    {
+      "slug": "fusion-pixel-12px-proportional-kr",
+      "family": "Fusion Pixel 12px Proportional KR"
+    },
+    {
+      "slug": "fusion-pixel-12px-proportional-sc",
+      "family": "Fusion Pixel 12px Proportional SC"
+    },
+    {
+      "slug": "fusion-pixel-12px-proportional-tc",
+      "family": "Fusion Pixel 12px Proportional TC"
+    },
+    {
+      "slug": "fusion-pixel-8px-monospaced-jp",
+      "family": "Fusion Pixel 8px Monospaced JP"
+    },
+    {
+      "slug": "fusion-pixel-8px-monospaced-kr",
+      "family": "Fusion Pixel 8px Monospaced KR"
+    },
+    {
+      "slug": "fusion-pixel-8px-monospaced-sc",
+      "family": "Fusion Pixel 8px Monospaced SC"
+    },
+    {
+      "slug": "fusion-pixel-8px-monospaced-tc",
+      "family": "Fusion Pixel 8px Monospaced TC"
+    },
+    {
+      "slug": "fusion-pixel-8px-proportional-jp",
+      "family": "Fusion Pixel 8px Proportional JP"
+    },
+    {
+      "slug": "fusion-pixel-8px-proportional-kr",
+      "family": "Fusion Pixel 8px Proportional KR"
+    },
+    {
+      "slug": "fusion-pixel-8px-proportional-sc",
+      "family": "Fusion Pixel 8px Proportional SC"
+    },
+    {
+      "slug": "fusion-pixel-8px-proportional-tc",
+      "family": "Fusion Pixel 8px Proportional TC"
+    },
+    {
+      "slug": "geist-sans",
+      "family": "Geist Sans"
+    },
+    {
+      "slug": "genjyuu-gothic",
+      "family": "Genjyuu Gothic"
+    },
+    {
+      "slug": "gentium-book-basic",
+      "family": "Gentium Book Basic"
+    },
+    {
+      "slug": "hauora-sans",
+      "family": "Hauora Sans"
+    },
+    {
+      "slug": "ia-writer-duo",
+      "family": "iA Writer Duo"
+    },
+    {
+      "slug": "ia-writer-mono",
+      "family": "iA Writer Mono"
+    },
+    {
+      "slug": "ia-writer-quattro",
+      "family": "iA Writer Quattro"
+    },
+    {
+      "slug": "iosevka",
+      "family": "Iosevka"
+    },
+    {
+      "slug": "iosevka-aile",
+      "family": "Iosevka Aile"
+    },
+    {
+      "slug": "iosevka-curly",
+      "family": "Iosevka Curly"
+    },
+    {
+      "slug": "iosevka-curly-slab",
+      "family": "Iosevka Curly Slab"
+    },
+    {
+      "slug": "iosevka-etoile",
+      "family": "Iosevka Etoile"
+    },
+    {
+      "slug": "junction",
+      "family": "Junction"
+    },
+    {
+      "slug": "kantumruy",
+      "family": "Kantumruy"
+    },
+    {
+      "slug": "karmilla",
+      "family": "Karmilla"
+    },
+    {
+      "slug": "league-mono",
+      "family": "League Mono"
+    },
+    {
+      "slug": "lextrall",
+      "family": "Lextrall"
+    },
+    {
+      "slug": "libre-caslon-condensed",
+      "family": "Libre Caslon Condensed"
+    },
+    {
+      "slug": "lxgw-wenkai",
+      "family": "LXGW WenKai"
+    },
+    {
+      "slug": "maple-mono",
+      "family": "Maple Mono"
+    },
+    {
+      "slug": "material-icons",
+      "family": "Material Icons"
+    },
+    {
+      "slug": "material-icons-outlined",
+      "family": "Material Icons Outlined"
+    },
+    {
+      "slug": "material-icons-round",
+      "family": "Material Icons Round"
+    },
+    {
+      "slug": "material-icons-sharp",
+      "family": "Material Icons Sharp"
+    },
+    {
+      "slug": "material-icons-two-tone",
+      "family": "Material Icons Two Tone"
+    },
+    {
+      "slug": "material-symbols",
+      "family": "Material Symbols"
+    },
+    {
+      "slug": "material-symbols-outlined",
+      "family": "Material Symbols Outlined"
+    },
+    {
+      "slug": "material-symbols-rounded",
+      "family": "Material Symbols Rounded"
+    },
+    {
+      "slug": "material-symbols-sharp",
+      "family": "Material Symbols Sharp"
+    },
+    {
+      "slug": "merienda-one",
+      "family": "Merienda One"
+    },
+    {
+      "slug": "metropolis",
+      "family": "Metropolis"
+    },
+    {
+      "slug": "monaspace-argon",
+      "family": "Monaspace Argon"
+    },
+    {
+      "slug": "monaspace-krypton",
+      "family": "Monaspace Krypton"
+    },
+    {
+      "slug": "monaspace-neon",
+      "family": "Monaspace Neon"
+    },
+    {
+      "slug": "monaspace-radon",
+      "family": "Monaspace Radon"
+    },
+    {
+      "slug": "monaspace-xenon",
+      "family": "Monaspace Xenon"
+    },
+    {
+      "slug": "mononoki",
+      "family": "Mononoki"
+    },
+    {
+      "slug": "montserrat-subrayada",
+      "family": "Montserrat Subrayada"
+    },
+    {
+      "slug": "nebula-sans",
+      "family": "Nebula Sans"
+    },
+    {
+      "slug": "norwester",
+      "family": "Norwester"
+    },
+    {
+      "slug": "noto-mono",
+      "family": "Noto Mono"
+    },
+    {
+      "slug": "noto-sans-phags-pa",
+      "family": "Noto Sans Phags Pa"
+    },
+    {
+      "slug": "open-runde",
+      "family": "Open Runde"
+    },
+    {
+      "slug": "open-sauce-one",
+      "family": "Open Sauce One"
+    },
+    {
+      "slug": "open-sauce-sans",
+      "family": "Open Sauce Sans"
+    },
+    {
+      "slug": "open-sauce-two",
+      "family": "Open Sauce Two"
+    },
+    {
+      "slug": "opendyslexic",
+      "family": "OpenDyslexic"
+    },
+    {
+      "slug": "ostrich-sans",
+      "family": "Ostrich Sans"
+    },
+    {
+      "slug": "peace-sans",
+      "family": "Peace Sans"
+    },
+    {
+      "slug": "pitagon-sans",
+      "family": "Pitagon Sans"
+    },
+    {
+      "slug": "pitagon-sans-mono",
+      "family": "Pitagon Sans Mono"
+    },
+    {
+      "slug": "pitagon-sans-text",
+      "family": "Pitagon Sans Text"
+    },
+    {
+      "slug": "pitagon-serif",
+      "family": "Pitagon Serif"
+    },
+    {
+      "slug": "pretendard",
+      "family": "Pretendard"
+    },
+    {
+      "slug": "pushster",
+      "family": "Pushster"
+    },
+    {
+      "slug": "redaction",
+      "family": "Redaction"
+    },
+    {
+      "slug": "redaction-10",
+      "family": "Redaction 10"
+    },
+    {
+      "slug": "redaction-100",
+      "family": "Redaction 100"
+    },
+    {
+      "slug": "redaction-20",
+      "family": "Redaction 20"
+    },
+    {
+      "slug": "redaction-35",
+      "family": "Redaction 35"
+    },
+    {
+      "slug": "redaction-50",
+      "family": "Redaction 50"
+    },
+    {
+      "slug": "redaction-70",
+      "family": "Redaction 70"
+    },
+    {
+      "slug": "rubik-one",
+      "family": "Rubik One"
+    },
+    {
+      "slug": "saira-stencil-one",
+      "family": "Saira Stencil One"
+    },
+    {
+      "slug": "source-sans-pro",
+      "family": "Source Sans Pro"
+    },
+    {
+      "slug": "source-serif-pro",
+      "family": "Source Serif Pro"
+    },
+    {
+      "slug": "syne-italic",
+      "family": "Syne Italic"
+    },
+    {
+      "slug": "uncut-sans",
+      "family": "Uncut Sans"
+    },
+    {
+      "slug": "unifont",
+      "family": "Unifont"
+    },
+    {
+      "slug": "unifontex",
+      "family": "UnifontEX"
+    },
+    {
+      "slug": "win95fa",
+      "family": "WIN95FA"
+    },
+    {
+      "slug": "yakuhanjp",
+      "family": "YakuHanJP"
+    },
+    {
+      "slug": "yakuhanjps",
+      "family": "YakuHanJPs"
+    },
+    {
+      "slug": "yakuhanmp",
+      "family": "YakuHanMP"
+    },
+    {
+      "slug": "yakuhanmps",
+      "family": "YakuHanMPs"
+    },
+    {
+      "slug": "yakuhanrp",
+      "family": "YakuHanRP"
+    },
+    {
+      "slug": "yakuhanrps",
+      "family": "YakuHanRPs"
+    }
+  ],
+  "googleOnly": []
+}

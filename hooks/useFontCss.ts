@@ -11,6 +11,7 @@ import {
 import { formatFontVariationSettings } from '../utils/fontVariationSettings';
 import { slugifyFontKey } from '../utils/fontSlug';
 import { shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
+import { fontStyleDbg } from '../utils/fontStyleDebugLog';
 
 /** CSS для превью: font-family, variation-settings, FontFace, экспорт строки. */
 export function useFontCss(
@@ -90,6 +91,16 @@ export function useFontCss(
       if (variationSettings && variationSettings !== 'normal') {
         properties.fontVariationSettings = variationSettings;
       }
+      const wghtValue = Number(
+        variableSettings?.wght ??
+        selectedFont?.currentWeight ??
+        selectedFont?.variableAxes?.wght?.currentValue ??
+        selectedFont?.variableAxes?.wght?.default ??
+        400,
+      );
+      if (Number.isFinite(wghtValue)) {
+        properties.fontWeight = wghtValue as CSSProperties['fontWeight'];
+      }
       const italValueFromSettings = Number(
         variableSettings?.ital ??
         selectedFont?.variableAxes?.ital?.currentValue ??
@@ -108,6 +119,15 @@ export function useFontCss(
       }
     }
 
+    fontStyleDbg('useFontCss computed', {
+      fontId: selectedFont?.id,
+      source: selectedFont?.source,
+      isVariable: Boolean(isSelectedFontVariable),
+      currentWeight: selectedFont?.currentWeight,
+      currentStyle: selectedFont?.currentStyle,
+      variableWght: variableSettings?.wght,
+      css: properties,
+    });
     return properties;
   }, [
     selectedFont,

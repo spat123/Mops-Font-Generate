@@ -19,28 +19,35 @@ export function resolveSavedLibraryFontCatalogMeta(
   let subsets: string[] = [];
   let isVariable = font?.isVariable === true;
   let hasItalic = false;
+  let category = '';
+  let styleCount = 0;
 
   if (!lookup) {
-    return { subsets, isVariable, hasItalic, source, id, label };
+    return { subsets, isVariable, hasItalic, category, styleCount, source, id, label };
   }
 
   if (source === 'google') {
     const family = id.startsWith('google:') ? id.slice('google:'.length) : label;
     const meta = lookup.googleByFamily.get(String(family || '').toLowerCase());
     subsets = Array.isArray(meta?.subsets) ? (meta.subsets as string[]) : [];
-    isVariable = isVariable || (Array.isArray(meta?.axes) && meta.axes.length > 0);
+    category = String(meta?.category || '').trim();
+    styleCount = Number(meta?.styleCount) || 0;
+    isVariable = isVariable || meta?.isVariable === true || (Array.isArray(meta?.axes) && meta.axes.length > 0);
     hasItalic =
+      meta?.hasItalic === true ||
       meta?.hasItalicStyles === true ||
       (typeof meta?.italicMode === 'string' && meta.italicMode && meta.italicMode !== 'none');
   } else if (source === 'fontsource') {
     const slug = id.startsWith('fontsource:') ? id.slice('fontsource:'.length) : '';
     const meta = lookup.fontsourceBySlug.get(slug);
     subsets = Array.isArray(meta?.subsets) ? (meta.subsets as string[]) : [];
+    category = String(meta?.category || '').trim();
+    styleCount = Number(meta?.styleCount) || 0;
     isVariable = isVariable || meta?.isVariable === true;
     hasItalic = meta?.hasItalic === true;
   }
 
-  return { subsets, isVariable, hasItalic, source, id, label };
+  return { subsets, isVariable, hasItalic, category, styleCount, source, id, label };
 }
 
 export function applySessionFontMetaHints(

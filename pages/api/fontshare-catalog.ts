@@ -23,5 +23,6 @@ export default createCatalogProxyHandler({
   logTag: 'fontshare-catalog',
   cacheTtlMs: 1000 * 60 * 60,
   cacheControl: CACHE_CONTROL,
+  fetchTimeoutMs: 30_000,
   fetchItems: fetchFontshareCatalogItems,
 });

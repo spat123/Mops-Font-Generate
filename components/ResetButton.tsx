@@ -39,6 +39,25 @@ function areValuesEqual(currentValue, defaultValue) {
   if (typeof currentValue === 'number' || typeof defaultValue === 'number') {
     return Number(currentValue) === Number(defaultValue);
   }
+  if (
+    currentValue &&
+    defaultValue &&
+    typeof currentValue === 'object' &&
+    typeof defaultValue === 'object' &&
+    !Array.isArray(currentValue) &&
+    !Array.isArray(defaultValue)
+  ) {
+    const a = currentValue as Record<string, unknown>;
+    const b = defaultValue as Record<string, unknown>;
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const k of aKeys) {
+      if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+      if (a[k] !== b[k]) return false;
+    }
+    return true;
+  }
   return currentValue === defaultValue;
 }
 
@@ -63,6 +82,7 @@ const PLAIN_TEXT_PREVIEW_RESET_KEYS = new Set([
   'fontSize',
   'lineHeight',
   'letterSpacing',
+  'openTypeFeatureOverrides',
   'textColor',
   'backgroundColor',
   'textDirection',
@@ -104,7 +124,9 @@ function buildMergedResetSnapshot(defaults, current, viewMode) {
   }
   const out = { ...defaults };
   out.viewMode = current.viewMode;
-  out.text = current.text;
+  // В Plain сброс должен возвращать дефолтный ASCII-набор,
+  // иначе при non-latin subset “Сбросить Plain” оставляет кириллицу/греческий и выглядит как баг.
+  out.text = viewMode === 'plain' ? defaults.text : current.text;
   for (const key of Object.keys(defaults)) {
     if (key === 'viewMode' || key === 'text') continue;
     if (!keysToReset.has(key)) {
@@ -152,11 +174,14 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     getDefaultAxisValues,
     selectedPresetName,
     getResetTargetPresetName,
+    applyCatalogSubset,
   } = useFontContext();
   const {
     resetSettings,
     text,
     setText,
+    setTextResetBaseline,
+    signalPreviewReset,
     fontSize,
     setFontSize,
     glyphsFontSize,
@@ -169,6 +194,8 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     setLetterSpacing,
     stylesLetterSpacing,
     setStylesLetterSpacing,
+    openTypeFeatureOverrides,
+    setOpenTypeFeatureOverrides,
     textColor,
     setTextColor,
     backgroundColor,
@@ -242,6 +269,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     lineHeight,
     letterSpacing,
     stylesLetterSpacing,
+    openTypeFeatureOverrides,
     textColor,
     backgroundColor,
     viewMode,
@@ -306,6 +334,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
       lineHeight,
       letterSpacing,
       stylesLetterSpacing,
+      openTypeFeatureOverrides,
       textColor,
       backgroundColor,
       viewMode,
@@ -337,6 +366,12 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
       getPreviewResetKeysForViewMode(viewMode) ??
       new Set(Object.keys(defaultPreviewSettings).filter((k) => k !== 'viewMode' && k !== 'text'));
 
+    // В Plain “дефолт” по тексту — латиница/ASCII из DEFAULT_SETTINGS.
+    // Иначе смена subset (например на кириллицу) визуально выглядит как “сломанный сброс Plain”.
+    if (viewMode === 'plain') {
+      return String(text ?? '') !== String(defaultPreviewSettings.text ?? '');
+    }
+
     return Object.entries(currentPreviewSettings).some(([key, value]) => {
       if (key === 'viewMode' || key === 'text') return false;
       if (!keysForDirty.has(key)) return false;
@@ -356,6 +391,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     previewBackgroundImage,
     stylesFontSize,
     stylesLetterSpacing,
+    openTypeFeatureOverrides,
     text,
     viewMode,
     textAlignment,
@@ -441,6 +477,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
             setLineHeight,
             setLetterSpacing,
             setStylesLetterSpacing,
+            setOpenTypeFeatureOverrides,
             setTextColor,
             setBackgroundColor,
             setViewMode,
@@ -468,6 +505,30 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
             setTextCenter,
           });
           setPreviewBackgroundImage(snapshotToApply.previewBackgroundImage ?? null);
+          // “Сбросить текст” в Plain должен возвращать к дефолтной латинице/ASCII,
+          // а не к последнему выбранному subset-образцу.
+          if (viewModeRef.current === 'plain') {
+            setTextResetBaseline(String(snapshotToApply.text ?? defaultPreviewSettings.text ?? ''));
+          }
+          signalPreviewReset?.();
+        }
+
+        // Важно: если пользователь был на кириллице/греческом subset (Fontsource),
+        // то ASCII-текст после “Сбросить Plain” отображается fallback-гарнитурой.
+        // Поэтому при сбросе Plain возвращаем activeSubset на latin (если шрифт это поддерживает).
+        if (
+          viewModeRef.current === 'plain' &&
+          selectedFont?.source === 'fontsource' &&
+          typeof applyCatalogSubset === 'function'
+        ) {
+          const allowed = Array.isArray(selectedFont?.catalogSubsets)
+            ? selectedFont.catalogSubsets.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean)
+            : [];
+          const hasLatin = allowed.includes('latin');
+          const current = String(selectedFont?.activeSubset || '').trim().toLowerCase();
+          if (hasLatin && current && current !== 'latin') {
+            void applyCatalogSubset('latin');
+          }
         }
 
         if (hasFontSpecificChanges) {
@@ -512,6 +573,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     setPreviewBackgroundImage,
     setStylesFontSize,
     setStylesLetterSpacing,
+    setOpenTypeFeatureOverrides,
     setText,
     setViewMode,
     setTextAlignment,
@@ -523,6 +585,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     setTextDirection,
     setTextFill,
     setTextCenter,
+    setTextResetBaseline,
     setVerticalAlignment,
     setWaterfallBaseSize,
     setWaterfallBodyLetterSpacing,
@@ -536,7 +599,7 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
     setWaterfallRows,
     setWaterfallScaleRatio,
     setWaterfallUnit,
-    selectedFont,
+    applyCatalogSubset,
   ]);
 
   const resetActionLabel = getPerViewResetShortLabel(viewMode);

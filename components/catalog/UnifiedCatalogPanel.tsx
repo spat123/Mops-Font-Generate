@@ -14,6 +14,8 @@ import {
   getCatalogItemLicenseKeys,
   CATALOG_LICENSE_LABELS_RU,
   compareCatalogLicenseLabels,
+  buildCatalogLicenseInheritIndex,
+  setCatalogLicenseInheritIndex,
 } from '../../utils/catalogLicenseFilter';
 import { getCatalogItemFeelingKeys, getCatalogFeelingLabelRu } from '../../utils/catalogFeelingFilter';
 import { getCatalogItemShapeKeys, getCatalogShapeLabelRu } from '../../utils/catalogShapeFilter';
@@ -72,6 +74,8 @@ import {
   downloadCatalogItemPackage,
   downloadCatalogItemAsFormat,
 } from '../../utils/catalogPreferredSource';
+import { catalogOpenDbg } from '../../utils/catalogOpenDebugLog';
+import { catalogFetchDbg } from '../../utils/catalogFetchDebugLog';
 import {
   clearGoogleFontCatalogCache,
   readGoogleFontCatalogCache,
@@ -89,6 +93,9 @@ import {
   readFontsourceCatalogCacheAsync,
   pickBetterFontsourceCatalogLists,
   FONTSOURCE_MIN_FULL_CATALOG_SIZE,
+  isFontsourceCatalogComplete,
+  isWeakFontsourceCatalogPayload,
+  fetchFontsourceCatalogFromFontlist,
 } from '../../utils/fontsourceCatalogCache';
 import { readFontshareCatalogCache, writeFontshareCatalogCache } from '../../utils/fontshareCatalogCache';
 import { readFontfabricTrialCatalogCache, writeFontfabricTrialCatalogCache } from '../../utils/fontfabricTrialCatalogCache';
@@ -110,6 +117,9 @@ const SCROLL_RENDER_NEAR_BOTTOM_PX = 520;
 const ROW_MODE_HEIGHT_PX = 240;
 const GRID_CARD_HEIGHT_PX = 168;
 const FONTSHARE_MIN_FULL_CATALOG_SIZE = 80;
+
+// Сессионная защёлка: не перезапрашивать каталоги при каждом ремоунте/возврате.
+let hasFetchedUnifiedCatalogNetworkThisSession = false;
 
 function unifiedCatalogGridCols(viewportWidth) {
   if (viewportWidth <= 0) return 2;
@@ -201,6 +211,7 @@ export default function UnifiedCatalogPanel({
   const {
     catalogScrollEl,
     setCatalogScrollContainer,
+    setGridWidthMeasureContainer,
     setTrailingToolbarContainer,
     viewportW,
     gridCols,
@@ -234,15 +245,50 @@ export default function UnifiedCatalogPanel({
     [setCatalogScrollContainer, setScrollElement],
   );
 
-  const [googleItems, setGoogleItems] = useState([]);
-  const [fontsourceItems, setFontsourceItems] = useState([]);
-  const [fontshareItems, setFontshareItems] = useState([]);
-  const [trialItems, setTrialItems] = useState([]);
-  const [loadError, setLoadError] = useState(null);
-  const [isInitialCatalogLoading, setIsInitialCatalogLoading] = useState(true);
-  const [areCardsVisible, setAreCardsVisible] = useState(false);
+  const setPanelRootRef = useCallback(
+    (node: HTMLElement | null) => {
+      setGridWidthMeasureContainer(node);
+    },
+    [setGridWidthMeasureContainer],
+  );
+
+  const readCaches = () => {
+    if (typeof window === 'undefined') {
+      return {
+        google: [] as unknown[],
+        fontsource: [] as unknown[],
+        fontshare: [] as unknown[],
+        trial: [] as unknown[],
+        hasCached: false,
+      };
+    }
+    const cachedGoogle = readGoogleFontCatalogCache();
+    const cachedFontsource = readFontsourceCatalogCache();
+    const cachedFontshare = readFontshareCatalogCache();
+    const cachedTrial = readFontfabricTrialCatalogCache();
+    const hasCached =
+      cachedGoogle.length > 0 || cachedFontsource.length > 0 || cachedFontshare.length > 0 || cachedTrial.length > 0;
+    return {
+      google: cachedGoogle,
+      fontsource: cachedFontsource,
+      fontshare: cachedFontshare,
+      trial: cachedTrial,
+      hasCached,
+    };
+  };
+
+  const initialCaches = readCaches();
+
+  const [googleItems, setGoogleItems] = useState(initialCaches.google);
+  const [fontsourceItems, setFontsourceItems] = useState(initialCaches.fontsource);
+  const [fontshareItems, setFontshareItems] = useState(initialCaches.fontshare);
+  const [trialItems, setTrialItems] = useState(initialCaches.trial);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isInitialCatalogLoading, setIsInitialCatalogLoading] = useState(!initialCaches.hasCached);
+  const [areCardsVisible, setAreCardsVisible] = useState(initialCaches.hasCached);
   const [addingFamilyKey, setAddingFamilyKey] = useState(null);
   const [visibleCardsCount, setVisibleCardsCount] = useState(0);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   const { set: recentlyAddedKeys, mark: markKeyRecentlyAdded } = useStickyTimedSet(MIN_LOADER_VISIBLE_MS);
 
@@ -272,6 +318,11 @@ export default function UnifiedCatalogPanel({
 
   const catalogItems = mergedAllItems;
 
+  useEffect(() => {
+    setCatalogLicenseInheritIndex(buildCatalogLicenseInheritIndex(mergedAllItems));
+    return () => setCatalogLicenseInheritIndex(null);
+  }, [mergedAllItems]);
+
   const sorters = useMemo(
     () => ({
       popular: compareUnifiedCatalogByPopular,
@@ -293,6 +344,25 @@ export default function UnifiedCatalogPanel({
   );
 
   const baseCountTotal = catalogItems.length;
+
+  // Важно: facetCountConfig передаётся в useCatalogToolbarProps и участвует в deps useMemo.
+  // Если создавать объект на каждый ререндер (например, из-за скролла/оверлей-скроллбара),
+  // то buildCatalogFacetCountMaps будет пересчитываться на каждое движение колеса/hover.
+  const facetCountConfig = useMemo(
+    () => ({
+      getSearchTokens: (item) => item.searchTokens,
+      getCategory: (item) => item?.category,
+      getSubsets: (item) => item?.subsets,
+      isVariable: (item) => item?.isVariable,
+      hasItalic: (item) => item?.hasItalic,
+      getLicenseKeys: getCatalogItemLicenseKeys,
+      getFeelingKeys: getCatalogItemFeelingKeys,
+      getShapeKeys: getCatalogItemShapeKeys,
+      getCalligraphyKeys: getCatalogItemCalligraphyKeys,
+      getPreserveKey: (item) => item?.familyKey,
+    }),
+    [],
+  );
 
   const isItemInSession = useCallback((fontsState, familyKey) => {
     const it = mergedByKeyRef.current.get(familyKey);
@@ -384,18 +454,7 @@ export default function UnifiedCatalogPanel({
         'box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent hover:text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900',
       facetItemsResolver: ({ rawItems }) => rawItems,
       facetCountItemsResolver: ({ filterBase }) => filterBase,
-      facetCountConfig: {
-        getSearchTokens: (item) => item.searchTokens,
-        getCategory: (item) => item?.category,
-        getSubsets: (item) => item?.subsets,
-        isVariable: (item) => item?.isVariable,
-        hasItalic: (item) => item?.hasItalic,
-        getLicenseKeys: getCatalogItemLicenseKeys,
-        getFeelingKeys: getCatalogItemFeelingKeys,
-        getShapeKeys: getCatalogItemShapeKeys,
-        getCalligraphyKeys: getCatalogItemCalligraphyKeys,
-        getPreserveKey: (item) => item?.familyKey,
-      },
+      facetCountConfig,
       getCategory: (item) => item?.category,
       getSubsets: (item) => item?.subsets,
       compareCategory: compareFontCategoryLabelsRu,
@@ -558,6 +617,13 @@ export default function UnifiedCatalogPanel({
       if (!key) return;
       setAddingFamilyKey(key);
       try {
+        catalogOpenDbg('open click', {
+          familyKey: item?.familyKey,
+          displayName: item?.displayName,
+          sources: Array.isArray(item?.sources)
+            ? item.sources.map((s) => ({ id: s?.id, hasRaw: Boolean(s?.raw) }))
+            : [],
+        });
         await openCatalogItemInEditor(item, {
           onOpenFontsource: (slug, isVariable) =>
             Promise.resolve(onOpenFontsourceInEditorTab?.(slug, isVariable)),
@@ -818,18 +884,20 @@ export default function UnifiedCatalogPanel({
   // --- Data loading ---
   useEffect(() => {
     if (!isActive) return undefined;
+    let cancelled = false;
     const loadingStartedAt = Date.now();
+    let didFinalizeInitialLoading = false;
 
-    const cachedGoogle = readGoogleFontCatalogCache();
-    let cachedFontsource = readFontsourceCatalogCache();
-    const cachedFontshare = readFontshareCatalogCache();
-    const cachedTrial = readFontfabricTrialCatalogCache();
-    const hasCached = cachedGoogle.length > 0 || cachedFontsource.length > 0 || cachedFontshare.length > 0 || cachedTrial.length > 0;
+    const caches = readCaches();
+    let cachedFontsource = caches.fontsource as unknown[];
+    const cachedFontshare = caches.fontshare as unknown[];
+    const cachedTrial = caches.trial as unknown[];
+    const hasCached = caches.hasCached;
 
-    if (cachedGoogle.length > 0) setGoogleItems(cachedGoogle);
-    if (cachedFontsource.length > 0) setFontsourceItems(cachedFontsource);
-    if (cachedFontshare.length > 0) setFontshareItems(cachedFontshare);
-    if (cachedTrial.length > 0) setTrialItems(cachedTrial);
+    if ((caches.google as unknown[]).length > 0) setGoogleItems(caches.google as unknown[]);
+    if ((caches.fontsource as unknown[]).length > 0) setFontsourceItems(caches.fontsource as unknown[]);
+    if ((caches.fontshare as unknown[]).length > 0) setFontshareItems(caches.fontshare as unknown[]);
+    if ((caches.trial as unknown[]).length > 0) setTrialItems(caches.trial as unknown[]);
 
     void readFontsourceCatalogCacheAsync().then((idbList) => {
       if (cancelled) return;
@@ -846,8 +914,9 @@ export default function UnifiedCatalogPanel({
       setAreCardsVisible(true);
     }
 
-    let cancelled = false;
     const finalizeInitialLoading = () => {
+      if (didFinalizeInitialLoading) return;
+      didFinalizeInitialLoading = true;
       const elapsed = Date.now() - loadingStartedAt;
       const delay = Math.max(0, MIN_LOADER_VISIBLE_MS - elapsed);
       window.setTimeout(() => {
@@ -857,6 +926,29 @@ export default function UnifiedCatalogPanel({
           if (!cancelled) setAreCardsVisible(true);
         });
       }, delay);
+    };
+
+    const safeErrorMessage = (e: unknown, fallback: string) => {
+      if (!e) return fallback;
+      if (typeof e === 'string') return e;
+      if (e instanceof Error) {
+        const msg = String(e.message || '').trim();
+        if (msg.toLowerCase().includes('aborted') || msg.toLowerCase().includes('abort')) return 'Таймаут запроса';
+        return msg || fallback;
+      }
+      return fallback;
+    };
+
+    const fetchWithTimeout = async (url: string, init?: RequestInit & { timeoutMs?: number }) => {
+      const timeoutMs = typeof init?.timeoutMs === 'number' ? init.timeoutMs : 25_000;
+      const controller = new AbortController();
+      const t = window.setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const { timeoutMs: _ignored, signal: _signalIgnored, ...rest } = init || {};
+        return await fetch(url, { ...rest, signal: controller.signal });
+      } finally {
+        window.clearTimeout(t);
+      }
     };
 
     const fetchGoogle = async () => {
@@ -871,99 +963,141 @@ export default function UnifiedCatalogPanel({
         if (googleCatalogHasTagMetadata(list) && googleCatalogHasCalligraphyMetadata(list)) {
           if (!cancelled) {
             setGoogleItems(list);
+            if (!hasCached && list.length > 0) finalizeInitialLoading();
           }
           return;
         }
 
-        if (list.length > 0 && needsClientTagEnrich(list)) {
-          try {
-            const tagsMaps = await fetchGoogleFamilyTagsMaps();
-            list = enrichGoogleCatalogRows(list, tagsMaps);
-            if (!cancelled) {
-              setGoogleItems(list);
-              writeGoogleFontCatalogCache(list);
-            }
-            return;
-          } catch (enrichErr) {
-            console.warn('[UnifiedCatalogPanel] Google tags enrich failed:', enrichErr?.message || enrichErr);
+        // Если кэш уже есть — показываем сразу, а enrich делаем в фоне (не блокируем каталог).
+        if (list.length > 0) {
+          if (!cancelled) {
+            setGoogleItems(list);
+            if (!hasCached) finalizeInitialLoading();
           }
+          if (needsClientTagEnrich(list)) {
+            void (async () => {
+              try {
+                const tagsMaps = await fetchGoogleFamilyTagsMaps();
+                const enriched = enrichGoogleCatalogRows(list, tagsMaps);
+                if (!cancelled && enriched.length > 0) {
+                  setGoogleItems(enriched);
+                  writeGoogleFontCatalogCache(enriched);
+                }
+              } catch (enrichErr) {
+                console.warn('[UnifiedCatalogPanel] Google tags enrich failed:', (enrichErr as any)?.message || enrichErr);
+              }
+            })();
+          }
+          return;
         }
 
         if (list.length > 0 && !googleCatalogHasCalligraphyMetadata(list)) {
           clearGoogleFontCatalogCache();
         }
 
-        const res = await fetch('/api/google-fonts-catalog');
+        const res = await fetchWithTimeout('/api/google-fonts-catalog', { timeoutMs: 60_000 });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         list = Array.isArray(data.items) ? data.items : [];
 
-        if (list.length > 0 && needsClientTagEnrich(list)) {
-          try {
-            const tagsMaps = await fetchGoogleFamilyTagsMaps();
-            list = enrichGoogleCatalogRows(list, tagsMaps);
-          } catch (enrichErr) {
-            console.warn('[UnifiedCatalogPanel] Google tags enrich failed:', enrichErr?.message || enrichErr);
-          }
-        }
-
         if (!cancelled && list.length > 0) {
           setGoogleItems(list);
           writeGoogleFontCatalogCache(list);
+          if (!hasCached) finalizeInitialLoading();
+        }
+        // enrich — отдельным шагом, не блокирует первичный показ.
+        if (list.length > 0 && needsClientTagEnrich(list)) {
+          void (async () => {
+            try {
+              const tagsMaps = await fetchGoogleFamilyTagsMaps();
+              const enriched = enrichGoogleCatalogRows(list, tagsMaps);
+              if (!cancelled && enriched.length > 0) {
+                setGoogleItems(enriched);
+                writeGoogleFontCatalogCache(enriched);
+              }
+            } catch (enrichErr) {
+              console.warn('[UnifiedCatalogPanel] Google tags enrich failed:', (enrichErr as any)?.message || enrichErr);
+            }
+          })();
         }
       } catch (e) {
         if (!cancelled) {
-          setLoadError((prev) => prev || (e?.message || 'Ошибка Google'));
+          const fallback = readGoogleFontCatalogCache();
+          if (fallback.length > 0) {
+            setGoogleItems(fallback);
+            catalogFetchDbg('google fetch failed, kept cache', { count: fallback.length });
+            return;
+          }
+          setLoadError((prev) => prev || safeErrorMessage(e, 'Ошибка Google'));
         }
       }
     };
 
     const fetchFontsource = async () => {
+      const cachedFsBefore = readFontsourceCatalogCache();
       try {
-        const res = await fetch('/api/fontsource-catalog');
+        const res = await fetchWithTimeout('/api/fontsource-catalog', { timeoutMs: 90_000 });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         let nextItems = Array.isArray(data.items) ? data.items : [];
-        const isFallbackPayload = data?.source === 'fallback';
-        const shouldTryDirectRemote = isFallbackPayload || nextItems.length < FONTSOURCE_MIN_FULL_CATALOG_SIZE;
-        if (shouldTryDirectRemote) {
-          try {
-            const directRes = await fetch('https://api.fontsource.org/v1/fonts');
-            if (directRes.ok) {
-              const directRows = await directRes.json();
-              const normalizedDirect = (Array.isArray(directRows) ? directRows : [])
-                .map(normalizeDirectFontsourceRow)
-                .filter(Boolean);
-              if (normalizedDirect.length >= FONTSOURCE_MIN_FULL_CATALOG_SIZE) {
-                nextItems = normalizedDirect;
+        const apiSource = typeof data?.source === 'string' ? data.source : '';
+        catalogFetchDbg('fontsource /api payload', {
+          source: apiSource,
+          count: nextItems.length,
+        });
+        const cachedFs = readFontsourceCatalogCache();
+        if (isWeakFontsourceCatalogPayload(nextItems, apiSource)) {
+          catalogFetchDbg('fontsource weak api payload', {
+            source: apiSource,
+            count: nextItems.length,
+            cacheCount: cachedFs.length,
+          });
+          if (cachedFs.length >= FONTSOURCE_MIN_FULL_CATALOG_SIZE) {
+            nextItems = [];
+          } else {
+            try {
+              const fromFontlist = await fetchFontsourceCatalogFromFontlist();
+              if (fromFontlist.length > nextItems.length) {
+                nextItems = fromFontlist;
+                catalogFetchDbg('fontsource fontlist fallback', { count: fromFontlist.length });
               }
+            } catch (fontlistErr) {
+              catalogFetchDbg('fontsource fontlist fallback failed', {
+                error: fontlistErr instanceof Error ? fontlistErr.message : String(fontlistErr),
+              });
             }
-          } catch {
-            // keep /api payload
           }
         }
-        const effective = pickBetterFontsourceCatalogLists(readFontsourceCatalogCache(), nextItems);
+        const effective = pickBetterFontsourceCatalogLists(cachedFs, nextItems);
         if (!cancelled) {
           setFontsourceItems(effective);
-          if (effective.length > 0) writeFontsourceCatalogCache(effective);
+          if (effective.length > 0 && effective.length >= cachedFs.length) {
+            writeFontsourceCatalogCache(effective);
+          }
+          if (!hasCached && effective.length > 0) finalizeInitialLoading();
         }
       } catch (e) {
         if (!cancelled) {
-          setLoadError((prev) => prev || (e?.message || 'Ошибка Fontsource'));
+          if (cachedFsBefore.length > 0) {
+            setFontsourceItems(cachedFsBefore);
+            catalogFetchDbg('fontsource fetch failed, kept cache', { count: cachedFsBefore.length });
+            return;
+          }
+          setLoadError((prev) => prev || safeErrorMessage(e, 'Ошибка Fontsource'));
         }
       }
     };
 
     const fetchFontshare = async () => {
       try {
-        const res = await fetch('/api/fontshare-catalog');
+        const res = await fetchWithTimeout('/api/fontshare-catalog', { timeoutMs: 60_000 });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         let nextItems = Array.isArray(data.items) ? data.items : [];
         const shouldTryDirectRemote = nextItems.length < FONTSHARE_MIN_FULL_CATALOG_SIZE;
         if (shouldTryDirectRemote) {
           try {
-            const directRes = await fetch('https://api.fontshare.com/v2/fonts');
+            const directRes = await fetchWithTimeout('https://api.fontshare.com/v2/fonts', { timeoutMs: 20_000 });
             if (directRes.ok) {
               const directData = await directRes.json();
               const directRows = Array.isArray(directData?.fonts) ? directData.fonts : [];
@@ -980,17 +1114,22 @@ export default function UnifiedCatalogPanel({
         if (!cancelled) {
           setFontshareItems(effective);
           if (effective.length > 0 && effective !== cachedFontshare) writeFontshareCatalogCache(effective);
+          if (!hasCached && effective.length > 0) finalizeInitialLoading();
         }
       } catch (e) {
         if (!cancelled) {
-          setLoadError((prev) => prev || (e?.message || 'Ошибка Fontshare'));
+          if (cachedFontshare.length > 0) {
+            setFontshareItems(cachedFontshare);
+            return;
+          }
+          setLoadError((prev) => prev || safeErrorMessage(e, 'Ошибка Fontshare'));
         }
       }
     };
 
     const fetchTrial = async () => {
       try {
-        const res = await fetch('/api/fontfabric-trial-catalog');
+        const res = await fetchWithTimeout('/api/fontfabric-trial-catalog', { timeoutMs: 60_000 });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const nextItems = Array.isArray(data.items) ? data.items : [];
@@ -998,15 +1137,32 @@ export default function UnifiedCatalogPanel({
         if (!cancelled) {
           setTrialItems(effective);
           if (nextItems.length > 0) writeFontfabricTrialCatalogCache(nextItems);
+          if (!hasCached && effective.length > 0) finalizeInitialLoading();
         }
       } catch (e) {
         if (!cancelled) {
-          setLoadError((prev) => prev || (e?.message || 'Ошибка Trial'));
+          if (cachedTrial.length > 0) {
+            setTrialItems(cachedTrial);
+            return;
+          }
+          setLoadError((prev) => prev || safeErrorMessage(e, 'Ошибка Trial'));
         }
       }
     };
 
+    const fontsourceCacheComplete = () => isFontsourceCatalogComplete(readFontsourceCatalogCache());
+
     (async () => {
+      // Сеть запрашиваем только один раз за сессию, но кэш-гидратацию делаем всегда.
+      // Важно: защёлка не должна блокировать загрузку, если кэша нет.
+      // Иначе при SPA-навигации можно получить пустой каталог до F5.
+      if (hasFetchedUnifiedCatalogNetworkThisSession && hasCached) {
+        if (!cancelled) setIsInitialCatalogLoading(false);
+        if (fontsourceCacheComplete()) return;
+        await fetchFontsource();
+        return;
+      }
+      hasFetchedUnifiedCatalogNetworkThisSession = true;
       await Promise.allSettled([fetchGoogle(), fetchFontsource(), fetchFontshare(), fetchTrial()]);
       if (!hasCached) finalizeInitialLoading();
       else if (!cancelled) setIsInitialCatalogLoading(false);
@@ -1015,7 +1171,7 @@ export default function UnifiedCatalogPanel({
     return () => {
       cancelled = true;
     };
-  }, [isActive]);
+  }, [isActive, reloadNonce]);
 
   // --- Viewport window: рендерим близко к видимой области, догружаем при скролле ---
   useEffect(() => {
@@ -1081,17 +1237,34 @@ export default function UnifiedCatalogPanel({
   const isChunkRendering = renderedItems.length < filteredSortedItems.length;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <CatalogPanelToolbar
-        {...toolbarProps}
-      />
+    <div ref={setPanelRootRef} className="flex min-h-0 flex-1 flex-col gap-4">
+      <div className="shrink-0">
+        <CatalogPanelToolbar {...toolbarProps} />
+      </div>
 
-      {loadError && mergedAllItems.length === 0 ? (
-        <p className="shrink-0 py-6 text-center text-sm text-red-600">Каталог: {loadError}</p>
-      ) : isInitialCatalogLoading && mergedAllItems.length === 0 ? (
-        <UnifiedCatalogEmptyLoader />
-      ) : mergedAllItems.length === 0 ? (
-        <UnifiedCatalogEmptyLoader />
+      {mergedAllItems.length === 0 ? (
+        isInitialCatalogLoading ? (
+          <UnifiedCatalogEmptyLoader />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-8">
+            <p className="text-center text-sm text-gray-700">
+              Каталог не загрузился{loadError ? `: ${loadError}` : '.'}
+            </p>
+            <button
+              type="button"
+              className="h-10 rounded-md bg-accent px-4 text-sm font-semibold text-white hover:bg-accent/90"
+              onClick={() => {
+                setLoadError(null);
+                setIsInitialCatalogLoading(true);
+                setAreCardsVisible(false);
+                hasFetchedUnifiedCatalogNetworkThisSession = false;
+                setReloadNonce((x) => x + 1);
+              }}
+            >
+              Повторить
+            </button>
+          </div>
+        )
       ) : filteredSortedItems.length === 0 ? (
         <p className="shrink-0 py-6 text-center text-sm uppercase text-gray-500">
           Ничего не найдено. Попробуйте другой запрос.
@@ -1174,7 +1347,9 @@ export default function UnifiedCatalogPanel({
         </div>
       )}
 
-      {loadError ? <p className="text-xs text-gray-500">Источник обновления недоступен: {loadError}</p> : null}
+      {loadError && mergedAllItems.length === 0 ? (
+        <p className="text-xs text-gray-500">Источник обновления недоступен: {loadError}</p>
+      ) : null}
     </div>
   );
 }

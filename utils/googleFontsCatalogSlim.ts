@@ -4,6 +4,7 @@
 import { resolveGoogleMetadataItalicMode, slimGoogleMetadataAxes } from './googleFontMetadataAxes';
 import { listGoogleDownloadStylesFromFontsObj } from './googleFontDownloadStyles';
 import { resolveCatalogCategory } from './fontCategoryLabels';
+import { GOOGLE_CATALOG_DEFAULT_LICENSE_ID } from './catalogLicenseFilter';
 
 type GoogleMetadataAxis = {
   tag?: string;
@@ -85,6 +86,7 @@ function slimCatalogEntry(x: GoogleMetadataCatalogRow, tagsMaps: GoogleCatalogTa
     italicMode,
     primaryScript: typeof x.primaryScript === 'string' ? x.primaryScript : '',
     downloadStyles: listGoogleDownloadStylesFromFontsObj(fontsObj),
+    license: GOOGLE_CATALOG_DEFAULT_LICENSE_ID,
   };
 }
 

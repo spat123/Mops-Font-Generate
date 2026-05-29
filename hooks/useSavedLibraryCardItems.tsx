@@ -13,6 +13,7 @@ import {
   downloadFontsourcePackageZip,
   downloadFontsourceVariableVariant,
 } from '../utils/catalogDownloadActions';
+import { buildCatalogCardMetaParts } from '../utils/buildCatalogCardMetaParts';
 import { getSessionFontCardPreviewStyle } from '../utils/sessionFontCardPreview';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type {
@@ -243,10 +244,12 @@ export function useSavedLibraryCardItems({
           variant: 'catalog',
           selected: false,
           title: family,
-          subtitleParts: buildSavedLibraryCardMetaParts({
-            id: `google:${family}`,
-            label: family,
-            source: 'google',
+          subtitleParts: buildCatalogCardMetaParts({
+            category: entry?.category,
+            subsets: Array.isArray(entry?.subsets) ? entry.subsets : [],
+            isVariable: entry?.isVariable === true,
+            hasItalic: entry?.hasItalic === true || entry?.hasItalicStyles === true,
+            styleCount: Number(entry?.styleCount) || 0,
           }),
           subtitleClassName: savedLibraryCardMetaClassName,
           previewStyle: { fontFamily: `'${family}', sans-serif` },
@@ -282,11 +285,12 @@ export function useSavedLibraryCardItems({
         variant: 'catalog',
         selected: false,
         title: family,
-        subtitleParts: buildSavedLibraryCardMetaParts({
-          id: `fontsource:${slug}`,
-          label: family,
-          source: 'fontsource',
+        subtitleParts: buildCatalogCardMetaParts({
+          category: item?.category,
+          subsets: Array.isArray(item?.subsets) ? item.subsets : [],
           isVariable: Boolean(item?.isVariable),
+          hasItalic: Boolean(item?.hasItalic),
+          styleCount: Number(item?.styleCount) || 0,
         }),
         subtitleClassName: savedLibraryCardMetaClassName,
         previewStyle: { fontFamily: `'${family}', sans-serif` },

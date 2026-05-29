@@ -54,20 +54,35 @@ export function parseFontsourceVariableAxesFromMeta(
   if (!variableMeta || typeof variableMeta !== 'object' || Array.isArray(variableMeta)) {
     return {};
   }
+  const pickNumber = (row: Record<string, unknown>, keys: string[]): number => {
+    for (const k of keys) {
+      const n = Number(row[k]);
+      if (Number.isFinite(n)) return n;
+    }
+    return NaN;
+  };
   return Object.entries(variableMeta as Record<string, unknown>).reduce<
     Record<string, FontsourceVariableAxisMeta>
   >((acc, [axisTag, axisValue]) => {
     if (!axisValue || typeof axisValue !== 'object' || Array.isArray(axisValue)) return acc;
-    const axisRow = axisValue as { min?: unknown; max?: unknown; default?: unknown; step?: unknown };
-    const min = Number(axisRow.min);
-    const max = Number(axisRow.max);
-    const def = Number(axisRow.default);
-    const step = Number(axisRow.step);
+    const axisRow = axisValue as Record<string, unknown>;
+    const min = pickNumber(axisRow, ['min', 'minimum']);
+    const max = pickNumber(axisRow, ['max', 'maximum']);
+    const def = pickNumber(axisRow, ['default', 'defaultValue', 'default_value', 'default-value']);
+    const step = pickNumber(axisRow, ['step', 'increment']);
     if (!Number.isFinite(min) || !Number.isFinite(max)) return acc;
+    const guessedDefault =
+      axisTag === 'wght' && min <= 400 && max >= 400
+        ? 400
+        : axisTag === 'ital'
+          ? 0
+          : axisTag === 'slnt' && min <= 0 && max >= 0
+            ? 0
+            : min;
     acc[axisTag] = {
       min,
       max,
-      default: Number.isFinite(def) ? def : min,
+      default: Number.isFinite(def) ? def : guessedDefault,
       step: Number.isFinite(step) ? step : 1,
     };
     return acc;

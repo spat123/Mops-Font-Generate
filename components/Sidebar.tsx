@@ -7,9 +7,16 @@ import CollapsedSidebarControls from './sidebar/CollapsedSidebarControls';
 import SidebarFooterControls from './sidebar/SidebarFooterControls';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../utils/colorUtils'; // Импорт утилит цвета
 import { useSettings } from '../contexts/SettingsContext';
+import {
+  buildEditorSubsetPreviewSampleText,
+  FULL_LATIN_ALPHANUM,
+  resolveEditorSidebarSampleText,
+  resolveEditorSidebarGlyphText,
+} from '../utils/googleFontCatalogSampleText';
 import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
 import { useFontContext } from '../contexts/FontContext';
 import ResetButton from './ResetButton';
+import { OpenTypeFeaturesPanel } from './OpenTypeFeaturesPanel';
 import {
   SegmentedControl,
   VIEW_MODE_OPTIONS,
@@ -26,6 +33,7 @@ import { AppButton } from './ui/AppButton';
 import { useLibraryAuth } from '../contexts/LibraryAuthContext';
 import { pickSelectValue } from '../utils/pickSelectValue';
 import type { TextDecoration, VerticalAlignment } from '../types/settingsContext';
+import { fontStyleDbg } from '../utils/fontStyleDebugLog';
 import {
   WATERFALL_SCALE_PRESETS,
   DEFAULT_WATERFALL_SCALE_PRESET,
@@ -781,6 +789,9 @@ export default function Sidebar({
   availableStyles,
   selectedPresetName,
   applyPresetStyle,
+  catalogSubsetOptions = [],
+  activeCatalogSubset = '',
+  onCatalogSubsetChange,
   getVariableAxes,
   handleVariableSettingsChange,
   variableSettings,
@@ -791,7 +802,8 @@ export default function Sidebar({
 }) {
   // Получаем настройки из контекста
   const { 
-    text, setText, 
+    text, setText,
+    setTextResetBaseline,
     fontSize, setFontSize, 
     glyphsFontSize, setGlyphsFontSize,
     stylesFontSize, setStylesFontSize,
@@ -841,6 +853,7 @@ export default function Sidebar({
     setPreviewBackgroundImage,
     viewMode,
     setViewMode,
+    previewResetSignal,
 } = useSettings();
 
   const { isPro, openPlans } = useLibraryAuth();
@@ -917,8 +930,12 @@ export default function Sidebar({
     setWaterfallScaleRatio(DEFAULT_WATERFALL_SCALE_PRESET.ratio);
   }, [isPro, waterfallScaleSelectKey, waterfallScaleRatio, setWaterfallScaleRatio]);
 
-  /** Выбранный быстрый пресет: `sample:*` или `glyph:*` (`glyph:entire` по умолчанию). */
-  const [sidebarTextPreset, setSidebarTextPreset] = useState('glyph:entire');
+  /**
+   * Выбранный быстрый пресет: `sample:*` или `glyph:*`.
+   * ВАЖНО: пресет отмечается только после явного выбора пользователем.
+   * Мы не пытаемся “угадать” пресет по текущему тексту (иначе после F5 сам включается pangram/latin_extended и т.п.).
+   */
+  const [sidebarTextPreset, setSidebarTextPreset] = useState('custom');
   const [activeColorTab, setActiveColorTab] = useState('foreground'); // foreground или background
   // Рефы для цветовых полей
   const fgColorFieldRef = useRef(null);
@@ -970,49 +987,43 @@ export default function Sidebar({
   const pickSidebarTextPreset = useCallback(
     (kind, itemKey) => {
       if (kind === 'sample') {
-        const val = sampleTexts?.[itemKey];
-        if (typeof val === 'string') {
+        const subsetKey = String(activeCatalogSubset || '').trim().toLowerCase();
+        const subsetSample =
+          subsetKey && (resolveEditorSidebarSampleText(subsetKey, itemKey) as string | null);
+        const val = subsetSample || sampleTexts?.[itemKey];
+        if (typeof val === 'string' && val.trim()) {
           setSidebarTextPreset(`sample:${itemKey}`);
           setText(val);
         }
         return;
       }
-      const content = glyphSets[itemKey];
+      const subsetKey = String(activeCatalogSubset || '').trim().toLowerCase();
+      const subsetGlyph =
+        subsetKey && (resolveEditorSidebarGlyphText(subsetKey, itemKey) as string | null);
+      const content = subsetGlyph || glyphSets[itemKey];
       if (content) {
         setSidebarTextPreset(`glyph:${itemKey}`);
         setText(content);
       }
     },
-    [sampleTexts, setText],
+    [activeCatalogSubset, sampleTexts, setText],
   );
 
-  const resolveSidebarTextPresetForText = useCallback(
-    (value) => {
-      if (typeof value !== 'string') return 'custom';
+  // Не синхронизируем sidebarTextPreset с текстом автоматически.
+  // Пресеты (Заголовок/Параграф/Панграмма/Latin Ext. A и т.д.) выбираются только пользователем.
 
-      if (sampleTexts && typeof sampleTexts === 'object') {
-        for (const k of Object.keys(sampleTexts)) {
-          if (sampleTexts[k] === value) return `sample:${k}`;
-        }
-      }
-
-      for (const k of Object.keys(glyphSets)) {
-        if (glyphSets[k] === value) return `glyph:${k}`;
-      }
-
-      return 'custom';
-    },
-    [sampleTexts],
-  );
-
-  /**
-   * При смене шрифта НЕ перезаписываем текст (иначе после F5 затирается custom previewText).
-   * Только синхронизируем выбранный “быстрый пресет” с текущим текстом.
-   */
+  // Но при явном Reset (например “Сбросить Plain”) подсветку пресета нужно очистить.
   useEffect(() => {
-    if (!selectedFont?.id) return;
-    setSidebarTextPreset(resolveSidebarTextPresetForText(text));
-  }, [resolveSidebarTextPresetForText, selectedFont?.id, text]);
+    setSidebarTextPreset('custom');
+  }, [previewResetSignal]);
+
+  // “Сбросить текст” должен возвращать к базовому набору текущего subset
+  // (а не к последнему выбранному sample/glyph пресету).
+  useEffect(() => {
+    const subsetKey = String(activeCatalogSubset || '').trim().toLowerCase();
+    const baseline = buildEditorSubsetPreviewSampleText(subsetKey);
+    setTextResetBaseline(baseline);
+  }, [activeCatalogSubset, selectedFont?.id, setTextResetBaseline]);
 
   // Получаем название пресета из веса и стиля
   // Удаляем локальную функцию
@@ -1245,14 +1256,10 @@ export default function Sidebar({
   const isVariableEnabled = () => {
     if (!selectedFont) return false;
     if (!selectedFont.isVariableFont) return false;
-    const hasAxes = Boolean(selectedFont.variableAxes && Object.keys(selectedFont.variableAxes).length > 0);
-    const hasItalicCapability = Boolean(
-      selectedFont.italicMode === 'axis-ital' ||
-      selectedFont.italicMode === 'axis-slnt' ||
-      selectedFont.italicMode === 'separate-style' ||
-      selectedFont.hasItalicStyles
-    );
-    return hasAxes || hasItalicCapability;
+    // Важно: для Fontsource/VF оси могут быть не заполнены в метаданных,
+    // но `VariableFontControls` умеет извлечь их из файла через getVariableAxes().
+    // Поэтому не прячем панель только из-за пустого variableAxes.
+    return true;
   };
 
   const sidebarPresetOptions = useMemo(
@@ -1262,7 +1269,10 @@ export default function Sidebar({
         label: preset.name,
         triggerLabel: preset.name,
         rightLabel: Number.isFinite(Number(preset?.weight)) ? String(Math.round(Number(preset.weight))) : '',
-        style: { fontWeight: preset.weight, fontStyle: preset.style },
+        style: {
+          fontWeight: preset.weight,
+          fontStyle: preset.style,
+        },
       })),
     [availableStyles],
   );
@@ -1684,6 +1694,15 @@ export default function Sidebar({
                 value={isWaterfallView ? activeWaterfallPresetName : selectedPresetName}
                 onChange={(v) => {
                   const preset = pickSelectValue(v);
+                  fontStyleDbg('Sidebar preset onChange', {
+                    raw: v,
+                    preset,
+                    isWaterfallView,
+                    waterfallEditTarget,
+                    fontId: selectedFont?.id,
+                    source: selectedFont?.source,
+                    isVariable: Boolean(selectedFont?.isVariableFont),
+                  });
                   if (isWaterfallView) {
                     if (waterfallEditTarget === 'body') setWaterfallBodyPresetName(preset);
                     else setWaterfallHeadingPresetName(preset);
@@ -1698,6 +1717,86 @@ export default function Sidebar({
               />
             </div>
           )}
+
+          {selectedFont && catalogSubsetOptions.length > 0 && typeof onCatalogSubsetChange === 'function' ? (
+            <div className="mb-3 min-w-0">
+              <CustomSelect
+                id="sidebar-catalog-subset"
+                value={activeCatalogSubset}
+                onChange={(v) => {
+                  const subset = pickSelectValue(v);
+                  if (!subset) return;
+                  const nextSubsetKey = String(subset).trim().toLowerCase();
+                  // Базовая строка для “Сбросить текст” — набор глифов сабсета.
+                  // Сами быстрые пресеты (панграмма/вики/...) могут менять текст, но не baseline.
+                  setTextResetBaseline(buildEditorSubsetPreviewSampleText(nextSubsetKey));
+
+                  // Если выбран конкретный “быстрый пресет” слева — сохраняем его,
+                  // но пересобираем текст под новый subset.
+                  if (typeof sidebarTextPreset === 'string' && sidebarTextPreset.includes(':')) {
+                    const [kindRaw, keyRaw] = sidebarTextPreset.split(':', 2);
+                    const kind = String(kindRaw || '').trim();
+                    const key = String(keyRaw || '').trim();
+                    if (kind === 'sample') {
+                      if (key === 'title' || key === 'paragraph' || key === 'wikipedia' || key === 'pangram') {
+                        const nextText = resolveEditorSidebarSampleText(nextSubsetKey, key) || buildEditorSubsetPreviewSampleText(nextSubsetKey);
+                        setText(nextText);
+                        onCatalogSubsetChange(subset);
+                        return;
+                      }
+                    }
+                    if (kind === 'glyph') {
+                      // "entire" и любые неизвестные key — считаем “дефолтным глифовым превью сабсета”.
+                      if (
+                        key === 'macos' ||
+                        key === 'windows1252' ||
+                        key === 'latin_extended' ||
+                        key === 'latin_supplement'
+                      ) {
+                        const nextText = resolveEditorSidebarGlyphText(nextSubsetKey, key) || buildEditorSubsetPreviewSampleText(nextSubsetKey);
+                        setText(nextText);
+                        onCatalogSubsetChange(subset);
+                        return;
+                      }
+                      if (key === 'entire' || key === 'basic' || key === 'overview') {
+                        const nextText = buildEditorSubsetPreviewSampleText(nextSubsetKey);
+                        setText(nextText);
+                        onCatalogSubsetChange(subset);
+                        return;
+                      }
+                    }
+                  }
+
+                  // Не затираем пользовательский текст при переключении subset.
+                  // Но если текущий текст — "дефолтная латиница" / ASCII-сэмпл (то есть авто),
+                  // то при выборе не-латинского subset переключаем на образец, иначе кажется, что subset "не работает".
+                  const prevAuto = buildEditorSubsetPreviewSampleText(activeCatalogSubset);
+                  const cur = typeof text === 'string' ? text.trim() : '';
+                  const isLatinSubset =
+                    nextSubsetKey === 'latin' ||
+                    nextSubsetKey === 'latin-ext' ||
+                    nextSubsetKey === 'math' ||
+                    nextSubsetKey === 'symbols';
+                  const isAsciiOnly = cur ? /^[\u0000-\u007F]+$/.test(cur) : true;
+                  const isDefaultLatin =
+                    cur === FULL_LATIN_ALPHANUM ||
+                    cur === ENTIRE_PRINTABLE_ASCII_SAMPLE ||
+                    cur === glyphSets.basic ||
+                    cur === glyphSets.overview;
+                  const shouldAutoReplace = !cur || cur === prevAuto.trim() || (!isLatinSubset && (isDefaultLatin || isAsciiOnly));
+                  if (shouldAutoReplace) {
+                    const nextText = buildEditorSubsetPreviewSampleText(subset);
+                    setText(nextText);
+                  }
+                  onCatalogSubsetChange(subset);
+                }}
+                options={catalogSubsetOptions}
+                className={sidebarSelectClass}
+                aria-label="Набор символов (subset)"
+                disabled={isStylesView}
+              />
+            </div>
+          ) : null}
           
           <div
             className="mb-3 flex items-center gap-2"
@@ -1980,6 +2079,9 @@ export default function Sidebar({
             />
           </div>
         )}
+
+        {/* OpenType features */}
+        <OpenTypeFeaturesPanel font={selectedFont} />
         
         {/* Секция настроек цвета */}
         <div className="-mx-4 border-t border-gray-200 px-4 pt-4 mb-4">

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import UnifiedCatalogPanel from '../catalog/UnifiedCatalogPanel';
 import type { FontsLibraryHomeScreenProps } from '../../types/libraryScreens';
 import { UnderlineTab } from '../ui/UnderlineTab';
@@ -16,7 +17,8 @@ import { EditorStatusBar } from '../ui/EditorStatusBar';
  * Экран «Все шрифты»: подвкладки каталог / сохранённые библиотеки, панели каталога, сетка библиотеки, статусбар.
  * Состояние и обработчики остаются в `pages/index.jsx`.
  */
-export function FontsLibraryHomeScreen({
+export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
+  screenActive = true,
   libraryTabs,
   fontsLibraryTab,
   setFontsLibraryTab,
@@ -81,7 +83,8 @@ export function FontsLibraryHomeScreen({
   setFileUploadTarget,
   fileInputRef,
   libraryStatusBar,
-}: FontsLibraryHomeScreenProps) {
+}: FontsLibraryHomeScreenProps & { screenActive?: boolean }) {
+  const isCatalogPanelActive = Boolean(screenActive && fontsLibraryTab === 'catalog');
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
       {libraryTabs.length > 1 ? (
@@ -107,23 +110,28 @@ export function FontsLibraryHomeScreen({
       ) : null}
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 pt-6">
-        {fontsLibraryTab === 'catalog' && (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <UnifiedCatalogPanel
-              isActive
-              fonts={fonts}
-              fontLibraries={fontLibraries}
-              onAddFontToLibrary={addFontEntryToLibrary}
-              onRequestCreateLibrary={requestCreateLibraryWithFonts}
-              onOpenGoogleEntryInEditorTab={openGoogleCatalogEntryInEditorTab}
-              onOpenFontsourceInEditorTab={openFontsourceSlugInEditorTab}
-              onOpenFontshareInEditorTab={openFontshareSlugInEditorTab}
-              onOpenTrialPage={onOpenFontfabricTrialPage}
-              onUploadTrial={onUploadFontfabricTrial}
-              onSelectionActionsChange={handleCatalogSelectionActionsChange}
-            />
-          </div>
-        )}
+        <div
+          className={
+            fontsLibraryTab === 'catalog'
+              ? 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'
+              : 'hidden'
+          }
+          aria-hidden={fontsLibraryTab !== 'catalog'}
+        >
+          <UnifiedCatalogPanel
+            isActive={isCatalogPanelActive}
+            fonts={fonts}
+            fontLibraries={fontLibraries}
+            onAddFontToLibrary={addFontEntryToLibrary}
+            onRequestCreateLibrary={requestCreateLibraryWithFonts}
+            onOpenGoogleEntryInEditorTab={openGoogleCatalogEntryInEditorTab}
+            onOpenFontsourceInEditorTab={openFontsourceSlugInEditorTab}
+            onOpenFontshareInEditorTab={openFontshareSlugInEditorTab}
+            onOpenTrialPage={onOpenFontfabricTrialPage}
+            onUploadTrial={onUploadFontfabricTrial}
+            onSelectionActionsChange={handleCatalogSelectionActionsChange}
+          />
+        </div>
 
         {activeSavedLibrary && (
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-7">
@@ -433,4 +441,15 @@ export function FontsLibraryHomeScreen({
       <EditorStatusBar leading={libraryStatusBar.leading} center={libraryStatusBar.center} />
     </div>
   );
-}
+},
+/**
+ * Когда экран «Все шрифты» скрыт (открыта вкладка конкретного шрифта),
+ * НЕ перерисовываем его на каждый тик (например, при перетаскивании осей VF),
+ * чтобы тяжёлый каталог (facet maps / лицензии / search index) не пересчитывался в фоне.
+ */
+(prev, next) => {
+  const prevActive = prev?.screenActive !== false;
+  const nextActive = next?.screenActive !== false;
+  if (!prevActive && !nextActive) return true;
+  return false;
+});

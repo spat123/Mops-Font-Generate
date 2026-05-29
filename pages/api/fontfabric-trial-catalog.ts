@@ -35,5 +35,6 @@ export default createCatalogProxyHandler({
   logTag: 'fontfabric-trial-catalog',
   cacheTtlMs: 1000 * 60 * 60 * 12,
   cacheControl: CACHE_CONTROL,
+  fetchTimeoutMs: 45_000,
   fetchItems: fetchFontfabricTrialCatalogItems,
 });

@@ -1,0 +1,154 @@
+42dot-sans	42dot Sans
+adwaita-mono	Adwaita Mono
+adwaita-sans	Adwaita Sans
+aileron	Aileron
+apfel-grotezk	Apfel Grotezk
+argentum-sans	Argentum Sans
+arima-madurai	Arima Madurai
+bagnard	Bagnard
+bagnard-sans	Bagnard Sans
+bbh-sans-bartle	BBH Sans Bartle
+bbh-sans-bogle	BBH Sans Bogle
+bbh-sans-hegarty	BBH Sans Hegarty
+big-shoulders-display	Big Shoulders Display
+big-shoulders-inline-display	Big Shoulders Inline Display
+big-shoulders-inline-text	Big Shoulders Inline Text
+big-shoulders-stencil-display	Big Shoulders Stencil Display
+big-shoulders-stencil-text	Big Shoulders Stencil Text
+big-shoulders-text	Big Shoulders Text
+bj-cree	BJ Cree
+blackout-midnight	Blackout Midnight
+blackout-sunrise	Blackout Sunrise
+blackout-two-am	Blackout Two AM
+bluu-next	Bluu Next
+bravura	Bravura
+bravura-text	Bravura Text
+briem-hand	Briem Hand
+chunk-five	Chunk Five
+clear-sans	Clear Sans
+coda-caption	Coda Caption
+comic-mono	Comic Mono
+commit-mono	Commit Mono
+cooper-hewitt	Cooper Hewitt
+dejavu-math	DejaVu Math
+dejavu-mono	DejaVu Mono
+dejavu-sans	DejaVu Sans
+dejavu-serif	DejaVu Serif
+dseg-weather	DSEG Weather
+dseg14-classic	DSEG14 Classic
+dseg14-classic-mini	DSEG14 Classic Mini
+dseg14-modern	DSEG14 Modern
+dseg14-modern-mini	DSEG14 Modern Mini
+dseg7-classic	DSEG7 Classic
+dseg7-classic-mini	DSEG7 Classic Mini
+dseg7-modern	DSEG7 Modern
+dseg7-modern-mini	DSEG7 Modern Mini
+dseg7-segg-chan	DSEG7 SEGG CHAN
+dseg7-segg-chan-mini	DSEG7 SEGG CHAN Mini
+finlandica	Finlandica
+firago	FiraGO
+fredoka-one	Fredoka One
+fusion-kai-g	Fusion Kai G
+fusion-kai-j	Fusion Kai J
+fusion-kai-t	Fusion Kai T
+fusion-pixel-10px-monospaced-jp	Fusion Pixel 10px Monospaced JP
+fusion-pixel-10px-monospaced-kr	Fusion Pixel 10px Monospaced KR
+fusion-pixel-10px-monospaced-sc	Fusion Pixel 10px Monospaced SC
+fusion-pixel-10px-monospaced-tc	Fusion Pixel 10px Monospaced TC
+fusion-pixel-10px-proportional-jp	Fusion Pixel 10px Proportional JP
+fusion-pixel-10px-proportional-kr	Fusion Pixel 10px Proportional KR
+fusion-pixel-10px-proportional-sc	Fusion Pixel 10px Proportional SC
+fusion-pixel-10px-proportional-tc	Fusion Pixel 10px Proportional TC
+fusion-pixel-12px-monospaced-jp	Fusion Pixel 12px Monospaced JP
+fusion-pixel-12px-monospaced-kr	Fusion Pixel 12px Monospaced KR
+fusion-pixel-12px-monospaced-sc	Fusion Pixel 12px Monospaced SC
+fusion-pixel-12px-monospaced-tc	Fusion Pixel 12px Monospaced TC
+fusion-pixel-12px-proportional-jp	Fusion Pixel 12px Proportional JP
+fusion-pixel-12px-proportional-kr	Fusion Pixel 12px Proportional KR
+fusion-pixel-12px-proportional-sc	Fusion Pixel 12px Proportional SC
+fusion-pixel-12px-proportional-tc	Fusion Pixel 12px Proportional TC
+fusion-pixel-8px-monospaced-jp	Fusion Pixel 8px Monospaced JP
+fusion-pixel-8px-monospaced-kr	Fusion Pixel 8px Monospaced KR
+fusion-pixel-8px-monospaced-sc	Fusion Pixel 8px Monospaced SC
+fusion-pixel-8px-monospaced-tc	Fusion Pixel 8px Monospaced TC
+fusion-pixel-8px-proportional-jp	Fusion Pixel 8px Proportional JP
+fusion-pixel-8px-proportional-kr	Fusion Pixel 8px Proportional KR
+fusion-pixel-8px-proportional-sc	Fusion Pixel 8px Proportional SC
+fusion-pixel-8px-proportional-tc	Fusion Pixel 8px Proportional TC
+geist-sans	Geist Sans
+genjyuu-gothic	Genjyuu Gothic
+gentium-book-basic	Gentium Book Basic
+hauora-sans	Hauora Sans
+ia-writer-duo	iA Writer Duo
+ia-writer-mono	iA Writer Mono
+ia-writer-quattro	iA Writer Quattro
+iosevka	Iosevka
+iosevka-aile	Iosevka Aile
+iosevka-curly	Iosevka Curly
+iosevka-curly-slab	Iosevka Curly Slab
+iosevka-etoile	Iosevka Etoile
+junction	Junction
+kantumruy	Kantumruy
+karmilla	Karmilla
+league-mono	League Mono
+lextrall	Lextrall
+libre-caslon-condensed	Libre Caslon Condensed
+lxgw-wenkai	LXGW WenKai
+maple-mono	Maple Mono
+material-icons	Material Icons
+material-icons-outlined	Material Icons Outlined
+material-icons-round	Material Icons Round
+material-icons-sharp	Material Icons Sharp
+material-icons-two-tone	Material Icons Two Tone
+material-symbols	Material Symbols
+material-symbols-outlined	Material Symbols Outlined
+material-symbols-rounded	Material Symbols Rounded
+material-symbols-sharp	Material Symbols Sharp
+merienda-one	Merienda One
+metropolis	Metropolis
+monaspace-argon	Monaspace Argon
+monaspace-krypton	Monaspace Krypton
+monaspace-neon	Monaspace Neon
+monaspace-radon	Monaspace Radon
+monaspace-xenon	Monaspace Xenon
+mononoki	Mononoki
+montserrat-subrayada	Montserrat Subrayada
+nebula-sans	Nebula Sans
+norwester	Norwester
+noto-mono	Noto Mono
+noto-sans-phags-pa	Noto Sans Phags Pa
+open-runde	Open Runde
+open-sauce-one	Open Sauce One
+open-sauce-sans	Open Sauce Sans
+open-sauce-two	Open Sauce Two
+opendyslexic	OpenDyslexic
+ostrich-sans	Ostrich Sans
+peace-sans	Peace Sans
+pitagon-sans	Pitagon Sans
+pitagon-sans-mono	Pitagon Sans Mono
+pitagon-sans-text	Pitagon Sans Text
+pitagon-serif	Pitagon Serif
+pretendard	Pretendard
+pushster	Pushster
+redaction	Redaction
+redaction-10	Redaction 10
+redaction-100	Redaction 100
+redaction-20	Redaction 20
+redaction-35	Redaction 35
+redaction-50	Redaction 50
+redaction-70	Redaction 70
+rubik-one	Rubik One
+saira-stencil-one	Saira Stencil One
+source-sans-pro	Source Sans Pro
+source-serif-pro	Source Serif Pro
+syne-italic	Syne Italic
+uncut-sans	Uncut Sans
+unifont	Unifont
+unifontex	UnifontEX
+win95fa	WIN95FA
+yakuhanjp	YakuHanJP
+yakuhanjps	YakuHanJPs
+yakuhanmp	YakuHanMP
+yakuhanmps	YakuHanMPs
+yakuhanrp	YakuHanRP
+yakuhanrps	YakuHanRPs

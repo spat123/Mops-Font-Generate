@@ -1,4 +1,4 @@
-const FONTSOURCE_VARIABLE_SETTINGS_CACHE_KEY = 'dinamic-fontsource-variable-settings-v1';
+export const FONTSOURCE_VARIABLE_SETTINGS_CACHE_KEY = 'dinamic-fontsource-variable-settings-v1';
 const FONTSOURCE_VARIABLE_SETTINGS_CACHE_LIMIT = 120;
 
 type VariableAxesMap = Record<string, { min?: number; max?: number; default?: number }>;
@@ -122,4 +122,13 @@ export function clearFontsourceVariableSettings(slug: unknown): void {
   if (!(key in cache)) return;
   delete cache[key];
   safeWriteCache(cache);
+}
+
+export function clearAllFontsourceVariableSettings(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(FONTSOURCE_VARIABLE_SETTINGS_CACHE_KEY);
+  } catch {
+    // noop
+  }
 }

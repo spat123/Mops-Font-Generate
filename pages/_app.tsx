@@ -20,6 +20,7 @@ import dynamic from 'next/dynamic';
 import { OpenGraphHead } from '../components/seo/OpenGraphHead';
 import { getDefaultSiteSeo } from '../utils/siteSeo';
 import type { SiteSeoMeta } from '../utils/siteSeo';
+import { installAppCacheConsoleCommands } from '../utils/appCacheConsoleCommands';
 
 const defaultSiteSeo = getDefaultSiteSeo(
   (process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXTAUTH_URL || 'https://dynamicfont.ru').replace(
@@ -43,6 +44,7 @@ export default function MyApp({
   pageProps: { session, seo: pageSeo, ...pageProps },
 }: AppProps<AppPageProps>) {
   useEffect(() => {
+    installAppCacheConsoleCommands();
     const clearFontsStyle = document.createElement('style');
     clearFontsStyle.textContent = `
       /* Очистка всех шрифтов */

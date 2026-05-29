@@ -92,6 +92,9 @@ export function buildEditorHomeLayoutProps(vm: Record<string, unknown>): EditorH
       availableStyles: vm.availableStyles,
       selectedPresetName: vm.selectedPresetName,
       applyPresetStyle: vm.applyPresetStyle,
+      catalogSubsetOptions: vm.catalogSubsetOptions,
+      activeCatalogSubset: vm.activeCatalogSubset,
+      onCatalogSubsetChange: vm.applyCatalogSubset,
       getVariableAxes: vm.getVariableAxes,
       variableSettings: vm.variableSettings,
       resetVariableSettings: vm.resetVariableSettings,
@@ -115,6 +118,8 @@ export function buildEditorHomeLayoutProps(vm: Record<string, unknown>): EditorH
     },
     preview: {
       sidebarSelectedFont: vm.sidebarSelectedFont,
+      variableSettings: vm.variableSettings,
+      exportedFont: vm.exportedFont,
       plainPreviewOpen: vm.plainPreviewOpen,
       closePlainPreview: vm.closePlainPreview,
       getFontFamily: vm.getFontFamily,
@@ -131,6 +136,7 @@ export function buildEditorHomeLayoutProps(vm: Record<string, unknown>): EditorH
       liveWaterfallBaseSize: vm.liveWaterfallBaseSize,
       handleWaterfallBaseSizeLiveChange: vm.handleWaterfallBaseSizeLiveChange,
       handleWaterfallBaseSizeCommit: vm.handleWaterfallBaseSizeCommit,
+      openGoogleCatalogEntryInEditorTab: vm.openGoogleCatalogEntryInEditorTab,
     },
     libraryScreenProps: {
       libraryTabs: vm.libraryTabs,

@@ -3,6 +3,7 @@ import { PRESET_STYLES } from '../utils/fontUtilsCommon';
 import { buildPresetViewStatePatch } from '../utils/fontViewStateWriter';
 import { findFontInstanceStyleByName } from '../utils/fontInstanceStyles';
 import { buildVariableSettingsForPresetApply } from '../utils/presetVariableSettings';
+import { fontStyleDbg } from '../utils/fontStyleDebugLog';
 import type { SessionFontRecord } from '../types/editorFonts';
 
 /** Пресеты вес/курсив, VF-оси, догрузка стилей Fontsource. */
@@ -21,12 +22,20 @@ export function useFontStyleManager(
     weight: number,
     style: string,
     font: SessionFontRecord,
-  ) => void,
+  ) => Promise<Blob | null | undefined>,
   onPresetApplied?: (fontId: string, patch: Record<string, unknown>) => void,
 ) {
   const applyPresetStyle = useCallback(async (presetName: string, font: SessionFontRecord | null = null) => {
     const fontToApply = font || selectedFont;
     if (!fontToApply) return;
+
+    fontStyleDbg('applyPresetStyle start', {
+      presetName,
+      fontId: fontToApply.id,
+      source: fontToApply.source,
+      isVariable: Boolean(fontToApply.isVariableFont),
+      before: { currentWeight: fontToApply.currentWeight, currentStyle: fontToApply.currentStyle },
+    });
 
     const customStyle =
       Array.isArray(fontToApply.availableStyles) &&
@@ -35,6 +44,7 @@ export function useFontStyleManager(
     const presetInfo = customStyle || PRESET_STYLES.find((p) => p.name === presetName);
     if (!presetInfo) {
       console.warn(`Стиль "${presetName}" не найден.`);
+      fontStyleDbg('applyPresetStyle not found', { presetName, fontId: fontToApply.id });
       return;
     }
     const { weight, style } = presetInfo;
@@ -58,11 +68,17 @@ export function useFontStyleManager(
         setSelectedFont(prevSelected => {
           // Случай 1: prevSelected есть и это тот же шрифт - обновляем его
           if (prevSelected && prevSelected.id === fontToApply.id) {
-             return { ...prevSelected, currentWeight: weight, currentStyle: style };
-          }
-          // Случай 2: prevSelected нет или это другой шрифт, но fontToApply есть - устанавливаем fontToApply как selectedFont
-          else if (fontToApply) {
-             return { ...fontToApply, currentWeight: weight, currentStyle: style };
+            const loadedStyles = Array.isArray(fontToApply.loadedStyles)
+              ? [...fontToApply.loadedStyles]
+              : prevSelected.loadedStyles;
+            return {
+              ...prevSelected,
+              currentWeight: weight,
+              currentStyle: style,
+              ...(loadedStyles ? { loadedStyles } : {}),
+            };
+          } else if (fontToApply) {
+            return { ...fontToApply, currentWeight: weight, currentStyle: style };
           }
           return prevSelected; // Возвращаем старое состояние в остальных случаях
         });
@@ -71,16 +87,31 @@ export function useFontStyleManager(
 
     // Логика для невариативных Fontsource шрифтов
     if (fontToApply.source === 'fontsource' && !fontToApply.isVariableFont) {
-      // Проверяем, был ли стиль загружен ранее
-      const styleIsLoaded = fontToApply.loadedStyles?.some(s => s.weight === weight && s.style === style);
-      if (!styleIsLoaded) {
-        // Загружаем нужный стиль
-        if (loadFontsourceStyleVariant) {
-          try {
-            loadFontsourceStyleVariant(fontToApply.name, weight, style, fontToApply);
-          } catch (error) {
-            console.error(`[applyPresetStyle] Ошибка загрузки стиля ${presetName}:`, error);
+      const styleIsLoaded = fontToApply.loadedStyles?.some(
+        (s) => s.weight === weight && s.style === style,
+      );
+      if (!styleIsLoaded && loadFontsourceStyleVariant) {
+        try {
+          const res = await loadFontsourceStyleVariant(fontToApply.name, weight, style, fontToApply);
+          if (res === null) {
+            fontStyleDbg('applyPresetStyle fontsource load FAIL', {
+              presetName,
+              fontId: fontToApply.id,
+              weight,
+              style,
+            });
+            return;
           }
+        } catch (error) {
+          console.error(`[applyPresetStyle] Ошибка загрузки стиля ${presetName}:`, error);
+          fontStyleDbg('applyPresetStyle fontsource load exception', {
+            presetName,
+            fontId: fontToApply.id,
+            weight,
+            style,
+            err: error instanceof Error ? error.message : String(error),
+          });
+          return;
         }
       }
     }
@@ -93,6 +124,13 @@ export function useFontStyleManager(
         instanceCoordinates,
         currentSettings: variableSettings,
       });
+      fontStyleDbg('applyPresetStyle variable settings', {
+        presetName,
+        fontId: fontToApply.id,
+        weight,
+        style,
+        settingsChanged,
+      });
       if (settingsChanged) {
         applyVariableSettings(newSettings, true, fontToApply);
       }
@@ -100,6 +138,11 @@ export function useFontStyleManager(
 
     // ВАЖНО: Обновляем selectedFont для ВСЕХ типов шрифтов (только один раз в конце)
     updateSelectedFontStateIfNeeded();
+    fontStyleDbg('applyPresetStyle end', {
+      presetName,
+      fontId: fontToApply.id,
+      after: { currentWeight: weight, currentStyle: style },
+    });
 
     // Обновляем lastUsedPresetName в общем массиве шрифтов
     // Это нужно делать всегда, независимо от того, изменились ли оси
@@ -110,8 +153,9 @@ export function useFontStyleManager(
       }
       return currentFonts.map(f => {
         if (f.id === fontToApply.id) {
-          // Вес/стиль должны жить и в массиве fonts: иначе эффект в pages/index.jsx
-          // подменяет selectedFont объектом из fonts без currentWeight — внизу всегда 400.
+          const loadedStyles = Array.isArray(fontToApply.loadedStyles)
+            ? [...fontToApply.loadedStyles]
+            : f.loadedStyles;
           return {
             ...f,
             ...buildPresetViewStatePatch(presetName, {
@@ -119,6 +163,7 @@ export function useFontStyleManager(
               currentWeight: weight,
               currentStyle: style,
             }),
+            ...(loadedStyles ? { loadedStyles } : {}),
           };
         }
         return f;

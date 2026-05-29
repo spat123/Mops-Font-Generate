@@ -6,6 +6,7 @@ import { applyFontInstanceStylesToFont, extractFvarInstanceStyles, type FontInst
 import { buildVariationSettingsCssString } from './fontVariationSettings';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGenerator';
 import type { SessionFontRecord } from '../types/editorFonts';
+import { resolveDefaultCatalogSubset } from './catalogActiveSubset';
 import type { FvarAxisMeta } from './fontParser';
 
 export type GoogleFontSlice = {
@@ -25,6 +26,8 @@ export type LocalFontProcessorInput = SessionFontRecord & {
   googleFontHasItalicStyles?: boolean;
   googleFontInstanceStyles?: FontInstanceStyle[];
   googleFontRecommendedSample?: string;
+  catalogSubsets?: string[];
+  activeSubset?: string;
 };
 
 type CachedAxisInfo = {
@@ -462,6 +465,12 @@ export const processLocalFont = async (
     fontObj.fontFamily = fontFamilyName;
     if (fontInput.googleFontRecommendedSample && typeof fontInput.googleFontRecommendedSample === 'string') {
       fontObj.googleFontRecommendedSample = fontInput.googleFontRecommendedSample.trim();
+    }
+    if (Array.isArray(fontInput.catalogSubsets) && fontInput.catalogSubsets.length > 0) {
+      fontObj.catalogSubsets = fontInput.catalogSubsets;
+      fontObj.activeSubset =
+        String(fontInput.activeSubset || '').trim() ||
+        resolveDefaultCatalogSubset(fontInput.catalogSubsets);
     }
 
     // 5. Заполняем fontObj данными парсинга, если он успешен

@@ -22,6 +22,7 @@ export type CreateCatalogProxyHandlerOptions = {
   logTag: string;
   cacheTtlMs: number;
   cacheControl: string;
+  fetchTimeoutMs?: number;
   fetchItems: () => Promise<unknown[]>;
 };
 
@@ -30,6 +31,7 @@ export function createCatalogProxyHandler({
   logTag,
   cacheTtlMs,
   cacheControl,
+  fetchTimeoutMs = 45_000,
   fetchItems,
 }: CreateCatalogProxyHandlerOptions) {
   let serverCache: { updatedAt: number; items: unknown[] | null } = {
@@ -54,7 +56,15 @@ export function createCatalogProxyHandler({
         return res.status(200).json({ items: serverCache.items, cached: true });
       }
 
-      const items = await fetchItems();
+      const fetchPromise = fetchItems();
+      // Важно: Promise.race не "подписывается" на losing-promise — чтобы не словить unhandled rejection.
+      void fetchPromise.catch(() => {});
+      const items = await Promise.race([
+        fetchPromise,
+        new Promise<unknown[]>((_, reject) => {
+          setTimeout(() => reject(new CatalogProxyFetchError('Таймаут загрузки каталога', { httpStatus: 504 })), fetchTimeoutMs);
+        }),
+      ]);
       serverCache = { updatedAt: now, items };
 
       res.setHeader('Content-Type', 'application/json; charset=utf-8');

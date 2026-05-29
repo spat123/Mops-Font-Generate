@@ -20,6 +20,7 @@ export function collectPerFontPreviewSnapshot(s: PerFontPreviewSnapshot): PerFon
     lineHeight: s.lineHeight,
     letterSpacing: s.letterSpacing,
     stylesLetterSpacing: s.stylesLetterSpacing,
+    openTypeFeatureOverrides: s.openTypeFeatureOverrides,
     textColor: s.textColor,
     backgroundColor: s.backgroundColor,
     textDirection: s.textDirection,
@@ -60,6 +61,7 @@ export function applyPerFontPreviewSnapshot(
     setLineHeight,
     setLetterSpacing,
     setStylesLetterSpacing,
+    setOpenTypeFeatureOverrides,
     setTextColor,
     setBackgroundColor,
     setTextDirection,
@@ -108,6 +110,20 @@ export function applyPerFontPreviewSnapshot(
   if (snapshot.letterSpacing !== undefined && setLetterSpacing) setLetterSpacing(snapshot.letterSpacing);
   if (typeof setStylesLetterSpacing === 'function' && snapshot.stylesLetterSpacing !== undefined) {
     setStylesLetterSpacing(snapshot.stylesLetterSpacing);
+  }
+  if (typeof setOpenTypeFeatureOverrides === 'function') {
+    const raw = (snapshot as any).openTypeFeatureOverrides;
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const out: Record<string, 0 | 1> = {};
+      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+        const tag = String(k || '').trim().toLowerCase().slice(0, 4);
+        if (!tag) continue;
+        if (v === 0 || v === 1) out[tag] = v;
+      }
+      setOpenTypeFeatureOverrides(out);
+    } else if (raw === null || raw === undefined) {
+      setOpenTypeFeatureOverrides({});
+    }
   }
   if (snapshot.textColor !== undefined && setTextColor) setTextColor(snapshot.textColor);
   if (snapshot.backgroundColor !== undefined && setBackgroundColor) setBackgroundColor(snapshot.backgroundColor);

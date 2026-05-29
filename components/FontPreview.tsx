@@ -28,16 +28,21 @@ import { formatUnifiedCatalogAvailabilityShort, getUnifiedCatalogStats } from '.
 import { ensureGoogleFontPreviewCss } from '../utils/googleFontPreviewCss';
 import { matchesCatalogFontSearch, matchesSearch } from '../utils/searchMatching';
 import { SearchClearButton } from './ui/SearchClearButton';
+import { CatalogCardHoverOverlay } from './catalog/CatalogCardHoverOverlay';
 import { CatalogFontCard } from './catalog/CatalogFontCard';
+import { getFontCategoryLabelRu } from '../utils/fontCategoryLabels';
+import { pluralRu } from '../utils/pluralRu';
 import { NATIVE_SELECT_FIELD_INTERACTIVE } from './ui/nativeSelectFieldClasses';
 import { SearchIcon } from './ui/CommonIcons';
 import { IconCircleButton } from './ui/IconCircleButton';
 import { AppButton } from './ui/AppButton';
 import { FontLibraryStatusMenu } from './ui/FontLibraryStatusMenu';
 import { CatalogLibraryActions } from './catalog/CatalogLibraryActions';
-import { CatalogDownloadSplitButton } from './catalog/CatalogDownloadSplitButton';
+import { buildFontFeatureSettingsCss } from '../utils/openTypeFeatureSettings';
+import { fontStyleDbg } from '../utils/fontStyleDebugLog';
 import { buildCatalogDownloadButtonProps } from './catalog/buildCatalogDownloadButtonProps';
 import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
+import { resolveSessionFontDisplayLabel } from '../utils/fontSlug';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 import { PreviewModeDock } from './ui/PreviewModeDock';
@@ -51,6 +56,7 @@ import {
   buildSelectionArchiveEntries,
   downloadGoogleAsFormat,
   downloadGooglePackageZip,
+  downloadGoogleVariableVariant,
   saveArchiveBlob,
 } from '../utils/catalogDownloadActions';
 import { GLYPH_COUNT_UNAVAILABLE } from './GlyphsMode';
@@ -65,43 +71,6 @@ const TextMode = lazy(() => import('./TextMode'));
 // --- Конец ленивой загрузки ---
 
 const EMPTY_STATE_GOOGLE_RESULTS_LIMIT = 8;
-
-function QuickSearchCardDownloadAction({
-  family,
-  entry,
-  onDownloadZip,
-  onDownloadAsFormat,
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  return (
-    <div
-      className={[
-        'max-w-[min(100%,12rem)] opacity-0 transition-opacity duration-200',
-        'pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100',
-        'focus-within:pointer-events-auto focus-within:opacity-100',
-        menuOpen ? '!pointer-events-auto !opacity-100' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
-      onClick={(event) => event.stopPropagation()}
-      onMouseDown={(event) => event.stopPropagation()}
-    >
-      <CatalogDownloadSplitButton
-        tone="light"
-        layout="comfortable"
-        className="!w-auto max-w-[min(100%,12rem)]"
-        {...buildCatalogDownloadButtonProps({
-          family,
-          item: entry,
-          onDownloadZip,
-          onDownloadAsFormat,
-          showVariable: Boolean(entry?.isVariable),
-        })}
-        onMenuOpenChange={setMenuOpen}
-      />
-    </div>
-  );
-}
 
 function resolvePreviewJustifyContent(verticalAlignment) {
   return verticalAlignment === 'middle'
@@ -119,12 +88,15 @@ function resolvePreviewAlignItems(textAlignment) {
       : 'stretch';
 }
 
+const EMPTY_STATE_CATALOG_WIDTH_CLASS = 'mx-auto w-full max-w-[min(100%,90rem)]';
+
 function getEmptyStateSearchLayoutClasses(isActive) {
   return {
-    viewportClassName: isActive ? 'items-center justify-start pt-8' : 'items-center justify-center',
-    widthClassName: isActive ? 'max-w-6xl py-8' : 'max-w-md py-8',
-    innerClassName: isActive ? 'max-w-5xl text-left' : 'max-w-md text-center',
-    stickyClassName: isActive ? 'sticky top-0 bg-white py-1' : '',
+    viewportClassName: isActive ? 'items-center justify-start pt-6' : 'items-center justify-center',
+    widthClassName: isActive ? 'w-full py-8' : 'max-w-md py-8',
+    innerClassName: isActive ? 'text-left' : 'max-w-md text-center',
+    catalogWidthClassName: EMPTY_STATE_CATALOG_WIDTH_CLASS,
+    stickyClassName: isActive ? 'sticky top-0 z-20 bg-white py-2' : '',
     barJustifyClassName: isActive ? 'w-full justify-start' : 'justify-center',
     searchWrapClassName: isActive ? 'min-w-0 flex-1 opacity-100' : 'max-w-0 opacity-0',
     toggleAriaLabel: isActive ? 'Закрыть поиск' : 'Открыть поиск',
@@ -159,12 +131,14 @@ export default function FontPreview({
   onSelectionActionsChange,
   selectionActionsActive = false,
   currentWaterfallBaseSize = null,
+  openGoogleCatalogEntryInEditorTab = null,
 }) {
   const { 
     text,
     fontSize, 
     lineHeight, 
     letterSpacing, 
+    openTypeFeatureOverrides,
     textColor, 
     backgroundColor, 
     viewMode,
@@ -232,13 +206,23 @@ export default function FontPreview({
     const fontStyleValue = fontCssProperties?.fontStyle || 'normal';
     const fontWeightValue = fontCssProperties?.fontWeight || 400;
 
-    return {
+    const out = {
       letterSpacingValue,
       lineHeightValue,
       fontStyleValue,
       fontWeightValue
     };
-  }, [letterSpacing, lineHeight, fontCssProperties?.fontWeight, fontCssProperties?.fontStyle, fontCssProperties?.fontFamily]);
+    fontStyleDbg('FontPreview styleValues', {
+      fontId: selectedFont?.id,
+      source: selectedFont?.source,
+      isVariable: Boolean(selectedFont?.isVariableFont),
+      currentWeight: selectedFont?.currentWeight,
+      currentStyle: selectedFont?.currentStyle,
+      fontCssProperties,
+      out,
+    });
+    return out;
+  }, [letterSpacing, lineHeight, fontCssProperties?.fontWeight, fontCssProperties?.fontStyle, fontCssProperties?.fontFamily, selectedFont?.id, selectedFont?.source, selectedFont?.isVariableFont, selectedFont?.currentWeight, selectedFont?.currentStyle]);
   
   const { letterSpacingValue, lineHeightValue, fontStyleValue, fontWeightValue } = styleValues;
   
@@ -254,6 +238,41 @@ export default function FontPreview({
   const variationSettingsValue = useMemo(() => {
     return getVariationSettings(selectedFont, variableSettings);
   }, [selectedFont, variableSettings, getVariationSettings]);
+
+  // Лог “эффективного” стиля превью (что реально применится в DOM).
+  useEffect(() => {
+    fontStyleDbg('FontPreview effective preview style', {
+      fontId: selectedFont?.id,
+      source: selectedFont?.source,
+      displayName: selectedFont?.displayName,
+      name: selectedFont?.name,
+      isVariable: Boolean(selectedFont?.isVariableFont),
+      currentWeight: selectedFont?.currentWeight,
+      currentStyle: selectedFont?.currentStyle,
+      activeSubset: (selectedFont as any)?.activeSubset,
+      variableSettings,
+      applied: {
+        fontFamily: fontFamilyValue,
+        fontWeight: fontWeightValue,
+        fontStyle: fontStyleValue,
+        fontVariationSettings: variationSettingsValue,
+      },
+    });
+  }, [
+    selectedFont?.id,
+    selectedFont?.source,
+    selectedFont?.displayName,
+    selectedFont?.name,
+    selectedFont?.isVariableFont,
+    selectedFont?.currentWeight,
+    selectedFont?.currentStyle,
+    (selectedFont as any)?.activeSubset,
+    fontFamilyValue,
+    fontWeightValue,
+    fontStyleValue,
+    variationSettingsValue,
+    variableSettings,
+  ]);
 
   const displayText = useMemo(() => {
     return text || 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -306,7 +325,7 @@ export default function FontPreview({
       letterSpacing: letterSpacingValue,
       lineHeight: lineHeightValue,
       color: textColor,
-      fontFeatureSettings: 'normal',
+      fontFeatureSettings: buildFontFeatureSettingsCss(openTypeFeatureOverrides),
       direction: textDirection as CSSProperties['direction'],
       textAlign: textAlignment as CSSProperties['textAlign'], 
       textTransform: textCase, 
@@ -321,6 +340,7 @@ export default function FontPreview({
       if (fontStyleValue && fontStyleValue !== 'normal') {
         styles.fontStyle = fontStyleValue;
       }
+      styles.fontWeight = fontWeightValue;
     } else if (shouldApplyCssWeightStyleForFont(selectedFont)) {
       styles.fontStyle = fontStyleValue;
       styles.fontWeight = fontWeightValue;
@@ -331,6 +351,7 @@ export default function FontPreview({
     fontFamilyValue, fontSize, letterSpacingValue, fontStyleValue, fontWeightValue, 
     lineHeightValue, textColor, selectedFont,
     variationSettingsValue,
+    openTypeFeatureOverrides,
     textDirection, textAlignment, textCase, textDecoration
   ]);
   
@@ -781,40 +802,42 @@ export default function FontPreview({
   }, [plainPreviewOpen]);
 
   const previewFontLabel = useMemo(() => {
-    return exportedFont
-      ? exportedFont.name.replace(/-static$/, '')
-      : selectedFont?.name ||
-          selectedFont?.family ||
-          (selectedFont?.fontFamily && selectedFont?.source !== 'google'
-            ? selectedFont.fontFamily
-            : 'Шрифт');
+    if (exportedFont) {
+      return exportedFont.name.replace(/-static$/, '');
+    }
+    return resolveSessionFontDisplayLabel(selectedFont);
   }, [exportedFont, selectedFont]);
 
   const previewSourceLabel = useMemo(() => {
     const source = String(selectedFont?.source || '').trim();
+    if (!source || source === 'fontsource') return '';
     if (source === 'local') return 'Локальный';
-    if (source === 'google') return 'Google';
-    if (source === 'fontsource') return 'Fontsource';
+    if (source === 'google') return '';
     return getLibrarySourceLabel(source);
   }, [selectedFont?.source]);
 
   const previewWeightValue = useMemo(() => {
+    if (!selectedFont) return null;
+    if (selectedFont.isVariableFont) {
+      const w = Number((variableSettings as any)?.wght);
+      if (Number.isFinite(w)) return Math.round(w);
+    }
     const weight = Number(selectedFont?.currentWeight);
     return Number.isFinite(weight) ? Math.round(weight) : null;
-  }, [selectedFont?.currentWeight]);
+  }, [selectedFont?.id, selectedFont?.isVariableFont, selectedFont?.currentWeight, (variableSettings as any)?.wght]);
 
   const showVariableBadge = Boolean(selectedFont?.isVariableFont);
   const showItalicBadge = fontStyleValue === 'italic' || selectedFont?.currentStyle === 'italic';
 
   const statusLibraryEntry = useMemo(() => {
     if (!selectedFont) return null;
-    const label = selectedFont.displayName || selectedFont.fontFamily || selectedFont.name || 'Шрифт';
+    const label = selectedFont.displayName || selectedFont.name || selectedFont.fontFamily || 'Шрифт';
     const candidateLabels = Array.from(
       new Set(
         [
           selectedFont.displayName,
-          selectedFont.fontFamily,
           selectedFont.name,
+          selectedFont.fontFamily,
           label,
         ]
           .map((value) =>
@@ -828,7 +851,7 @@ export default function FontPreview({
     );
     if (selectedFont.source === 'google') {
       const family = normalizeLibraryText(
-        selectedFont.fontFamily || selectedFont.displayName || selectedFont.name || '',
+        selectedFont.displayName || selectedFont.name || selectedFont.fontFamily || '',
       )
         .replace(/\.woff2$/i, '')
         .replace(/\s+variable$/i, '')
@@ -845,7 +868,7 @@ export default function FontPreview({
     if (selectedFont.source === 'fontsource') {
       const key = String(selectedFont.name || selectedFont.displayName || selectedFont.id || '').trim();
       const familyLabel = normalizeLibraryText(
-        selectedFont.displayName || selectedFont.fontFamily || selectedFont.name || '',
+        selectedFont.displayName || selectedFont.name || selectedFont.fontFamily || '',
       )
         .replace(/\s+variable$/i, '')
         .trim();
@@ -940,16 +963,17 @@ export default function FontPreview({
     return (
       <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-white">
         <div
-          className={`flex w-full min-h-0 flex-1 flex-col overflow-y-auto ${
-            /* flex-col: cross axis = горизонталь -> items-center по центру; main = вертикаль -> justify-start к верху как раньше */
-            emptyStateLayout.viewportClassName
-          }`}
+          className={`flex w-full min-h-0 flex-1 flex-col overflow-y-auto ${emptyStateLayout.viewportClassName}`}
         >
         <div
           className={`w-full px-6 ${emptyStateLayout.widthClassName}`}
         >
           <div
-            className={`mx-auto ${emptyStateLayout.innerClassName}`}
+            className={
+              emptyStateSearchActive
+                ? emptyStateLayout.catalogWidthClassName
+                : `mx-auto ${emptyStateLayout.innerClassName}`
+            }
           >
             <div
               ref={emptyStateSearchWrapRef}
@@ -990,7 +1014,7 @@ export default function FontPreview({
               <div
                 className={`overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${emptyStateLayout.searchWrapClassName}`}
               >
-                <div className="relative">
+                <div className="relative min-w-0">
                   <input
                     ref={emptyStateSearchInputRef}
                     type="search"
@@ -1014,14 +1038,140 @@ export default function FontPreview({
               </div>
             </div>
 
-            <div className="relative mt-6">
-              <div
-                className={`${
-                  emptyStateSearchActive
-                    ? 'pointer-events-none absolute inset-x-0 top-0 opacity-0'
-                    : 'relative opacity-100'
-                }`}
-              >
+            {emptyStateSearchActive ? (
+              <div className="mt-4">
+                {emptyStateSearchQuery ? (
+                  filteredGoogleCatalogResults.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      {filteredGoogleCatalogResults.map((entry) => {
+                        const family = String(entry?.family || '').trim();
+                        if (!family) return null;
+                        const isSelected = selectedQuickSearchFamilies.has(family);
+                        const categoryLabel = getFontCategoryLabelRu(entry?.category) || null;
+                        const isVariable = entry?.isVariable === true;
+                        const hasItalic =
+                          entry?.hasItalic === true || entry?.hasItalicStyles === true;
+                        const languageCount = Array.isArray(entry?.subsets) ? entry.subsets.length : 0;
+                        const styleCountNum = Number(entry?.styleCount) || 0;
+                        const footerLeftBadges = [
+                          categoryLabel,
+                          isVariable ? 'vf' : null,
+                          hasItalic ? 'italic' : null,
+                        ].filter(Boolean) as string[];
+                        const footerRightBadges = [
+                          languageCount > 0
+                            ? `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}`
+                            : null,
+                          styleCountNum > 0
+                            ? `${styleCountNum} ${pluralRu(styleCountNum, 'начертание', 'начертания', 'начертаний')}`
+                            : null,
+                        ].filter(Boolean) as string[];
+                        const downloadButtonProps = buildCatalogDownloadButtonProps({
+                          family,
+                          item: entry,
+                          catalogEntry: entry,
+                          catalogSource: 'google',
+                          onDownloadZip: downloadGooglePackageZip,
+                          onDownloadAsFormat: (it, format) => downloadGoogleAsFormat(it, format),
+                          onDownloadVariableVariant: downloadGoogleVariableVariant,
+                          showVariable: entry?.isVariable === true,
+                        });
+                        const openInEditor = () => {
+                          if (typeof openGoogleCatalogEntryInEditorTab === 'function') {
+                            return openGoogleCatalogEntryInEditorTab(entry);
+                          }
+                          return loadPresetFont(family);
+                        };
+                        return (
+                          <CatalogFontCard
+                            key={family}
+                            className="min-h-[148px]"
+                            fadeFooterWithHoverUi
+                            actions={
+                              <CatalogLibraryActions
+                                libraries={fontLibraries}
+                                libraryEntry={createCatalogLibraryEntry({
+                                  source: 'google',
+                                  key: family,
+                                  label: family,
+                                })}
+                                onAddFontToLibrary={onMoveFontToLibrary}
+                                onRequestCreateLibrary={onRequestCreateLibrary}
+                                stateKey={`empty-search:${family}`}
+                              />
+                            }
+                            hoverOverlay={
+                              <CatalogCardHoverOverlay
+                                openButtonProps={{
+                                  primaryLabel: 'Открыть',
+                                  primaryAriaLabel: `Открыть ${family} в редакторе`,
+                                  onPrimaryClick: openInEditor,
+                                }}
+                                downloadButtonProps={downloadButtonProps}
+                              />
+                            }
+                            selected={isSelected}
+                            onClick={(event) => {
+                              if (isInteractiveTarget(event?.target)) return;
+                              onQuickSearchCardClick(event, family);
+                            }}
+                            onPointerDown={(event) => startQuickSearchLongPress(event, family)}
+                            onPointerUp={clearQuickSearchLongPressTimer}
+                            onPointerLeave={clearQuickSearchLongPressTimer}
+                            onPointerCancel={clearQuickSearchLongPressTimer}
+                            title={family}
+                            preview={
+                              <div
+                                className="mt-2 min-h-[1.75rem] flex-1 truncate text-[1.75rem] leading-tight text-gray-800"
+                                style={{ fontFamily: `'${family}', sans-serif` }}
+                              >
+                                {family}
+                              </div>
+                            }
+                            footer={
+                              footerLeftBadges.length > 0 || footerRightBadges.length > 0 ? (
+                                <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                    {footerLeftBadges.map((part) => (
+                                      <span
+                                        key={`l-${part}`}
+                                        className="truncate text-xs font-semibold uppercase text-gray-800"
+                                      >
+                                        {part}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5 text-xs font-semibold uppercase tabular-nums text-gray-800">
+                                    {footerRightBadges.map((part) => (
+                                      <span key={`r-${part}`} className="whitespace-nowrap">
+                                        {part}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : null
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : googleCatalogEntries.length > 0 ? (
+                    <p className="py-6 text-center text-sm uppercase text-gray-500">
+                      Ничего не найдено. Попробуйте другой запрос.
+                    </p>
+                  ) : (
+                    <p className="py-6 text-center text-sm uppercase text-gray-500">
+                      Кэш каталога Google пока пуст. Откройте вкладку Google Fonts, и поиск здесь сразу начнет показывать карточки.
+                    </p>
+                  )
+                ) : (
+                  <p className="py-6 text-center text-sm uppercase text-gray-500">
+                    Начните вводить название шрифта, и здесь появятся карточки из каталога Google.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="relative mt-6">
                 <h2 className="mb-4 text-2xl font-bold uppercase text-gray-900">Загрузите шрифт для начала работы</h2>
                 <p className="mb-6 text-gray-600">Перетащите шрифт или нажмите на область</p>
                 <div className="mb-8">
@@ -1046,99 +1196,7 @@ export default function FontPreview({
                   <p className="mt-4 text-sm text-gray-500">Ничего не найдено. Попробуйте другой запрос.</p>
                 )}
               </div>
-            </div>
-
-            {emptyStateSearchActive ? (
-              <div className="mt-4">
-                {emptyStateSearchQuery ? (
-                  filteredGoogleCatalogResults.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                      {filteredGoogleCatalogResults.map((entry) => {
-                        const family = String(entry?.family || '').trim();
-                        if (!family) return null;
-                        const isSelected = selectedQuickSearchFamilies.has(family);
-                        return (
-                          <CatalogFontCard
-                            key={family}
-                            className="min-h-[148px] cursor-pointer"
-                            actions={
-                              <CatalogLibraryActions
-                                libraries={fontLibraries}
-                                libraryEntry={createCatalogLibraryEntry({
-                                  source: 'google',
-                                  key: family,
-                                  label: family,
-                                })}
-                                onAddFontToLibrary={onMoveFontToLibrary}
-                                onRequestCreateLibrary={onRequestCreateLibrary}
-                                stateKey={`empty-search:${family}`}
-                              />
-                            }
-                            selected={isSelected}
-                            onClick={(event) => {
-                              if (isInteractiveTarget(event?.target)) return;
-                              onQuickSearchCardClick(event, family);
-                              if (event?.defaultPrevented || selectedQuickSearchFamilies.size > 0) return;
-                              loadPresetFont(family);
-                            }}
-                            onPointerDown={(event) => startQuickSearchLongPress(event, family)}
-                            onPointerUp={clearQuickSearchLongPressTimer}
-                            onPointerLeave={clearQuickSearchLongPressTimer}
-                            onPointerCancel={clearQuickSearchLongPressTimer}
-                            title={family}
-                            preview={
-                              <div
-                                className="mt-2 min-h-[1.75rem] flex-1 truncate text-[1.75rem] leading-tight text-gray-800"
-                                style={{ fontFamily: `'${family}', sans-serif` }}
-                              >
-                                {family}
-                              </div>
-                            }
-                            footer={
-                              <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
-                                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                  <span className="truncate text-xs font-semibold uppercase text-gray-800">
-                                    {entry.category || 'Google'}
-                                  </span>
-                                  {entry.isVariable ? (
-                                    <span className="shrink-0 text-xs font-semibold uppercase text-gray-800">
-                                      vf
-                                    </span>
-                                  ) : null}
-                                  {entry.hasItalic ? (
-                                    <span className="shrink-0 text-xs font-semibold uppercase text-gray-800">
-                                      italic
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <QuickSearchCardDownloadAction
-                                  family={family}
-                                  entry={entry}
-                                  onDownloadZip={downloadGooglePackageZip}
-                                  onDownloadAsFormat={(it, format) => downloadGoogleAsFormat(it, format)}
-                                />
-                              </div>
-                            }
-                          />
-                        );
-                      })}
-                    </div>
-                  ) : googleCatalogEntries.length > 0 ? (
-                    <p className="py-6 text-center text-sm uppercase text-gray-500">
-                      Ничего не найдено. Попробуйте другой запрос.
-                    </p>
-                  ) : (
-                    <p className="py-6 text-center text-sm uppercase text-gray-500">
-                      Кэш каталога Google пока пуст. Откройте вкладку Google Fonts, и поиск здесь сразу начнет показывать карточки.
-                    </p>
-                  )
-                ) : (
-                  <p className="py-6 text-center text-sm uppercase text-gray-500">
-                    Начните вводить название шрифта, и здесь появятся карточки из каталога Google.
-                  </p>
-                )}
-              </div>
-            ) : null}
+            )}
           </div>
         </div>
         </div>
@@ -1233,7 +1291,7 @@ export default function FontPreview({
             selectedFont ? (
               <div className="flex items-center justify-center gap-2">
                 <span className="truncate">{previewFontLabel}</span>
-                <span>{previewSourceLabel}</span>
+                {previewSourceLabel ? <span>{previewSourceLabel}</span> : null}
                 {showVariableBadge ? (
                   <Tooltip content="Variable Font" className="pointer-events-auto">
                     <span>VF</span>

@@ -5,7 +5,7 @@ import type { SessionFontRecord } from '../types/editorFonts';
 
 const fontMetadataCache = new Map<string, unknown[]>();
 
-type ApplyVariableOpts = { skipSideEffects?: boolean };
+type ApplyVariableOpts = { skipSideEffects?: boolean; replaceAll?: boolean };
 
 /** Оси VF: применение, сброс, список осей для UI. */
 export function useVariableFontControls(
@@ -32,6 +32,7 @@ export function useVariableFontControls(
     opts: ApplyVariableOpts = {},
   ) => {
     const skipSideEffects = opts.skipSideEffects === true;
+    const replaceAll = opts.replaceAll === true;
     const fontToApply = font || selectedFont;
     if (!fontToApply || !fontToApply.isVariableFont) return;
 
@@ -39,13 +40,15 @@ export function useVariableFontControls(
 
     let hasChanges = false;
     Object.keys(newSettings).forEach(tag => {
-      if (variableSettings[tag] !== newSettings[tag]) hasChanges = true;
+      if ((replaceAll ? undefined : variableSettings[tag]) !== newSettings[tag]) hasChanges = true;
     });
     if (!hasChanges && !isFinalUpdate) return; // Выходим если нет изменений И это не финальный апдейт (финальный может быть без изменений)
 
-    setVariableSettings(currentPrevSettings => ({ ...currentPrevSettings, ...newSettings }));
+    setVariableSettings((currentPrevSettings) =>
+      replaceAll ? { ...newSettings } : { ...currentPrevSettings, ...newSettings },
+    );
 
-    const updatedSettings = { ...variableSettings, ...newSettings };
+    const updatedSettings = replaceAll ? { ...newSettings } : { ...variableSettings, ...newSettings };
 
     if (!skipSideEffects) {
       // Обновляем объект selectedFont асинхронно
@@ -54,7 +57,7 @@ export function useVariableFontControls(
 
         const variationSettingsStr = formatFontVariationSettings(updatedSettings, { fallback: 'normal' });
 
-        const updatedAxes = { ...fontToApply.variableAxes };
+        const updatedAxes = { ...(prevFont.variableAxes || fontToApply.variableAxes) };
         Object.entries(updatedSettings).forEach(([tag, value]) => {
           if (updatedAxes[tag]) {
             if (typeof updatedAxes[tag] === 'object') {
@@ -65,16 +68,56 @@ export function useVariableFontControls(
           }
         });
 
-        return { ...prevFont, variableAxes: updatedAxes, variationSettings: variationSettingsStr };
+        const wght = Number(updatedSettings.wght);
+        const nextWeight = Number.isFinite(wght) ? Math.round(wght) : prevFont.currentWeight;
+        let nextStyle: string = typeof prevFont.currentStyle === 'string' ? prevFont.currentStyle : 'normal';
+        const italicMode = typeof prevFont.italicMode === 'string' ? prevFont.italicMode : 'none';
+        if (italicMode === 'axis-ital') {
+          const ital = Number(updatedSettings.ital);
+          nextStyle = Number.isFinite(ital) && ital >= 1 ? 'italic' : 'normal';
+        } else if (italicMode === 'axis-slnt') {
+          const slnt = Number(updatedSettings.slnt);
+          nextStyle = Number.isFinite(slnt) && slnt < 0 ? 'italic' : 'normal';
+        }
+        return {
+          ...prevFont,
+          variableAxes: updatedAxes,
+          variationSettings: variationSettingsStr,
+          ...(nextWeight != null ? { currentWeight: nextWeight } : {}),
+          currentStyle: nextStyle,
+        };
       });
 
       // Обновляем lastUsedVariableSettings в общем массиве шрифтов
-      setFonts(currentFonts => currentFonts.map(f => {
-        if (f.id === fontToApply.id) {
-          return { ...f, ...buildVariableSettingsViewStatePatch(updatedSettings) };
+      // ВАЖНО: это очень тяжело для каталога (он пересчитывает исключения/фасеты по `fonts`).
+      // Поэтому обновляем `fonts` только на финальном commit, а во время “drag” держим изменения
+      // в `variableSettings` + `selectedFont`.
+      if (isFinalUpdate) {
+        const wght = Number(updatedSettings.wght);
+        const nextWeight = Number.isFinite(wght) ? Math.round(wght) : undefined;
+        let nextStyle: string | undefined;
+        const italicMode = typeof fontToApply.italicMode === 'string' ? fontToApply.italicMode : 'none';
+        if (italicMode === 'axis-ital') {
+          const ital = Number(updatedSettings.ital);
+          nextStyle = Number.isFinite(ital) && ital >= 1 ? 'italic' : 'normal';
+        } else if (italicMode === 'axis-slnt') {
+          const slnt = Number(updatedSettings.slnt);
+          nextStyle = Number.isFinite(slnt) && slnt < 0 ? 'italic' : 'normal';
         }
-        return f;
-      }));
+        setFonts((currentFonts) =>
+          currentFonts.map((f) => {
+            if (f.id === fontToApply.id) {
+              return {
+                ...f,
+                ...buildVariableSettingsViewStatePatch(updatedSettings),
+                ...(nextWeight !== undefined ? { currentWeight: nextWeight } : {}),
+                ...(nextStyle ? { currentStyle: nextStyle } : {}),
+              };
+            }
+            return f;
+          }),
+        );
+      }
     }
 
     // Обновляем CSS (если финальное изменение)
@@ -100,11 +143,12 @@ export function useVariableFontControls(
 
   applyVariableSettingsRef.current = applyVariableSettings;
 
-  const getDefaultAxisValues = useCallback((): Record<string, number> => {
-    if (!selectedFont || !selectedFont.variableAxes) return {};
+  const getDefaultAxisValues = useCallback((font?: SessionFontRecord | null): Record<string, number> => {
+    const targetFont = font || selectedFont;
+    if (!targetFont || !targetFont.variableAxes) return {};
 
     const defaultSettings: Record<string, number> = {};
-    Object.entries(selectedFont.variableAxes).forEach(([tag, axisData]) => {
+    Object.entries(targetFont.variableAxes).forEach(([tag, axisData]) => {
       if (typeof axisData === 'object' && axisData && 'default' in axisData && axisData.default !== undefined) {
         defaultSettings[tag] = Number(axisData.default);
       } else if (typeof axisData === 'number') {
@@ -115,12 +159,12 @@ export function useVariableFontControls(
   }, [selectedFont]);
 
   const resetVariableSettings = useCallback(() => {
-    const defaultSettings = getDefaultAxisValues();
+    const defaultSettings = getDefaultAxisValues(selectedFont);
     if (Object.keys(defaultSettings).length > 0) {
       applyVariableSettingsRef.current?.(defaultSettings, true);
     }
     return defaultSettings;
-  }, [getDefaultAxisValues]);
+  }, [getDefaultAxisValues, selectedFont]);
 
   /** Оси из объекта шрифта / кэша; парсинг файла не реализован. */
   const getVariableAxesInfo = useCallback(async (font?: SessionFontRecord | null) => {

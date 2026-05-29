@@ -1,10 +1,10 @@
 const SUBSET_LABELS_RU: Record<string, string> = {
   latin: 'Латиница',
-  'latin-ext': 'Латиница расширенная',
+  'latin-ext': 'Латиница расшир.',
   cyrillic: 'Кириллица',
-  'cyrillic-ext': 'Кириллица расширенная',
+  'cyrillic-ext': 'Кириллица расшир.',
   greek: 'Греческий',
-  'greek-ext': 'Греческий расширенный',
+  'greek-ext': 'Греческий расшир.',
   hebrew: 'Иврит',
   arabic: 'Арабский',
   vietnamese: 'Вьетнамский',

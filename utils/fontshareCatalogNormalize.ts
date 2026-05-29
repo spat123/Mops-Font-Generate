@@ -1,5 +1,7 @@
 /** Нормализация записи каталога Fontshare (API v2). */
 
+import { normalizeFontLicenseId } from './fontLicenseNormalize';
+
 export type FontshareStyleRow = {
   id: string;
   file: string;
@@ -16,6 +18,7 @@ export type FontshareCatalogItem = {
   label: string;
   category: string;
   licenseType: string;
+  license: string;
   canRedistribute: boolean;
   trialsEnabled: boolean;
   subsets: string[];
@@ -68,6 +71,12 @@ export function normalizeFontshareCatalogItem(row: Record<string, unknown> | nul
   const hasItalic = styles.some((s) => s.isItalic);
   const isVariable = styles.some((s) => s.isVariable) || (Array.isArray(row.axes) && row.axes.length > 0);
   const licenseType = String(row.license_type || 'itf_ffl').trim();
+  const license =
+    licenseType === 'sil_ofl'
+      ? 'sil-ofl-1.1'
+      : licenseType === 'itf_ffl'
+        ? 'itf-ffl'
+        : normalizeFontLicenseId(licenseType);
 
   return {
     id: slug,
@@ -76,6 +85,7 @@ export function normalizeFontshareCatalogItem(row: Record<string, unknown> | nul
     label: family,
     category: String(row.category || ''),
     licenseType,
+    license,
     canRedistribute: licenseType === 'sil_ofl',
     trialsEnabled: Boolean(row.trials_enabled),
     subsets: row.script ? [String(row.script)] : ['latin'],

@@ -17,6 +17,8 @@ export type SavedLibraryFontCatalogMeta = {
   subsets: string[];
   isVariable: boolean;
   hasItalic: boolean;
+  category: string;
+  styleCount: number;
   source: string;
   id: string;
   label: string;

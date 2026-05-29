@@ -75,10 +75,10 @@ export function buildPersistedFontViewStatePatch(
   const { variableSettings = null, presetName = null } = options;
 
   const metaPatch: FontViewStatePatch = {};
-  if (font?.currentWeight !== undefined) {
+  if (font?.currentWeight != null) {
     metaPatch.currentWeight = font.currentWeight;
   }
-  if (font?.currentStyle !== undefined) {
+  if (font?.currentStyle != null) {
     metaPatch.currentStyle = font.currentStyle;
   }
 

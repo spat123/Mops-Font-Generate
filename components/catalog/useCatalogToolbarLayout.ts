@@ -17,6 +17,8 @@ export function useCatalogToolbarLayout({
   enabled = true,
 }: UseCatalogToolbarLayoutParams = {}) {
   const [gridInnerWidth, setGridInnerWidth] = useState<number | null>(null);
+  /** Контейнер для ширины сетки (всегда в DOM), не зависит от области карточек. */
+  const [gridMeasureEl, setGridMeasureEl] = useState<HTMLElement | null>(null);
   const [catalogScrollEl, setCatalogScrollEl] = useState<HTMLElement | null>(null);
   const [viewportW, setViewportW] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth : 0,
@@ -32,6 +34,10 @@ export function useCatalogToolbarLayout({
     return () => window.removeEventListener('resize', onResize);
   }, [enabled]);
 
+  const setGridWidthMeasureContainer = useCallback((node: HTMLElement | null) => {
+    setGridMeasureEl(node instanceof HTMLElement ? node : null);
+  }, []);
+
   const setCatalogScrollContainer = useCallback((node: HTMLElement | null) => {
     setCatalogScrollEl(node instanceof HTMLElement ? node : null);
   }, []);
@@ -45,7 +51,7 @@ export function useCatalogToolbarLayout({
       setGridInnerWidth(null);
       return undefined;
     }
-    if (!catalogScrollEl) {
+    if (!gridMeasureEl) {
       return undefined;
     }
     let rafId: number | null = null;
@@ -63,22 +69,22 @@ export function useCatalogToolbarLayout({
       });
     };
 
-    commitWidth(catalogScrollEl.clientWidth);
+    commitWidth(gridMeasureEl.clientWidth);
 
     if (typeof ResizeObserver !== 'function') return undefined;
     const ro = new ResizeObserver((entries) => {
       const first = entries?.[0];
       const w = first?.contentRect?.width;
-      scheduleCommit(w ?? catalogScrollEl.clientWidth);
+      scheduleCommit(w ?? gridMeasureEl.clientWidth);
     });
-    ro.observe(catalogScrollEl);
+    ro.observe(gridMeasureEl);
     return () => {
       ro.disconnect();
       if (rafId != null && typeof window !== 'undefined') {
         window.cancelAnimationFrame(rafId);
       }
     };
-  }, [autoMeasureGridWidth, catalogScrollEl, enabled]);
+  }, [autoMeasureGridWidth, enabled, gridMeasureEl]);
 
   useIsomorphicLayoutEffect(() => {
     if (!enabled || !trailingToolbarEl) {
@@ -135,6 +141,7 @@ export function useCatalogToolbarLayout({
     viewportW,
     catalogScrollEl,
     setCatalogScrollContainer,
+    setGridWidthMeasureContainer,
     setTrailingToolbarContainer,
     setGridInnerWidth,
     gridInnerWidth,

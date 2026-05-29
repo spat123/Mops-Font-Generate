@@ -312,7 +312,6 @@ export const CustomSelect = forwardRef<HTMLButtonElement, CustomSelectProps>(fun
                 role="option"
                 aria-selected={isSelected}
                 aria-disabled={isOptionDisabled || undefined}
-                style={opt.style}
                 className={[
                   'group break-words border-b border-gray-200 p-3 text-left text-sm font-semibold uppercase text-gray-900 transition-colors last:border-b-0',
                   isOptionDisabled
@@ -332,7 +331,9 @@ export const CustomSelect = forwardRef<HTMLButtonElement, CustomSelectProps>(fun
                   {multiple ? (
                     <CatalogCheckboxMark checked={isSelected} inverted={isSelected} />
                   ) : null}
-                  <span className="min-w-0 flex-1 break-words">{opt.label}</span>
+                  <span className="min-w-0 flex-1 break-words" style={opt.style}>
+                    {opt.label}
+                  </span>
                   {opt?.rightLabel ? (
                     <span className="shrink-0 tabular-nums opacity-80">{String(opt.rightLabel)}</span>
                   ) : null}

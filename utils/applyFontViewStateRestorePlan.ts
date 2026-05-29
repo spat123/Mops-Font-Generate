@@ -10,6 +10,7 @@ export type ApplyFontViewStateRestorePlanArgs = {
     settings: Record<string, number>,
     isFinal: boolean,
     font: SessionFontRecord,
+    opts?: { skipSideEffects?: boolean; replaceAll?: boolean },
   ) => void;
   applyPresetStyle?: (presetName: string, font: SessionFontRecord) => void;
   /** defer CSS/preset side effects (как safeSelectFont в useFontManager). */
@@ -38,9 +39,13 @@ export function applyFontViewStateRestorePlan({
   if (!font || plan.mode === 'noop') return;
 
   if (plan.mode === 'axes') {
-    setVariableSettings?.(plan.settings);
     if (applyVariableSettings) {
-      runDeferred(() => applyVariableSettings(plan.settings, true, font), deferSideEffects);
+      runDeferred(
+        () => applyVariableSettings(plan.settings, true, font, { replaceAll: true }),
+        deferSideEffects,
+      );
+    } else {
+      setVariableSettings?.(plan.settings);
     }
     return;
   }
@@ -58,7 +63,14 @@ export function applyFontViewStateRestorePlan({
 
   if (plan.mode === 'fallback') {
     if (font.isVariableFont) {
-      setVariableSettings?.(plan.variableSettings || {});
+      const next = plan.variableSettings || {};
+      if (applyVariableSettings) {
+        // Не финальный коммит: нужно быстро выставить wght/ital в selectedFont и variableSettings,
+        // но не трогать тяжёлый `fonts` во время safeSelectFont.
+        runDeferred(() => applyVariableSettings(next, false, font, { replaceAll: true }), deferSideEffects);
+      } else {
+        setVariableSettings?.(next);
+      }
     } else {
       setVariableSettings?.({});
     }

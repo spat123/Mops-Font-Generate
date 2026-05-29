@@ -53,15 +53,13 @@ async function fetchRemoteMetadata(slug: string) {
 }
 
 async function fetchRemoteFontFileFromCdn(slug: string, subset: string, weight: string, style: string) {
+  // Важно: НЕ подменяем weight (например 900 -> 400), иначе в UI "Black не Black".
+  // Фоллбек допускаем только по subset (latin/cyrillic/greek) при том же weight/style.
   const candidates = [
     `${slug}-${subset}-${weight}-${style}.woff2`,
-    `${slug}-latin-${weight}-${style}.woff2`,
-    `${slug}-cyrillic-${weight}-${style}.woff2`,
-    `${slug}-greek-${weight}-${style}.woff2`,
-    `${slug}-${subset}-400-${style}.woff2`,
-    `${slug}-${subset}-${weight}-normal.woff2`,
-    `${slug}-latin-400-normal.woff2`,
-    `${slug}-cyrillic-400-normal.woff2`,
+    ...(subset !== 'latin' ? [`${slug}-latin-${weight}-${style}.woff2`] : []),
+    ...(subset !== 'cyrillic' ? [`${slug}-cyrillic-${weight}-${style}.woff2`] : []),
+    ...(subset !== 'greek' ? [`${slug}-greek-${weight}-${style}.woff2`] : []),
   ];
 
   for (const fileName of candidates) {
@@ -90,6 +88,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const style = firstQueryString(req.query.style) || 'normal';
   const subset = firstQueryString(req.query.subset) || 'latin';
   const metaOnly = req.query.meta === 'true';
+  const debug = req.query.debug === 'true';
 
   if (!fontFamily) {
     console.error(`[FontsourceAPI] Отсутствует fontFamily в запросе`);
@@ -117,24 +116,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const filesDir = path.join(packagePath, 'files');
       await fs.access(filesDir);
 
-      const expectedFileName = `${slug}-${subset}-${weight}-${style}.woff2`;
-      const expectedFilePath = path.join(filesDir, expectedFileName);
+      const requestedFileName = `${slug}-${subset}-${weight}-${style}.woff2`;
+      const requestedFilePath = path.join(filesDir, requestedFileName);
 
       try {
-        await fs.access(expectedFilePath);
-        fontFile = await fs.readFile(expectedFilePath);
-        actualFileName = expectedFileName;
+        await fs.access(requestedFilePath);
+        fontFile = await fs.readFile(requestedFilePath);
+        actualFileName = requestedFileName;
       } catch {
-        const allFiles = await fs.readdir(filesDir);
-
+        // Фоллбек только по subset (НЕ по weight).
         const searchPatterns = [
-          `${slug}-latin-${weight}-${style}.woff2`,
-          `${slug}-cyrillic-${weight}-${style}.woff2`,
-          `${slug}-greek-${weight}-${style}.woff2`,
-          `${slug}-${subset}-400-${style}.woff2`,
-          `${slug}-${subset}-${weight}-normal.woff2`,
-          `${slug}-latin-400-normal.woff2`,
-          `${slug}-cyrillic-400-normal.woff2`,
+          ...(subset !== 'latin' ? [`${slug}-latin-${weight}-${style}.woff2`] : []),
+          ...(subset !== 'cyrillic' ? [`${slug}-cyrillic-${weight}-${style}.woff2`] : []),
+          ...(subset !== 'greek' ? [`${slug}-greek-${weight}-${style}.woff2`] : []),
         ];
 
         for (const pattern of searchPatterns) {
@@ -148,18 +142,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Продолжаем поиск
           }
         }
-
-        if (!fontFile) {
-          const fontNameRegex = new RegExp(`^${slug}-.*\\.woff2$`, 'i');
-          const matchingFiles = allFiles.filter((file) => fontNameRegex.test(file));
-
-          if (matchingFiles.length > 0) {
-            const firstMatchingFile = matchingFiles[0];
-            const firstMatchingPath = path.join(filesDir, firstMatchingFile);
-            fontFile = await fs.readFile(firstMatchingPath);
-            actualFileName = firstMatchingFile;
-          }
-        }
+        // ВАЖНО: не подставляем “любой файл” как fallback — иначе UI выглядит как “Black не Black”.
       }
     } else {
       metadata = await fetchRemoteMetadata(slug);
@@ -185,10 +168,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: `Файл шрифта не найден для ${slug} ${weight} ${style} ${subset}` });
     }
 
+    if (debug) {
+      // eslint-disable-next-line no-console
+      console.log('[FontsourceAPI] font file', {
+        slug,
+        requested: { weight, style, subset },
+        actualFileName,
+        hasLocalPackage: Boolean(packagePath),
+      });
+    }
+
     const result = {
       metadata,
       fontData: nodeBufferToBase64(fontFile),
       actualFileName,
+      requestedFileName: `${slug}-${subset}-${weight}-${style}.woff2`,
       requestedParams: { weight, style, subset },
     };
 

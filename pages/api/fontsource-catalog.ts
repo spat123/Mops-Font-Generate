@@ -14,10 +14,20 @@ import { applyFontsourceCatalogCacheHeaders } from '../../utils/fontsourceApiCac
 import { pickCatalogPopularityScore } from '../../utils/catalogPopularityScore';
 import { fetchJsonWithTimeout } from '../../utils/fetchJsonWithTimeout';
 import { resolveServerDiskCacheFile } from '../../utils/serverDiskCachePath';
+import { normalizeFontLicenseId } from '../../utils/fontLicenseNormalize';
+import {
+  fetchFontsourceCatalogFromFontlist,
+  isFontsourceCatalogComplete,
+} from '../../utils/fontsourceCatalogCache';
 
 const FONTSOURCE_API_URL = 'https://api.fontsource.org/v1/fonts';
 const SERVER_CACHE_TTL_MS = 1000 * 60 * 60;
-const REMOTE_FETCH_TIMEOUT_MS = 30_000;
+// Fontsource API может отвечать медленно (большой JSON).
+// 60s часто не хватает и мы проваливаемся в урезанный fallback (package.json).
+const REMOTE_FETCH_TIMEOUT_MS = 120_000;
+// Если удалённый каталог недоступен, fallback (package.json) не должен триггерить
+// удалённую загрузку на каждый запрос — иначе UI “ждёт таймаут и всё равно урезано”.
+const FALLBACK_MEMORY_TTL_MS = 1000 * 60 * 10;
 const DISK_CACHE_PATH = resolveServerDiskCacheFile('fontsource-catalog-v1.json');
 const DISK_CACHE_MIN_ITEMS = 500;
 
@@ -36,6 +46,7 @@ type FontsourceCatalogItem = {
   styleCount: number;
   popularityScore: number;
   source: string;
+  license: string;
 };
 
 let serverCache: {
@@ -81,6 +92,7 @@ function normalizeRemoteItem(row: Record<string, unknown>): FontsourceCatalogIte
     styleCount: Math.max(1, (weights.length || 1) * (styles.length || 1)),
     popularityScore: pickCatalogPopularityScore(row),
     source: 'fontsource',
+    license: normalizeFontLicenseId(row.license),
   };
 }
 
@@ -127,6 +139,7 @@ async function readInstalledFontsourcePackages(): Promise<FontsourceCatalogItem[
       styleCount: 1,
       popularityScore: 0,
       source: 'fontsource',
+      license: 'unknown',
     });
   }
 
@@ -167,6 +180,33 @@ async function fetchRemoteFontsourceCatalog(): Promise<FontsourceCatalogItem[]> 
   return normalizeRemoteItems(rows);
 }
 
+let fontsourceRemoteRefresh: Promise<void> | null = null;
+
+/** Не блокирует ответ API: догружает полный каталог с fontsource.org в disk-cache. */
+function scheduleFontsourceRemoteRefresh(): void {
+  if (fontsourceRemoteRefresh) return;
+  fontsourceRemoteRefresh = (async () => {
+    try {
+      const items = await fetchRemoteFontsourceCatalog();
+      if (items.length === 0) return;
+      const now = Date.now();
+      serverCache = {
+        updatedAt: now,
+        items,
+        source: isFontsourceCatalogComplete(items) ? 'remote' : 'remote-partial',
+      };
+      if (isFontsourceCatalogComplete(items)) {
+        await writeDiskFontsourceCatalog(items);
+      }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn('[fontsource-catalog] background refresh failed:', message);
+    } finally {
+      fontsourceRemoteRefresh = null;
+    }
+  })();
+}
+
 /**
  * Полный каталог Fontsource (через API) с fallback на локально установленные пакеты.
  */
@@ -177,40 +217,82 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const now = Date.now();
+    const disk = await readDiskFontsourceCatalog();
+
+    const hasMemoryItems = Array.isArray(serverCache.items) && serverCache.items.length > 0;
+    const memoryTtl =
+      serverCache.source === 'fallback' ? FALLBACK_MEMORY_TTL_MS : SERVER_CACHE_TTL_MS;
+    // Не отдаём из RAM урезанный fallback (5 пакетов) — иначе каталог = только Google.
     const memoryFresh =
-      Array.isArray(serverCache.items) &&
-      serverCache.items.length > 0 &&
+      hasMemoryItems &&
       serverCache.source !== 'fallback' &&
-      now - serverCache.updatedAt < SERVER_CACHE_TTL_MS;
+      (serverCache.items?.length ?? 0) >= DISK_CACHE_MIN_ITEMS &&
+      now - serverCache.updatedAt < memoryTtl;
 
     if (memoryFresh) {
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       applyFontsourceCatalogCacheHeaders(res);
-      return res.status(200).json({ items: serverCache.items, cached: true, source: serverCache.source });
+      return res.status(200).json({
+        items: serverCache.items,
+        cached: true,
+        source: serverCache.source,
+        complete: isFontsourceCatalogComplete(serverCache.items),
+      });
+    }
+
+    // Полный disk-cache — сразу. Урезанный — тоже сразу + remote в фоне (иначе клиент ловит таймаут 70s).
+    if (disk?.items?.length) {
+      const complete = isFontsourceCatalogComplete(disk.items);
+      if (!complete) {
+        scheduleFontsourceRemoteRefresh();
+      }
+      serverCache = {
+        updatedAt: now,
+        items: disk.items,
+        source: complete ? 'disk' : 'disk-partial',
+      };
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      applyFontsourceCatalogCacheHeaders(res);
+      return res.status(200).json({
+        items: disk.items,
+        cached: true,
+        source: complete ? 'disk' : 'disk-partial',
+        complete,
+        refreshing: !complete,
+        diskUpdatedAt: disk.updatedAt,
+      });
     }
 
     let items: FontsourceCatalogItem[] = [];
     let source = 'remote';
     try {
       items = await fetchRemoteFontsourceCatalog();
-      if (items.length >= DISK_CACHE_MIN_ITEMS) {
+      if (isFontsourceCatalogComplete(items)) {
         await writeDiskFontsourceCatalog(items);
       }
     } catch (remoteErr) {
       const remoteMessage = remoteErr instanceof Error ? remoteErr.message : String(remoteErr);
       console.warn('[fontsource-catalog] remote failed:', remoteMessage);
-      const disk = await readDiskFontsourceCatalog();
       if (disk?.items?.length) {
+        console.warn('[fontsource-catalog] using partial disk cache:', disk.items.length);
         items = disk.items;
-        source = 'disk';
+        source = 'disk-partial';
       } else {
-        console.warn('[fontsource-catalog] fallback to package.json');
-        items = await readInstalledFontsourcePackages();
-        source = 'fallback';
+        try {
+          console.warn('[fontsource-catalog] remote failed, trying fontlist API');
+          items = await fetchFontsourceCatalogFromFontlist();
+          source = 'fontlist';
+        } catch (fontlistErr) {
+          const fontlistMessage = fontlistErr instanceof Error ? fontlistErr.message : String(fontlistErr);
+          console.warn('[fontsource-catalog] fontlist failed:', fontlistMessage);
+          console.warn('[fontsource-catalog] fallback to package.json');
+          items = await readInstalledFontsourcePackages();
+          source = 'fallback';
+        }
       }
     }
 
-    if (items.length > 0) {
+    if (items.length > 0 && source !== 'fallback') {
       serverCache = {
         updatedAt: now,
         items,
@@ -220,7 +302,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     applyFontsourceCatalogCacheHeaders(res);
-    return res.status(200).json({ items, source });
+    return res.status(200).json({
+      items,
+      source,
+      complete: isFontsourceCatalogComplete(items),
+    });
   } catch (e) {
     console.error('[fontsource-catalog]', e);
     const message = e instanceof Error ? e.message : String(e);

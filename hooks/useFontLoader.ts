@@ -9,22 +9,91 @@ import {
 import { processLocalFont } from '../utils/localFontProcessor';
 import { saveFont } from '../utils/db';
 import { base64ToArrayBuffer } from '../utils/fontManagerUtils';
+import { getFontsourceSubsetUnicodeRange } from '../utils/fontsourceSubsetUnicodeRange';
 import {
-  FONTSOURCE_UNICODE_RANGE_CYRILLIC,
-  FONTSOURCE_UNICODE_RANGE_LATIN,
-} from '../utils/fontsourceSubsetUnicodeRange';
+  normalizeCatalogSubsets,
+  parseCatalogSubsetsFromMetadata,
+  resolveDefaultCatalogSubset,
+} from '../utils/catalogActiveSubset';
 import {
   fetchFontsourceVariablePackageMetadata,
   getFontsourceMetadataPayload,
   parseFontsourceVariableAxesFromMeta,
   resolveFontsourceItalicMode,
 } from '../utils/fontsourceApiNormalize';
+import { humanizeFontsourceFamilyLabel } from '../utils/fontSlug';
+import { fontStyleDbg, isFontStyleDebugEnabled } from '../utils/fontStyleDebugLog';
+import { formatFontVariationSettings } from '../utils/fontVariationSettings';
 
 // Кэш для хранения загруженных файлов шрифтов (статических Fontsource)
-const fontFaceCache = new Map();
+const fontFaceCache = new Map<string, unknown>();
+const FONTSOURCE_VF_PICK_VERSION = 'v2';
+// Кэш VF-слайсов (subset/style -> blobUrl). Нужен, чтобы:
+// - при переключении subset не перекачивать одно и то же;
+// - не “ломать” глифы/начертания из‑за сетевых флапов;
+// - сделать переключение языков мгновенным после первого скачивания.
+const fontsourceVfSliceCache = new Map<
+  string,
+  { blob: Blob; fileExtension: string; blobUrl: string; fileName: string }
+>();
 
-// Хеш-функция для создания уникальных ключей кэширования
-const createCacheKey = (fontFamily, weight, style) => `fontsource_${fontFamily}_${weight}_${style}`;
+const createCacheKey = (fontFamily: string, subset: string, weight: number, style: string) =>
+  `fontsource_${fontFamily}_${subset}_${weight}_${style}`;
+
+// Сабсеты “надстройки” над латиницей: файл сабсета часто НЕ содержит базовые ASCII-символы.
+// Для них подгружаем latin + сабсет, чтобы ABC/123 не уходили в fallback.
+// Для `cyrillic`/`greek` тоже добавляем latin, иначе UI-строки (Thin/Black/Italic) рисуются системным шрифтом.
+const ADDITIVE_LATIN_SUBSETS = new Set(['latin-ext', 'vietnamese', 'cyrillic', 'cyrillic-ext', 'greek', 'greek-ext']);
+
+function buildFontsourceSubsetLoadPlan(
+  requestedSubset: string,
+  catalogSubsets: unknown,
+): string[] {
+  const req = String(requestedSubset || '').trim().toLowerCase() || 'latin';
+  const allowed = normalizeCatalogSubsets(catalogSubsets as string[] | undefined);
+  if (!allowed.length) return [req];
+  if (!allowed.includes(req)) return [resolveDefaultCatalogSubset(allowed)];
+  if (req !== 'latin' && ADDITIVE_LATIN_SUBSETS.has(req) && allowed.includes('latin')) {
+    return ['latin', req];
+  }
+  return [req];
+}
+
+function removeFontsourceInjectedStyles(slug: string) {
+  if (typeof document === 'undefined') return;
+  const token = String(slug || '').trim();
+  if (!token) return;
+  document.querySelectorAll(`style[data-mops-fontsource="${CSS.escape(token)}"]`).forEach((el) => {
+    el.remove();
+  });
+}
+
+function clearFontsourceStyleCache(slug: string) {
+  const prefix = `fontsource_${String(slug || '').trim()}_`;
+  for (const key of [...fontFaceCache.keys()]) {
+    if (key.startsWith(prefix)) fontFaceCache.delete(key);
+  }
+}
+
+type FontsourceFaceCacheEntry = {
+  blobUrls?: string[];
+  styleElement?: HTMLStyleElement;
+  weight?: number;
+  style?: string;
+};
+
+function isFontsourceCacheEntryLive(entry: unknown): boolean {
+  if (!entry || typeof entry !== 'object') return false;
+  const el = (entry as FontsourceFaceCacheEntry).styleElement;
+  return el instanceof HTMLStyleElement && el.isConnected;
+}
+
+function resolveFontsourceActiveSubset(fontObj: SessionFontRecord): string {
+  const fromFont = String(fontObj?.activeSubset || '').trim().toLowerCase();
+  if (fromFont) return fromFont;
+  const catalog = Array.isArray(fontObj?.catalogSubsets) ? fontObj.catalogSubsets : [];
+  return resolveDefaultCatalogSubset(catalog as string[]);
+}
 
 /** Локальные файлы и Fontsource: парсинг, стили, выбор после загрузки. */
 export function useFontLoader(
@@ -40,14 +109,28 @@ export function useFontLoader(
       return returnBlob ? null : undefined;
     }
 
-    const cacheKey = createCacheKey(fontFamily, weight, style);
+    const requestedSubset = resolveFontsourceActiveSubset(fontObj);
+    const subsetPlan = buildFontsourceSubsetLoadPlan(requestedSubset, fontObj?.catalogSubsets);
+    const cacheKey = createCacheKey(fontFamily, subsetPlan.join('+'), weight, style);
 
     if (!returnBlob && fontFaceCache.has(cacheKey)) {
-      const cachedData = fontFaceCache.get(cacheKey);
-      if (fontObj.loadedStyles && !fontObj.loadedStyles.some(s => s.weight === weight && s.style === style)) {
-        fontObj.loadedStyles.push({ weight, style, cached: true });
+      const cachedData = fontFaceCache.get(cacheKey) as FontsourceFaceCacheEntry | undefined;
+      if (isFontsourceCacheEntryLive(cachedData)) {
+        fontStyleDbg('Fontsource style cache hit', {
+          cacheKey,
+          fontFamily,
+          fontId: fontObj?.id,
+          requestedSubset,
+          subsetPlan,
+          weight,
+          style,
+        });
+        if (fontObj.loadedStyles && !fontObj.loadedStyles.some((s) => s.weight === weight && s.style === style)) {
+          fontObj.loadedStyles.push({ weight, style, cached: true });
+        }
+        return returnBlob ? null : undefined;
       }
-      return returnBlob ? null : undefined;
+      fontFaceCache.delete(cacheKey);
     }
 
     let blob = null;
@@ -63,7 +146,8 @@ export function useFontLoader(
     };
 
     const fetchFontsourceSubset = async (subset) => {
-      const apiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?weight=${weight}&style=${style}&subset=${encodeURIComponent(subset)}`;
+      const debug = isFontStyleDebugEnabled() ? '&debug=true' : '';
+      const apiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?weight=${weight}&style=${style}&subset=${encodeURIComponent(subset)}${debug}`;
       const response = await fetch(apiUrl);
       if (!response.ok) return null;
       const contentType = response.headers.get('content-type');
@@ -78,20 +162,40 @@ export function useFontLoader(
       const fontBufferBase64 = parsed.fontBufferBase64 ?? parsed.fontData;
       const fileName = parsed.fileName ?? parsed.actualFileName;
       if (!fontBufferBase64) return null;
+      fontStyleDbg('Fontsource subset payload', {
+        apiUrl,
+        requestedSubset,
+        subset,
+        fileName,
+        responseLen: typeof responseText === 'string' ? responseText.length : -1,
+      });
       return { fontBufferBase64, fileName: String(fileName || '') };
     };
 
     try {
       const fontFamilyName = fontObj.fontFamily || fontFamily;
+      fontStyleDbg('Fontsource load style start', {
+        fontFamily,
+        fontFamilyName,
+        fontId: fontObj?.id,
+        requestedSubset,
+        subsetPlan,
+        weight,
+        style,
+        returnBlob,
+      });
 
-      const latinRow = await fetchFontsourceSubset('latin');
-      if (!latinRow) {
-        throw new Error('Ошибка HTTP или пустой ответ для subset=latin');
+      const rows: Array<{ subset: string; row: { fontBufferBase64: string; fileName: string } }> = [];
+      for (const s of subsetPlan) {
+        // eslint-disable-next-line no-await-in-loop
+        const row = await fetchFontsourceSubset(s);
+        if (!row) {
+          throw new Error(`Ошибка HTTP или пустой ответ для subset=${s}`);
+        }
+        rows.push({ subset: s, row });
       }
 
-      const cyrillicRow = await fetchFontsourceSubset('cyrillic');
-
-      const makeBlobUrl = (row) => {
+      const makeBlobUrl = (row: { fontBufferBase64: string; fileName: string }) => {
         const fontBuffer = base64ToArrayBuffer(row.fontBufferBase64);
         const mimeType = `font/${getFormatFromExtension(row.fileName || '.woff2')}`;
         const b = new Blob([fontBuffer], { type: mimeType });
@@ -100,51 +204,32 @@ export function useFontLoader(
         return { url: u, fileName: row.fileName, fmt: formatCssFromFileName(row.fileName) };
       };
 
-      const latin = makeBlobUrl(latinRow);
-      let cyrillic = null;
-      if (cyrillicRow) {
-        try {
-          cyrillic = makeBlobUrl(cyrillicRow);
-        } catch (e) {
-          console.warn(`[FontLoader] Cyrillic subset пропущен для ${fontFamily} ${weight} ${style}:`, e?.message || e);
-        }
-      }
-
-      blob = new Blob([base64ToArrayBuffer(latinRow.fontBufferBase64)], {
-        type: `font/${getFormatFromExtension(latinRow.fileName || '.woff2')}`,
-      });
-
-      if (fontObj && cyrillicRow && !(fontObj.fontsourceCyrillicFile instanceof Blob)) {
-        try {
-          fontObj.fontsourceCyrillicFile = new Blob([base64ToArrayBuffer(cyrillicRow.fontBufferBase64)], {
-            type: `font/${getFormatFromExtension(cyrillicRow.fileName || '.woff2')}`,
-          });
-        } catch (persistCyErr) {
-          console.warn(`[FontLoader] Не удалось сохранить cyrillic blob для ${fontFamily}:`, persistCyErr?.message || persistCyErr);
-        }
-      }
-
       const ffName = JSON.stringify(fontFamilyName);
-      const rules = [
-        `@font-face {
+      const rules: string[] = [];
+      let primaryRow = rows.find((r) => r.subset === requestedSubset)?.row || rows[rows.length - 1]?.row || null;
+      if (!primaryRow) primaryRow = rows[0]?.row || null;
+      if (primaryRow) {
+        blob = new Blob([base64ToArrayBuffer(primaryRow.fontBufferBase64)], {
+          type: `font/${getFormatFromExtension(primaryRow.fileName || '.woff2')}`,
+        });
+      }
+
+      for (const { subset: s, row } of rows) {
+        const slice = makeBlobUrl(row);
+        const unicodeRange = getFontsourceSubsetUnicodeRange(s);
+        const unicodeLine = unicodeRange ? `\n          unicode-range: ${unicodeRange};` : '';
+        rules.push(
+          `@font-face {
           font-family: ${ffName};
-          src: url('${latin.url}') format('${latin.fmt}');
+          src: url('${slice.url}') format('${slice.fmt}');
           font-weight: ${weight};
-          font-style: ${style};
-          unicode-range: ${FONTSOURCE_UNICODE_RANGE_LATIN};
+          font-style: ${style};${unicodeLine}
         }`,
-      ];
-      if (cyrillic) {
-        rules.push(`@font-face {
-          font-family: ${ffName};
-          src: url('${cyrillic.url}') format('${cyrillic.fmt}');
-          font-weight: ${weight};
-          font-style: ${style};
-          unicode-range: ${FONTSOURCE_UNICODE_RANGE_CYRILLIC};
-        }`);
+        );
       }
 
       const styleElement = document.createElement('style');
+      styleElement.setAttribute('data-mops-fontsource', String(fontFamily));
       styleElement.textContent = rules.join('\n');
       document.head.appendChild(styleElement);
 
@@ -154,12 +239,27 @@ export function useFontLoader(
       const loadSpec = `${fontStyleToken} ${weight} 16px ${ffName}`;
       try {
         await document.fonts.load(loadSpec);
+        fontStyleDbg('Fontsource document.fonts.load OK', {
+          loadSpec,
+          fontFamilyName,
+          weight,
+          style,
+          requestedSubset,
+        });
         if (fontObj.loadedStyles && !fontObj.loadedStyles.some((s) => s.weight === weight && s.style === style)) {
           fontObj.loadedStyles.push({ weight, style, cached: false });
         }
         return returnBlob ? blob : undefined;
       } catch (loadError) {
         console.warn(`Не удалось дождаться загрузки шрифта для ${fontFamily} ${weight} ${style}:`, loadError);
+        fontStyleDbg('Fontsource document.fonts.load FAIL', {
+          loadSpec,
+          fontFamilyName,
+          weight,
+          style,
+          requestedSubset,
+          err: String(loadError),
+        });
         for (const u of blobUrls) {
           try {
             URL.revokeObjectURL(u);
@@ -173,10 +273,17 @@ export function useFontLoader(
           // noop
         }
         fontFaceCache.delete(cacheKey);
-        return returnBlob ? null : undefined;
+        return null;
       }
     } catch (error) {
       console.error(`Ошибка при загрузке стиля ${fontFamily} ${weight} ${style}:`, error);
+      fontStyleDbg('Fontsource load style exception', {
+        fontFamily,
+        weight,
+        style,
+        requestedSubset,
+        err: error instanceof Error ? error.message : String(error),
+      });
       for (const u of blobUrls) {
         try {
           URL.revokeObjectURL(u);
@@ -184,12 +291,16 @@ export function useFontLoader(
           // noop
         }
       }
-      if (returnBlob) return null;
-      else throw error;
+      return null;
     }
   }, []);
 
-  const loadAllFontsourceStyles = useCallback(async (fontFamily, forceVariableFont = false) => {
+  const loadAllFontsourceStyles = useCallback(async (
+    fontFamily,
+    forceVariableFont = false,
+    options: { silent?: boolean } = {},
+  ) => {
+    const silent = options?.silent === true;
     try {
       const metaApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}?meta=true`;
 
@@ -223,8 +334,9 @@ export function useFontLoader(
         }
       }
 
-      const familyLabel =
-        metadataPayload?.family || metadata?.family || fontFamily;
+      const familyLabel = humanizeFontsourceFamilyLabel(
+        metadataPayload?.family || metadata?.family || fontFamily,
+      );
       const displayName = actualIsVariableFont
         ? `${familyLabel} Variable`
         : familyLabel;
@@ -242,6 +354,9 @@ export function useFontLoader(
         ? resolveFontsourceItalicMode(parsedVariableAxes, hasItalicStyles)
         : 'none';
 
+      const catalogSubsets = parseCatalogSubsetsFromMetadata(metadataPayload);
+      const activeSubset = resolveDefaultCatalogSubset(catalogSubsets);
+
       const fontObj: SessionFontRecord = {
         id: fontId,
         name: fontFamily,
@@ -255,6 +370,8 @@ export function useFontLoader(
         hasItalicStyles,
         availableStyles: [],
         loadedStyles: [],
+        catalogSubsets,
+        activeSubset,
         file: undefined,
         url: undefined,
       };
@@ -263,8 +380,21 @@ export function useFontLoader(
         try {
           const cssFmt = (ext) => (ext === 'ttf' ? 'truetype' : ext === 'otf' ? 'opentype' : ext);
 
-          const loadVariableStylePayload = async (targetStyle = 'normal', subset = 'latin', softFail = false) => {
-            const variableApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}/variable?subset=${encodeURIComponent(subset)}&style=${encodeURIComponent(targetStyle)}&forceVariable=true`;
+          const loadVariableStylePayload = async (targetStyle = 'normal', subset = activeSubset, softFail = false) => {
+            const debug = isFontStyleDebugEnabled() ? '&debug=true' : '';
+            // `pick=v2` — cache-buster и версия алгоритма подбора VF-файла на сервере.
+            const variableApiUrl = `/api/fontsource/${encodeURIComponent(fontFamily)}/variable?subset=${encodeURIComponent(subset)}&style=${encodeURIComponent(targetStyle)}&forceVariable=true&pick=v2${debug}`;
+            const cacheKey = `vf:${String(fontFamily)}:${String(targetStyle)}:${String(subset)}`;
+            const cached = fontsourceVfSliceCache.get(cacheKey);
+            if (cached?.blobUrl) {
+              fontStyleDbg('Fontsource VF slice cache hit', {
+                fontFamily,
+                subset,
+                style: targetStyle,
+                fileName: cached.fileName,
+              });
+              return cached;
+            }
             const fontFileResponse = await fetch(variableApiUrl);
             if (!fontFileResponse.ok) {
               if (softFail) return null;
@@ -282,74 +412,145 @@ export function useFontLoader(
             const mimeType = `font/${fileExtension === 'ttf' ? 'ttf' : fileExtension === 'otf' ? 'otf' : fileExtension === 'woff' ? 'woff' : 'woff2'}`;
             const blob = new Blob([fontBuffer], { type: mimeType });
             const blobUrl = URL.createObjectURL(blob);
-            return { blob, fileExtension, blobUrl };
+            fontStyleDbg('Fontsource VF slice payload', {
+              fontFamily,
+              subset,
+              style: targetStyle,
+              fileName,
+              blobSize: blob.size,
+            });
+            const out = { blob, fileExtension, blobUrl, fileName };
+            fontsourceVfSliceCache.set(cacheKey, out);
+            return out;
           };
 
-          const normalLatin = await loadVariableStylePayload('normal', 'latin', false);
-          const normalCyrillic = await loadVariableStylePayload('normal', 'cyrillic', true);
+          const subsetPlan = buildFontsourceSubsetLoadPlan(activeSubset, catalogSubsets);
+          // Важно: при повторных загрузках/сменах алгоритма подбора VF-файла удаляем старые @font-face,
+          // иначе браузер может продолжать использовать первый (ошибочно подобранный) face.
+          removeFontsourceInjectedStyles(fontFamily);
+          const normalPayloads: Array<{ subset: string; payload: { blob: Blob; fileExtension: string; blobUrl: string } }> = [];
+          for (const s of subsetPlan) {
+            // eslint-disable-next-line no-await-in-loop
+            const p = await loadVariableStylePayload('normal', s, false);
+            if (!p) throw new Error(`Не удалось загрузить VF subset=${s}`);
+            normalPayloads.push({ subset: s, payload: p });
+          }
+          const primaryNormal =
+            normalPayloads.find((p) => p.subset === activeSubset)?.payload ||
+            normalPayloads[normalPayloads.length - 1]?.payload;
 
-          fontObj.file = normalLatin.blob;
-          fontObj.url = normalLatin.blobUrl;
-          if (normalCyrillic) {
-            fontObj.fontsourceCyrillicFile = normalCyrillic.blob;
+          fontObj.file = primaryNormal?.blob;
+          fontObj.url = primaryNormal?.blobUrl;
+          fontObj.fontsourceSubsetBlobUrls = normalPayloads.map((p) => p.payload.blobUrl);
+          fontObj.fontsourceVfFiles = normalPayloads.map((p) => ({ subset: p.subset, fileName: p.payload.fileName }));
+          fontObj.fontsourceVfPickVersion = FONTSOURCE_VF_PICK_VERSION;
+
+          // Стартовое состояние VF (чтобы превью не мигало "Thin" до restore-plan).
+          const defaultAxisSettings = Object.entries(parsedVariableAxes || {}).reduce<Record<string, number>>(
+            (acc, [tag, axis]) => {
+              const def = Number((axis as any)?.default);
+              if (Number.isFinite(def)) acc[tag] = def;
+              return acc;
+            },
+            {},
+          );
+          if (Object.keys(defaultAxisSettings).length > 0) {
+            fontObj.lastUsedVariableSettings = defaultAxisSettings;
+            fontObj.variationSettings = formatFontVariationSettings(defaultAxisSettings, { fallback: 'normal' });
+            const w = Number(defaultAxisSettings.wght);
+            if (Number.isFinite(w)) fontObj.currentWeight = Math.round(w);
+            if (fontObj.currentStyle == null) fontObj.currentStyle = 'normal';
           }
 
+          const wghtAxis = parsedVariableAxes?.wght;
+          const wMin = wghtAxis && Number.isFinite(Number(wghtAxis.min)) ? Number(wghtAxis.min) : 100;
+          const wMax = wghtAxis && Number.isFinite(Number(wghtAxis.max)) ? Number(wghtAxis.max) : 900;
+          const wLo = Math.min(wMin, wMax);
+          const wHi = Math.max(wMin, wMax);
+
           const ff = JSON.stringify(displayName);
-          const normalRules = [
-            `@font-face {
-                  font-family: ${ff};
-                  src: url('${normalLatin.blobUrl}') format('${cssFmt(normalLatin.fileExtension)}');
-                  font-style: normal;
-                  font-display: swap;
-                  unicode-range: ${FONTSOURCE_UNICODE_RANGE_LATIN};
-              }`,
-          ];
-          if (normalCyrillic) {
+          const normalRules: string[] = [];
+          for (const { subset: s, payload } of normalPayloads) {
+            const unicode = getFontsourceSubsetUnicodeRange(s);
+            const unicodeLine = unicode ? `\n                  unicode-range: ${unicode};` : '';
             normalRules.push(`@font-face {
                   font-family: ${ff};
-                  src: url('${normalCyrillic.blobUrl}') format('${cssFmt(normalCyrillic.fileExtension)}');
+                  src: url('${payload.blobUrl}') format('${cssFmt(payload.fileExtension)}');
+                  font-weight: ${wLo} ${wHi};
                   font-style: normal;
-                  font-display: swap;
-                  unicode-range: ${FONTSOURCE_UNICODE_RANGE_CYRILLIC};
+                  font-display: swap;${unicodeLine}
               }`);
           }
 
           const styleElement = document.createElement('style');
+          styleElement.setAttribute('data-mops-fontsource', String(fontFamily));
+          styleElement.setAttribute('data-mops-fontsource-kind', 'vf-normal');
           styleElement.textContent = normalRules.join('\n');
           document.head.appendChild(styleElement);
 
           if (italicMode === 'separate-style' && hasItalicStyles) {
             try {
-              const italicLatin = await loadVariableStylePayload('italic', 'latin', false);
-              const italicCyrillic = await loadVariableStylePayload('italic', 'cyrillic', true);
-              const italicRules = [
-                `@font-face {
-                    font-family: ${ff};
-                    src: url('${italicLatin.blobUrl}') format('${cssFmt(italicLatin.fileExtension)}');
-                    font-style: italic;
-                    font-display: swap;
-                    unicode-range: ${FONTSOURCE_UNICODE_RANGE_LATIN};
-                }`,
-              ];
-              if (italicCyrillic) {
+              const italicPayloads: Array<{ subset: string; payload: { blob: Blob; fileExtension: string; blobUrl: string } }> = [];
+              for (const s of subsetPlan) {
+                // eslint-disable-next-line no-await-in-loop
+                const p = await loadVariableStylePayload('italic', s, false);
+                if (!p) throw new Error(`Не удалось загрузить italic VF subset=${s}`);
+                italicPayloads.push({ subset: s, payload: p });
+              }
+              const italicRules: string[] = [];
+              for (const { subset: s, payload } of italicPayloads) {
+                const unicode = getFontsourceSubsetUnicodeRange(s);
+                const unicodeLine = unicode ? `\n                    unicode-range: ${unicode};` : '';
                 italicRules.push(`@font-face {
                     font-family: ${ff};
-                    src: url('${italicCyrillic.blobUrl}') format('${cssFmt(italicCyrillic.fileExtension)}');
+                    src: url('${payload.blobUrl}') format('${cssFmt(payload.fileExtension)}');
+                    font-weight: ${wLo} ${wHi};
                     font-style: italic;
-                    font-display: swap;
-                    unicode-range: ${FONTSOURCE_UNICODE_RANGE_CYRILLIC};
+                    font-display: swap;${unicodeLine}
                 }`);
               }
               const italicStyleElement = document.createElement('style');
+              italicStyleElement.setAttribute('data-mops-fontsource', String(fontFamily));
+              italicStyleElement.setAttribute('data-mops-fontsource-kind', 'vf-italic');
               italicStyleElement.textContent = italicRules.join('\n');
               document.head.appendChild(italicStyleElement);
-              fontObj.fontsourceItalicLatinFile = italicLatin.blob;
-              if (italicCyrillic) {
-                fontObj.fontsourceItalicCyrillicFile = italicCyrillic.blob;
-              }
+              // Сохраняем один blob (для совместимости с остальным кодом).
+              fontObj.fontsourceItalicLatinFile = italicPayloads[0]?.payload?.blob;
+              fontObj.fontsourceVfItalicFiles = italicPayloads.map((p) => ({ subset: p.subset, fileName: p.payload.fileName }));
             } catch (italicLoadError) {
               console.warn(`[FontLoader] Не удалось догрузить italic-face для ${displayName}:`, italicLoadError);
             }
+          }
+
+          // Prefetch остальных subset-ов в фоне: чтобы “переключение языка” не дёргало сеть бесконечно.
+          const allAllowed = normalizeCatalogSubsets(catalogSubsets as string[] | undefined);
+          const remaining = allAllowed.filter((s) => !subsetPlan.includes(s));
+          if (remaining.length > 0) {
+            fontStyleDbg('Fontsource VF subset prefetch scheduled', {
+              fontFamily,
+              activeSubset,
+              subsetPlan,
+              remainingCount: remaining.length,
+              remaining: remaining.slice(0, 20),
+            });
+            setTimeout(() => {
+              void (async () => {
+                for (const s of remaining) {
+                  // eslint-disable-next-line no-await-in-loop
+                  const p = await loadVariableStylePayload('normal', s, true);
+                  if (!p || !styleElement.isConnected) continue;
+                  const unicode = getFontsourceSubsetUnicodeRange(s);
+                  const unicodeLine = unicode ? `\n                  unicode-range: ${unicode};` : '';
+                  styleElement.textContent += `\n@font-face {
+                  font-family: ${ff};
+                  src: url('${p.blobUrl}') format('${cssFmt(p.fileExtension)}');
+                  font-weight: ${wLo} ${wHi};
+                  font-style: normal;
+                  font-display: swap;${unicodeLine}
+              }`;
+                }
+              })();
+            }, 0);
           }
 
         } catch (loadError) {
@@ -394,9 +595,11 @@ export function useFontLoader(
           } else {
             console.warn(`[FontLoader] Не удалось получить Blob для основного стиля ${displayName}. Глифы могут быть недоступны.`);
           }
-        } catch (mainStyleError) {
+          } catch (mainStyleError) {
             console.error(`[FontLoader] Критическая ошибка при загрузке основного стиля ${displayName}:`, mainStyleError);
-            toast.error(`Ошибка загрузки основного стиля ${displayName}. Глифы будут недоступны.`);
+            if (!silent) {
+              toast.error(`Ошибка загрузки основного стиля ${displayName}. Глифы будут недоступны.`);
+            }
         }
 
         // Загружаем остальные стили в фоне
@@ -417,7 +620,9 @@ export function useFontLoader(
       return fontObj;
     } catch (error) {
       console.error(`[FontLoader] Ошибка при загрузке всех стилей шрифта ${fontFamily}:`, error);
-      toast.error(`Не удалось загрузить шрифт ${fontFamily}: ${error.message}`);
+      if (!silent) {
+        toast.error(`Не удалось загрузить шрифт ${fontFamily}: ${error.message}`);
+      }
       throw error; // Пробрасываем ошибку для обработки в вызывающей функции
     }
   }, [setFonts, loadFontStyleVariant, findStyleInfoByWeightAndStyle]);
@@ -499,6 +704,26 @@ export function useFontLoader(
       });
 
       if (existingFont) {
+        // Если ранее VF был подобран неверно (например, вместо VF подсунули Thin static),
+        // принудительно перезагружаем при запросе VF.
+        const existingPick = (existingFont as any)?.fontsourceVfPickVersion;
+        const shouldReloadVf =
+          forceVariableFont === true &&
+          existingFont?.source === 'fontsource' &&
+          existingFont?.isVariableFont === true &&
+          existingPick !== FONTSOURCE_VF_PICK_VERSION;
+        if (shouldReloadVf) {
+          setIsLoading(true);
+          const reloaded = await loadAllFontsourceStyles(fontFamilyName, forceVariableFont, options);
+          if (reloaded) {
+            await saveFont(reloaded);
+            setFonts((prev) => prev.map((f) => (f.id === existingFont.id ? reloaded : f)));
+            if (!noSelect && typeof safeSelectFont === 'function') {
+              safeSelectFont(reloaded);
+            }
+            return reloaded;
+          }
+        }
         if (!noSelect && typeof safeSelectFont === 'function') {
           safeSelectFont(existingFont);
           if (!silent) {
@@ -509,7 +734,7 @@ export function useFontLoader(
       }
 
       setIsLoading(true);
-      const fontObj = await loadAllFontsourceStyles(fontFamilyName, forceVariableFont);
+      const fontObj = await loadAllFontsourceStyles(fontFamilyName, forceVariableFont, options);
 
       if (fontObj) {
         await saveFont(fontObj); // Сохраняем в DB
@@ -533,9 +758,221 @@ export function useFontLoader(
     }
   }, [currentFonts, setIsLoading, setFonts, safeSelectFont, loadAllFontsourceStyles, saveFont]);
 
+  const applyFontsourceActiveSubset = useCallback(
+    async (font: SessionFontRecord, subset: string) => {
+      if (!font || font.source !== 'fontsource') return font;
+      const slug = String(font.name || '').trim();
+      const nextSubset = String(subset || '').trim().toLowerCase();
+      if (!slug || !nextSubset) return font;
+      const allowed = normalizeCatalogSubsets(font.catalogSubsets as string[] | undefined);
+      if (allowed.length > 0 && !allowed.includes(nextSubset)) return font;
+      if (font.activeSubset === nextSubset) return font;
+
+      removeFontsourceInjectedStyles(slug);
+      clearFontsourceStyleCache(slug);
+
+      const working: SessionFontRecord = {
+        ...font,
+        activeSubset: nextSubset,
+        loadedStyles: [],
+      };
+
+      try {
+        if (font.isVariableFont) {
+          const subsetPlan = buildFontsourceSubsetLoadPlan(nextSubset, font.catalogSubsets);
+          const cssFmt = (ext: string) => (ext === 'ttf' ? 'truetype' : ext === 'otf' ? 'opentype' : ext);
+          const displayName = font.displayName || font.fontFamily || slug;
+          const wghtAxis = font?.variableAxes && typeof font.variableAxes === 'object' ? (font.variableAxes as any).wght : null;
+          const wMin = wghtAxis && Number.isFinite(Number(wghtAxis.min)) ? Number(wghtAxis.min) : 100;
+          const wMax = wghtAxis && Number.isFinite(Number(wghtAxis.max)) ? Number(wghtAxis.max) : 900;
+          const wLo = Math.min(wMin, wMax);
+          const wHi = Math.max(wMin, wMax);
+          const loadVariableStylePayload = async (
+            targetStyle = 'normal',
+            subsetKey: string = nextSubset,
+            softFail = false,
+          ) => {
+            const debug = isFontStyleDebugEnabled() ? '&debug=true' : '';
+            const variableApiUrl = `/api/fontsource/${encodeURIComponent(slug)}/variable?subset=${encodeURIComponent(subsetKey)}&style=${encodeURIComponent(targetStyle)}&forceVariable=true&pick=${encodeURIComponent(FONTSOURCE_VF_PICK_VERSION)}${debug}`;
+            const cacheKey = `vf:${String(slug)}:${String(targetStyle)}:${String(subsetKey)}`;
+            const cached = fontsourceVfSliceCache.get(cacheKey);
+            if (cached?.blobUrl) {
+              fontStyleDbg('Fontsource VF slice cache hit (subset switch)', {
+                fontFamily: slug,
+                subset: subsetKey,
+                style: targetStyle,
+                fileName: cached.fileName,
+              });
+              return cached;
+            }
+            const fontFileResponse = await fetch(variableApiUrl);
+            if (!fontFileResponse.ok) {
+              if (softFail) return null;
+              throw new Error(`Не удалось загрузить VF (статус ${fontFileResponse.status})`);
+            }
+            const variablePayload = await fontFileResponse.json();
+            const fontBufferBase64 = variablePayload?.fontBufferBase64;
+            const fileName = String(variablePayload?.fileName || '');
+            if (!fontBufferBase64) {
+              if (softFail) return null;
+              throw new Error('Пустой буфер вариативного шрифта');
+            }
+            const fontBuffer = base64ToArrayBuffer(fontBufferBase64);
+            const fileExtension = fileName.split('.').pop()?.toLowerCase() || 'woff2';
+            const mimeType = `font/${fileExtension === 'ttf' ? 'ttf' : fileExtension === 'otf' ? 'otf' : fileExtension === 'woff' ? 'woff' : 'woff2'}`;
+            const blob = new Blob([fontBuffer], { type: mimeType });
+            const blobUrl = URL.createObjectURL(blob);
+            fontStyleDbg('Fontsource VF subset switch slice payload', {
+              fontFamily: slug,
+              subset: subsetKey,
+              style: targetStyle,
+              fileName,
+              blobSize: blob.size,
+            });
+            const out = { blob, fileExtension, blobUrl, fileName };
+            fontsourceVfSliceCache.set(cacheKey, out);
+            return out;
+          };
+
+          const ff = JSON.stringify(displayName);
+
+          const normalPayloads: Array<{
+            subset: string;
+            payload: { blob: Blob; fileExtension: string; blobUrl: string; fileName: string };
+          }> = [];
+          for (const s of subsetPlan) {
+            // eslint-disable-next-line no-await-in-loop
+            const p = await loadVariableStylePayload('normal', s, false);
+            normalPayloads.push({ subset: s, payload: p });
+          }
+          const primaryNormal =
+            normalPayloads.find((p) => p.subset === nextSubset)?.payload || normalPayloads[normalPayloads.length - 1]?.payload;
+
+          working.file = primaryNormal?.blob;
+          working.url = primaryNormal?.blobUrl;
+          working.fontsourceSubsetBlobUrls = normalPayloads.map((p) => p.payload.blobUrl);
+          (working as any).fontsourceVfFiles = normalPayloads.map((p) => ({ subset: p.subset, fileName: p.payload.fileName }));
+          (working as any).fontsourceVfPickVersion = FONTSOURCE_VF_PICK_VERSION;
+
+          const normalRules: string[] = [];
+          for (const { subset: s, payload } of normalPayloads) {
+            const unicode = getFontsourceSubsetUnicodeRange(s);
+            const unicodeLine = unicode ? `\n                  unicode-range: ${unicode};` : '';
+            normalRules.push(`@font-face {
+                  font-family: ${ff};
+                  src: url('${payload.blobUrl}') format('${cssFmt(payload.fileExtension)}');
+                  font-weight: ${wLo} ${wHi};
+                  font-style: normal;
+                  font-display: swap;${unicodeLine}
+              }`);
+          }
+          const styleElement = document.createElement('style');
+          styleElement.setAttribute('data-mops-fontsource', slug);
+          styleElement.setAttribute('data-mops-fontsource-kind', 'vf-normal');
+          styleElement.textContent = normalRules.join('\n');
+          document.head.appendChild(styleElement);
+          fontStyleDbg('Fontsource VF subset switch injected faces', {
+            fontFamily: slug,
+            displayName,
+            subsetPlan,
+            normalFiles: normalPayloads.map((p) => ({ subset: p.subset, fileName: p.payload.fileName })),
+            normalRuleChars: styleElement.textContent?.length ?? -1,
+          });
+
+          if (font.italicMode === 'separate-style' && font.hasItalicStyles) {
+            const italicPayloads: Array<{
+              subset: string;
+              payload: { blob: Blob; fileExtension: string; blobUrl: string; fileName: string };
+            }> = [];
+            for (const s of subsetPlan) {
+              // eslint-disable-next-line no-await-in-loop
+              const p = await loadVariableStylePayload('italic', s, false);
+              italicPayloads.push({ subset: s, payload: p });
+            }
+            const italicRules: string[] = [];
+            for (const { subset: s, payload } of italicPayloads) {
+              const unicode = getFontsourceSubsetUnicodeRange(s);
+              const unicodeLine = unicode ? `\n                  unicode-range: ${unicode};` : '';
+              italicRules.push(`@font-face {
+                  font-family: ${ff};
+                  src: url('${payload.blobUrl}') format('${cssFmt(payload.fileExtension)}');
+                  font-weight: ${wLo} ${wHi};
+                  font-style: italic;
+                  font-display: swap;${unicodeLine}
+              }`);
+            }
+            const italicStyleElement = document.createElement('style');
+            italicStyleElement.setAttribute('data-mops-fontsource', slug);
+            italicStyleElement.setAttribute('data-mops-fontsource-kind', 'vf-italic');
+            italicStyleElement.textContent = italicRules.join('\n');
+            document.head.appendChild(italicStyleElement);
+            (working as any).fontsourceVfItalicBlobUrls = italicPayloads.map((p) => p.payload.blobUrl);
+            (working as any).fontsourceVfItalicFiles = italicPayloads.map((p) => ({ subset: p.subset, fileName: p.payload.fileName }));
+            working.fontsourceItalicLatinFile = italicPayloads[0]?.payload?.blob;
+            fontStyleDbg('Fontsource VF subset switch injected italic faces', {
+              fontFamily: slug,
+              subsetPlan,
+              italicFiles: italicPayloads.map((p) => ({ subset: p.subset, fileName: p.payload.fileName })),
+              italicRuleChars: italicStyleElement.textContent?.length ?? -1,
+            });
+          }
+
+          // Важно: при смене subset сначала инжектим новые @font-face и ждём, пока браузер их подхватит,
+          // и НЕ ревокаем VF blob URL (они кэшируются, чтобы не перекачивать и не “ломаться” при флапах сети).
+          try {
+            const loadStyle = String(working.currentStyle || 'normal') === 'italic' ? 'italic' : 'normal';
+            const loadWeight = Number(working.currentWeight) || 400;
+            const loadSpec = `${loadStyle} ${loadWeight} 16px ${ff}`;
+            await document.fonts.load(loadSpec);
+            fontStyleDbg('Fontsource VF subset switch document.fonts.load OK', {
+              fontFamily: slug,
+              displayName,
+              loadSpec,
+              loadWeight,
+              loadStyle,
+            });
+          } catch (e) {
+            fontStyleDbg('Fontsource VF subset switch document.fonts.load FAIL', {
+              fontFamily: slug,
+              displayName,
+              err: e instanceof Error ? e.message : String(e),
+            });
+          }
+        } else {
+          const weight = Number(font.currentWeight) || 400;
+          const style = String(font.currentStyle || 'normal');
+          const blob = await loadFontStyleVariant(slug, weight, style, working, true);
+          if (blob instanceof Blob) {
+            if (working.url) {
+              try {
+                URL.revokeObjectURL(String(working.url));
+              } catch {
+                // noop
+              }
+            }
+            working.file = blob;
+            working.url = URL.createObjectURL(blob);
+          }
+        }
+
+        const loadedStyles = Array.isArray(working.loadedStyles) ? [...working.loadedStyles] : [];
+        const synced = { ...working, loadedStyles };
+        setFonts((prev) => prev.map((f) => (f.id === font.id ? synced : f)));
+        await saveFont(synced);
+        return synced;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        toast.error(`Не удалось переключить набор символов: ${message}`);
+        return font;
+      }
+    },
+    [loadFontStyleVariant, saveFont, setFonts],
+  );
+
   return {
     handleLocalFontsUpload,
     loadAndSelectFontsourceFont,
     loadFontsourceStyleVariant: loadFontStyleVariant,
+    applyFontsourceActiveSubset,
   };
 }

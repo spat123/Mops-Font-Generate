@@ -12,6 +12,7 @@ import { updateIconUrl } from '../ui/editIconUrls';
 import { hsvToRgb, rgbToHex, hexToHsv, hexToRgbComponents } from '../../utils/colorUtils';
 import { getBillingCopy } from '../../utils/billingCopy';
 import { getLibraryCreateActionHint } from '../../utils/libraryCreateLabels';
+import { KnowledgeBaseNavButton } from '../library/KnowledgeBaseNavButton';
 
 function getNextCycleValue(options, currentValue) {
   const values = (Array.isArray(options) ? options : [])
@@ -332,6 +333,11 @@ function CollapsedLibraryRail({
         {pinAddToBottom && plusFooter ? (
           <div className="w-full shrink-0 border-t border-gray-100 bg-white pt-2">{plusFooter}</div>
         ) : null}
+      </div>
+      <div className="w-full shrink-0 bg-white pt-2">
+        <div className="flex justify-center">
+          <KnowledgeBaseNavButton compact />
+        </div>
       </div>
       {limitFooter}
     </div>

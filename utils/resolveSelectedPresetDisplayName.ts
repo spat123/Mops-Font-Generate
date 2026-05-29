@@ -18,14 +18,18 @@ export function resolveSelectedPresetDisplayName(
   if (!font.isVariableFont) {
     const available = getFontAvailableStyles(font);
 
-    if (font.currentWeight !== undefined && font.currentStyle !== undefined) {
+    // В базе/сессии currentWeight/currentStyle могут быть null (reset),
+    // поэтому проверяем именно на "есть значение", а не на undefined.
+    if (font.currentWeight != null && typeof font.currentStyle === 'string' && font.currentStyle.trim()) {
       const w = Number(font.currentWeight);
-      const st = font.currentStyle === 'italic' ? 'italic' : 'normal';
-      const hit = available.find((s) => Number(s?.weight) === w && String(s?.style) === st);
-      if (hit?.name) return hit.name;
+      if (Number.isFinite(w)) {
+        const st = font.currentStyle === 'italic' ? 'italic' : 'normal';
+        const hit = available.find((s) => Number(s?.weight) === w && String(s?.style) === st);
+        if (hit?.name) return hit.name;
 
-      const styleInfo = findStyleInfoByWeightAndStyle(w, st);
-      return styleInfo?.name || 'Regular';
+        const styleInfo = findStyleInfoByWeightAndStyle(w, st);
+        return styleInfo?.name || 'Regular';
+      }
     }
 
     if (font.lastUsedPresetName) {
@@ -50,7 +54,12 @@ export function resolveSelectedPresetDisplayName(
   let hintStyle = 'normal';
 
   if (axisSource) {
-    hintW = axisSource.wght != null ? Number(axisSource.wght) : 400;
+    hintW =
+      axisSource.wght != null
+        ? Number(axisSource.wght)
+        : font.currentWeight != null && Number.isFinite(Number(font.currentWeight))
+          ? Number(font.currentWeight)
+          : 400;
     hintStyle =
       axisSource.ital === 1 || (axisSource.slnt != null && Number(axisSource.slnt) < 0)
         ? 'italic'

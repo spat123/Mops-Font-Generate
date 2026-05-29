@@ -2,6 +2,11 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import type { SessionFontRecord } from '../types/editorFonts';
 import { toast } from '../utils/appNotify';
 import {
+  buildCatalogSubsetSelectOptions,
+  readCatalogSubsetsFromFont,
+  resolveDefaultCatalogSubset,
+} from '../utils/catalogActiveSubset';
+import {
   PRESET_STYLES,
   filterPresetStylesForVariableAxes,
   resolveDefaultStaticPresetName,
@@ -40,7 +45,12 @@ export function useFontManager() {
   // Создаём ref для safeSelectFont, чтобы использовать в колбэках
   const safeSelectFontRef = useRef(null);
   
-  const { handleLocalFontsUpload, loadAndSelectFontsourceFont, loadFontsourceStyleVariant } = useFontLoader(
+  const {
+    handleLocalFontsUpload,
+    loadAndSelectFontsourceFont,
+    loadFontsourceStyleVariant,
+    applyFontsourceActiveSubset,
+  } = useFontLoader(
     setFonts,
     setIsLoading,
     useCallback((font) => safeSelectFontRef.current?.(font), []),
@@ -117,6 +127,27 @@ export function useFontManager() {
   useEffect(() => {
     saveLastVariableSettingsRef.current = saveLastVariableSettings;
   }, [saveLastVariableSettings]);
+
+  const applyCatalogSubset = useCallback(
+    async (subset: string) => {
+      if (!selectedFont) return;
+      if (selectedFont.source !== 'fontsource') {
+        toast.info('Переключение набора символов пока доступно для шрифтов Fontsource.');
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const updated = await applyFontsourceActiveSubset(selectedFont, subset);
+        if (updated && updated.id === selectedFont.id) {
+          setSelectedFont(updated);
+          setFonts((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [selectedFont, applyFontsourceActiveSubset, setSelectedFont, setFonts, setIsLoading],
+  );
 
   const isSelectedFontVariable = useMemo(() => selectedFont?.isVariableFont || false, [selectedFont]);
 
@@ -271,6 +302,22 @@ export function useFontManager() {
   }, [selectedFont]);
 
   // Мемоизированное имя шрифта
+  const catalogSubsetOptions = useMemo(() => {
+    if (selectedFont?.source !== 'fontsource') return [];
+    const subsets = readCatalogSubsetsFromFont(selectedFont);
+    if (subsets.length <= 1) return [];
+    return buildCatalogSubsetSelectOptions(subsets);
+  }, [selectedFont]);
+
+  const activeCatalogSubset = useMemo(() => {
+    const subsets = readCatalogSubsetsFromFont(selectedFont);
+    const active = String(selectedFont?.activeSubset || '')
+      .trim()
+      .toLowerCase();
+    if (active && subsets.includes(active)) return active;
+    return resolveDefaultCatalogSubset(subsets);
+  }, [selectedFont]);
+
   const selectedFontName = useMemo(() => {
     return selectedFont ? selectedFont.name : '';
   }, [selectedFont]);
@@ -471,6 +518,9 @@ export function useFontManager() {
     resetVariableSettings,
     getDefaultAxisValues,
     applyPresetStyle,
+    applyCatalogSubset,
+    catalogSubsetOptions,
+    activeCatalogSubset,
     getFontFamily,
     getVariationSettings,
     generateCSS,
