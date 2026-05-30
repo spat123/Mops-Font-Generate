@@ -45,17 +45,38 @@ function SelectionOverlay() {
   );
 }
 
-function CatalogStyleFooter({ parts }: { parts: ReactNode[] }) {
-  if (!parts.length) return null;
+function CatalogStyleFooter({
+  leftParts = [],
+  rightParts = [],
+}: {
+  leftParts?: ReactNode[];
+  rightParts?: ReactNode[];
+}) {
+  const left = (leftParts || []).filter(Boolean);
+  const right = (rightParts || []).filter(Boolean);
+  if (!left.length && !right.length) return null;
   return (
     <div className="mt-auto flex w-full min-w-0 flex-wrap items-end justify-between gap-x-2 gap-y-1 pt-1">
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        {parts.map((part, index) => (
-          <span key={`${String(part)}-${index}`} className="truncate text-xs font-semibold uppercase text-gray-800">
-            {part}
-          </span>
-        ))}
-      </div>
+      {left.length > 0 ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {left.map((part, index) => (
+            <span key={`l-${String(part)}-${index}`} className="truncate text-xs font-semibold uppercase text-gray-800">
+              {part}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="min-w-0 shrink" aria-hidden />
+      )}
+      {right.length > 0 ? (
+        <div className="flex shrink-0 items-center justify-end gap-1.5 text-right text-xs font-semibold uppercase tabular-nums leading-snug text-gray-800">
+          {right.map((part, index) => (
+            <span key={`r-${String(part)}-${index}`} className="whitespace-nowrap">
+              {part}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -67,6 +88,8 @@ export type SessionFontCardProps = {
   recentlyAdded?: boolean;
   subtitle?: ReactNode;
   subtitleParts?: ReactNode[];
+  subtitleLeftParts?: ReactNode[];
+  subtitleRightParts?: ReactNode[];
   subtitleClassName?: string;
   previewStyle?: CSSProperties;
   onCardClick?: MouseEventHandler<HTMLDivElement>;
@@ -96,6 +119,8 @@ export function SessionFontCard({
   recentlyAdded = false,
   subtitle,
   subtitleParts,
+  subtitleLeftParts,
+  subtitleRightParts,
   subtitleClassName,
   previewStyle,
   onCardClick,
@@ -127,10 +152,16 @@ export function SessionFontCard({
     [],
   );
 
-  const footerParts = useMemo(
-    () => (Array.isArray(subtitleParts) ? subtitleParts.filter(Boolean) : []),
-    [subtitleParts],
-  );
+  const footerMeta = useMemo(() => {
+    const left = Array.isArray(subtitleLeftParts) ? subtitleLeftParts.filter(Boolean) : [];
+    const right = Array.isArray(subtitleRightParts) ? subtitleRightParts.filter(Boolean) : [];
+    if (left.length > 0 || right.length > 0) {
+      return { left, right };
+    }
+    const flat = Array.isArray(subtitleParts) ? subtitleParts.filter(Boolean) : [];
+    if (flat.length === 0) return { left: [], right: [] };
+    return { left: flat, right: [] as ReactNode[] };
+  }, [subtitleLeftParts, subtitleParts, subtitleRightParts]);
 
   if (variant === 'catalog') {
     const previewText = title || PREVIEW_SAMPLE;
@@ -189,7 +220,7 @@ export function SessionFontCard({
               {previewText}
             </div>
           }
-          footer={<CatalogStyleFooter parts={footerParts} />}
+          footer={<CatalogStyleFooter leftParts={footerMeta.left} rightParts={footerMeta.right} />}
           actions={topActions}
           selected={batchSelected}
           selectionOverlay={batchSelected ? <SelectionOverlay /> : undefined}

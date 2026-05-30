@@ -13,7 +13,7 @@ import {
   downloadFontsourcePackageZip,
   downloadFontsourceVariableVariant,
 } from '../utils/catalogDownloadActions';
-import { buildCatalogCardMetaParts } from '../utils/buildCatalogCardMetaParts';
+import { buildCatalogCardMetaSplit } from '../utils/buildCatalogCardMetaParts';
 import { getSessionFontCardPreviewStyle } from '../utils/sessionFontCardPreview';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type {
@@ -31,10 +31,10 @@ type UseSavedLibraryCardItemsParams = {
   mainTab: string;
   fontLibraries: SavedLibraryRecord[];
   selectedSavedLibraryFontIds: Set<string>;
-  buildSavedLibraryCardMetaParts: (
+  buildSavedLibraryCardMetaSplit: (
     font: SavedLibraryFontEntry,
     sessionFont?: SessionFontRecord | null,
-  ) => string[] | undefined;
+  ) => { left: string[]; right: string[] };
   savedLibraryCardMetaClassName: string;
   savedLibraryHideDownloadLabel: boolean;
   resolveSessionFontForLibraryEntry: (font: SavedLibraryFontEntry) => SessionFontRecord | null | undefined;
@@ -68,7 +68,7 @@ export function useSavedLibraryCardItems({
   mainTab,
   fontLibraries,
   selectedSavedLibraryFontIds,
-  buildSavedLibraryCardMetaParts,
+  buildSavedLibraryCardMetaSplit,
   savedLibraryCardMetaClassName,
   savedLibraryHideDownloadLabel,
   resolveSessionFontForLibraryEntry,
@@ -92,6 +92,7 @@ export function useSavedLibraryCardItems({
     const now = Date.now();
     return filteredActiveSavedLibraryFonts.map((font) => {
       const sessionFont = resolveSessionFontForLibraryEntry(font);
+      const cardMeta = buildSavedLibraryCardMetaSplit(font, sessionFont);
       return {
         id: font.id,
         variant: 'catalog',
@@ -99,7 +100,8 @@ export function useSavedLibraryCardItems({
         batchSelected: selectedSavedLibraryFontIds.has(font.id),
         title: font.label,
         recentlyAdded: isLibraryFontRecentlyAdded(font, now),
-        subtitleParts: buildSavedLibraryCardMetaParts(font, sessionFont),
+        subtitleLeftParts: cardMeta.left,
+        subtitleRightParts: cardMeta.right,
         subtitleClassName: savedLibraryCardMetaClassName,
         previewStyle: sessionFont ? getSessionFontCardPreviewStyle(sessionFont) : undefined,
         onCardClick: (event) => {
@@ -177,7 +179,7 @@ export function useSavedLibraryCardItems({
   }, [
     activeSavedLibrary,
     filteredActiveSavedLibraryFonts,
-    buildSavedLibraryCardMetaParts,
+    buildSavedLibraryCardMetaSplit,
     clearSavedLibraryLongPressTimer,
     fontLibraries,
     handleUpdateSavedLibrary,
@@ -239,18 +241,20 @@ export function useSavedLibraryCardItems({
           label: family,
           source: 'google',
         };
+        const googleMeta = buildCatalogCardMetaSplit({
+          category: entry?.category,
+          subsets: Array.isArray(entry?.subsets) ? entry.subsets : [],
+          isVariable: entry?.isVariable === true,
+          hasItalic: entry?.hasItalic === true || entry?.hasItalicStyles === true,
+          styleCount: Number(entry?.styleCount) || 0,
+        });
         return {
           id: row.id,
           variant: 'catalog',
           selected: false,
           title: family,
-          subtitleParts: buildCatalogCardMetaParts({
-            category: entry?.category,
-            subsets: Array.isArray(entry?.subsets) ? entry.subsets : [],
-            isVariable: entry?.isVariable === true,
-            hasItalic: entry?.hasItalic === true || entry?.hasItalicStyles === true,
-            styleCount: Number(entry?.styleCount) || 0,
-          }),
+          subtitleLeftParts: googleMeta.left,
+          subtitleRightParts: googleMeta.right,
           subtitleClassName: savedLibraryCardMetaClassName,
           previewStyle: { fontFamily: `'${family}', sans-serif` },
           onCardClick: () => openGoogleCatalogEntryInEditorTab(entry),
@@ -280,18 +284,20 @@ export function useSavedLibraryCardItems({
         source: 'fontsource',
         isVariable: Boolean(item?.isVariable),
       };
+      const fontsourceMeta = buildCatalogCardMetaSplit({
+        category: item?.category,
+        subsets: Array.isArray(item?.subsets) ? item.subsets : [],
+        isVariable: Boolean(item?.isVariable),
+        hasItalic: Boolean(item?.hasItalic),
+        styleCount: Number(item?.styleCount) || 0,
+      });
       return {
         id: row.id,
         variant: 'catalog',
         selected: false,
         title: family,
-        subtitleParts: buildCatalogCardMetaParts({
-          category: item?.category,
-          subsets: Array.isArray(item?.subsets) ? item.subsets : [],
-          isVariable: Boolean(item?.isVariable),
-          hasItalic: Boolean(item?.hasItalic),
-          styleCount: Number(item?.styleCount) || 0,
-        }),
+        subtitleLeftParts: fontsourceMeta.left,
+        subtitleRightParts: fontsourceMeta.right,
         subtitleClassName: savedLibraryCardMetaClassName,
         previewStyle: { fontFamily: `'${family}', sans-serif` },
         onCardClick: () => openFontsourceSlugInEditorTab(slug, Boolean(item?.isVariable)),
@@ -318,7 +324,7 @@ export function useSavedLibraryCardItems({
   }, [
     activeSavedLibrary,
     addFontEntryToLibrary,
-    buildSavedLibraryCardMetaParts,
+    buildSavedLibraryCardMetaSplit,
     catalogSearchResults,
     markSavedLibraryCatalogRecentlyAdded,
     openFontsourceSlugInEditorTab,

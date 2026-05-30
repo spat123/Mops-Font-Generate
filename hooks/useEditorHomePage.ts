@@ -470,7 +470,7 @@ export function useEditorHomePage(router: NextRouter) {
 
     const {
       savedLibrarySubsetOptions,
-      buildSavedLibraryCardMetaParts,
+      buildSavedLibraryCardMetaSplit,
       filteredActiveSavedLibraryFonts,
       catalogSearchResults,
     } = useSavedLibraryDerivedState({
@@ -664,7 +664,7 @@ export function useEditorHomePage(router: NextRouter) {
       mainTab,
       fontLibraries,
       selectedSavedLibraryFontIds,
-      buildSavedLibraryCardMetaParts,
+      buildSavedLibraryCardMetaSplit,
       savedLibraryCardMetaClassName,
       savedLibraryHideDownloadLabel,
       resolveSessionFontForLibraryEntry,

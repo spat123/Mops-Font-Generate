@@ -18,6 +18,8 @@ export type SavedLibraryCardViewItem = {
   recentlyAdded?: boolean;
   subtitle?: string;
   subtitleParts?: string[];
+  subtitleLeftParts?: string[];
+  subtitleRightParts?: string[];
   subtitleClassName?: string;
   previewStyle?: CSSProperties;
   onCardClick?: (event?: MouseEvent) => void;

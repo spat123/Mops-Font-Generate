@@ -37,6 +37,8 @@ export function SortableFontCardGrid({
             recentlyAdded={item.recentlyAdded === true}
             subtitle={item.subtitle}
             subtitleParts={item.subtitleParts}
+            subtitleLeftParts={item.subtitleLeftParts}
+            subtitleRightParts={item.subtitleRightParts}
             subtitleClassName={item.subtitleClassName}
             previewStyle={item.previewStyle}
             onCardClick={item.onCardClick}

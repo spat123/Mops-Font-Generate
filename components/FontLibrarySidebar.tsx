@@ -403,7 +403,7 @@ export default function FontLibrarySidebar({
                 <div className="shrink-0 bg-white">{addLibraryPlusBlock}</div>
               ) : null}
               </div>
-              <div className="mt-3 shrink-0 border-t border-gray-100 pt-3">{knowledgeBaseLink}</div>
+              <div className="mt-3 shrink-0 pt-3">{knowledgeBaseLink}</div>
               {libraryLimitReachedPanel ? (
                 <div className="mt-3 shrink-0 bg-white">{libraryLimitReachedPanel}</div>
               ) : null}

@@ -136,7 +136,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
         {activeSavedLibrary && (
           <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden pb-7">
             {savedLibraryToolbarIsWideRow ? (
-              <div className="shrink-0 pb-4" ref={savedLibrarySearchWrapRef}>
+              <div className="shrink-0 pb-4">
                 <div className="relative">
                   <div className="grid max-w-full grid-cols-5 items-center gap-4">
                     <div className="min-w-0">
@@ -149,87 +149,88 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                         options={activeSavedLibraryScopeOptions}
                       />
                     </div>
-                    {savedLibrarySearchActive ? (
-                      savedLibrarySearchOverlayEnabled ? (
-                        <div className="relative col-start-2 col-span-4 min-w-0 pr-24">
-                          {savedLibrarySearchDesktopControls}
-                        </div>
-                      ) : (
-                        <div className="col-start-2 col-span-4 min-w-0">{savedLibrarySearchDesktopControls}</div>
-                      )
-                    ) : (
-                      <>
-                        <div className="min-w-0">
-                          <CustomSelect
-                            id="saved-library-filter-variable"
-                            value={savedLibraryFilterVariable}
-                            onChange={setSavedLibraryFilterVariable}
-                            className={customSelectTriggerClass({
-                              placeholderMuted: String(savedLibraryFilterVariable || 'all') === 'all',
-                            })}
-                            aria-label="Вариативность"
-                            placeholder="Вариативность"
-                            emptyValue="all"
-                            clearable
-                            clearAriaLabel="Очистить фильтр вариативности"
-                            options={savedLibraryVariableOptions}
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <CustomSelect
-                            id="saved-library-filter-subsets"
-                            value={savedLibraryFilterSubsets}
-                            onChange={setSavedLibraryFilterSubsets}
-                            className={customSelectTriggerClass({
-                              placeholderMuted:
-                                !Array.isArray(savedLibraryFilterSubsets) ||
-                                savedLibraryFilterSubsets.length === 0,
-                            })}
-                            aria-label="Языки"
-                            placeholder="Языки"
-                            multiple
-                            searchable
-                            clearable
-                            clearAriaLabel="Очистить фильтр языков"
-                            searchPlaceholder="Поиск языка"
-                            options={savedLibrarySubsetOptions}
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <CatalogCheckboxControl
-                            checked={savedLibraryFilterItalic}
-                            onChange={(next) => setSavedLibraryFilterItalic(next)}
-                            label="Курсив"
-                            inline={savedLibraryToolbarViewportW > 1440}
-                          />
-                        </div>
-                        <div
-                          className={`flex min-w-0 items-center justify-between ${
-                            savedLibraryToolbarIsTightResetGap ? 'gap-0' : 'gap-3'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={resetSavedLibraryFilters}
-                            disabled={
-                              !savedLibraryHasAdvancedFilters &&
-                              String(savedLibraryFontsScope || 'all') === 'all' &&
-                              !savedLibrarySearchQueryTrimmed
-                            }
-                            className="box-border h-10 shrink-0 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
-                          >
-                            {savedLibraryResetLabel}
-                          </button>
-                          <div className="flex items-center gap-2">
-                            {renderSavedLibrarySearchToggleButton(
-                              '',
-                              savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
-                            )}
-                            {savedLibraryShareButton}
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <div
+                      className={`min-w-0 transition-opacity duration-300 ${
+                        savedLibrarySearchActive ? 'pointer-events-none opacity-0' : 'opacity-100'
+                      }`}
+                    >
+                      <CustomSelect
+                        id="saved-library-filter-variable"
+                        value={savedLibraryFilterVariable}
+                        onChange={setSavedLibraryFilterVariable}
+                        className={customSelectTriggerClass({
+                          placeholderMuted: String(savedLibraryFilterVariable || 'all') === 'all',
+                        })}
+                        aria-label="Вариативность"
+                        placeholder="Вариативность"
+                        emptyValue="all"
+                        clearable
+                        clearAriaLabel="Очистить фильтр вариативности"
+                        options={savedLibraryVariableOptions}
+                      />
+                    </div>
+                    <div
+                      className={`min-w-0 transition-opacity duration-300 ${
+                        savedLibrarySearchActive ? 'pointer-events-none opacity-0' : 'opacity-100'
+                      }`}
+                    >
+                      <CustomSelect
+                        id="saved-library-filter-subsets"
+                        value={savedLibraryFilterSubsets}
+                        onChange={setSavedLibraryFilterSubsets}
+                        className={customSelectTriggerClass({
+                          placeholderMuted:
+                            !Array.isArray(savedLibraryFilterSubsets) ||
+                            savedLibraryFilterSubsets.length === 0,
+                        })}
+                        aria-label="Языки"
+                        placeholder="Языки"
+                        multiple
+                        searchable
+                        clearable
+                        clearAriaLabel="Очистить фильтр языков"
+                        searchPlaceholder="Поиск языка"
+                        options={savedLibrarySubsetOptions}
+                      />
+                    </div>
+                    <div
+                      className={`min-w-0 transition-opacity duration-300 ${
+                        savedLibrarySearchActive ? 'pointer-events-none opacity-0' : 'opacity-100'
+                      }`}
+                    >
+                      <CatalogCheckboxControl
+                        checked={savedLibraryFilterItalic}
+                        onChange={(next) => setSavedLibraryFilterItalic(next)}
+                        label="Курсив"
+                        inline={savedLibraryToolbarViewportW > 1440}
+                      />
+                    </div>
+                    <div
+                      className={`flex min-w-0 items-center transition-opacity duration-300 ${
+                        savedLibrarySearchActive ? 'pointer-events-none opacity-0' : 'opacity-100'
+                      } ${savedLibraryToolbarIsTightResetGap ? 'gap-0' : 'gap-3'}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={resetSavedLibraryFilters}
+                        disabled={
+                          !savedLibraryHasAdvancedFilters &&
+                          String(savedLibraryFontsScope || 'all') === 'all' &&
+                          !savedLibrarySearchQueryTrimmed
+                        }
+                        className="box-border h-10 min-w-0 flex-1 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
+                      >
+                        {savedLibraryResetLabel}
+                      </button>
+                    </div>
+                  </div>
+                  <div
+                    className={`absolute inset-y-0 right-0 z-20 flex min-w-0 items-center pl-4 ${
+                      savedLibrarySearchActive ? 'bg-white' : ''
+                    }`}
+                    style={{ left: 'calc((100% - 4 * 1rem) / 5 + 1rem)' }}
+                  >
+                    {savedLibrarySearchDesktopControls}
                   </div>
                 </div>
               </div>

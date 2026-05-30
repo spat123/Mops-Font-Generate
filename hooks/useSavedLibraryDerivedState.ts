@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { buildCatalogCardMetaParts } from '../utils/buildCatalogCardMetaParts';
+import { buildCatalogCardMetaSplit, type CatalogCardMetaSplit } from '../utils/buildCatalogCardMetaParts';
 import { buildGroupedFontSubsetOptions } from '../utils/fontSubsetLabels';
 import { buildSavedLibraryCatalogLookup } from '../utils/savedLibraryCatalogLookup';
 import {
@@ -58,11 +58,11 @@ export function useSavedLibraryDerivedState({
     [availableSavedLibrarySubsets, savedLibraryFilterSubsets],
   );
 
-  const buildSavedLibraryCardMetaParts = useCallback(
-    (font: SavedLibraryFontEntry, sessionFont: SessionFontRecord | null = null) => {
+  const buildSavedLibraryCardMetaSplit = useCallback(
+    (font: SavedLibraryFontEntry, sessionFont: SessionFontRecord | null = null): CatalogCardMetaSplit => {
       const meta = resolveSavedLibraryFontCatalogMeta(font, catalogLookup);
       const { isVariable, hasItalic } = applySessionFontMetaHints(meta, sessionFont);
-      return buildCatalogCardMetaParts({
+      return buildCatalogCardMetaSplit({
         category: meta.category,
         subsets: meta.subsets,
         isVariable,
@@ -109,7 +109,7 @@ export function useSavedLibraryDerivedState({
     catalogLookup,
     availableSavedLibrarySubsets,
     savedLibrarySubsetOptions,
-    buildSavedLibraryCardMetaParts,
+    buildSavedLibraryCardMetaSplit,
     filteredActiveSavedLibraryFonts,
     catalogSearchResults,
   };

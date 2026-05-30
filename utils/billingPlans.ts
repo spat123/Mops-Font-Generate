@@ -66,7 +66,6 @@ export function getFreePlanFeatures(locale: BillingLocale | string = 'RU'): stri
   if (en) {
     return [
       `Up to ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} font libraries`,
-      'Google Fonts, Fontsource, and local uploads',
       'Preview modes: Plain, Waterfall, Glyphs, Styles',
       'Waterfall: preset scale ratios (custom scale — Pro)',
       'CSS export with @font-face (.css / .txt)',
@@ -76,7 +75,6 @@ export function getFreePlanFeatures(locale: BillingLocale | string = 'RU'): stri
   }
   return [
     `До ${MAX_SAVED_LIBRARIES_PER_ACCOUNT} библиотек`,
-    'Google Fonts, Fontsource и локальные файлы',
     'Режимы превью: Plain, Waterfall, Glyphs, Styles',
     'Waterfall: готовые шкалы (своё значение — Pro)',
     'Экспорт CSS с @font-face (.css / .txt)',

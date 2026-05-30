@@ -10,24 +10,29 @@ export type BuildCatalogCardMetaPartsInput = {
   includeTrial?: boolean;
 };
 
-/** Строки метаданных для карточки каталога / библиотеки (как в UnifiedCatalogCard). */
-export function buildCatalogCardMetaParts({
+export type CatalogCardMetaSplit = {
+  left: string[];
+  right: string[];
+};
+
+/** Левая колонка: категория / vf / italic; правая: языки / начертания / trial (как в каталоге). */
+export function buildCatalogCardMetaSplit({
   category,
   subsets,
   isVariable = false,
   hasItalic = false,
   styleCount = 0,
   includeTrial = false,
-}: BuildCatalogCardMetaPartsInput): string[] {
+}: BuildCatalogCardMetaPartsInput): CatalogCardMetaSplit {
   const categoryLabel = getFontCategoryLabelRu(category) || null;
   const languageCount = Array.isArray(subsets) ? subsets.filter(Boolean).length : 0;
   const styleCountNum = Number(styleCount) || 0;
   const hasStyleCount = styleCountNum > 0;
 
-  return [
-    categoryLabel,
-    isVariable ? 'vf' : null,
-    hasItalic ? 'italic' : null,
+  const left = [categoryLabel, isVariable ? 'vf' : null, hasItalic ? 'italic' : null].filter(
+    (part): part is string => Boolean(part),
+  );
+  const right = [
     languageCount > 0
       ? `${languageCount} ${pluralRu(languageCount, 'язык', 'языка', 'языков')}`
       : null,
@@ -36,4 +41,12 @@ export function buildCatalogCardMetaParts({
       : null,
     includeTrial ? 'trial' : null,
   ].filter((part): part is string => Boolean(part));
+
+  return { left, right };
+}
+
+/** Строки метаданных для карточки каталога / библиотеки (как в UnifiedCatalogCard). */
+export function buildCatalogCardMetaParts(input: BuildCatalogCardMetaPartsInput): string[] {
+  const { left, right } = buildCatalogCardMetaSplit(input);
+  return [...left, ...right];
 }

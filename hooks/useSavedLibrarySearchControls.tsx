@@ -137,10 +137,10 @@ export function useSavedLibrarySearchControls({
   );
 
   const savedLibrarySearchDesktopControls = (
-    <div ref={savedLibrarySearchWrapRef} className="relative min-w-0 pr-24">
+    <div ref={savedLibrarySearchWrapRef} className="relative flex min-w-0 w-full pr-24">
       <div
-        className={`min-w-0 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
-          savedLibrarySearchActive ? 'opacity-100' : 'max-w-0 opacity-0'
+        className={`min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
+          savedLibrarySearchActive ? 'w-full max-w-full opacity-100' : 'max-w-0 opacity-0'
         }`}
       >
         {savedLibrarySearchField}
