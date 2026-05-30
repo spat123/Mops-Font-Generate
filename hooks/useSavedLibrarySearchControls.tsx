@@ -136,8 +136,12 @@ export function useSavedLibrarySearchControls({
     </div>
   );
 
-  const savedLibrarySearchDesktopControls = (
-    <div ref={savedLibrarySearchWrapRef} className="relative flex min-w-0 w-full pr-24">
+  /** Поле поиска: растёт влево (якорь справа у кнопки «Искать»). */
+  const savedLibrarySearchExpandField = (
+    <div
+      ref={savedLibrarySearchWrapRef}
+      className="flex h-full min-w-0 w-full items-center justify-end overflow-hidden"
+    >
       <div
         className={`min-w-0 overflow-hidden transition-[max-width,opacity] duration-300 ease-[cubic-bezier(0.33,1,0.68,1)] ${
           savedLibrarySearchActive ? 'w-full max-w-full opacity-100' : 'max-w-0 opacity-0'
@@ -145,6 +149,24 @@ export function useSavedLibrarySearchControls({
       >
         {savedLibrarySearchField}
       </div>
+    </div>
+  );
+
+  /** Широкий тулбар: «Искать» слева от «Поделиться», поле — в оверлее слева от них. */
+  const savedLibrarySearchCol5Trailing = (
+    <div className="relative z-20 flex shrink-0 items-center gap-2">
+      {renderSavedLibrarySearchToggleButton(
+        '',
+        savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
+      )}
+      {savedLibraryShareButton}
+    </div>
+  );
+
+  /** Узкий trailing (каталог-подобный): поле + кнопки справа. */
+  const savedLibrarySearchDesktopControls = (
+    <div className="relative flex min-w-0 w-full pr-24">
+      {savedLibrarySearchExpandField}
       {renderSavedLibrarySearchToggleButton(
         'absolute right-12 top-1/2 z-10 -translate-y-1/2',
         savedLibrarySearchActive ? clearSavedLibrarySearch : openSavedLibrarySearch,
@@ -179,6 +201,8 @@ export function useSavedLibrarySearchControls({
     savedLibraryShareButton,
     renderSavedLibrarySearchToggleButton,
     savedLibrarySearchInlineButton,
+    savedLibrarySearchExpandField,
+    savedLibrarySearchCol5Trailing,
     savedLibrarySearchDesktopControls,
     savedLibrarySearchMobileExpandedControls,
   };

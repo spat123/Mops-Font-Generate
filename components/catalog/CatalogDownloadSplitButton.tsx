@@ -213,14 +213,14 @@ export function CatalogDownloadSplitButton({
       : 'gap-1.5 px-3';
   const rootClassName = `relative inline-flex ${resolvedHeightClass} w-40.5 items-stretch overflow-hidden rounded-sm ${className}`.trim();
   const primaryClassName = isAccent
-    ? `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${primaryContentClassName} ${showSecondary ? 'rounded-l-sm' : 'rounded-sm'} bg-accent text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover active:bg-accent-hover disabled:cursor-default disabled:bg-accent/60 disabled:text-white/80`
-    : `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${hidePrimaryLabel ? 'justify-center px-3' : roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} ${showSecondary ? 'rounded-l-sm' : 'rounded-sm'} bg-white text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:bg-white disabled:text-gray-400 disabled:opacity-60`;
+    ? `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${primaryContentClassName} ${showSecondary ? 'rounded-l-sm' : 'rounded-sm'} bg-accent text-xs uppercase font-semibold leading-none text-white cursor-pointer transition-colors hover:bg-accent-hover active:bg-accent-hover disabled:cursor-default disabled:bg-accent/60 disabled:text-white/80`
+    : `inline-flex ${resolvedHeightClass} min-w-0 flex-1 items-center ${hidePrimaryLabel ? 'justify-center px-3' : roomy ? 'gap-2 px-4' : 'gap-1.5 px-2'} ${showSecondary ? 'rounded-l-sm' : 'rounded-sm'} bg-white text-xs uppercase font-semibold leading-none text-gray-800 cursor-pointer transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:bg-white disabled:text-gray-400 disabled:opacity-60`;
   const secondaryClassName = `${
     isAccent
-      ? `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white transition-colors hover:bg-accent-hover active:bg-accent-hover disabled:cursor-default disabled:border-white/20 disabled:bg-accent/60 disabled:text-white/80 ${
+      ? `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-white/30 bg-accent text-white cursor-pointer transition-colors hover:bg-accent-hover active:bg-accent-hover disabled:cursor-default disabled:border-white/20 disabled:bg-accent/60 disabled:text-white/80 ${
           open ? 'bg-accent-hover' : ''
         }`
-      : `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:border-gray-200 disabled:bg-white disabled:text-gray-400 disabled:opacity-60 ${
+      : `inline-flex ${resolvedHeightClass} w-9 shrink-0 items-center justify-center rounded-r-sm border-l border-gray-200 bg-white text-gray-800 cursor-pointer transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:border-gray-200 disabled:bg-white disabled:text-gray-400 disabled:opacity-60 ${
           open ? 'bg-white' : ''
         }`
   } ${secondaryButtonClassName}`.trim();
@@ -315,7 +315,7 @@ export function CatalogDownloadSplitButton({
               setOpen(false);
               runActionWithFeedback(item.onSelect);
             }}
-            className={`flex w-full items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
+            className={`flex w-full cursor-pointer items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
               roomy ? 'py-3.5' : 'py-2.5'
             } ${index > 0 ? 'border-t border-gray-200' : ''}`}
           >
@@ -334,7 +334,7 @@ export function CatalogDownloadSplitButton({
             setOpen(false);
             setStyleDialogOpen(true);
           }}
-          className={`flex w-full items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
+          className={`flex w-full cursor-pointer items-center px-3 text-left text-xs font-semibold uppercase text-gray-900 transition-colors hover:bg-accent hover:text-white disabled:cursor-default disabled:opacity-50 ${
             roomy ? 'py-3.5' : 'py-2.5'
           } ${visibleMenuItems.length > 0 ? 'border-t border-gray-200' : ''}`}
         >

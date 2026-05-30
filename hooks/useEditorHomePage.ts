@@ -513,6 +513,8 @@ export function useEditorHomePage(router: NextRouter) {
       savedLibraryShareButton,
       renderSavedLibrarySearchToggleButton,
       savedLibrarySearchInlineButton,
+      savedLibrarySearchExpandField,
+      savedLibrarySearchCol5Trailing,
       savedLibrarySearchDesktopControls,
       savedLibrarySearchMobileExpandedControls,
     } = useSavedLibrarySearchControls({
@@ -814,6 +816,8 @@ export function useEditorHomePage(router: NextRouter) {
         clearSavedLibrarySearchTextOnly,
         clearSavedLibrarySearch,
         savedLibraryShareButton,
+        savedLibrarySearchExpandField,
+        savedLibrarySearchCol5Trailing,
         savedLibrarySearchDesktopControls,
         savedLibraryFilterVariable,
         setSavedLibraryFilterVariable,

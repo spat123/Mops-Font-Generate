@@ -24,7 +24,7 @@ export function CatalogGridModeToggle({
   value = 'grid',
   onChange,
   layout = 'segmented',
-  buttonClassName = 'inline-flex h-9 w-9 items-center justify-center transition-colors',
+  buttonClassName = 'inline-flex h-9 w-9 cursor-pointer items-center justify-center transition-colors disabled:cursor-not-allowed',
   groupClassName = 'inline-flex items-center gap-2',
 }: CatalogGridModeToggleProps) {
   const buttonBaseClass = buttonClassName;

@@ -34,7 +34,7 @@ const VARIANT_CLASSES = {
 } as const;
 
 const BASE_CLASS =
-  'inline-flex shrink-0 items-center justify-center rounded-full transition-colors';
+  'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed';
 
 export type IconCircleButtonVariant = keyof typeof VARIANT_CLASSES;
 

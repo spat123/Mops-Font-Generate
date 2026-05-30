@@ -92,7 +92,7 @@ const SIZE_CLASS = {
   icon: 'h-9 w-9 min-h-9 min-w-9 shrink-0 !gap-0 p-0 [&_svg]:block',
 } as const;
 
-const BASE_CLASS = 'inline-flex items-center justify-center gap-2';
+const BASE_CLASS = 'inline-flex cursor-pointer items-center justify-center gap-2';
 
 export type AppButtonVariant = 'outline' | 'accent' | 'soft' | 'toolbarIcon' | 'chip' | 'link';
 

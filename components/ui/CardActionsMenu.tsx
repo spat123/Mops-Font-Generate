@@ -337,7 +337,7 @@ export function CardActionsMenu({
                 index === items.length - 1 ? 'rounded-b-md' : '',
                 item.disabled
                   ? 'cursor-not-allowed text-gray-400'
-                  : 'text-gray-900 hover:bg-accent hover:text-white',
+                  : 'cursor-pointer text-gray-900 hover:bg-accent hover:text-white',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -424,7 +424,7 @@ export function CardActionsMenu({
               subIndex === activeSubmenuItems.length - 1 ? 'rounded-b-md' : '',
               subItem.disabled
                 ? 'cursor-not-allowed text-gray-400'
-                : 'text-gray-900 hover:bg-accent hover:text-white',
+                : 'cursor-pointer text-gray-900 hover:bg-accent hover:text-white',
             ]
               .filter(Boolean)
               .join(' ')}

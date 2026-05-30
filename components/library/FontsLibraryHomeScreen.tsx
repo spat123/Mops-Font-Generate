@@ -53,6 +53,8 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
   clearSavedLibrarySearchTextOnly,
   clearSavedLibrarySearch,
   savedLibraryShareButton,
+  savedLibrarySearchExpandField,
+  savedLibrarySearchCol5Trailing,
   savedLibrarySearchDesktopControls,
   savedLibraryFilterVariable,
   setSavedLibraryFilterVariable,
@@ -205,11 +207,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                         inline={savedLibraryToolbarViewportW > 1440}
                       />
                     </div>
-                    <div
-                      className={`flex min-w-0 items-center transition-opacity duration-300 ${
-                        savedLibrarySearchActive ? 'pointer-events-none opacity-0' : 'opacity-100'
-                      } ${savedLibraryToolbarIsTightResetGap ? 'gap-0' : 'gap-3'}`}
-                    >
+                    <div className="relative flex min-w-0 items-center justify-end gap-2">
                       <button
                         type="button"
                         onClick={resetSavedLibraryFilters}
@@ -218,19 +216,29 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                           String(savedLibraryFontsScope || 'all') === 'all' &&
                           !savedLibrarySearchQueryTrimmed
                         }
-                        className="box-border h-10 min-w-0 flex-1 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent disabled:cursor-default disabled:opacity-40 disabled:text-gray-900"
+                        className={`box-border h-10 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent transition-all duration-300 disabled:cursor-default disabled:opacity-40 disabled:text-gray-900 ${
+                          savedLibrarySearchActive
+                            ? 'pointer-events-none w-0 min-w-0 flex-none overflow-hidden p-0 opacity-0'
+                            : 'min-w-0 flex-1 opacity-100'
+                        }`}
                       >
                         {savedLibraryResetLabel}
                       </button>
+                      {savedLibrarySearchCol5Trailing}
                     </div>
                   </div>
                   <div
-                    className={`absolute inset-y-0 right-0 z-20 flex min-w-0 items-center pl-4 ${
-                      savedLibrarySearchActive ? 'bg-white' : ''
+                    className={`absolute inset-y-0 z-10 flex min-w-0 items-center overflow-hidden transition-opacity duration-300 ${
+                      savedLibrarySearchActive
+                        ? 'pointer-events-auto bg-white opacity-100'
+                        : 'pointer-events-none opacity-0'
                     }`}
-                    style={{ left: 'calc((100% - 4 * 1rem) / 5 + 1rem)' }}
+                    style={{
+                      left: 'calc((100% - 4 * 1rem) / 5 + 1rem)',
+                      right: 'calc(2.5rem + 0.5rem + 2.5rem)',
+                    }}
                   >
-                    {savedLibrarySearchDesktopControls}
+                    {savedLibrarySearchExpandField}
                   </div>
                 </div>
               </div>

@@ -330,7 +330,7 @@ export function NewsNotificationsDock() {
         onClick={handleOpen}
         aria-label="Уведомления"
         aria-expanded={open}
-        className={`relative flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent ${
+        className={`relative flex h-full min-h-12 w-12 shrink-0 cursor-pointer items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent ${
           showNotifyPulse ? 'overflow-hidden' : ''
         }`}
       >

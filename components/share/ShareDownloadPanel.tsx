@@ -93,7 +93,7 @@ export function ShareDownloadPanel({
             type="button"
             disabled={importBusy}
             onClick={onImport}
-            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-xs font-bold uppercase text-gray-900 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-xs font-bold uppercase text-gray-900 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <PlusIcon className="h-4 w-4 shrink-0" aria-hidden />
             <span className="truncate">{importBusy ? importBusyLabel : importLabel}</span>
@@ -122,7 +122,7 @@ export function ShareDownloadPanel({
       <div className="mt-auto mx-auto shrink-0 pt-10">
         <Link
           href="/"
-          className="inline-flex h-12 items-center justify-center gap-2 bg-white px-4 text-xs font-bold uppercase text-gray-900 transition-colors  hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
+          className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 bg-white px-4 text-xs font-bold uppercase text-gray-900 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
         >
           <EditAssetIcon src={heartIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
           <span className="truncate">Поддержать проект</span>

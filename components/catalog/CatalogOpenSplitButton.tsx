@@ -252,7 +252,7 @@ export function CatalogOpenSplitButton({
                 setOpen(false);
                 runOpenAction(t.onOpen);
               }}
-              className={`inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-2 transition-colors ${
+              className={`inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-md border px-2 transition-colors ${
                 active
                   ? 'border-accent bg-accent text-white'
                   : 'border-gray-200 bg-white text-gray-900 hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white'
@@ -282,7 +282,7 @@ export function CatalogOpenSplitButton({
         onClick={runOpenWithFeedback}
         className={`inline-flex h-9 min-w-0 flex-1 items-center ${
           hidePrimaryLabel ? 'justify-center px-3' : 'gap-2 px-4'
-        } ${showSecondary ? 'rounded-l-md' : 'rounded-md'} bg-white text-xs uppercase font-semibold text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70`}
+        } ${showSecondary ? 'rounded-l-md' : 'rounded-md'} bg-white text-xs uppercase font-semibold text-gray-800 cursor-pointer transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70`}
         aria-label={effectiveAriaLabel}
       >
         {primaryIcon}
@@ -297,7 +297,7 @@ export function CatalogOpenSplitButton({
             event.stopPropagation();
             setOpen((value) => !value);
           }}
-          className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-r-md border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70 ${
+          className={`inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-r-md border-l border-gray-200 bg-white text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70 ${
             open ? 'bg-white' : ''
           }`}
           aria-label="Выбрать источник для открытия"

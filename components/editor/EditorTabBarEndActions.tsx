@@ -135,7 +135,7 @@ export function EditorTabBarEndActions({
           type="button"
           disabled={!canGenerate}
           onClick={onGenerateClick}
-          className="inline-flex h-8 w-40.5 shrink-0 items-center justify-center rounded-sm border border-gray-200 bg-white px-3 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9] disabled:cursor-default disabled:border-gray-50 disabled:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-gray-50 disabled:hover:text-gray-400"
+          className="inline-flex h-8 w-40.5 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-gray-200 bg-white px-3 text-xs uppercase font-semibold leading-none text-gray-800 transition-colors hover:text-white hover:bg-black/[0.9] hover:border-black/[0.9] disabled:cursor-not-allowed disabled:border-gray-50 disabled:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-gray-50 disabled:hover:text-gray-400"
         >
           Генерация
         </button>
@@ -144,7 +144,7 @@ export function EditorTabBarEndActions({
         <button
           type="button"
           onClick={onExportClick}
-          className="inline-flex h-8 w-40.5 shrink-0 items-center justify-center rounded-sm bg-accent px-3 text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover"
+          className="inline-flex h-8 w-40.5 shrink-0 cursor-pointer items-center justify-center rounded-sm bg-accent px-3 text-xs uppercase font-semibold leading-none text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed"
           aria-label="Экспорт CSS: предпросмотр, копирование, скачивание файла"
         >
           Экспорт
@@ -156,7 +156,7 @@ export function EditorTabBarEndActions({
             type="button"
             onClick={onPlainPreviewOpen}
             aria-label="Полноэкранное превью текста (plain)"
-            className="flex h-full min-h-12 w-12 shrink-0 items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent"
+            className="flex h-full min-h-12 w-12 shrink-0 cursor-pointer items-center justify-center border-l border-gray-200 px-2 text-gray-800 transition-colors hover:text-accent"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
