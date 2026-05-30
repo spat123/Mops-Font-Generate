@@ -1,10 +1,10 @@
 import { ImageResponse } from 'next/og';
 import { resolveShareFromQuery } from '../../../lib/share/resolveShareFromQuery';
 import { getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../../utils/libraryShareOg';
-import { loadShareOgImageAssets } from '../../../utils/ogImageAssets';
+import { loadShareOgImageAssets, LOGO_HEIGHT, LOGO_WIDTH } from '../../../utils/ogImageAssets';
 
 export const config = {
-  runtime: 'edge',
+  runtime: 'nodejs',
 };
 
 const MAX_BADGES = 9;
@@ -52,6 +52,7 @@ export default async function handler(req: Request) {
   }
 
   const rightWidth = SHARE_OG_WIDTH / 2;
+  const showStats = data.showStatic || data.showVariable;
 
   return new ImageResponse(
     (
@@ -79,8 +80,8 @@ export default async function handler(req: Request) {
             <img
               src={logoDataUrl}
               alt=""
-              width={220}
-              height={30}
+              width={LOGO_WIDTH}
+              height={LOGO_HEIGHT}
               style={{ objectFit: 'contain', objectPosition: 'left center' }}
             />
           ) : (
@@ -124,44 +125,62 @@ export default async function handler(req: Request) {
               {String(data.total || 0)}
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {data.showStatic ? (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: '1px solid #e5e7eb',
-                  paddingTop: 12,
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: '#111827',
-                }}
-              >
-                <span>СТАТИЧЕСКИХ</span>
-                <span>{String(data.staticCount)}</span>
-              </div>
-            ) : null}
-            {data.showVariable ? (
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderTop: data.showStatic ? 'none' : '1px solid #e5e7eb',
-                  paddingTop: data.showStatic ? 0 : 12,
-                  fontSize: 18,
-                  fontWeight: 600,
-                  color: '#111827',
-                }}
-              >
-                <span>ВАРИАТИВНЫХ</span>
-                <span>{String(data.variableCount)}</span>
-              </div>
-            ) : null}
-          </div>
+          {showStats ? (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                borderTop: '1px solid #111827',
+                paddingTop: 12,
+              }}
+            >
+              {data.showStatic ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: '#111827',
+                  }}
+                >
+                  <span>СТАТИЧЕСКИХ</span>
+                  <span>{String(data.staticCount)}</span>
+                </div>
+              ) : null}
+              {data.showStatic && data.showVariable ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    height: 1,
+                    backgroundColor: '#111827',
+                    marginTop: 12,
+                    marginBottom: 12,
+                  }}
+                />
+              ) : null}
+              {data.showVariable ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: '#111827',
+                    paddingTop: data.showStatic ? 0 : 0,
+                  }}
+                >
+                  <span>ВАРИАТИВНЫХ</span>
+                  <span>{String(data.variableCount)}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div
           style={{
@@ -171,7 +190,6 @@ export default async function handler(req: Request) {
             flexDirection: 'column',
             position: 'relative',
             overflow: 'hidden',
-            backgroundColor: '#e85d4a',
           }}
         >
           {backgroundDataUrl ? (
@@ -189,7 +207,18 @@ export default async function handler(req: Request) {
                 objectFit: 'cover',
               }}
             />
-          ) : null}
+          ) : (
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#e85d4a',
+              }}
+            />
+          )}
           <div
             style={{
               display: 'flex',

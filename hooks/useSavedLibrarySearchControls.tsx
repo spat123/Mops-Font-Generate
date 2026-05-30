@@ -102,8 +102,13 @@ export function useSavedLibrarySearchControls({
     </Tooltip>
   );
 
+  const savedLibrarySearchInputClassName = [
+    'box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3',
+    savedLibrarySearchActive ? 'pr-14' : 'pr-10',
+  ].join(' ');
+
   const savedLibrarySearchField = (
-    <div className="relative">
+    <div className="relative min-w-0">
       <input
         ref={savedLibrarySearchInputRef}
         type="search"
@@ -112,7 +117,7 @@ export function useSavedLibrarySearchControls({
         onBlur={handleSavedLibrarySearchBlur}
         onChange={(event) => setSavedLibrarySearchQuery(event.target.value)}
         placeholder="Поиск в библиотеке"
-        className="box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 focus:border-black/[0.14] focus:outline-none sm:pl-3"
+        className={savedLibrarySearchInputClassName}
         autoComplete="off"
         spellCheck={false}
       />
@@ -120,7 +125,7 @@ export function useSavedLibrarySearchControls({
         <SearchClearButton
           onClick={clearSavedLibrarySearchTextOnly}
           ariaLabel="Очистить текст поиска"
-          className="absolute right-2 top-1/2 -translate-y-1/2"
+          className="absolute right-3 top-1/2 -translate-y-1/2"
         />
       ) : null}
     </div>

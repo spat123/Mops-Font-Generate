@@ -235,7 +235,8 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                     }`}
                     style={{
                       left: 'calc((100% - 4 * 1rem) / 5 + 1rem)',
-                      right: 'calc(2.5rem + 0.5rem + 2.5rem)',
+                      // 2× кнопка (2.5rem) + 2× gap-2 (0.5rem): между полем и «Закрыть», между «Закрыть» и «Поделиться»
+                      right: 'calc(2.5rem + 0.5rem + 2.5rem + 0.5rem)',
                     }}
                   >
                     {savedLibrarySearchExpandField}

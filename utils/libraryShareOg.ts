@@ -1,7 +1,7 @@
 import { decodeLibrarySharePayloadFromQueryParam } from './libraryShareLinkServer';
 import { isShareCatalogItemVariable, type ShareCatalogItem } from './libraryShareImport';
 import type { LibrarySharePayload } from './libraryShareLink';
-import { SHARE_OG_BACKGROUND_PATH } from './ogImageAssets';
+import { SHARE_OG_BACKGROUND_PATH } from './shareOgPaths';
 
 export const SHARE_OG_WIDTH = 1200;
 export const SHARE_OG_HEIGHT = 630;
