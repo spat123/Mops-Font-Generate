@@ -4,7 +4,7 @@ import { getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../..
 import { loadShareOgImageAssets, LOGO_HEIGHT, LOGO_WIDTH } from '../../../utils/ogImageAssets';
 
 export const config = {
-  runtime: 'nodejs',
+  runtime: 'edge',
 };
 
 const MAX_BADGES = 9;
@@ -23,38 +23,31 @@ function badgeLabel(name: string | null, overflow: number) {
 }
 
 export default async function handler(req: Request) {
-  const url = new URL(req.url);
-  const origin = `${url.protocol}//${url.host}`;
-  const { payload } = await resolveShareFromQuery({
-    id: url.searchParams.get('id') || '',
-    share: url.searchParams.get('share') || '',
-  });
-  if (!payload) {
-    return Response.redirect(`${origin}/og.png`, 302);
-  }
-  const data = getShareOgDisplayData(payload);
-
-  const visibleFonts = data.fontNames.slice(0, MAX_BADGES);
-  const overflow = Math.max(0, data.fontNames.length - visibleFonts.length);
-  const badges: Array<string | null> = overflow > 0 ? [...visibleFonts, null] : visibleFonts;
-
-  let fontData: ArrayBuffer;
-  let logoDataUrl: string | null;
-  let backgroundDataUrl: string | null;
   try {
-    [fontData, { logoDataUrl, backgroundDataUrl }] = await Promise.all([
+    const url = new URL(req.url);
+    const origin = `${url.protocol}//${url.host}`;
+    const { payload } = await resolveShareFromQuery({
+      id: url.searchParams.get('id') || '',
+      share: url.searchParams.get('share') || '',
+    });
+    if (!payload) {
+      return Response.redirect(`${origin}/og.png`, 302);
+    }
+    const data = getShareOgDisplayData(payload);
+
+    const visibleFonts = data.fontNames.slice(0, MAX_BADGES);
+    const overflow = Math.max(0, data.fontNames.length - visibleFonts.length);
+    const badges: Array<string | null> = overflow > 0 ? [...visibleFonts, null] : visibleFonts;
+
+    const [fontData, { logoDataUrl, backgroundDataUrl }] = await Promise.all([
       loadInterSemiBold(),
       loadShareOgImageAssets(origin),
     ]);
-  } catch (e) {
-    console.error('[og/share] assets', e);
-    return new Response('Asset load error', { status: 500 });
-  }
 
-  const rightWidth = SHARE_OG_WIDTH / 2;
-  const showStats = data.showStatic || data.showVariable;
+    const rightWidth = SHARE_OG_WIDTH / 2;
+    const showStats = data.showStatic || data.showVariable;
 
-  return new ImageResponse(
+    return new ImageResponse(
     (
       <div
         style={{
@@ -279,5 +272,10 @@ export default async function handler(req: Request) {
         },
       ],
     },
-  );
+    );
+  } catch (e) {
+    console.error('[og/share]', e);
+    const message = e instanceof Error ? e.message : 'OG render failed';
+    return new Response(message, { status: 500 });
+  }
 }
