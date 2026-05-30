@@ -263,11 +263,16 @@ export function CatalogRowModeCard({
 
   const previewContent = editingPreview ? previewEditingInline : previewReadOnly;
 
-  const rowCardClassName = `rounded-none h-full min-h-0 border-b border-gray-300 bg-white ${
-    selected
+  const rowDividerClass = shareSurface ? 'border-gray-200' : 'border-gray-300';
+  const rowCardClassName = [
+    'rounded-none h-full min-h-0 bg-white',
+    `border-0 border-b ${rowDividerClass}`,
+    shareSurface || selected
       ? ''
-      : `hover:!bg-accent hover:border-accent${canEditPreview ? ' focus-within:!bg-accent focus-within:border-accent' : ''}`
-  }`;
+      : `hover:!bg-accent hover:!border-b-accent${canEditPreview ? ' focus-within:!bg-accent focus-within:!border-b-accent' : ''}`,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const headerFamilyClassName = `min-w-0 max-w-full truncate text-left text-xs font-medium leading-tight text-gray-800 ${
     selected ? '' : 'group-hover:!text-white group-data-[catalog-hover-ui=true]:!text-white'
@@ -287,7 +292,7 @@ export function CatalogRowModeCard({
       <div className="h-full min-h-0">
         <CatalogFontCard
           className={rowCardClassName}
-          hoverSurface="accent"
+          hoverSurface={shareSurface ? 'neutral' : 'accent'}
           minHeightClass=""
           pinPreviewToBottom
           pinPreviewColumnClassName={pinPreviewColumnClassName}

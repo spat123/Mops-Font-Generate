@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { resolveShareFromQuery } from '../../../lib/share/resolveShareFromQuery';
+import { resolveSharePayloadForOg } from '../../../lib/share/resolveSharePayloadForOg';
 import { getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../../utils/libraryShareOg';
 import { loadShareOgImageAssets, LOGO_HEIGHT, LOGO_WIDTH } from '../../../utils/ogImageAssets';
 
@@ -26,9 +26,9 @@ export default async function handler(req: Request) {
   try {
     const url = new URL(req.url);
     const origin = `${url.protocol}//${url.host}`;
-    const { payload } = await resolveShareFromQuery({
-      id: url.searchParams.get('id') || '',
-      share: url.searchParams.get('share') || '',
+    const payload = await resolveSharePayloadForOg(origin, {
+      id: url.searchParams.get('id'),
+      share: url.searchParams.get('share'),
     });
     if (!payload) {
       return Response.redirect(`${origin}/og.png`, 302);

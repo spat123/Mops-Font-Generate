@@ -10,6 +10,12 @@ export { SHARE_OG_LOGO_PATH, SHARE_OG_BACKGROUND_PATH, SHARE_OG_LOGO_WIDTH, SHAR
 export const LOGO_WIDTH = SHARE_OG_LOGO_WIDTH;
 export const LOGO_HEIGHT = SHARE_OG_LOGO_HEIGHT;
 
+function extensionFromPublicPath(publicPath: string): string {
+  const base = publicPath.split('?')[0].split('#')[0];
+  const lastDot = base.lastIndexOf('.');
+  return lastDot === -1 ? '' : base.slice(lastDot);
+}
+
 function mimeFromExt(ext: string): string {
   const lower = ext.toLowerCase();
   if (lower === '.png') return 'image/png';
@@ -39,7 +45,7 @@ async function fetchPublicAssetAsDataUrl(origin: string, publicPath: string): Pr
       console.error('[og] asset fetch failed', url, res.status);
       return null;
     }
-    const mime = res.headers.get('content-type') || mimeFromExt(path.extname(pathPart.split('?')[0]));
+    const mime = res.headers.get('content-type') || mimeFromExt(extensionFromPublicPath(pathPart));
     const base64 = arrayBufferToBase64(await res.arrayBuffer());
     return `data:${mime};base64,${base64}`;
   } catch (e) {

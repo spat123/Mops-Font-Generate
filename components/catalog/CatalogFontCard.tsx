@@ -97,14 +97,22 @@ export function CatalogFontCard({
   const accentSurface = hoverSurface === 'accent';
   const accentSurfaceLive = accentSurface && !selected && hoverUiActive;
 
+  /** ROW: только нижний разделитель; полный `border border-transparent` перебивает `border-b`. */
+  const isRowShell = pinPreviewToBottom;
+
   const rootClassName = [
     'group relative flex flex-col rounded-lg bg-surface-card p-4 select-none transition-colors duration-100',
     selected
       ? ''
-      : accentSurface
-        ? 'border border-transparent hover:!bg-accent hover:border-accent'
-        : 'hover:bg-gray-50',
-    accentSurfaceLive ? '!bg-accent !border-accent' : '',
+      : isRowShell
+        ? accentSurface
+          ? ''
+          : 'border-0 border-b border-gray-200 hover:bg-gray-50'
+        : accentSurface
+          ? 'border border-transparent hover:!bg-accent hover:border-accent'
+          : 'hover:bg-gray-50',
+    accentSurfaceLive && !isRowShell ? '!bg-accent !border-accent' : '',
+    accentSurfaceLive && isRowShell ? '!bg-accent' : '',
     minHeightClass,
     className,
   ]
