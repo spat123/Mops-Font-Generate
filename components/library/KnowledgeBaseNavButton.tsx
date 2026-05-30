@@ -33,7 +33,7 @@ export function KnowledgeBaseNavButton({ compact = false }: { compact?: boolean 
     return (
       <Tooltip content="База знаний" openDelayMs={200}>
         <Link
-          href="/help"
+          href="/help?tab=overview"
           className={`${OUTLINE_LINK_CLASS} h-9 w-9 shrink-0`}
           aria-label="База знаний"
         >
@@ -44,7 +44,7 @@ export function KnowledgeBaseNavButton({ compact = false }: { compact?: boolean 
   }
 
   return (
-    <Link href="/help" className={`${OUTLINE_LINK_CLASS} w-full gap-2 px-3 py-2.5`}>
+    <Link href="/help?tab=overview" className={`${OUTLINE_LINK_CLASS} w-full gap-2 px-3 py-2.5`}>
       <BookOpenIcon className="h-4 w-4 shrink-0" />
       База знаний
     </Link>

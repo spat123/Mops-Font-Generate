@@ -41,6 +41,8 @@ export function SortableFontCardGrid({
             subtitleRightParts={item.subtitleRightParts}
             subtitleClassName={item.subtitleClassName}
             previewStyle={item.previewStyle}
+            onOpen={item.onOpen}
+            openAriaLabel={item.openAriaLabel}
             onCardClick={item.onCardClick}
             onPointerDown={item.onPointerDown}
             onPointerUp={item.onPointerUp}

@@ -1,14 +1,15 @@
 import { decodeLibrarySharePayloadFromQueryParam } from './libraryShareLinkServer';
 import { isShareCatalogItemVariable, type ShareCatalogItem } from './libraryShareImport';
 import type { LibrarySharePayload } from './libraryShareLink';
+import { SHARE_OG_BACKGROUND_PATH } from './ogImageAssets';
 
 export const SHARE_OG_WIDTH = 1200;
 export const SHARE_OG_HEIGHT = 630;
 export const SHARE_OG_IMAGE_PATH = '/api/og/share';
 
 export function getShareOgBackgroundPath(): string {
-  return '/assets/Open%20Graph/Open%20One.jpg';
-};
+  return SHARE_OG_BACKGROUND_PATH;
+}
 
 export type ShareOgDisplayData = {
   total: number;

@@ -106,9 +106,11 @@ export function useSavedLibraryCardItems({
         previewStyle: sessionFont ? getSessionFontCardPreviewStyle(sessionFont) : undefined,
         onCardClick: (event) => {
           onSavedLibrarySelectionCardClick(event as React.MouseEvent, font.id);
-          if (event?.defaultPrevented || selectedSavedLibraryFontIds.size > 0) return;
+        },
+        onOpen: () => {
           void openLibraryFontEntry(font);
         },
+        openAriaLabel: `Открыть ${font.label} в редакторе`,
         onPointerDown: (event) => startSavedLibraryCardLongPress(event, font.id),
         onPointerUp: clearSavedLibraryLongPressTimer,
         onPointerLeave: clearSavedLibraryLongPressTimer,
@@ -257,7 +259,8 @@ export function useSavedLibraryCardItems({
           subtitleRightParts: googleMeta.right,
           subtitleClassName: savedLibraryCardMetaClassName,
           previewStyle: { fontFamily: `'${family}', sans-serif` },
-          onCardClick: () => openGoogleCatalogEntryInEditorTab(entry),
+          onOpen: () => openGoogleCatalogEntryInEditorTab(entry),
+          openAriaLabel: `Открыть ${family} в редакторе`,
           downloadSplitButtonProps: {
             ...downloadBase,
             ...buildCatalogDownloadButtonProps({
@@ -300,7 +303,8 @@ export function useSavedLibraryCardItems({
         subtitleRightParts: fontsourceMeta.right,
         subtitleClassName: savedLibraryCardMetaClassName,
         previewStyle: { fontFamily: `'${family}', sans-serif` },
-        onCardClick: () => openFontsourceSlugInEditorTab(slug, Boolean(item?.isVariable)),
+        onOpen: () => openFontsourceSlugInEditorTab(slug, Boolean(item?.isVariable)),
+        openAriaLabel: `Открыть ${family} в редакторе`,
         downloadSplitButtonProps: {
           ...downloadBase,
           ...buildCatalogDownloadButtonProps({

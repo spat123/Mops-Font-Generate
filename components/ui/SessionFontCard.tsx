@@ -1,7 +1,9 @@
-import { useMemo, useState, type ComponentProps, type CSSProperties, type DragEventHandler, type MouseEventHandler, type PointerEventHandler, type ReactNode } from 'react';
+import { useMemo, useState, type CSSProperties, type DragEventHandler, type MouseEventHandler, type PointerEventHandler, type ReactNode } from 'react';
 import { CatalogFontCard } from '../catalog/CatalogFontCard';
-import { CardActionsMenu, type CardActionMenuItem } from './CardActionsMenu';
+import { CatalogCardHoverOverlay } from '../catalog/CatalogCardHoverOverlay';
 import { CatalogDownloadSplitButton } from '../catalog/CatalogDownloadSplitButton';
+import { CardActionsMenu, type CardActionMenuItem } from './CardActionsMenu';
+import type { CatalogDownloadButtonProps } from '../../types/catalog';
 import { Tooltip } from './Tooltip';
 import {
   CATALOG_PREVIEW_FONT_SIZE_DEFAULT_PX,
@@ -9,8 +11,6 @@ import {
 } from '../../utils/catalogPreviewSample';
 
 const PREVIEW_SAMPLE = 'AaBbCcDdEe';
-
-type CatalogDownloadSplitButtonProps = ComponentProps<typeof CatalogDownloadSplitButton>;
 
 function CardRemoveButton({ onClick }: { onClick: MouseEventHandler<HTMLButtonElement> }) {
   return (
@@ -92,6 +92,9 @@ export type SessionFontCardProps = {
   subtitleRightParts?: ReactNode[];
   subtitleClassName?: string;
   previewStyle?: CSSProperties;
+  /** Плитка каталога: открыть шрифт (кнопка «Открыть» в оверлее) */
+  onOpen?: () => void | Promise<void>;
+  openAriaLabel?: string;
   onCardClick?: MouseEventHandler<HTMLDivElement>;
   onPointerDown?: PointerEventHandler<HTMLDivElement>;
   onPointerUp?: PointerEventHandler<HTMLDivElement>;
@@ -100,7 +103,7 @@ export type SessionFontCardProps = {
   onRemove?: () => void;
   cornerAction?: ReactNode;
   menuItems?: CardActionMenuItem[];
-  downloadSplitButtonProps?: Omit<CatalogDownloadSplitButtonProps, 'onMenuOpenChange'>;
+  downloadSplitButtonProps?: CatalogDownloadButtonProps | null;
   variant?: 'default' | 'tall' | 'catalog';
   previewClassName?: string;
   shellClassName?: string;
@@ -123,6 +126,8 @@ export function SessionFontCard({
   subtitleRightParts,
   subtitleClassName,
   previewStyle,
+  onOpen,
+  openAriaLabel,
   onCardClick,
   onPointerDown,
   onPointerUp,
@@ -186,25 +191,34 @@ export function SessionFontCard({
         <CardActionsMenu triggerLabel={`Действия: ${title}`} items={menuItems} />
       ) : null;
 
+    const catalogHoverOverlay = useMemo(() => {
+      if (batchSelected) return null;
+      const showOpen = typeof onOpen === 'function';
+      const showDownload = Boolean(downloadSplitButtonProps);
+      if (!showOpen && !showDownload) return null;
+      return (
+        <CatalogCardHoverOverlay
+          onOpen={showOpen ? () => void onOpen?.() : undefined}
+          openAriaLabel={
+            openAriaLabel || (title ? `Открыть ${title} в редакторе` : 'Открыть в редакторе')
+          }
+          downloadButtonProps={showDownload ? downloadSplitButtonProps : null}
+        />
+      );
+    }, [batchSelected, downloadSplitButtonProps, onOpen, openAriaLabel, title]);
+
     return (
       <div
-        className={`group relative min-w-0 ${onCardClick ? 'cursor-pointer' : ''} ${shellClassName}`.trim()}
-        onClick={onCardClick}
-        onPointerDown={onPointerDown}
-        onPointerUp={onPointerUp}
-        onPointerLeave={onPointerLeave}
-        onPointerCancel={onPointerCancel}
-        draggable={draggable}
-        onDragStart={onDragStart}
+        className={`relative min-w-0 ${shellClassName}`.trim()}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        onDragEnd={onDragEnd}
       >
         <CatalogFontCard
           className={selected && !batchSelected ? 'ring-2 ring-inset ring-accent/35' : ''}
           minHeightClass="h-auto min-w-0"
           rootStyle={{ minHeight: `${catalogMinHeightPx}px` }}
           containIntrinsicHeightPx={catalogMinHeightPx}
+          fadeFooterWithHoverUi={Boolean(catalogHoverOverlay)}
           title={titleNode}
           preview={
             <div
@@ -222,28 +236,18 @@ export function SessionFontCard({
           }
           footer={<CatalogStyleFooter leftParts={footerMeta.left} rightParts={footerMeta.right} />}
           actions={topActions}
+          hoverOverlay={catalogHoverOverlay}
           selected={batchSelected}
           selectionOverlay={batchSelected ? <SelectionOverlay /> : undefined}
+          onClick={onCardClick}
+          onPointerDown={onPointerDown}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerLeave}
+          onPointerCancel={onPointerCancel}
+          draggable={draggable}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
         />
-        {!batchSelected && downloadSplitButtonProps ? (
-          <div
-            className={[
-              'absolute bottom-2 right-2 z-[31] max-w-[calc(100%-1rem)] opacity-0 transition-opacity duration-200',
-              'pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100',
-              'focus-within:pointer-events-auto focus-within:opacity-100',
-              downloadUiOpen ? '!pointer-events-auto !opacity-100' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <CatalogDownloadSplitButton
-              {...downloadSplitButtonProps}
-              onMenuOpenChange={setDownloadUiOpen}
-            />
-          </div>
-        ) : null}
       </div>
     );
   }

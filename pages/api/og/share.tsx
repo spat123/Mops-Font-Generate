@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { resolveShareFromQuery } from '../../../lib/share/resolveShareFromQuery';
 import { getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../../utils/libraryShareOg';
+import { loadShareOgImageAssets } from '../../../utils/ogImageAssets';
 
 export const config = {
   runtime: 'edge',
@@ -16,12 +17,12 @@ async function loadInterSemiBold() {
   return res.arrayBuffer();
 }
 
-function badgeLabel(name, overflow) {
+function badgeLabel(name: string | null, overflow: number) {
   if (overflow > 0) return 'И ДРУГИЕ';
   return String(name || '').slice(0, 36);
 }
 
-export default async function handler(req) {
+export default async function handler(req: Request) {
   const url = new URL(req.url);
   const origin = `${url.protocol}//${url.host}`;
   const { payload } = await resolveShareFromQuery({
@@ -33,20 +34,24 @@ export default async function handler(req) {
   }
   const data = getShareOgDisplayData(payload);
 
-  const logoUrl = `${origin}/email-logo.png`;
-  const bgUrl = `${origin}/assets/Open%20Graph/Open%20One.jpg`;
-
   const visibleFonts = data.fontNames.slice(0, MAX_BADGES);
   const overflow = Math.max(0, data.fontNames.length - visibleFonts.length);
-  const badges = overflow > 0 ? [...visibleFonts, null] : visibleFonts;
+  const badges: Array<string | null> = overflow > 0 ? [...visibleFonts, null] : visibleFonts;
 
-  let fontData;
+  let fontData: ArrayBuffer;
+  let logoDataUrl: string | null;
+  let backgroundDataUrl: string | null;
   try {
-    fontData = await loadInterSemiBold();
+    [fontData, { logoDataUrl, backgroundDataUrl }] = await Promise.all([
+      loadInterSemiBold(),
+      loadShareOgImageAssets(origin),
+    ]);
   } catch (e) {
-    console.error('[og/share] font', e);
-    return new Response('Font load error', { status: 500 });
+    console.error('[og/share] assets', e);
+    return new Response('Asset load error', { status: 500 });
   }
+
+  const rightWidth = SHARE_OG_WIDTH / 2;
 
   return new ImageResponse(
     (
@@ -70,7 +75,27 @@ export default async function handler(req) {
             justifyContent: 'space-between',
           }}
         >
-          <img src={logoUrl} alt="" width={220} height={30} style={{ objectFit: 'contain' }} />
+          {logoDataUrl ? (
+            <img
+              src={logoDataUrl}
+              alt=""
+              width={220}
+              height={30}
+              style={{ objectFit: 'contain', objectPosition: 'left center' }}
+            />
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                fontSize: 20,
+                fontWeight: 600,
+                color: '#111827',
+                letterSpacing: '0.06em',
+              }}
+            >
+              DINAMIC FONT
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'center' }}>
             <div
               style={{
@@ -143,47 +168,73 @@ export default async function handler(req) {
             display: 'flex',
             width: '50%',
             height: '100%',
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            alignContent: 'center',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 14,
-            padding: 36,
-            backgroundImage: `url(${bgUrl})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
+            flexDirection: 'column',
+            position: 'relative',
+            overflow: 'hidden',
+            backgroundColor: '#e85d4a',
           }}
         >
-          {badges.map((name, idx) => {
-            const isOthers = name === null;
-            return (
-              <div
-                key={`${name ?? 'more'}-${idx}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#ffffff',
-                  borderRadius: 999,
-                  padding: '12px 22px',
-                  maxWidth: 280,
-                }}
-              >
-                <span
+          {backgroundDataUrl ? (
+            <img
+              src={backgroundDataUrl}
+              alt=""
+              width={rightWidth}
+              height={SHARE_OG_HEIGHT}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
+            />
+          ) : null}
+          <div
+            style={{
+              display: 'flex',
+              position: 'relative',
+              width: '100%',
+              height: '100%',
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              alignContent: 'center',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 14,
+              padding: 36,
+            }}
+          >
+            {badges.map((name, idx) => {
+              const isOthers = name === null;
+              return (
+                <div
+                  key={`${name ?? 'more'}-${idx}`}
                   style={{
                     display: 'flex',
-                    fontSize: 15,
-                    fontWeight: 600,
-                    color: '#111827',
-                    letterSpacing: '0.04em',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#ffffff',
+                    borderRadius: 999,
+                    padding: '12px 22px',
+                    maxWidth: 280,
                   }}
                 >
-                  {badgeLabel(name, isOthers ? overflow : 0)}
-                </span>
-              </div>
-            );
-          })}
+                  <span
+                    style={{
+                      display: 'flex',
+                      fontSize: 15,
+                      fontWeight: 600,
+                      color: '#111827',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {badgeLabel(name, isOthers ? overflow : 0)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     ),

@@ -122,16 +122,21 @@ export function AuthLogoLink({
   className = '',
   href = '/',
   onClick,
+  align = 'center',
 }: {
   className?: string;
   href?: string;
   onClick?: (e: MouseEvent<HTMLAnchorElement>) => void;
+  /** center — формы auth; start — шапки help/legal */
+  align?: 'center' | 'start';
 }) {
+  const alignClass = align === 'start' ? 'justify-start' : 'mx-auto justify-center';
+
   return (
     <Link
       href={href}
       onClick={onClick}
-      className={`mx-auto flex w-fit max-w-full items-center justify-center ${className}`}
+      className={`flex w-fit max-w-full shrink-0 items-center ${alignClass} ${className}`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

@@ -22,6 +22,8 @@ export type SavedLibraryCardViewItem = {
   subtitleRightParts?: string[];
   subtitleClassName?: string;
   previewStyle?: CSSProperties;
+  onOpen?: () => void | Promise<void>;
+  openAriaLabel?: string;
   onCardClick?: (event?: MouseEvent) => void;
   onPointerDown?: (event: PointerEvent) => void;
   onPointerUp?: (event: PointerEvent) => void;

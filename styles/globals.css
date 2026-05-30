@@ -94,6 +94,7 @@ html.theme-dark {
 /* Базовые стили */
 html {
   font-family: var(--font-family-sans);
+  scrollbar-gutter: stable;
 }
 
 body {
