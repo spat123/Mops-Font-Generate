@@ -173,6 +173,8 @@ export function buildEditorHomeLayoutProps(vm: Record<string, unknown>): EditorH
       clearSavedLibrarySearchTextOnly: vm.clearSavedLibrarySearchTextOnly,
       clearSavedLibrarySearch: vm.clearSavedLibrarySearch,
       savedLibraryShareButton: vm.savedLibraryShareButton,
+      savedLibrarySearchExpandField: vm.savedLibrarySearchExpandField,
+      savedLibrarySearchCol5Trailing: vm.savedLibrarySearchCol5Trailing,
       savedLibrarySearchDesktopControls: vm.savedLibrarySearchDesktopControls,
       savedLibraryFilterVariable: vm.savedLibraryFilterVariable,
       setSavedLibraryFilterVariable: vm.setSavedLibraryFilterVariable,

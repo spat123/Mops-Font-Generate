@@ -153,6 +153,12 @@ export function CatalogPanelToolbar({
   const useMobileGridToolbar =
     viewportW < 1024 && toolbarAlignToGrid && oneCardWidthPx != null;
   const useCompactGridToolbar = useMdGridToolbar || useTabletGridToolbar;
+  const gridToolbarRowClass = toolbarAlignToGrid
+    ? 'flex w-full flex-nowrap items-center gap-4'
+    : 'flex w-full flex-wrap items-center gap-4';
+  const gridToolbarRowClassInline = toolbarAlignToGrid
+    ? 'flex flex-nowrap items-center gap-4'
+    : 'flex flex-wrap items-center gap-4';
   const clearFiltersClass = [
     useCompactGridToolbar
       ? clearFiltersButtonClassName.replace(/\bpx-2\b/, 'px-0')
@@ -598,7 +604,7 @@ export function CatalogPanelToolbar({
   /** <1024px: 7 строк по сетке каталога (2 колонки). */
   const mobileGridToolbar = (
     <div className="flex shrink-0 flex-col gap-4">
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {leadingToolbar ? (
           <div ref={trailingContainerRef} className="min-w-0 shrink-0" style={cardWidthStyle}>
             {leadingToolbar}
@@ -607,27 +613,27 @@ export function CatalogPanelToolbar({
         {oneCardSearchWithButton}
         {cardSlot(categoryControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {oneCardPreviewSampleControl}
         {cardSlot(licenseControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {cardSlot(feelingControl)}
         {cardSlot(shapeControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {cardSlot(variableControl)}
         {cardSlot(subsetControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {cardSlot(calligraphyControl)}
         {rolePurposeControlSlot}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {mdFontSizeSlot}
         {mdItalicCardSlot}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {cardSlot(sortSelectControl)}
         {mdResetGridSlot}
       </div>
@@ -637,7 +643,7 @@ export function CatalogPanelToolbar({
   /** 1024–1279px: 4 строки по сетке каталога (4 колонки). */
   const tabletGridToolbar = (
     <div className="flex shrink-0 flex-col gap-4">
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {leadingToolbar ? (
           <div ref={trailingContainerRef} className="min-w-0 shrink-0" style={cardWidthStyle}>
             {leadingToolbar}
@@ -647,18 +653,18 @@ export function CatalogPanelToolbar({
         {cardSlot(categoryControl)}
         {cardSlot(licenseControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {twoCardPreviewSampleControl}
         {cardSlot(feelingControl)}
         {cardSlot(shapeControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {cardSlot(variableControl)}
         {cardSlot(subsetControl)}
         {cardSlot(calligraphyControl)}
         {rolePurposeControlSlot}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {mdFontSizeSlot}
         {mdItalicCardSlot}
         {cardSlot(sortSelectControl)}
@@ -670,7 +676,7 @@ export function CatalogPanelToolbar({
   /** 1280–1440px: 4 строки по сетке карточек каталога. */
   const mdGridToolbar = (
     <div className="flex shrink-0 flex-col gap-4">
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {leadingToolbar ? (
           <div ref={trailingContainerRef} className="min-w-0 shrink-0" style={cardWidthStyle}>
             {leadingToolbar}
@@ -686,7 +692,7 @@ export function CatalogPanelToolbar({
           {categoryControl}
         </div>
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         <CatalogPreviewSampleControls
           layout="text-first"
           presetId={previewPresetFilterId}
@@ -706,14 +712,14 @@ export function CatalogPanelToolbar({
           {licenseControl}
         </div>
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {cardSlot(shapeControl)}
         {cardSlot(variableControl)}
         {cardSlot(subsetControl)}
         {cardSlot(feelingControl)}
         {cardSlot(calligraphyControl)}
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {mdFontSizeSlot}
         {rolePurposeControlSlot}
         {mdItalicCardSlot}
@@ -736,7 +742,7 @@ export function CatalogPanelToolbar({
 
   const wideDesktopToolbar = (
     <div className="flex shrink-0 flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClassInline}>
         {leadingToolbar ? (
           <div
             ref={trailingContainerRef}
@@ -757,7 +763,7 @@ export function CatalogPanelToolbar({
           {shapeControl}
         </div>
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         {wideDesktopPreviewControl}
         <div className="min-w-0 shrink-0" style={cardWidthStyle}>
           {variableControl}
@@ -769,7 +775,7 @@ export function CatalogPanelToolbar({
           {feelingControl}
         </div>
       </div>
-      <div className="flex w-full flex-wrap items-center gap-4">
+      <div className={gridToolbarRowClass}>
         <div className="min-w-0 shrink-0" style={cardWidthStyle}>
           {calligraphyControl}
         </div>

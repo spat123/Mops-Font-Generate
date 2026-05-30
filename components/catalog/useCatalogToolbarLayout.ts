@@ -121,16 +121,22 @@ export function useCatalogToolbarLayout({
     };
   }, [enabled, trailingToolbarEl]);
 
+  /** Ширина для раскладки тулбара: как у сетки карточек, не window.innerWidth (иначе lg/xl на узкой панели). */
+  const toolbarLayoutW = useMemo(() => {
+    if (gridInnerWidth != null && gridInnerWidth > 0) return gridInnerWidth;
+    return viewportW;
+  }, [gridInnerWidth, viewportW]);
+
   const gridCols = useMemo(() => {
-    if (typeof gridColsResolver === 'function') return gridColsResolver(viewportW);
+    if (typeof gridColsResolver === 'function') return gridColsResolver(toolbarLayoutW);
     return 2;
-  }, [gridColsResolver, viewportW]);
+  }, [gridColsResolver, toolbarLayoutW]);
 
   const oneCardWidthPx =
     gridInnerWidth != null && gridInnerWidth > 0
       ? (gridInnerWidth - (gridCols - 1) * gridGapPx) / gridCols
       : null;
-  const toolbarAlignToGrid = oneCardWidthPx != null && viewportW >= 640;
+  const toolbarAlignToGrid = oneCardWidthPx != null && toolbarLayoutW >= 640;
   const twoCardWidthPx = toolbarAlignToGrid ? oneCardWidthPx * 2 + gridGapPx : null;
   const searchWidthPx =
     toolbarAlignToGrid && twoCardWidthPx != null
@@ -138,7 +144,9 @@ export function useCatalogToolbarLayout({
       : null;
 
   return {
-    viewportW,
+    /** Для CatalogPanelToolbar и gridCols — ширина контейнера каталога. */
+    viewportW: toolbarLayoutW,
+    windowViewportW: viewportW,
     catalogScrollEl,
     setCatalogScrollContainer,
     setGridWidthMeasureContainer,
