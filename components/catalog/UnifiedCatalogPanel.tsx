@@ -642,24 +642,19 @@ export default function UnifiedCatalogPanel({
     async (item) => {
       const key = item?.familyKey || '';
       if (!key) return;
-      setAddingFamilyKey(key);
-      try {
-        catalogOpenDbg('open click', {
-          familyKey: item?.familyKey,
-          displayName: item?.displayName,
-          sources: Array.isArray(item?.sources)
-            ? item.sources.map((s) => ({ id: s?.id, hasRaw: Boolean(s?.raw) }))
-            : [],
-        });
-        await openCatalogItemInEditor(item, {
-          onOpenFontsource: (slug, isVariable) =>
-            Promise.resolve(onOpenFontsourceInEditorTab?.(slug, isVariable)),
-          onOpenGoogle: (rawEntry) =>
-            Promise.resolve(onOpenGoogleEntryInEditorTab?.(rawEntry as Record<string, unknown>)),
-        });
-      } finally {
-        setAddingFamilyKey(null);
-      }
+      catalogOpenDbg('open click', {
+        familyKey: item?.familyKey,
+        displayName: item?.displayName,
+        sources: Array.isArray(item?.sources)
+          ? item.sources.map((s) => ({ id: s?.id, hasRaw: Boolean(s?.raw) }))
+          : [],
+      });
+      await openCatalogItemInEditor(item, {
+        onOpenFontsource: (slug, isVariable) =>
+          Promise.resolve(onOpenFontsourceInEditorTab?.(slug, isVariable)),
+        onOpenGoogle: (rawEntry) =>
+          Promise.resolve(onOpenGoogleEntryInEditorTab?.(rawEntry as Record<string, unknown>)),
+      });
     },
     [onOpenFontsourceInEditorTab, onOpenGoogleEntryInEditorTab],
   );

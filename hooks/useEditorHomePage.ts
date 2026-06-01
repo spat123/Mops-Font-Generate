@@ -265,8 +265,11 @@ export function useEditorHomePage(router: NextRouter) {
       uploadFontfabricTrialRef,
       onUploadFontfabricTrial,
     } = useCatalogOpenInEditor({
+      fonts,
       handleFontsUploaded,
       selectOrAddFontsourceFont,
+      safeSelectFont,
+      setClosedLibraryFontIds,
       mainTab,
       setMainTab,
       setEmptySlotIds,
@@ -615,6 +618,7 @@ export function useEditorHomePage(router: NextRouter) {
     });
 
     const openLibraryFontEntry = useOpenLibraryFontEntry({
+      fonts,
       resolveSessionFontForLibraryEntry,
       setClosedLibraryFontIds,
       safeSelectFont,

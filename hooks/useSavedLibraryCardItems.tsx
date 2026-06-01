@@ -24,6 +24,16 @@ import type {
   SavedLibraryCardViewItem,
   SavedLibraryCatalogSearchRow,
 } from '../types/savedLibraryCard';
+import type { OpenLibraryFontEntryOptions } from './useOpenLibraryFontEntry';
+
+function DuplicateIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>
+      <rect x="7" y="3" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="3" y="5" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
 
 type SavedLibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
 
@@ -42,7 +52,10 @@ type UseSavedLibraryCardItemsParams = {
   savedLibraryCardMetaClassName: string;
   savedLibraryHideDownloadLabel: boolean;
   resolveSessionFontForLibraryEntry: (font: SavedLibraryFontEntry) => SessionFontRecord | null | undefined;
-  openLibraryFontEntry: (font: SavedLibraryFontEntry) => void | Promise<void>;
+  openLibraryFontEntry: (
+    font: SavedLibraryFontEntry,
+    options?: OpenLibraryFontEntryOptions,
+  ) => void | Promise<void>;
   onSavedLibrarySelectionCardClick: (event: React.MouseEvent, fontId: string) => void;
   startSavedLibraryCardLongPress: (event: React.PointerEvent, fontId: string) => void;
   clearSavedLibraryLongPressTimer: () => void;
@@ -134,6 +147,18 @@ export function useSavedLibraryCardItems({
                   icon: <OpenExternalIcon />,
                   onSelect: () => {
                     void openLibraryFontEntry(font);
+                  },
+                },
+              ]
+            : []),
+          ...(canOpenInEditor && sessionFont
+            ? [
+                {
+                  key: 'duplicate',
+                  label: 'Дублировать',
+                  icon: <DuplicateIcon />,
+                  onSelect: () => {
+                    void openLibraryFontEntry(font, { forceDuplicate: true });
                   },
                 },
               ]

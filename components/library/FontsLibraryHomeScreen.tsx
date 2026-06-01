@@ -215,7 +215,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                         inline={savedLibraryToolbarViewportW > 1440}
                       />
                     </div>
-                    <div className="relative flex min-w-0 items-center justify-end gap-2">
+                    <div className="relative flex min-w-0 items-center justify-start gap-2">
                       <button
                         type="button"
                         onClick={handleResetSavedLibraryFilters}
@@ -224,10 +224,10 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                           String(savedLibraryFontsScope || 'all') === 'all' &&
                           !savedLibrarySearchQueryTrimmed
                         }
-                        className={`box-border h-10 flex-1 justify-left whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent transition-all duration-300 disabled:cursor-default disabled:opacity-40 disabled:text-gray-900 ${
+                        className={`box-border h-10 shrink-0 justify-start whitespace-nowrap px-2 text-left text-sm font-semibold uppercase text-accent transition-all duration-300 disabled:cursor-default disabled:opacity-40 disabled:text-gray-900 ${
                           savedLibrarySearchActive
-                            ? 'pointer-events-none w-0 min-w-0 flex-none overflow-hidden p-0 opacity-0'
-                            : 'min-w-0 flex-1 opacity-100'
+                            ? 'pointer-events-none w-0 min-w-0 overflow-hidden p-0 opacity-0'
+                            : 'opacity-100'
                         }`}
                       >
                         {savedLibraryResetLabel}
@@ -370,7 +370,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                     </div>
                     <div
                       className={
-                        savedLibraryToolbarIs4Col ? 'flex min-w-0 items-center justify-end' : 'min-w-0'
+                        savedLibraryToolbarIs4Col ? 'flex min-w-0 items-center justify-start' : 'min-w-0'
                       }
                     >
                       <button

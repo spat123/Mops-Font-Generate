@@ -17,10 +17,20 @@ import {
   resolveFontfabricTrialCatalogItem,
   resolveFontshareCatalogItem,
 } from '../utils/catalogCacheLookup';
+import {
+  buildSessionFontDuplicateUploadInput,
+  findFontsourceFontInSession,
+  findGoogleFontInSession,
+  focusSessionFontInEditor,
+} from '../utils/fontLibraryUtils';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type { EditorFontUploadInput } from './useEditorFontNav';
 
 type LibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
+
+export type OpenLibraryFontEntryOptions = {
+  forceDuplicate?: boolean;
+};
 
 type GoogleCatalogEntry = Record<string, unknown> & {
   family?: string;
@@ -34,6 +44,7 @@ type GoogleCatalogEntry = Record<string, unknown> & {
 };
 
 type UseOpenLibraryFontEntryParams = {
+  fonts: SessionFontRecord[];
   resolveSessionFontForLibraryEntry: (entry: LibraryFontEntry) => SessionFontRecord | null | undefined;
   setClosedLibraryFontIds: Dispatch<SetStateAction<string[]>>;
   safeSelectFont: (font: SessionFontRecord) => void;
@@ -53,6 +64,7 @@ type UseOpenLibraryFontEntryParams = {
  * Открытие записи из сохранённой библиотеки в редактор.
  */
 export function useOpenLibraryFontEntry({
+  fonts,
   resolveSessionFontForLibraryEntry,
   setClosedLibraryFontIds,
   safeSelectFont,
@@ -60,18 +72,37 @@ export function useOpenLibraryFontEntry({
   selectOrAddFontsourceFontWithNav,
   handleFontsUploadedWithNav,
 }: UseOpenLibraryFontEntryParams) {
+  const focusExisting = useCallback(
+    (font: SessionFontRecord) => {
+      focusSessionFontInEditor(font, { setClosedLibraryFontIds, safeSelectFont, setMainTab });
+    },
+    [safeSelectFont, setClosedLibraryFontIds, setMainTab],
+  );
+
   return useCallback(
-    async (fontEntry: LibraryFontEntry | null | undefined) => {
+    async (
+      fontEntry: LibraryFontEntry | null | undefined,
+      options: OpenLibraryFontEntryOptions = {},
+    ) => {
       if (!fontEntry) return;
+      const forceDuplicate = options.forceDuplicate === true;
       const entryId = String(fontEntry.id || '').trim();
       const entryLabel = String(fontEntry.label || '').trim();
       const entrySource = String(fontEntry.source || 'editor').trim();
       const sessionFont = resolveSessionFontForLibraryEntry(fontEntry);
 
-      if (sessionFont) {
-        setClosedLibraryFontIds((prev) => prev.filter((id) => id !== sessionFont.id));
-        safeSelectFont(sessionFont);
-        setMainTab(sessionFont.id);
+      if (forceDuplicate && sessionFont) {
+        const duplicatePayload = buildSessionFontDuplicateUploadInput(sessionFont);
+        if (duplicatePayload) {
+          await handleFontsUploadedWithNav([duplicatePayload as EditorFontUploadInput], {
+            silent: true,
+          });
+          return;
+        }
+      }
+
+      if (sessionFont && !forceDuplicate) {
+        focusExisting(sessionFont);
         return;
       }
 
@@ -80,6 +111,13 @@ export function useOpenLibraryFontEntry({
         if (!slug) {
           toast.info(`Не удалось определить пакет Fontsource для ${entryLabel || 'шрифта'}`);
           return;
+        }
+        if (!forceDuplicate) {
+          const existing = findFontsourceFontInSession(fonts, slug);
+          if (existing) {
+            focusExisting(existing);
+            return;
+          }
         }
         await selectOrAddFontsourceFontWithNav(
           slug,
@@ -91,6 +129,13 @@ export function useOpenLibraryFontEntry({
 
       if (entrySource === 'google') {
         const family = entryLabel;
+        if (!forceDuplicate) {
+          const existing = findGoogleFontInSession(fonts, family);
+          if (existing) {
+            focusExisting(existing);
+            return;
+          }
+        }
         const catalogEntry = readGoogleFontCatalogCache().find(
           (item) => String(item?.family || '').trim().toLowerCase() === family.toLowerCase(),
         ) as GoogleCatalogEntry | undefined;
@@ -184,12 +229,11 @@ export function useOpenLibraryFontEntry({
       }
     },
     [
+      focusExisting,
+      fonts,
       handleFontsUploadedWithNav,
       resolveSessionFontForLibraryEntry,
-      safeSelectFont,
       selectOrAddFontsourceFontWithNav,
-      setClosedLibraryFontIds,
-      setMainTab,
     ],
   );
 }

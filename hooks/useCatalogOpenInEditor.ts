@@ -1,5 +1,10 @@
 import { useCallback, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { toast } from '../utils/appNotify';
+import {
+  findFontshareFontInSession,
+  findGoogleFontInSession,
+  focusSessionFontInEditor,
+} from '../utils/fontLibraryUtils';
 import { readFontshareCatalogCache } from '../utils/fontshareCatalogCache';
 import { fetchFontshareEditorSliceBlob } from '../utils/catalogDownloadActions';
 import {
@@ -27,6 +32,7 @@ type GoogleCatalogEntry = Record<string, unknown> & {
 };
 
 type UseCatalogOpenInEditorParams = {
+  fonts: SessionFontRecord[];
   handleFontsUploaded: (
     items: EditorFontUploadInput[],
     options?: { silent?: boolean },
@@ -36,6 +42,8 @@ type UseCatalogOpenInEditorParams = {
     forceVariableFont?: boolean,
     options?: { silent?: boolean },
   ) => Promise<SessionFontRecord | null | undefined>;
+  safeSelectFont: (font: SessionFontRecord) => void;
+  setClosedLibraryFontIds: Dispatch<SetStateAction<string[]>>;
   mainTab: string;
   setMainTab: Dispatch<SetStateAction<string>>;
   setEmptySlotIds: Dispatch<SetStateAction<string[]>>;
@@ -48,8 +56,11 @@ type UseCatalogOpenInEditorParams = {
  * Открытие шрифта из каталога / share-query в сессию редактора.
  */
 export function useCatalogOpenInEditor({
+  fonts,
   handleFontsUploaded,
   selectOrAddFontsourceFont,
+  safeSelectFont,
+  setClosedLibraryFontIds,
   mainTab,
   setMainTab,
   setEmptySlotIds,
@@ -57,6 +68,12 @@ export function useCatalogOpenInEditor({
   fileInputRef,
   setFileUploadTarget,
 }: UseCatalogOpenInEditorParams) {
+  const focusExisting = useCallback(
+    (font: SessionFontRecord) => {
+      focusSessionFontInEditor(font, { setClosedLibraryFontIds, safeSelectFont, setMainTab });
+    },
+    [safeSelectFont, setClosedLibraryFontIds, setMainTab],
+  );
   const { handleFontsUploadedWithNav, selectOrAddFontsourceFontWithNav } = useEditorFontNav({
     handleFontsUploaded,
     selectOrAddFontsourceFont,
@@ -70,6 +87,11 @@ export function useCatalogOpenInEditor({
     async (catalogEntry: GoogleCatalogEntry) => {
       if (!catalogEntry?.family) return;
       const family = String(catalogEntry.family);
+      const existing = findGoogleFontInSession(fonts, family);
+      if (existing) {
+        focusExisting(existing);
+        return;
+      }
       try {
         const subsetList = Array.isArray(catalogEntry.subsets) ? catalogEntry.subsets : [];
         const defaultSubset = resolveDefaultCatalogSubset(subsetList);
@@ -120,7 +142,7 @@ export function useCatalogOpenInEditor({
         toast.error(`Не удалось открыть ${family}`);
       }
     },
-    [handleFontsUploadedWithNav],
+    [focusExisting, fonts, handleFontsUploadedWithNav],
   );
 
   const openFontsourceSlugInEditorTab = useCallback(
@@ -135,6 +157,11 @@ export function useCatalogOpenInEditor({
     async (slug: string) => {
       const key = String(slug || '').trim();
       if (!key) return;
+      const existing = findFontshareFontInSession(fonts, key);
+      if (existing) {
+        focusExisting(existing);
+        return;
+      }
       const item =
         readFontshareCatalogCache().find(
           (row) => String(row?.slug || row?.id || '').trim().toLowerCase() === key.toLowerCase(),
@@ -163,7 +190,7 @@ export function useCatalogOpenInEditor({
         toast.error(`Не удалось открыть ${item.family || key}`);
       }
     },
-    [handleFontsUploadedWithNav],
+    [focusExisting, fonts, handleFontsUploadedWithNav],
   );
 
   const openFontfabricTrialPage = useCallback((item: { trialUrl?: string }) => {

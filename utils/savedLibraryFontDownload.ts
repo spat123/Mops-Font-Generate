@@ -22,6 +22,7 @@ import { buildSafeFileBase, saveBlobAsFile } from './fileDownloadUtils';
 import { buildLocalStylePickerProps } from './fontDownloadStylePicker';
 import { buildCatalogDownloadButtonProps } from '../components/catalog/buildCatalogDownloadButtonProps';
 import { buildCatalogTrialDownloadProps } from '../components/catalog/buildCatalogSourceDownloadProps';
+import { isCatalogExternalDownloadButtonProps } from '../components/catalog/catalogExternalDownload';
 import {
   parseFontfabricTrialEntrySlug,
   parseFontshareEntrySlug,
@@ -99,7 +100,14 @@ function wrapSavedLibraryDownloadProps(
       menuItems: [],
     };
   }
-  return { ...SAVED_LIBRARY_DOWNLOAD_CHROME, ...download };
+  const external = isCatalogExternalDownloadButtonProps(download);
+  return {
+    ...SAVED_LIBRARY_DOWNLOAD_CHROME,
+    ...download,
+    className: external
+      ? '!w-auto !max-w-none shrink-0'
+      : SAVED_LIBRARY_DOWNLOAD_CHROME.className,
+  };
 }
 
 /**

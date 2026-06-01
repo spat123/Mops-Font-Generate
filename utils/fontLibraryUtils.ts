@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type { SavedLibraryFontEntry } from '../types/savedLibrary';
 
@@ -239,20 +240,103 @@ export function getFontIdsToRemoveWhenLibraryDeleted(
   return out;
 }
 
-export function isGoogleFontInSession(fonts: SessionFontRecord[] | null | undefined, family: string): boolean {
-  return (Array.isArray(fonts) ? fonts : []).some(
-    (font) =>
-      font?.source === 'google' &&
-      (font.originalName === `${family}.woff2` ||
-        font.name === family ||
-        font.displayName === family),
+function normalizeCatalogFamilyKey(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+export function findGoogleFontInSession(
+  fonts: SessionFontRecord[] | null | undefined,
+  family: string,
+): SessionFontRecord | null {
+  const target = normalizeCatalogFamilyKey(family);
+  if (!target) return null;
+  return (
+    (Array.isArray(fonts) ? fonts : []).find((font) => {
+      if (font?.source !== 'google') return false;
+      const name = normalizeCatalogFamilyKey(font.name);
+      const display = normalizeCatalogFamilyKey(font.displayName);
+      const original = String(font.originalName || '').trim().toLowerCase();
+      return (
+        name === target ||
+        display === target ||
+        original === `${target}.woff2`
+      );
+    }) || null
   );
 }
 
-export function isFontsourceFontInSession(fonts: SessionFontRecord[] | null | undefined, slug: string): boolean {
-  return (Array.isArray(fonts) ? fonts : []).some(
-    (font) => font?.source === 'fontsource' && font.name === slug,
+export function findFontsourceFontInSession(
+  fonts: SessionFontRecord[] | null | undefined,
+  slug: string,
+): SessionFontRecord | null {
+  const target = normalizeCatalogFamilyKey(slug);
+  if (!target) return null;
+  return (
+    (Array.isArray(fonts) ? fonts : []).find(
+      (font) => font?.source === 'fontsource' && normalizeCatalogFamilyKey(font.name) === target,
+    ) || null
   );
+}
+
+export function findFontshareFontInSession(
+  fonts: SessionFontRecord[] | null | undefined,
+  slug: string,
+): SessionFontRecord | null {
+  const target = String(slug || '').trim();
+  if (!target) return null;
+  const targetLower = target.toLowerCase();
+  return (
+    (Array.isArray(fonts) ? fonts : []).find(
+      (font) =>
+        font?.source === 'fontshare' &&
+        (font.name === target || font.originKey === `fontshare:${target}` || font.name?.toLowerCase() === targetLower),
+    ) || null
+  );
+}
+
+export function isGoogleFontInSession(fonts: SessionFontRecord[] | null | undefined, family: string): boolean {
+  return findGoogleFontInSession(fonts, family) != null;
+}
+
+export function isFontsourceFontInSession(fonts: SessionFontRecord[] | null | undefined, slug: string): boolean {
+  return findFontsourceFontInSession(fonts, slug) != null;
+}
+
+export function buildSessionFontDuplicateUploadInput(
+  sessionFont: SessionFontRecord | null | undefined,
+): Record<string, unknown> & { file: Blob; name: string } | null {
+  if (!sessionFont || !(sessionFont.file instanceof Blob) || sessionFont.file.size === 0) {
+    return null;
+  }
+  const { id: _id, url: _url, ...rest } = sessionFont;
+  const name =
+    String(sessionFont.originalName || '').trim() ||
+    String(sessionFont.name || '').trim() ||
+    'font.woff2';
+  return {
+    ...rest,
+    file: sessionFont.file,
+    name,
+  };
+}
+
+export function focusSessionFontInEditor(
+  font: SessionFontRecord,
+  {
+    setClosedLibraryFontIds,
+    safeSelectFont,
+    setMainTab,
+  }: {
+    setClosedLibraryFontIds: Dispatch<SetStateAction<string[]>>;
+    safeSelectFont: (font: SessionFontRecord) => void;
+    setMainTab: Dispatch<SetStateAction<string>>;
+  },
+): void {
+  const fontId = String(font.id || '').trim();
+  if (!fontId) return;
+  setClosedLibraryFontIds((prev) => prev.filter((id) => id !== fontId));
+  safeSelectFont(font);
+  setMainTab(fontId);
 }
 
 export function isFontshareFontInSession(fonts: SessionFontRecord[] | null | undefined, slug: string): boolean {

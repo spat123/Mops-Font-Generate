@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import type { CatalogDownloadButtonProps } from '../../types/catalog';
+import { CATALOG_EXTERNAL_DOWNLOAD_PRIMARY_LABEL } from './catalogExternalDownload';
 
 export type CatalogDownloadSplitButtonProps = CatalogDownloadButtonProps & {
   disabled?: boolean;
@@ -364,7 +365,17 @@ export function CatalogDownloadSplitButton({
         ) : (
           <EditAssetIcon src={downloudIconUrl} className="h-4 w-4" />
         )}
-        {!hidePrimaryLabel ? <span className="truncate">{effectivePrimaryLabel}</span> : null}
+        {!hidePrimaryLabel ? (
+          <span
+            className={
+              effectivePrimaryLabel === CATALOG_EXTERNAL_DOWNLOAD_PRIMARY_LABEL
+                ? 'whitespace-nowrap'
+                : 'truncate'
+            }
+          >
+            {effectivePrimaryLabel}
+          </span>
+        ) : null}
         {showCountBadge ? <span className={countBadgeClassName}>{primaryCount}</span> : null}
       </button>
       {showSecondary ? (
