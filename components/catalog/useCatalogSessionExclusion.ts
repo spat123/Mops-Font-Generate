@@ -13,8 +13,8 @@ export type UseCatalogSessionExclusionParams<T> = {
 };
 
 /**
- * Общий фильтр: "показываем в каталоге только то, чего ещё нет в сессии/библиотеках",
- * но при этом оставляем видимыми ключи, которые сейчас добавляются или только что добавлены (sticky).
+ * Фильтр каталога: скрываем только то, что уже в сессии редактора;
+ * записи в сохранённых библиотеках остаются в каталоге (libraryFontEntryIds — для UI «+»).
  */
 export function useCatalogSessionExclusion<T>({
   items,
@@ -42,14 +42,13 @@ export function useCatalogSessionExclusion<T>({
     return list.filter((item) => {
       const key = getKey?.(item);
       if (!key) return false;
-      const libraryEntryId = `${sourcePrefix}:${key}`;
       return (
-        (!isInSession?.(fonts, key) && !libraryFontEntryIds.has(libraryEntryId)) ||
+        !isInSession?.(fonts, key) ||
         addingKey === key ||
         Boolean(recentlyAddedSet?.has?.(key))
       );
     });
-  }, [items, getKey, sourcePrefix, isInSession, fonts, libraryFontEntryIds, addingKey, recentlyAddedSet]);
+  }, [items, getKey, isInSession, fonts, addingKey, recentlyAddedSet]);
 
   return { libraryFontEntryIds, itemsNotInSession };
 }

@@ -40,7 +40,7 @@ import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useStickyTimedSet } from '../components/ui/useStickyTimedSet';
 import { useSavedLibrarySelection } from './useSavedLibrarySelection';
 import { useLibraryFontSessionLookup } from './useLibraryFontSessionLookup';
-import { EDITOR_MAIN_TAB_PENDING } from '../utils/editorShellStorage';
+import { EDITOR_MAIN_TAB_PENDING, isFontTabId } from '../utils/editorShellStorage';
 import { useEditorShellPersistence } from './useEditorShellPersistence';
 import { useSessionFontTabsPreviewCache } from './useSessionFontTabsPreviewCache';
 import { buildEditorHomeLayoutProps } from './buildEditorHomeLayoutProps';
@@ -197,6 +197,7 @@ export function useEditorHomePage(router: NextRouter) {
       handleDeleteSavedLibrary,
       handleMoveLibraryFont,
       addFontEntryToLibrary,
+      duplicateLibraryFontEntryInLibrary,
       handleLibraryTabDragOver,
       handleLibraryTabDrop,
       moveFontEntryToLibrary,
@@ -439,6 +440,17 @@ export function useEditorHomePage(router: NextRouter) {
         setSelectedFont(fresh);
       }
     }, [fonts, selectedFont, setSelectedFont]);
+
+    /** При клике по вкладке шрифта — восстановить selectedFont и настройки превью. */
+    useEffect(() => {
+      if (!isInitialLoadComplete) return;
+      if (!isFontTabId(mainTab)) return;
+      const tabFont = fonts.find((font) => font.id === mainTab);
+      if (!tabFont) return;
+      if (selectedFont?.id !== mainTab) {
+        safeSelectFont(tabFont);
+      }
+    }, [fonts, isInitialLoadComplete, mainTab, safeSelectFont, selectedFont?.id]);
 
     const savedLibrarySearchQueryState = useSavedLibrarySearchQuery();
     const { resetSavedLibrarySearch } = savedLibrarySearchQueryState;
@@ -722,12 +734,12 @@ export function useEditorHomePage(router: NextRouter) {
       onSavedLibrarySelectionCardClick,
       startSavedLibraryCardLongPress,
       clearSavedLibraryLongPressTimer,
-      moveSingleSavedLibraryFont,
       openLibraryShareDialog,
       handleUpdateSavedLibrary,
       openGoogleCatalogEntryInEditorTab,
       openFontsourceSlugInEditorTab,
       addFontEntryToLibrary,
+      duplicateLibraryFontEntryInLibrary,
       savedLibraryCatalogAddBusyId,
       setSavedLibraryCatalogAddBusyId,
       savedLibraryCatalogRecentlyAddedSet,

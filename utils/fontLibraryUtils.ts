@@ -131,6 +131,44 @@ export type CreateCatalogLibraryEntryParams = {
   isVariable?: boolean;
 };
 
+/** Ключ семейства каталога для записи библиотеки (без суффикса :dup:N). */
+export function getLibraryEntryCatalogKey(
+  fontEntry: Pick<SavedLibraryFontEntry, 'id' | 'source'> | null | undefined,
+): string | null {
+  const id = String(fontEntry?.id || '').trim();
+  const source = String(fontEntry?.source || '').trim();
+  if (!id || !source) return null;
+  if (source === 'google') {
+    const raw = id.replace(/^google:/i, '').replace(/:dup:\d+$/i, '').trim();
+    return raw ? `google:${normalizeLibraryText(raw).toLowerCase()}` : null;
+  }
+  if (source === 'fontsource') {
+    const raw = id.replace(/^fontsource:/i, '').replace(/:dup:\d+$/i, '').trim();
+    return raw ? `fontsource:${normalizeLibraryText(raw).toLowerCase()}` : null;
+  }
+  if (source === 'fontshare') {
+    const raw = id.replace(/^fontshare:/i, '').replace(/:dup:\d+$/i, '').trim();
+    return raw ? `fontshare:${normalizeLibraryText(raw).toLowerCase()}` : null;
+  }
+  return `${source}:${id.toLowerCase()}`;
+}
+
+export function countSameCatalogFontInLibrary(
+  fontEntry: SavedLibraryFontEntry | null | undefined,
+  libraryFonts: SavedLibraryFontEntry[] | null | undefined,
+): number {
+  const key = getLibraryEntryCatalogKey(sanitizeLibraryFont(fontEntry) || fontEntry);
+  if (!key) return 0;
+  return (Array.isArray(libraryFonts) ? libraryFonts : []).filter(
+    (item) => getLibraryEntryCatalogKey(item) === key,
+  ).length;
+}
+
+export function formatLibraryPickerLabel(libraryName: string, matchCount: number): string {
+  const name = String(libraryName || '').trim() || 'Библиотека';
+  return matchCount > 0 ? `${name} (${matchCount})` : name;
+}
+
 export function createCatalogLibraryEntry({
   source,
   key,
@@ -244,25 +282,82 @@ function normalizeCatalogFamilyKey(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function googleSessionFamilyKeys(font: SessionFontRecord): Set<string> {
+  const keys = new Set<string>();
+  const add = (value: unknown) => {
+    const raw = normalizeCatalogFamilyKey(value);
+    if (!raw) return;
+    keys.add(raw);
+    const withoutVariable = raw.replace(/\s+variable$/i, '').trim();
+    if (withoutVariable) keys.add(withoutVariable);
+  };
+  add(font.name);
+  add(font.displayName);
+  add(String(font.originalName || '').replace(/\.woff2$/i, ''));
+  return keys;
+}
+
 export function findGoogleFontInSession(
   fonts: SessionFontRecord[] | null | undefined,
   family: string,
 ): SessionFontRecord | null {
   const target = normalizeCatalogFamilyKey(family);
   if (!target) return null;
+  const targetBase = target.replace(/\s+variable$/i, '').trim();
   return (
     (Array.isArray(fonts) ? fonts : []).find((font) => {
       if (font?.source !== 'google') return false;
-      const name = normalizeCatalogFamilyKey(font.name);
-      const display = normalizeCatalogFamilyKey(font.displayName);
-      const original = String(font.originalName || '').trim().toLowerCase();
-      return (
-        name === target ||
-        display === target ||
-        original === `${target}.woff2`
-      );
+      const keys = googleSessionFamilyKeys(font);
+      return keys.has(target) || (targetBase ? keys.has(targetBase) : false);
     }) || null
   );
+}
+
+/** Копия записи в той же библиотеке: «Roboto 2», id `google:roboto:dup:2`. */
+export function buildDuplicatedLibraryFontEntry(
+  fontEntry: SavedLibraryFontEntry,
+  libraryFonts: SavedLibraryFontEntry[] | null | undefined,
+): SavedLibraryFontEntry | null {
+  const base = sanitizeLibraryFont(fontEntry);
+  if (!base) return null;
+  const rootLabel = String(base.label || '')
+    .trim()
+    .replace(/\s+\d+$/i, '')
+    .trim();
+  if (!rootLabel) return null;
+
+  const labelPattern = new RegExp(`^${escapeRegExp(rootLabel)}(?:\\s+(\\d+))?$`, 'i');
+  let maxLabelSuffix = 1;
+  for (const item of Array.isArray(libraryFonts) ? libraryFonts : []) {
+    const match = String(item?.label || '').trim().match(labelPattern);
+    if (!match) continue;
+    maxLabelSuffix = Math.max(maxLabelSuffix, match[1] ? Number.parseInt(match[1], 10) : 1);
+  }
+  const nextLabelSuffix = maxLabelSuffix + 1;
+  const label = `${rootLabel} ${nextLabelSuffix}`;
+
+  const rootId = String(base.id || '').replace(/:dup:\d+$/i, '').trim();
+  let maxDupSuffix = 1;
+  for (const item of Array.isArray(libraryFonts) ? libraryFonts : []) {
+    const itemId = String(item?.id || '').trim();
+    if (itemId === rootId) maxDupSuffix = Math.max(maxDupSuffix, 1);
+    const dupMatch = itemId.match(/:dup:(\d+)$/i);
+    if (dupMatch && itemId.startsWith(`${rootId}:dup:`)) {
+      maxDupSuffix = Math.max(maxDupSuffix, Number.parseInt(dupMatch[1], 10));
+    }
+  }
+  const nextDupSuffix = maxDupSuffix + 1;
+  const id = `${rootId}:dup:${nextDupSuffix}`;
+
+  return stampLibraryFontAddedNow({
+    ...base,
+    id,
+    label,
+  });
 }
 
 export function findFontsourceFontInSession(

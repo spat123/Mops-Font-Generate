@@ -26,7 +26,13 @@ export function useEditorTabBarModel({
   tabStripPreviewFromCache,
 }: UseEditorTabBarModelParams) {
   const sidebarSelectedFont = useMemo(() => {
-    if (isFontTabId(mainTab)) return selectedFont;
+    if (isFontTabId(mainTab)) {
+      const tabFont = fonts.find((font) => font.id === mainTab) || null;
+      if (tabFont) {
+        return selectedFont?.id === mainTab ? selectedFont : tabFont;
+      }
+      return selectedFont?.id === mainTab ? selectedFont : null;
+    }
     if (mainTab.startsWith(EMPTY_PREFIX)) {
       const slotId = mainTab.slice(EMPTY_PREFIX.length);
       const slotFont = catalogPreviewSlotsById?.[slotId] || null;
@@ -35,7 +41,7 @@ export function useEditorTabBarModel({
       return slotFont;
     }
     return null;
-  }, [mainTab, selectedFont, catalogPreviewSlotsById]);
+  }, [catalogPreviewSlotsById, fonts, mainTab, selectedFont]);
 
   const fontTabPlaceholders = useMemo(() => {
     if (fonts.length > 0) return null;

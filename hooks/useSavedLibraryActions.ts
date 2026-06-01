@@ -5,7 +5,12 @@ import {
   notifyFontAlreadyInLibrary,
   notifyFontMovedToLibrary,
 } from '../components/ui/FontLibraryToastNotifications';
-import { getFontIdsToRemoveWhenLibraryDeleted, stampLibraryFontAddedNow } from '../utils/fontLibraryUtils';
+import {
+  buildDuplicatedLibraryFontEntry,
+  countSameCatalogFontInLibrary,
+  getFontIdsToRemoveWhenLibraryDeleted,
+  stampLibraryFontAddedNow,
+} from '../utils/fontLibraryUtils';
 import { readLibraryFontDragData } from '../utils/libraryDragData';
 import { makeSavedLibraryTabId, readSavedLibraryId } from '../utils/savedLibraryTabIds';
 import {
@@ -141,15 +146,34 @@ export function useSavedLibraryActions({
     [reorderLibraryFonts],
   );
 
+  const duplicateLibraryFontEntryInLibrary = useCallback(
+    (libraryId: string, fontEntry: LibraryFontEntry) => {
+      const targetLibrary = fontLibraries.find((library) => library.id === libraryId);
+      if (!targetLibrary) return false;
+      const duplicate = buildDuplicatedLibraryFontEntry(fontEntry, targetLibrary.fonts || []);
+      if (!duplicate) {
+        toast.error('Не удалось дублировать запись в библиотеке');
+        return false;
+      }
+      handleUpdateSavedLibrary(libraryId, {
+        fonts: [...(targetLibrary.fonts || []), duplicate],
+      });
+      toast.success(`Добавлена копия «${duplicate.label}»`);
+      prefetchLibraryEntry(duplicate);
+      return true;
+    },
+    [fontLibraries, handleUpdateSavedLibrary, prefetchLibraryEntry],
+  );
+
   const addFontEntryToLibrary = useCallback(
     (libraryId: string, fontEntry: LibraryFontEntry) => {
       const entry = stampLibraryFontAddedNow(fontEntry);
       if (!entry) return false;
       const targetLibrary = fontLibraries.find((library) => library.id === libraryId);
       if (!targetLibrary) return false;
-      if (targetLibrary.fonts?.some((item) => item.id === entry.id)) {
-        notifyFontAlreadyInLibrary(entry.label, targetLibrary.name);
-        return false;
+      const existingCount = countSameCatalogFontInLibrary(entry, targetLibrary.fonts || []);
+      if (existingCount > 0 || targetLibrary.fonts?.some((item) => item.id === entry.id)) {
+        return duplicateLibraryFontEntryInLibrary(libraryId, fontEntry);
       }
       handleUpdateSavedLibrary(libraryId, {
         fonts: [...(targetLibrary.fonts || []), entry],
@@ -254,6 +278,7 @@ export function useSavedLibraryActions({
     handleDeleteSavedLibrary,
     handleMoveLibraryFont,
     addFontEntryToLibrary,
+    duplicateLibraryFontEntryInLibrary,
     handleLibraryTabDragOver,
     handleLibraryTabDrop,
     moveFontEntryToLibrary,

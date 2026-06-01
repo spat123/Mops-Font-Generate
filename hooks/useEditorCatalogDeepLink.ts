@@ -3,6 +3,7 @@ import type { NextRouter } from 'next/router';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 
 const editorDeepLinkTasks = new Map<string, Promise<void>>();
+const editorDeepLinkInFlight = new Set<string>();
 
 type UseEditorCatalogDeepLinkParams = {
   router: NextRouter;
@@ -38,8 +39,13 @@ export function useEditorCatalogDeepLink({
     if (!family && !slug) return;
 
     const linkKey = family ? `google:${family}:${googleVar ? '1' : '0'}` : `fontsource:${slug}:${fsVar ? '1' : '0'}`;
+    if (editorDeepLinkInFlight.has(linkKey)) return;
+    editorDeepLinkInFlight.add(linkKey);
     const existingTask = editorDeepLinkTasks.get(linkKey);
-    if (existingTask) return;
+    if (existingTask) {
+      editorDeepLinkInFlight.delete(linkKey);
+      return;
+    }
 
     const stripOpenQuery = async () => {
       const nextQuery = { ...router.query };
@@ -92,6 +98,7 @@ export function useEditorCatalogDeepLink({
 
     editorDeepLinkTasks.set(linkKey, task);
     void task.finally(() => {
+      editorDeepLinkInFlight.delete(linkKey);
       if (editorDeepLinkTasks.get(linkKey) === task) {
         editorDeepLinkTasks.delete(linkKey);
       }

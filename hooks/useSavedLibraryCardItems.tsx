@@ -10,6 +10,10 @@ import {
   savedLibraryFontCanOpenInEditor,
 } from '../utils/fontLibraryUtils';
 import {
+  countSameCatalogFontInLibrary,
+  formatLibraryPickerLabel,
+} from '../utils/fontLibraryUtils';
+import {
   downloadGoogleAsFormat,
   downloadGooglePackageZip,
   downloadGoogleVariableVariant,
@@ -59,15 +63,12 @@ type UseSavedLibraryCardItemsParams = {
   onSavedLibrarySelectionCardClick: (event: React.MouseEvent, fontId: string) => void;
   startSavedLibraryCardLongPress: (event: React.PointerEvent, fontId: string) => void;
   clearSavedLibraryLongPressTimer: () => void;
-  moveSingleSavedLibraryFont: (
-    font: SavedLibraryFontEntry,
-    targetLibraryId: string,
-  ) => void | Promise<boolean>;
   openLibraryShareDialog: (libraryId: string, options?: { onlyFontIds?: string[] }) => void;
   handleUpdateSavedLibrary: (libraryId: string, draft: Partial<SavedLibraryRecord>) => void;
   openGoogleCatalogEntryInEditorTab: (entry: Record<string, unknown>) => void;
   openFontsourceSlugInEditorTab: (slug: string, isVariable?: boolean) => void;
   addFontEntryToLibrary: (libraryId: string, libraryEntry: SavedLibraryFontEntry) => boolean;
+  duplicateLibraryFontEntryInLibrary: (libraryId: string, fontEntry: SavedLibraryFontEntry) => boolean;
   savedLibraryCatalogAddBusyId: string | null;
   setSavedLibraryCatalogAddBusyId: (id: string | null) => void;
   savedLibraryCatalogRecentlyAddedSet: Set<string>;
@@ -93,12 +94,12 @@ export function useSavedLibraryCardItems({
   onSavedLibrarySelectionCardClick,
   startSavedLibraryCardLongPress,
   clearSavedLibraryLongPressTimer,
-  moveSingleSavedLibraryFont,
   openLibraryShareDialog,
   handleUpdateSavedLibrary,
   openGoogleCatalogEntryInEditorTab,
   openFontsourceSlugInEditorTab,
   addFontEntryToLibrary,
+  duplicateLibraryFontEntryInLibrary,
   savedLibraryCatalogAddBusyId,
   setSavedLibraryCatalogAddBusyId,
   savedLibraryCatalogRecentlyAddedSet,
@@ -129,6 +130,12 @@ export function useSavedLibraryCardItems({
         onPointerUp: clearSavedLibraryLongPressTimer,
         onPointerLeave: clearSavedLibraryLongPressTimer,
         onPointerCancel: clearSavedLibraryLongPressTimer,
+        onOpen: canOpenInEditor
+          ? () => {
+              void openLibraryFontEntry(font);
+            }
+          : undefined,
+        openAriaLabel: font.label ? `Открыть ${font.label} в редакторе` : 'Открыть в редакторе',
         downloadSplitButtonProps: (() => {
           const props = buildSavedLibraryDownloadSplitButtonProps(font, sessionFont);
           if (!props) return null;
@@ -158,14 +165,15 @@ export function useSavedLibraryCardItems({
                   label: 'Дублировать',
                   icon: <DuplicateIcon />,
                   onSelect: () => {
-                    void openLibraryFontEntry(font, { forceDuplicate: true });
+                    if (!activeSavedLibrary?.id) return;
+                    duplicateLibraryFontEntryInLibrary(activeSavedLibrary.id, font);
                   },
                 },
               ]
             : []),
           {
             key: 'move',
-            label: 'Переместить',
+            label: 'В библиотеку',
             icon: (
               <img
                 src={moveAndSwapIconUrl}
@@ -182,13 +190,20 @@ export function useSavedLibraryCardItems({
                 const emptyLabel = fontLibraries?.length ? 'Других библиотек нет' : 'Библиотек нет';
                 return [{ key: 'move-empty', label: emptyLabel, disabled: true }];
               }
-              return targets.map((library) => ({
-                key: `move-${library.id}`,
-                label: library.name,
-                onSelect: () => {
-                  void moveSingleSavedLibraryFont(font, library.id);
-                },
-              }));
+              return targets.map((library) => {
+                const matchCount = countSameCatalogFontInLibrary(font, library.fonts || []);
+                return {
+                  key: `move-${library.id}`,
+                  label: formatLibraryPickerLabel(library.name, matchCount),
+                  onSelect: () => {
+                    if (matchCount > 0) {
+                      duplicateLibraryFontEntryInLibrary(library.id, font);
+                      return;
+                    }
+                    addFontEntryToLibrary(library.id, font);
+                  },
+                };
+              });
             })(),
           },
           {
@@ -220,7 +235,6 @@ export function useSavedLibraryCardItems({
     fontLibraries,
     handleUpdateSavedLibrary,
     mainTab,
-    moveSingleSavedLibraryFont,
     onSavedLibrarySelectionCardClick,
     openLibraryFontEntry,
     openLibraryShareDialog,
@@ -362,6 +376,7 @@ export function useSavedLibraryCardItems({
   }, [
     activeSavedLibrary,
     addFontEntryToLibrary,
+    duplicateLibraryFontEntryInLibrary,
     buildSavedLibraryCardMetaSplit,
     catalogSearchResults,
     markSavedLibraryCatalogRecentlyAdded,

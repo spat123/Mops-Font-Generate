@@ -326,7 +326,7 @@ function CollapsedLibraryRail({
   return (
     <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col items-stretch">
       <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2">
-        <div className="editor-sidebar-scroll flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-y-auto overscroll-contain pb-1">
+        <div className="editor-sidebar-scroll flex min-h-0 w-full flex-1 flex-col items-center gap-2 overflow-x-visible overflow-y-auto overscroll-contain px-1 pb-1 pt-2">
           {libraryChips}
           {!pinAddToBottom && plusFooter ? <div className="mt-2 shrink-0 w-full">{plusFooter}</div> : null}
         </div>
