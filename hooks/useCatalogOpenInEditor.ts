@@ -17,7 +17,7 @@ import {
 } from '../utils/googleFontCatalogSampleText';
 import { listGoogleCatalogDownloadStyles } from '../utils/googleFontDownloadStyles';
 import { resolveDefaultCatalogSubset } from '../utils/catalogActiveSubset';
-import { useEditorFontNav, type EditorFontUploadInput } from './useEditorFontNav';
+import { useEditorFontNav, type EditorFontUploadInput, type EditorFontUploadOptions } from './useEditorFontNav';
 import type { SessionFontRecord } from '../types/editorFonts';
 
 type GoogleCatalogEntry = Record<string, unknown> & {
@@ -35,12 +35,12 @@ type UseCatalogOpenInEditorParams = {
   fonts: SessionFontRecord[];
   handleFontsUploaded: (
     items: EditorFontUploadInput[],
-    options?: { silent?: boolean },
+    options?: EditorFontUploadOptions,
   ) => Promise<SessionFontRecord | null | undefined>;
   selectOrAddFontsourceFont: (
     fontFamilyName: string,
     forceVariableFont?: boolean,
-    options?: { silent?: boolean },
+    options?: EditorFontUploadOptions,
   ) => Promise<SessionFontRecord | null | undefined>;
   safeSelectFont: (font: SessionFontRecord) => void;
   setClosedLibraryFontIds: Dispatch<SetStateAction<string[]>>;

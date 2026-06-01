@@ -24,7 +24,7 @@ import {
   focusSessionFontInEditor,
 } from '../utils/fontLibraryUtils';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
-import type { EditorFontUploadInput } from './useEditorFontNav';
+import type { EditorFontUploadInput, EditorFontUploadOptions } from './useEditorFontNav';
 
 type LibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
 
@@ -52,11 +52,11 @@ type UseOpenLibraryFontEntryParams = {
   selectOrAddFontsourceFontWithNav: (
     fontFamilyName: string,
     forceVariableFont?: boolean,
-    options?: { silent?: boolean },
+    options?: EditorFontUploadOptions,
   ) => Promise<SessionFontRecord | null | undefined>;
   handleFontsUploadedWithNav: (
     items: EditorFontUploadInput[],
-    options?: { silent?: boolean },
+    options?: EditorFontUploadOptions,
   ) => Promise<SessionFontRecord | null | undefined>;
 };
 

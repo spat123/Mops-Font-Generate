@@ -3,7 +3,11 @@ import { EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import type { SessionFontRecord } from '../types/editorFonts';
 import type { Dispatch, SetStateAction } from 'react';
 
-type UploadOptions = { noSelect?: boolean; silent?: boolean; forceDuplicate?: boolean };
+export type EditorFontUploadOptions = {
+  noSelect?: boolean;
+  silent?: boolean;
+  forceDuplicate?: boolean;
+};
 
 /** Элемент загрузки: файл с диска, blob из каталога или session-запись. */
 export type EditorFontUploadInput =
@@ -13,12 +17,12 @@ export type EditorFontUploadInput =
 type UseEditorFontNavParams = {
   handleFontsUploaded: (
     newFonts: EditorFontUploadInput[],
-    options?: UploadOptions,
+    options?: EditorFontUploadOptions,
   ) => Promise<SessionFontRecord | null | undefined>;
   selectOrAddFontsourceFont: (
     fontFamilyName: string,
     forceVariableFont?: boolean,
-    options?: UploadOptions,
+    options?: EditorFontUploadOptions,
   ) => Promise<SessionFontRecord | null | undefined>;
   mainTab: string;
   setMainTab: Dispatch<SetStateAction<string>>;
@@ -38,7 +42,7 @@ export function useEditorFontNav({
   setFontsLibraryTab,
 }: UseEditorFontNavParams) {
   const handleFontsUploadedWithNav = useCallback(
-    async (newFonts: EditorFontUploadInput[], options: UploadOptions = {}) => {
+    async (newFonts: EditorFontUploadInput[], options: EditorFontUploadOptions = {}) => {
       const { noSelect = false } = options;
       const fromEmptySlot = mainTab.startsWith(EMPTY_PREFIX) ? mainTab.slice(EMPTY_PREFIX.length) : null;
       const added = await handleFontsUploaded(newFonts, options);
@@ -62,7 +66,7 @@ export function useEditorFontNav({
   );
 
   const selectOrAddFontsourceFontWithNav = useCallback(
-    async (fontFamilyName: string, forceVariableFont = false, options: UploadOptions = {}) => {
+    async (fontFamilyName: string, forceVariableFont = false, options: EditorFontUploadOptions = {}) => {
       const { noSelect = false } = options;
       const fromEmptySlot = mainTab.startsWith(EMPTY_PREFIX) ? mainTab.slice(EMPTY_PREFIX.length) : null;
       const added = await selectOrAddFontsourceFont(fontFamilyName, forceVariableFont, options);
