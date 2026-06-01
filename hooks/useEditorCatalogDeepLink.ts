@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import type { NextRouter } from 'next/router';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 
@@ -18,7 +18,7 @@ export function useEditorCatalogDeepLink({
   openGoogleCatalogEntryInEditorTab,
   openFontsourceSlugInEditorTab,
 }: UseEditorCatalogDeepLinkParams): void {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!router.isReady) return;
     const rawG = router.query.openGoogle;
     const rawFs = router.query.openFontsource;

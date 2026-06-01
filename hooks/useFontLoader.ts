@@ -695,9 +695,9 @@ export function useFontLoader(
   const loadAndSelectFontsourceFont = useCallback(async (
     fontFamilyName: string,
     forceVariableFont = false,
-    options: { silent?: boolean; noSelect?: boolean } = {},
+    options: { silent?: boolean; noSelect?: boolean; forceDuplicate?: boolean } = {},
   ) => {
-    const { silent = false, noSelect = false } = options;
+    const { silent = false, noSelect = false, forceDuplicate = false } = options;
     try {
       // Проверяем существующие шрифты (переданные как currentFonts)
       const existingFont = currentFonts.find(font => {
@@ -709,7 +709,7 @@ export function useFontLoader(
         return sourceMatch && nameMatch && variableMatch && displayNameMatch;
       });
 
-      if (existingFont) {
+      if (existingFont && !forceDuplicate) {
         // Если ранее VF был подобран неверно (например, вместо VF подсунули Thin static),
         // принудительно перезагружаем при запросе VF.
         const existingPick = (existingFont as any)?.fontsourceVfPickVersion;

@@ -151,7 +151,7 @@ export function useSavedLibraryCardItems({
                 },
               ]
             : []),
-          ...(canOpenInEditor && sessionFont
+          ...(canOpenInEditor
             ? [
                 {
                   key: 'duplicate',

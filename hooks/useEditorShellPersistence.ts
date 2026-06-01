@@ -10,6 +10,7 @@ import {
   SESSION_FONT_TABS_PREVIEW_KEY,
   readEditorShellFromStorage,
 } from '../utils/editorShellStorage';
+import { hasCatalogEditorDeepLinkInSearch } from '../utils/catalogShareLink';
 import { SAVED_LIBRARY_TAB_PREFIX } from '../utils/savedLibraryTabIds';
 import { editorShellDbg } from '../utils/editorShellDebugLog';
 import { previewTextDbg } from '../utils/previewTextDebugLog';
@@ -83,16 +84,24 @@ export function useEditorShellPersistence({
     }
 
     const shell = readEditorShellFromStorage();
+    const catalogEditorDeepLink =
+      typeof window !== 'undefined' && hasCatalogEditorDeepLinkInSearch(window.location.search);
     if (shell) {
       editorShellDbg('layout#1: readEditorShellFromStorage', {
         mainTab: shell.mainTab,
         emptySlotCount: Array.isArray(shell.emptySlotIds) ? shell.emptySlotIds.length : 0,
-      });
-      previewTextDbg('shell: восстановление mainTab из localStorage (до этого per-font snapshot мог ждать)', {
-        mainTab: shell.mainTab,
+        catalogEditorDeepLink,
       });
       setEmptySlotIds(shell.emptySlotIds);
-      setMainTab(shell.mainTab);
+      if (catalogEditorDeepLink) {
+        previewTextDbg('shell: deep link openGoogle/openFontsource — mainTab pending, без вкладки «каталог»', {});
+        setMainTab(EDITOR_MAIN_TAB_PENDING);
+      } else {
+        previewTextDbg('shell: восстановление mainTab из localStorage (до этого per-font snapshot мог ждать)', {
+          mainTab: shell.mainTab,
+        });
+        setMainTab(shell.mainTab);
+      }
     } else {
       editorShellDbg('layout#1: readEditorShellFromStorage вернул null', {});
       previewTextDbg('shell: readEditorShellFromStorage null — mainTab из shell не выставлен', {});

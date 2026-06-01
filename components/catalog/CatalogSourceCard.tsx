@@ -362,7 +362,7 @@ function CatalogSourceCardComponent({
   return (
     <CatalogFontCard
       fadeFooterWithHoverUi
-      pinActionsVisible={!fontLibraries?.length}
+      pinActionsVisible={showLibraryActions && !(fontLibraries?.length)}
       selected={selected}
       onClick={handleCardClick}
       onPointerDown={handlePointerDown}

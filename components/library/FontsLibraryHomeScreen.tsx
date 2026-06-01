@@ -215,7 +215,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                         inline={savedLibraryToolbarViewportW > 1440}
                       />
                     </div>
-                    <div className="relative flex min-w-0 items-center justify-start gap-2">
+                    <div className="relative flex min-w-0 items-center justify-between gap-2">
                       <button
                         type="button"
                         onClick={handleResetSavedLibraryFilters}

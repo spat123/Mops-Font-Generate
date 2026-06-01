@@ -5,6 +5,13 @@ import { buildAbsoluteLibraryShareUrl, type LibrarySharePayload } from './librar
 import type { ShareCatalogItem } from './libraryShareImport';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 
+/** Есть ли в query параметры авто-открытия шрифта в редакторе. */
+export function hasCatalogEditorDeepLinkInSearch(search: string): boolean {
+  if (!search) return false;
+  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+  return Boolean(String(params.get('openGoogle') || '').trim() || String(params.get('openFontsource') || '').trim());
+}
+
 /** Query для `useEditorCatalogDeepLink` из каталога / share. */
 export function buildCatalogEditorOpenQuery(
   sourceId: string,

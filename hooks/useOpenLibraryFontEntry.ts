@@ -91,6 +91,11 @@ export function useOpenLibraryFontEntry({
       const entrySource = String(fontEntry.source || 'editor').trim();
       const sessionFont = resolveSessionFontForLibraryEntry(fontEntry);
 
+      if (sessionFont && !forceDuplicate) {
+        focusExisting(sessionFont);
+        return;
+      }
+
       if (forceDuplicate && sessionFont) {
         const duplicatePayload = buildSessionFontDuplicateUploadInput(sessionFont);
         if (duplicatePayload) {
@@ -101,38 +106,47 @@ export function useOpenLibraryFontEntry({
         }
       }
 
-      if (sessionFont && !forceDuplicate) {
-        focusExisting(sessionFont);
-        return;
-      }
-
       if (entrySource === 'fontsource') {
         const slug = entryId.startsWith('fontsource:') ? entryId.slice('fontsource:'.length) : '';
         if (!slug) {
           toast.info(`Не удалось определить пакет Fontsource для ${entryLabel || 'шрифта'}`);
           return;
         }
-        if (!forceDuplicate) {
-          const existing = findFontsourceFontInSession(fonts, slug);
-          if (existing) {
-            focusExisting(existing);
+        const existingInSession = findFontsourceFontInSession(fonts, slug);
+        if (!forceDuplicate && existingInSession) {
+          focusExisting(existingInSession);
+          return;
+        }
+        if (forceDuplicate && existingInSession) {
+          const duplicatePayload = buildSessionFontDuplicateUploadInput(existingInSession);
+          if (duplicatePayload) {
+            await handleFontsUploadedWithNav([duplicatePayload as EditorFontUploadInput], {
+              silent: true,
+            });
             return;
           }
         }
         await selectOrAddFontsourceFontWithNav(
           slug,
           Boolean((fontEntry as { isVariable?: boolean }).isVariable),
-          { silent: true },
+          { silent: true, forceDuplicate },
         );
         return;
       }
 
       if (entrySource === 'google') {
         const family = entryLabel;
-        if (!forceDuplicate) {
-          const existing = findGoogleFontInSession(fonts, family);
-          if (existing) {
-            focusExisting(existing);
+        const existingInSession = findGoogleFontInSession(fonts, family);
+        if (!forceDuplicate && existingInSession) {
+          focusExisting(existingInSession);
+          return;
+        }
+        if (forceDuplicate && existingInSession) {
+          const duplicatePayload = buildSessionFontDuplicateUploadInput(existingInSession);
+          if (duplicatePayload) {
+            await handleFontsUploadedWithNav([duplicatePayload as EditorFontUploadInput], {
+              silent: true,
+            });
             return;
           }
         }

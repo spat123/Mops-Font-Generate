@@ -3,7 +3,7 @@ import { EMPTY_PREFIX } from '../components/ui/EditorTabBar';
 import type { SessionFontRecord } from '../types/editorFonts';
 import type { Dispatch, SetStateAction } from 'react';
 
-type UploadOptions = { noSelect?: boolean; silent?: boolean };
+type UploadOptions = { noSelect?: boolean; silent?: boolean; forceDuplicate?: boolean };
 
 /** Элемент загрузки: файл с диска, blob из каталога или session-запись. */
 export type EditorFontUploadInput =
@@ -53,7 +53,7 @@ export function useEditorFontNav({
         }
         setMainTab(added.id);
       }
-      if (src === 'google' || src === 'fontsource') {
+      if ((src === 'google' || src === 'fontsource') && mainTab === 'library') {
         setFontsLibraryTab('catalog');
       }
       return added || null;
@@ -72,7 +72,9 @@ export function useEditorFontNav({
         }
         setMainTab(added.id);
       }
-      setFontsLibraryTab('catalog');
+      if (mainTab === 'library') {
+        setFontsLibraryTab('catalog');
+      }
       return added || null;
     },
     [selectOrAddFontsourceFont, mainTab, setEmptySlotIds, setFontsLibraryTab, setMainTab],
