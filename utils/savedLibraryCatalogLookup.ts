@@ -22,7 +22,7 @@ export function buildSavedLibraryCatalogLookup(): SavedLibraryCatalogLookup {
   (Array.isArray(fontsource) ? fontsource : []).forEach((item) => {
     const slug = String(item?.id || item?.slug || '').trim();
     if (!slug) return;
-    fontsourceBySlug.set(slug, item as Record<string, unknown>);
+    fontsourceBySlug.set(slug.toLowerCase(), item as Record<string, unknown>);
   });
 
   const fontshare = readFontshareCatalogCache();

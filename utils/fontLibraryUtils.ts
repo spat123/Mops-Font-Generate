@@ -131,6 +131,13 @@ export type CreateCatalogLibraryEntryParams = {
   isVariable?: boolean;
 };
 
+function stripLibraryEntryDupSuffix(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .replace(/:dup:\d+$/i, '')
+    .trim();
+}
+
 /** Ключ семейства каталога для записи библиотеки (без суффикса :dup:N). */
 export function getLibraryEntryCatalogKey(
   fontEntry: Pick<SavedLibraryFontEntry, 'id' | 'source'> | null | undefined,
@@ -139,18 +146,22 @@ export function getLibraryEntryCatalogKey(
   const source = String(fontEntry?.source || '').trim();
   if (!id || !source) return null;
   if (source === 'google') {
-    const raw = id.replace(/^google:/i, '').replace(/:dup:\d+$/i, '').trim();
+    const raw = stripLibraryEntryDupSuffix(id.replace(/^google:/i, ''));
     return raw ? `google:${normalizeLibraryText(raw).toLowerCase()}` : null;
   }
   if (source === 'fontsource') {
-    const raw = id.replace(/^fontsource:/i, '').replace(/:dup:\d+$/i, '').trim();
+    const raw = stripLibraryEntryDupSuffix(id.replace(/^fontsource:/i, ''));
     return raw ? `fontsource:${normalizeLibraryText(raw).toLowerCase()}` : null;
   }
   if (source === 'fontshare') {
-    const raw = id.replace(/^fontshare:/i, '').replace(/:dup:\d+$/i, '').trim();
+    const raw = stripLibraryEntryDupSuffix(id.replace(/^fontshare:/i, ''));
     return raw ? `fontshare:${normalizeLibraryText(raw).toLowerCase()}` : null;
   }
-  return `${source}:${id.toLowerCase()}`;
+  if (source === 'fontfabric-trial') {
+    const raw = stripLibraryEntryDupSuffix(id.replace(/^fontfabric-trial:/i, ''));
+    return raw ? `fontfabric-trial:${normalizeLibraryText(raw).toLowerCase()}` : null;
+  }
+  return `${source}:${stripLibraryEntryDupSuffix(id).toLowerCase()}`;
 }
 
 export function countSameCatalogFontInLibrary(
