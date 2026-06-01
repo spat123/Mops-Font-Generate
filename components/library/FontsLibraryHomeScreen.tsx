@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import UnifiedCatalogPanel from '../catalog/UnifiedCatalogPanel';
 import type { FontsLibraryHomeScreenProps } from '../../types/libraryScreens';
 import { UnderlineTab } from '../ui/UnderlineTab';
@@ -86,6 +86,14 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
   fileInputRef,
   libraryStatusBar,
 }: FontsLibraryHomeScreenProps & { screenActive?: boolean }) {
+  const libraryScrollRef = useRef<HTMLDivElement>(null);
+  const handleResetSavedLibraryFilters = useCallback(() => {
+    resetSavedLibraryFilters();
+    requestAnimationFrame(() => {
+      libraryScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  }, [resetSavedLibraryFilters]);
+
   const isCatalogPanelActive = Boolean(screenActive && fontsLibraryTab === 'catalog');
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-white">
@@ -210,7 +218,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                     <div className="relative flex min-w-0 items-center justify-end gap-2">
                       <button
                         type="button"
-                        onClick={resetSavedLibraryFilters}
+                        onClick={handleResetSavedLibraryFilters}
                         disabled={
                           !savedLibraryHasAdvancedFilters &&
                           String(savedLibraryFontsScope || 'all') === 'all' &&
@@ -367,7 +375,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                     >
                       <button
                         type="button"
-                        onClick={resetSavedLibraryFilters}
+                        onClick={handleResetSavedLibraryFilters}
                         disabled={
                           !savedLibraryHasAdvancedFilters &&
                           String(savedLibraryFontsScope || 'all') === 'all' &&
@@ -386,7 +394,10 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                 </div>
               </>
             )}
-            <div className="catalog-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-10">
+            <div
+              ref={libraryScrollRef}
+              className="catalog-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain pb-10"
+            >
               {savedLibrarySearchQueryTrimmed ? (
                 activeSavedLibraryItems.length === 0 && activeSavedLibraryCatalogItems.length === 0 ? (
                   <p className="py-4 text-sm text-gray-500">Ничего не найдено.</p>

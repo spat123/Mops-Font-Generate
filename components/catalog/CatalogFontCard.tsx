@@ -239,12 +239,17 @@ export function CatalogFontCard({
     );
   }, [hoverOverlay, handleRequestCloseHoverUi]);
 
-  const showHoverOverlay = Boolean(resolvedHoverOverlay) && !selected && hoverUiActive;
+  const showHoverOverlay =
+    Boolean(resolvedHoverOverlay) && !selected && (hoverUiActive || pinActionsVisible);
   // ВАЖНО: `will-change` и постоянные transforms на тысячах карточек могут разгонять Layerize/память/GC.
   // Для массового списка оставляем только opacity-переход.
   const hoverOverlayClassName =
     'absolute -inset-1 z-20 transition-opacity duration-75 ' +
-    (showHoverOverlay ? 'pointer-events-none opacity-100' : 'pointer-events-none opacity-0');
+    (showHoverOverlay
+      ? pinActionsVisible
+        ? 'pointer-events-auto opacity-100'
+        : 'pointer-events-none opacity-100'
+      : 'pointer-events-none opacity-0');
 
   const rootMergedStyle = useMemo((): CSSProperties | undefined => {
     const merged = {

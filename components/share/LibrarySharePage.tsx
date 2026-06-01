@@ -51,6 +51,7 @@ import {
 } from '../../utils/editorShellStorage';
 import { makeSavedLibraryTabId } from '../../utils/savedLibraryTabIds';
 import { OpenGraphHead } from '../seo/OpenGraphHead';
+import { buildCatalogEditorOpenQuery } from '../../utils/catalogShareLink';
 
 const SHARE_ROW_SAMPLE_TOOLTIP =
   'Дважды щёлкните, чтобы изменить образец в этой строке (только на этой странице)';
@@ -147,6 +148,7 @@ const ShareCatalogRefRow = memo(function ShareCatalogRefRow({
     primarySource === 'google'
       ? `'${unifiedItem.displayName}', sans-serif`
       : previewFamily || 'system-ui, sans-serif';
+  const shareCardPreviewText = String(unifiedItem.displayName || row.title || '').trim() || 'Шрифт';
 
   return (
     <>
@@ -166,8 +168,9 @@ const ShareCatalogRefRow = memo(function ShareCatalogRefRow({
         isRowMode={isRowMode}
         shareSurface
         draggable={false}
-        previewText="AaBbCcDdEe"
-        rowCatalogPreviewText={rowSampleText}
+        previewText={shareCardPreviewText}
+        rowCatalogPreviewText={rowSampleText || shareCardPreviewText}
+        rowPreviewFallback={shareCardPreviewText}
         rowPreviewAlign="start"
         rowSampleTooltip={SHARE_ROW_SAMPLE_TOOLTIP}
         rowPreviewEditorAriaLabel={SHARE_ROW_EDITOR_ARIA}
@@ -197,7 +200,9 @@ function ShareCloudRow({ row, isRowMode }) {
               </div>
             ) : null}
           </div>
-          <p className="shrink-0 truncate text-2xl leading-tight text-gray-800">AaBbCcDdEe</p>
+          <p className="shrink-0 max-w-[min(100%,28rem)] truncate text-2xl leading-tight text-gray-800">
+            {row.title}
+          </p>
         </div>
       </div>
     );
@@ -206,7 +211,7 @@ function ShareCloudRow({ row, isRowMode }) {
     <div className="flex h-[10.5rem] min-h-32 min-w-0 flex-col rounded-lg border border-gray-200 bg-surface-card p-4">
       <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wide text-gray-900">{row.title}</p>
       <div className="mt-2 flex min-h-0 flex-1 items-end truncate text-2xl leading-tight text-gray-800">
-        AaBbCcDdEe
+        {row.title}
       </div>
       {row.cascadeSizes?.length ? (
         <div className="mt-auto flex flex-wrap gap-2 pt-2">
@@ -326,6 +331,30 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
     () => computeShareFontStats(rows),
     [rows, shareCatalogHydratedTick],
   );
+
+  /** Один шрифт Google/Fontsource + `?autoEditor=1` → сразу открыть вкладку в редакторе (SEO-ссылки). */
+  useEffect(() => {
+    if (!router.isReady || !payload) return;
+    if (router.query.autoEditor !== '1') return;
+    const openable = rows.filter(
+      (r) =>
+        r.kind === 'catalog-ref' &&
+        (r.catalogSource === 'google' || r.catalogSource === 'fontsource'),
+    );
+    if (openable.length !== 1 || !openable[0]?.shareItem) return;
+    const row = openable[0];
+    const item = row.shareItem as ShareCatalogItem;
+    const sourceId = row.catalogSource === 'google' ? 'google' : 'fontsource';
+    const key = String(item.key || '').trim();
+    const isVariable = item.isVariable === true;
+    const raw =
+      sourceId === 'google'
+        ? { family: String(item.family || key) }
+        : { id: key, slug: key, family: String(item.family || key) };
+    const query = buildCatalogEditorOpenQuery(sourceId, raw, isVariable);
+    if (!query.openGoogle && !query.openFontsource) return;
+    void router.replace({ pathname: '/', query });
+  }, [router, router.isReady, router.query.autoEditor, payload, rows]);
 
   const ownedShareLibrary = useMemo(
     () => (payload ? findOwnedShareLibrary(payload, savedLibraries) : null),

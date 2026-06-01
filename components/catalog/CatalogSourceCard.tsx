@@ -70,6 +70,8 @@ export type CatalogSourceCardProps = {
   openButtonProps?: CatalogOpenSplitButtonProps | null;
   openAriaLabel?: string;
   openLabel?: string;
+  onShare?: () => unknown;
+  shareAriaLabel?: string;
   downloadButtonProps?: CatalogDownloadButtonProps | null;
   fontLibraries?: SavedLibraryRecord[];
   busy?: boolean;
@@ -124,6 +126,8 @@ function CatalogSourceCardComponent({
   openButtonProps = null,
   openAriaLabel,
   openLabel,
+  onShare,
+  shareAriaLabel,
   downloadButtonProps,
 
   // library actions
@@ -189,10 +193,12 @@ function CatalogSourceCardComponent({
         openButtonProps={openButtonProps}
         openAriaLabel={openAriaLabel}
         openLabel={openLabel}
+        onShare={shareSurface ? undefined : onShare}
+        shareAriaLabel={shareAriaLabel}
         downloadButtonProps={downloadButtonProps}
       />
     ),
-    [downloadButtonProps, isRowMode, onOpen, openAriaLabel, openButtonProps, openLabel],
+    [downloadButtonProps, isRowMode, onOpen, onShare, openAriaLabel, openButtonProps, openLabel, shareAriaLabel, shareSurface],
   );
 
   const actions = useMemo(() => {

@@ -21,6 +21,7 @@ export type UnifiedCatalogPanelItemProps = {
   onAddFontToLibrary?: (libraryId: string, entry: SavedLibraryFontEntry) => boolean | Promise<boolean>;
   onRequestCreateLibrary?: (entries: SavedLibraryFontEntry[]) => void;
   onOpenInEditor?: (item: MergedCatalogItem) => unknown;
+  onShareCatalogItem?: (item: MergedCatalogItem) => unknown;
   onCardClick?: (event: PointerEvent<HTMLElement>, familyKey: string) => void;
   onStartCardLongPress?: (event: PointerEvent<HTMLElement>, familyKey: string) => void;
   onPointerUp?: (event: PointerEvent<HTMLElement>) => void;
@@ -54,6 +55,7 @@ function UnifiedCatalogPanelItemComponent({
   onAddFontToLibrary,
   onRequestCreateLibrary,
   onOpenInEditor,
+  onShareCatalogItem,
   onCardClick,
   onStartCardLongPress,
   onPointerUp,
@@ -114,6 +116,7 @@ function UnifiedCatalogPanelItemComponent({
       onAddFontToLibrary={onAddFontToLibrary}
       onRequestCreateLibrary={onRequestCreateLibrary}
       onOpenInEditor={undefined}
+      onShareCatalogItem={onShareCatalogItem}
       openButtonProps={openButtonProps}
       onCardClick={handleCardClick}
       onStartCardLongPress={handleLongPress}

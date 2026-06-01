@@ -5,6 +5,7 @@ import { OpenExternalIcon, ShareIcon, TrashIcon } from '../components/ui/CommonI
 import { moveAndSwapIconUrl } from '../components/ui/editIconUrls';
 import { buildSavedLibraryDownloadSplitButtonProps } from '../utils/savedLibraryFontDownload';
 import {
+  isExternalLibraryFontSource,
   isLibraryFontRecentlyAdded,
   savedLibraryFontCanOpenInEditor,
 } from '../utils/fontLibraryUtils';
@@ -118,7 +119,11 @@ export function useSavedLibraryCardItems({
         downloadSplitButtonProps: (() => {
           const props = buildSavedLibraryDownloadSplitButtonProps(font, sessionFont);
           if (!props) return null;
-          return { ...props, hidePrimaryLabel: savedLibraryHideDownloadLabel };
+          const external = isExternalLibraryFontSource(font.source);
+          return {
+            ...props,
+            hidePrimaryLabel: external ? false : savedLibraryHideDownloadLabel,
+          };
         })(),
         menuItems: [
           ...(canOpenInEditor

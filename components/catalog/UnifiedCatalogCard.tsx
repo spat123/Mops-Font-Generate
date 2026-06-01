@@ -23,6 +23,7 @@ export type UnifiedCatalogCardProps = {
   onAddFontToLibrary?: (libraryId: string, entry: SavedLibraryFontEntry) => boolean | Promise<boolean>;
   onRequestCreateLibrary?: (entries: SavedLibraryFontEntry[]) => void;
   onOpenInEditor?: (item: MergedCatalogItem) => unknown;
+  onShareCatalogItem?: (item: MergedCatalogItem) => unknown;
   openButtonProps?: CatalogOpenSplitButtonProps | null;
   onCardClick?: (event: React.MouseEvent, familyKey: string) => void;
   onStartCardLongPress?: (event: React.PointerEvent, familyKey: string) => void;
@@ -62,6 +63,7 @@ function UnifiedCatalogCardComponent({
   onAddFontToLibrary,
   onRequestCreateLibrary,
   onOpenInEditor,
+  onShareCatalogItem,
   openButtonProps = null,
   onCardClick,
   onStartCardLongPress,
@@ -178,6 +180,14 @@ function UnifiedCatalogCardComponent({
       }
       openButtonProps={shareSurface || !showOpenInEditor ? null : openButtonProps}
       openAriaLabel={family ? `Открыть ${family} в редакторе` : 'Открыть в редакторе'}
+      onShare={
+        shareSurface || typeof onShareCatalogItem !== 'function'
+          ? undefined
+          : () => {
+              onShareCatalogItem(item);
+            }
+      }
+      shareAriaLabel={family ? `Поделиться: ${family}` : 'Поделиться'}
       downloadButtonProps={downloadButtonProps}
       fontLibraries={fontLibraries}
       busy={busy}

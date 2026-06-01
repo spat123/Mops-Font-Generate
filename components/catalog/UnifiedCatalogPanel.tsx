@@ -101,6 +101,7 @@ import {
   fetchFontsourceCatalogFromFontlist,
 } from '../../utils/fontsourceCatalogCache';
 import { readFontshareCatalogCache, writeFontshareCatalogCache } from '../../utils/fontshareCatalogCache';
+import { copyCatalogItemShareLink } from '../../utils/catalogShareLink';
 import { readFontfabricTrialCatalogCache, writeFontfabricTrialCatalogCache } from '../../utils/fontfabricTrialCatalogCache';
 import { UnifiedCatalogPanelItem } from './UnifiedCatalogPanelItem';
 import {
@@ -621,6 +622,19 @@ export default function UnifiedCatalogPanel({
     },
     [markKeyRecentlyAdded, onAddFontToLibrary],
   );
+
+  const shareCatalogItem = useCallback(async (item: MergedCatalogItem) => {
+    try {
+      const url = await copyCatalogItemShareLink(item, { openInEditor: true });
+      if (url) {
+        toast.success('Ссылка скопирована');
+      } else {
+        toast.info('Не удалось создать ссылку');
+      }
+    } catch {
+      toast.error('Не удалось скопировать ссылку');
+    }
+  }, []);
 
   const openInEditor = useCallback(
     async (item) => {
@@ -1327,6 +1341,7 @@ export default function UnifiedCatalogPanel({
                     onAddFontToLibrary={addToLibrary}
                     onRequestCreateLibrary={onRequestCreateLibrary}
                     onOpenInEditor={openInEditor}
+                    onShareCatalogItem={shareCatalogItem}
                     onCardClick={onCardClick}
                     onStartCardLongPress={startCardLongPress}
                     onPointerUp={clearLongPressTimer}

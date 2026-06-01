@@ -12,10 +12,13 @@ export type CatalogCardHoverOverlayProps = {
   openLabel?: string;
   openButtonProps?: CatalogOpenSplitButtonProps | null;
   downloadButtonProps?: CatalogDownloadButtonProps | null;
+  onShare?: () => unknown;
+  shareAriaLabel?: string;
 };
 import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
 import { CatalogOpenSplitButton } from './CatalogOpenSplitButton';
 import { isCatalogExternalDownloadButtonProps } from './catalogExternalDownload';
+import { ShareIcon } from '../ui/CommonIcons';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { linkIconUrl } from '../ui/editIconUrls';
 
@@ -78,6 +81,8 @@ export function CatalogCardHoverOverlay({
   openLabel = 'Открыть',
   openButtonProps = null,
   downloadButtonProps,
+  onShare,
+  shareAriaLabel = 'Поделиться',
 }: CatalogCardHoverOverlayProps) {
   const hasOpenButtonProps = openButtonProps && typeof openButtonProps === 'object';
   const showOpenButton = hasOpenButtonProps || typeof onOpen === 'function';
@@ -295,10 +300,29 @@ export function CatalogCardHoverOverlay({
     useRowSplitDownload ||
     rowDownloadItems.length === 0 ||
     isCatalogExternalDownloadButtonProps(resolvedDownloadButtonProps);
+  const showShareButton = typeof onShare === 'function';
   const downloadOnlyCorner =
     !showOpenButton &&
+    !showShareButton &&
     Boolean(downloadButtonProps) &&
     (showRowPrimaryDownloadButton || !centered);
+
+  const runShare = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    void onShare?.();
+  };
+
+  const shareButton = (
+    <button
+      type="button"
+      data-no-card-select="true"
+      onClick={runShare}
+      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md bg-white text-gray-800 transition-colors hover:bg-white active:bg-white"
+      aria-label={shareAriaLabel}
+    >
+      <ShareIcon className="h-4 w-4" />
+    </button>
+  );
 
   const gridDownloadAnchorClass = downloadOnlyCorner
     ? 'pointer-events-auto absolute bottom-5 right-5 flex max-w-[calc(100%-1.25rem)] justify-end'
@@ -306,7 +330,7 @@ export function CatalogCardHoverOverlay({
 
   return centered ? (
     <div ref={rootRef} className="relative h-full w-full">
-      <div className="pointer-events-auto absolute bottom-5 right-5 flex max-w-[calc(100%-1.25rem)] flex-wrap justify-end gap-2.5">
+      <div className="pointer-events-auto absolute bottom-5 right-5 flex max-w-[calc(100%-1.25rem)] flex-wrap items-center justify-end gap-2.5">
         {showOpenButton ? (
           useRowIconOnlyActions ? (
             compactOpenControl
@@ -328,6 +352,7 @@ export function CatalogCardHoverOverlay({
             )
           )
         ) : null}
+        {showShareButton ? shareButton : null}
         {showRowPrimaryDownloadButton
           ? downloadButton
           : rowDownloadItems.map((item) => (
@@ -351,9 +376,10 @@ export function CatalogCardHoverOverlay({
     </div>
   ) : (
     <div ref={rootRef} className="relative h-full w-full">
-      {showOpenButton ? (
-        <div className="pointer-events-auto absolute bottom-4 left-4">
-          {useCompactButtons ? compactOpenControl : openControl}
+      {showOpenButton || showShareButton ? (
+        <div className="pointer-events-auto absolute bottom-4 left-4 flex flex-wrap items-center gap-2.5">
+          {showOpenButton ? (useCompactButtons ? compactOpenControl : openControl) : null}
+          {showShareButton ? shareButton : null}
         </div>
       ) : null}
       <div className={gridDownloadAnchorClass}>{downloadButton}</div>

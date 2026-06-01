@@ -220,6 +220,7 @@ export function SessionFontCard({
           minHeightClass="h-auto min-w-0"
           rootStyle={{ minHeight: `${catalogMinHeightPx}px` }}
           containIntrinsicHeightPx={catalogMinHeightPx}
+          pinActionsVisible={isCatalogExternalDownloadButtonProps(downloadSplitButtonProps)}
           fadeFooterWithHoverUi={Boolean(catalogHoverOverlay)}
           title={titleNode}
           preview={
