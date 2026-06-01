@@ -9,6 +9,7 @@ import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedir
 import { completeRegistrationSignIn } from '../../utils/completeRegistrationSignIn';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
+import { NoIndexHead } from '../../components/seo/NoIndexHead';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_CODE_INPUT_CLASS,
@@ -88,6 +89,7 @@ export default function AuthSignUpPage({ isRuGeo = false }: AuthPageProps) {
       <Head>
         <title>Регистрация — DINAMIC FONT</title>
       </Head>
+      <NoIndexHead />
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
         <AuthLogoLink className="mb-10" />
 

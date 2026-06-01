@@ -7,6 +7,7 @@ const editorDeepLinkInFlight = new Set<string>();
 
 type UseEditorCatalogDeepLinkParams = {
   router: NextRouter;
+  isInitialLoadComplete: boolean;
   openGoogleCatalogEntryInEditorTab: (entry: Record<string, unknown>) => Promise<void>;
   openFontsourceSlugInEditorTab: (slug: string, isVariable?: boolean) => Promise<unknown>;
 };
@@ -16,11 +17,13 @@ type UseEditorCatalogDeepLinkParams = {
  */
 export function useEditorCatalogDeepLink({
   router,
+  isInitialLoadComplete,
   openGoogleCatalogEntryInEditorTab,
   openFontsourceSlugInEditorTab,
 }: UseEditorCatalogDeepLinkParams): void {
   useLayoutEffect(() => {
     if (!router.isReady) return;
+    if (!isInitialLoadComplete) return;
     const rawG = router.query.openGoogle;
     const rawFs = router.query.openFontsource;
     const family = typeof rawG === 'string' ? rawG.trim() : '';
@@ -106,6 +109,7 @@ export function useEditorCatalogDeepLink({
   }, [
     router,
     router.isReady,
+    isInitialLoadComplete,
     router.query.openGoogle,
     router.query.openGoogleVar,
     router.query.openFontsource,

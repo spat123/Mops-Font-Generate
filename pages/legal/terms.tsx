@@ -19,6 +19,7 @@ export default function TermsPage() {
     <LegalPageLayout
       title="Условия использования"
       description="Условия использования веб-сервиса DINAMIC FONT"
+      canonicalPath="/legal/terms"
     >
       <LegalP>
         Настоящие Условия регулируют использование веб-сервиса{' '}

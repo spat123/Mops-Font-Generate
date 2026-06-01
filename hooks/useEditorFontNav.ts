@@ -27,6 +27,7 @@ type UseEditorFontNavParams = {
   mainTab: string;
   setMainTab: Dispatch<SetStateAction<string>>;
   setEmptySlotIds: Dispatch<SetStateAction<string[]>>;
+  setClosedLibraryFontIds: Dispatch<SetStateAction<string[]>>;
   setFontsLibraryTab: Dispatch<SetStateAction<string>>;
 };
 
@@ -39,6 +40,7 @@ export function useEditorFontNav({
   mainTab,
   setMainTab,
   setEmptySlotIds,
+  setClosedLibraryFontIds,
   setFontsLibraryTab,
 }: UseEditorFontNavParams) {
   const handleFontsUploadedWithNav = useCallback(
@@ -55,6 +57,7 @@ export function useEditorFontNav({
         if (fromEmptySlot) {
           setEmptySlotIds((ids) => ids.filter((x) => x !== fromEmptySlot));
         }
+        setClosedLibraryFontIds((ids) => ids.filter((id) => id !== added.id));
         setMainTab(added.id);
       }
       if ((src === 'google' || src === 'fontsource') && mainTab === 'library') {
@@ -62,7 +65,14 @@ export function useEditorFontNav({
       }
       return added || null;
     },
-    [handleFontsUploaded, mainTab, setEmptySlotIds, setFontsLibraryTab, setMainTab],
+    [
+      handleFontsUploaded,
+      mainTab,
+      setClosedLibraryFontIds,
+      setEmptySlotIds,
+      setFontsLibraryTab,
+      setMainTab,
+    ],
   );
 
   const selectOrAddFontsourceFontWithNav = useCallback(
@@ -74,6 +84,7 @@ export function useEditorFontNav({
         if (fromEmptySlot) {
           setEmptySlotIds((ids) => ids.filter((x) => x !== fromEmptySlot));
         }
+        setClosedLibraryFontIds((ids) => ids.filter((id) => id !== added.id));
         setMainTab(added.id);
       }
       if (mainTab === 'library') {
@@ -81,7 +92,14 @@ export function useEditorFontNav({
       }
       return added || null;
     },
-    [selectOrAddFontsourceFont, mainTab, setEmptySlotIds, setFontsLibraryTab, setMainTab],
+    [
+      selectOrAddFontsourceFont,
+      mainTab,
+      setClosedLibraryFontIds,
+      setEmptySlotIds,
+      setFontsLibraryTab,
+      setMainTab,
+    ],
   );
 
   return { handleFontsUploadedWithNav, selectOrAddFontsourceFontWithNav };

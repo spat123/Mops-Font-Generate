@@ -2,24 +2,58 @@ import type { ReactNode } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { AuthLogoLink } from '../auth/AuthSplitLayout';
+import { OpenGraphHead } from '../seo/OpenGraphHead';
 import { legalMeta } from '../../config/legal';
+import { getDefaultOgImageUrl, getSiteOrigin } from '../../utils/siteSeo';
 
 export function LegalPageLayout({
   title,
   description,
+  canonicalPath,
   children,
 }: {
   title: string;
   description?: string;
+  canonicalPath: string;
   children: ReactNode;
 }) {
+  const siteOrigin = getSiteOrigin();
+  const canonicalUrl = `${siteOrigin}${canonicalPath}`;
+  const seoTitle = `${title} — ${legalMeta.serviceName}`;
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': `${canonicalUrl}#webpage`,
+    url: canonicalUrl,
+    name: seoTitle,
+    description,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: legalMeta.serviceName,
+      url: siteOrigin,
+    },
+    inLanguage: 'ru-RU',
+  };
+
   return (
     <>
+      <OpenGraphHead
+        title={seoTitle}
+        description={description || ''}
+        canonicalUrl={canonicalUrl}
+        imageUrl={getDefaultOgImageUrl(siteOrigin)}
+        imageWidth={525}
+        imageHeight={225}
+        imageType="image/png"
+        imageAlt={legalMeta.serviceName}
+        siteName={legalMeta.serviceName}
+        type="website"
+      />
       <Head>
-        <title>
-          {title} — {legalMeta.serviceName}
-        </title>
-        {description ? <meta name="description" content={description} /> : null}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </Head>
       <div className="min-h-screen bg-gray-50 px-4 py-10 sm:py-12">
         <div className="mx-auto w-full max-w-3xl">

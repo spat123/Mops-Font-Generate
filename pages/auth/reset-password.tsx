@@ -4,6 +4,7 @@ import type { AuthPageProps } from '../../types/authPages';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { NoIndexHead } from '../../components/seo/NoIndexHead';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_FORM_ERROR_CLASS,
@@ -76,6 +77,7 @@ export default function AuthResetPasswordPage({ isRuGeo = false }: AuthPageProps
       <Head>
         <title>Новый пароль — DINAMIC FONT</title>
       </Head>
+      <NoIndexHead />
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
         <AuthLogoLink className="mb-10" />
 

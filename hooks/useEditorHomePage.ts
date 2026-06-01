@@ -625,6 +625,7 @@ export function useEditorHomePage(router: NextRouter) {
 
     useEditorCatalogDeepLink({
       router,
+      isInitialLoadComplete,
       openGoogleCatalogEntryInEditorTab,
       openFontsourceSlugInEditorTab,
     });

@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
+import { NoIndexHead } from '../../components/seo/NoIndexHead';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import {
   AUTH_INPUT_CLASS,
@@ -57,6 +58,7 @@ export default function AuthLinkPage({ isRuGeo = false }: AuthPageProps) {
       <Head>
         <title>Привязка аккаунта — DINAMIC FONT</title>
       </Head>
+      <NoIndexHead />
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
         <AuthLogoLink
           className="mb-10"

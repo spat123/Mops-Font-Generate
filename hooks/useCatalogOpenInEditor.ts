@@ -80,6 +80,7 @@ export function useCatalogOpenInEditor({
     mainTab,
     setMainTab,
     setEmptySlotIds,
+    setClosedLibraryFontIds,
     setFontsLibraryTab,
   });
 

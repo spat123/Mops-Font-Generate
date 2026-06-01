@@ -16,6 +16,7 @@ export default function PrivacyPage() {
     <LegalPageLayout
       title="Политика конфиденциальности"
       description="Политика обработки персональных данных сервиса DINAMIC FONT"
+      canonicalPath="/legal/privacy"
     >
       <LegalP>
         Настоящая Политика описывает, как обрабатываются персональные данные при использовании{' '}

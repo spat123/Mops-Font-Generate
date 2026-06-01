@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { getProviders, signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { SignInProviderButtons } from '../../components/auth/SignInProviderButtons';
+import { NoIndexHead } from '../../components/seo/NoIndexHead';
 import { getIsRuGeoFromHeaders } from '../../utils/authGeo';
 import { hasSignedInBefore, markHasSignedInBefore } from '../../utils/authReturningUser';
 import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
@@ -165,6 +166,7 @@ export default function AuthSignInPage({ isRuGeo = false }: AuthPageProps) {
       <Head>
         <title>{isReturningUser ? 'С возвращением — DINAMIC FONT' : 'Вход — DINAMIC FONT'}</title>
       </Head>
+      <NoIndexHead />
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
         <AuthLogoLink className="mb-10" />
 

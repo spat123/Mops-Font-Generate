@@ -4,6 +4,7 @@ import type { AuthPageProps } from '../../types/authPages';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { NoIndexHead } from '../../components/seo/NoIndexHead';
 import { markHasSignedInBefore } from '../../utils/authReturningUser';
 import { redirectAfterAuth, redirectAfterAuthQuery } from '../../utils/authRedirect';
 import { completeRegistrationSignIn } from '../../utils/completeRegistrationSignIn';
@@ -210,6 +211,7 @@ export default function AuthCheckEmailPage({ isRuGeo = false }: AuthPageProps) {
       <Head>
         <title>Подтвердите email — DINAMIC FONT</title>
       </Head>
+      <NoIndexHead />
       <AuthSplitLayout isRuGeo={isRuGeo} footer={<AuthLegalFooter />}>
         <AuthLogoLink className="mb-10" />
 
