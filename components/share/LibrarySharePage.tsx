@@ -18,6 +18,8 @@ import {
   type ShareViewRow,
 } from '../../utils/libraryShareImport';
 import {
+  resolveFontfabricTrialCatalogItemFromShareItem,
+  resolveFontshareCatalogItemFromShareItem,
   resolveFontsourceCatalogItemFromShareItem,
   resolveGoogleCatalogEntryFromShareItem,
 } from '../../utils/libraryShareCatalogResolve';
@@ -32,7 +34,10 @@ import { ensureCatalogCachesLoaded } from '../../utils/ensureCatalogCachesLoaded
 import { pickFontsourcePreviewSubsetsForCardText } from '../../utils/catalogPreviewSample';
 import { loadFontsourcePreviewFamily } from '../../utils/fontsourcePreviewRuntimeCache';
 import { UnifiedCatalogCard } from '../catalog/UnifiedCatalogCard';
-import { buildCatalogSourceDownloadProps } from '../catalog/buildCatalogSourceDownloadProps';
+import {
+  buildCatalogSourceDownloadProps,
+  buildCatalogTrialDownloadProps,
+} from '../catalog/buildCatalogSourceDownloadProps';
 import { buildSingleSourceUnifiedItem } from '../../utils/unifiedCatalogMerge';
 import { CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX } from '../catalog/CatalogRowModeCard';
 import { AppButton } from '../ui/AppButton';
@@ -95,6 +100,14 @@ const ShareCatalogRefRow = memo(function ShareCatalogRefRow({
       const item = resolveFontsourceCatalogItemFromShareItem(row.shareItem as ShareCatalogItem);
       return item ? buildSingleSourceUnifiedItem('fontsource', item) : null;
     }
+    if (row.catalogSource === 'fontshare') {
+      const item = resolveFontshareCatalogItemFromShareItem(row.shareItem as ShareCatalogItem);
+      return item ? buildSingleSourceUnifiedItem('fontshare', item) : null;
+    }
+    if (row.catalogSource === 'fontfabric-trial') {
+      const item = resolveFontfabricTrialCatalogItemFromShareItem(row.shareItem as ShareCatalogItem);
+      return item ? buildSingleSourceUnifiedItem('demo', item) : null;
+    }
     return null;
   }, [row, catalogHydratedTick]);
 
@@ -103,6 +116,18 @@ const ShareCatalogRefRow = memo(function ShareCatalogRefRow({
 
   const downloadButtonProps = useMemo(() => {
     if (!unifiedItem || !primaryRaw) return null;
+    if (primarySource === 'demo') {
+      return buildCatalogTrialDownloadProps({
+        displayName: unifiedItem.displayName,
+        raw: primaryRaw,
+        onOpenTrialPage: (trialRaw) => {
+          const url = String(trialRaw?.trialUrl || trialRaw?.link || '').trim();
+          if (typeof window !== 'undefined' && url) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+        },
+      });
+    }
     return buildCatalogSourceDownloadProps({
       sourceId: primarySource,
       raw: primaryRaw,
@@ -160,28 +185,34 @@ function ShareCloudRow({ row, isRowMode }) {
   if (isRowMode) {
     return (
       <div
-        className="relative w-full min-w-0 border-b border-gray-300 bg-white"
+        className="relative w-full min-w-0 border-b border-gray-200 bg-white"
         style={{ minHeight: `${CATALOG_ROW_MODE_ESTIMATED_HEIGHT_PX}px` }}
       >
-        <div className="flex h-full flex-col justify-center px-4 py-4 sm:px-6">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-800">{row.title}</p>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600">
-            Локальный файл — предпросмотр и скачивание по ссылке недоступны (данные были только у отправителя).
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <CascadeSizesBadge sizes={row.cascadeSizes} />
+        <div className="flex h-full items-center gap-6 px-4 py-4 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium uppercase tracking-wide text-gray-800">{row.title}</p>
+            {row.cascadeSizes?.length ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <CascadeSizesBadge sizes={row.cascadeSizes} />
+              </div>
+            ) : null}
           </div>
+          <p className="shrink-0 truncate text-2xl leading-tight text-gray-800">AaBbCcDdEe</p>
         </div>
       </div>
     );
   }
   return (
-    <div className="flex min-h-32 h-[10.5rem] min-w-0 flex-col rounded-lg border border-gray-200 bg-surface-card p-4">
+    <div className="flex h-[10.5rem] min-h-32 min-w-0 flex-col rounded-lg border border-gray-200 bg-surface-card p-4">
       <p className="line-clamp-2 text-sm font-semibold uppercase tracking-wide text-gray-900">{row.title}</p>
-      <p className="mt-2 text-xs leading-snug text-gray-500">Локальный файл — недоступен по ссылке</p>
-      <div className="mt-auto flex flex-wrap gap-2 pt-2">
-        <CascadeSizesBadge sizes={row.cascadeSizes} />
+      <div className="mt-2 flex min-h-0 flex-1 items-end truncate text-2xl leading-tight text-gray-800">
+        AaBbCcDdEe
       </div>
+      {row.cascadeSizes?.length ? (
+        <div className="mt-auto flex flex-wrap gap-2 pt-2">
+          <CascadeSizesBadge sizes={row.cascadeSizes} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -263,10 +294,19 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
     const needsFontshare = items.some(
       (it) => it?.kind === 'catalog-ref' && String(it.source || '').toLowerCase() === 'fontshare',
     );
+    const needsFontfabricTrial = items.some(
+      (it) =>
+        it?.kind === 'catalog-ref' && String(it.source || '').toLowerCase() === 'fontfabric-trial',
+    );
 
     let cancelled = false;
 
-    void ensureCatalogCachesLoaded({ needsGoogle, needsFontsource, needsFontshare }).then((wrote) => {
+    void ensureCatalogCachesLoaded({
+      needsGoogle,
+      needsFontsource,
+      needsFontshare,
+      needsFontfabricTrial,
+    }).then((wrote) => {
       if (!cancelled && wrote) {
         setShareCatalogHydratedTick((n) => n + 1);
       }
@@ -479,7 +519,7 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
     }
     if (!row.shareItem) return null;
 
-    if (row.catalogSource === 'google' || row.catalogSource === 'fontsource') {
+    if (row.catalogSource) {
       const slug =
         row.catalogSource === 'fontsource' ? String(row.shareItem.key || '').trim() : '';
       const previewFamily =
@@ -594,7 +634,6 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
             downloadPanel={
               <ShareDownloadPanel
                 stats={shareStats}
-                catalogDownloadableCount={draft.fonts.length}
                 importBusy={importBusy}
                 zipBusy={zipBusy}
                 isShareOwner={isShareOwner}

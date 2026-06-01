@@ -4,7 +4,10 @@ import { SavedLibraryCatalogAddCorner } from '../components/library/SavedLibrary
 import { OpenExternalIcon, ShareIcon, TrashIcon } from '../components/ui/CommonIcons';
 import { moveAndSwapIconUrl } from '../components/ui/editIconUrls';
 import { buildSavedLibraryDownloadSplitButtonProps } from '../utils/savedLibraryFontDownload';
-import { isLibraryFontRecentlyAdded } from '../utils/fontLibraryUtils';
+import {
+  isLibraryFontRecentlyAdded,
+  savedLibraryFontCanOpenInEditor,
+} from '../utils/fontLibraryUtils';
 import {
   downloadGoogleAsFormat,
   downloadGooglePackageZip,
@@ -93,6 +96,7 @@ export function useSavedLibraryCardItems({
     return filteredActiveSavedLibraryFonts.map((font) => {
       const sessionFont = resolveSessionFontForLibraryEntry(font);
       const cardMeta = buildSavedLibraryCardMetaSplit(font, sessionFont);
+      const canOpenInEditor = savedLibraryFontCanOpenInEditor(font, sessionFont);
       return {
         id: font.id,
         variant: 'catalog',
@@ -107,10 +111,6 @@ export function useSavedLibraryCardItems({
         onCardClick: (event) => {
           onSavedLibrarySelectionCardClick(event as React.MouseEvent, font.id);
         },
-        onOpen: () => {
-          void openLibraryFontEntry(font);
-        },
-        openAriaLabel: `Открыть ${font.label} в редакторе`,
         onPointerDown: (event) => startSavedLibraryCardLongPress(event, font.id),
         onPointerUp: clearSavedLibraryLongPressTimer,
         onPointerLeave: clearSavedLibraryLongPressTimer,
@@ -121,14 +121,18 @@ export function useSavedLibraryCardItems({
           return { ...props, hidePrimaryLabel: savedLibraryHideDownloadLabel };
         })(),
         menuItems: [
-          {
-            key: 'open',
-            label: 'Открыть',
-            icon: <OpenExternalIcon />,
-            onSelect: () => {
-              void openLibraryFontEntry(font);
-            },
-          },
+          ...(canOpenInEditor
+            ? [
+                {
+                  key: 'open',
+                  label: 'Открыть',
+                  icon: <OpenExternalIcon />,
+                  onSelect: () => {
+                    void openLibraryFontEntry(font);
+                  },
+                },
+              ]
+            : []),
           {
             key: 'move',
             label: 'Переместить',

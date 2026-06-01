@@ -97,7 +97,7 @@ export function payloadHasAnyCascadeSizes(payload: SharePayload | null | undefin
 export type ShareViewRow = {
   rowKey: string;
   kind: string;
-  catalogSource: 'google' | 'fontsource' | null;
+  catalogSource: 'google' | 'fontsource' | 'fontshare' | 'fontfabric-trial' | null;
   shareItem: ShareCatalogItem | ShareCloudItem;
   title: string;
   sourceLabel: string;
@@ -119,11 +119,27 @@ export function buildShareViewRows(payload: SharePayload | null | undefined): Sh
           rowKey: `cat-${catalogItem.source}-${catalogItem.key}-${index}`,
           kind: 'catalog-ref',
           catalogSource:
-            source === 'google' ? ('google' as const) : source === 'fontsource' ? ('fontsource' as const) : null,
+            source === 'google'
+              ? ('google' as const)
+              : source === 'fontsource'
+                ? ('fontsource' as const)
+                : source === 'fontshare'
+                  ? ('fontshare' as const)
+                  : source === 'fontfabric-trial'
+                    ? ('fontfabric-trial' as const)
+                    : null,
           shareItem: catalogItem,
           title: String(catalogItem.family || catalogItem.key || '').trim() || 'Шрифт',
           sourceLabel:
-            source === 'google' ? 'Google Fonts' : source === 'fontsource' ? 'Fontsource' : source,
+            source === 'google'
+              ? 'Google Fonts'
+              : source === 'fontsource'
+                ? 'Fontsource'
+                : source === 'fontshare'
+                  ? 'Fontshare'
+                  : source === 'fontfabric-trial'
+                    ? 'Fontfabric Trial'
+                    : source,
           cascadeSizes: Array.isArray(catalogItem.cascadeSizes)
             ? catalogItem.cascadeSizes
                 .map((n) => Number(n))

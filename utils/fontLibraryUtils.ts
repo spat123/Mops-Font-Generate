@@ -27,6 +27,22 @@ export function isDynamicLibraryFontSource(source: unknown): boolean {
   return !isLocalLibraryFontSource(source);
 }
 
+/** Внешний каталог: только «Скачать с источника», без открытия в редакторе. */
+export function isExternalLibraryFontSource(source: unknown): boolean {
+  const normalized = String(source || '').trim();
+  return normalized === 'fontshare' || normalized === 'fontfabric-trial';
+}
+
+export function savedLibraryFontCanOpenInEditor(
+  font: Pick<SavedLibraryFontEntry, 'source'> | null | undefined,
+  sessionFont: SessionFontRecord | null | undefined = null,
+): boolean {
+  if (sessionFont) return true;
+  const source = String(font?.source || '').trim();
+  if (isExternalLibraryFontSource(source)) return false;
+  return source === 'google' || source === 'fontsource';
+}
+
 export function getLibraryFontShortSourceLabel(source: unknown): string {
   return isLocalLibraryFontSource(source) ? 'L' : 'D';
 }

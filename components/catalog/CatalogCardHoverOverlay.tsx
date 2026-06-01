@@ -295,6 +295,14 @@ export function CatalogCardHoverOverlay({
     useRowSplitDownload ||
     rowDownloadItems.length === 0 ||
     isCatalogExternalDownloadButtonProps(resolvedDownloadButtonProps);
+  const downloadOnlyCorner =
+    !showOpenButton &&
+    Boolean(downloadButtonProps) &&
+    (showRowPrimaryDownloadButton || !centered);
+
+  const gridDownloadAnchorClass = downloadOnlyCorner
+    ? 'pointer-events-auto absolute bottom-5 right-5 flex max-w-[calc(100%-1.25rem)] justify-end'
+    : 'pointer-events-auto absolute bottom-4 right-4';
 
   return centered ? (
     <div ref={rootRef} className="relative h-full w-full">
@@ -348,11 +356,7 @@ export function CatalogCardHoverOverlay({
           {useCompactButtons ? compactOpenControl : openControl}
         </div>
       ) : null}
-      <div
-        className={`pointer-events-auto absolute bottom-4 ${showOpenButton ? 'right-4' : 'left-4 right-4 flex justify-end'}`.trim()}
-      >
-        {downloadButton}
-      </div>
+      <div className={gridDownloadAnchorClass}>{downloadButton}</div>
     </div>
   );
 }

@@ -268,7 +268,7 @@ export function CatalogRowModeCard({
     'rounded-none h-full min-h-0 bg-white',
     '!border-0 !border-b !border-solid',
     rowDividerClass,
-    shareSurface || selected
+    selected
       ? ''
       : `hover:!bg-accent hover:!border-b-accent${canEditPreview ? ' focus-within:!bg-accent focus-within:!border-b-accent' : ''}`,
   ]
@@ -293,7 +293,7 @@ export function CatalogRowModeCard({
       <div className="h-full min-h-0">
         <CatalogFontCard
           className={rowCardClassName}
-          hoverSurface={shareSurface ? 'neutral' : 'accent'}
+          hoverSurface="accent"
           minHeightClass=""
           pinPreviewToBottom
           pinPreviewColumnClassName={pinPreviewColumnClassName}

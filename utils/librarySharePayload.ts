@@ -62,6 +62,16 @@ function resolveCatalogRefForEntry(fontEntry: SavedLibraryFontEntry): CatalogRef
     if (!slug) return null;
     return { source: 'fontsource', key: slug, family: label || slug };
   }
+  if (source === 'fontshare') {
+    const slug = id.startsWith('fontshare:') ? id.slice('fontshare:'.length) : '';
+    if (!slug) return null;
+    return { source: 'fontshare', key: slug, family: label || slug };
+  }
+  if (source === 'fontfabric-trial') {
+    const slug = id.startsWith('fontfabric-trial:') ? id.slice('fontfabric-trial:'.length) : '';
+    if (!slug) return null;
+    return { source: 'fontfabric-trial', key: slug, family: label || slug };
+  }
   return null;
 }
 

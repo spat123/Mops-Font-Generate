@@ -10,6 +10,7 @@ export type ShareFontStats = {
   total?: number;
   static?: number;
   variable?: number;
+  external?: number;
 };
 
 function StatRow({ label, value }: { label: string; value: number }) {
@@ -23,7 +24,6 @@ function StatRow({ label, value }: { label: string; value: number }) {
 
 export type ShareDownloadPanelProps = {
   stats?: ShareFontStats | null;
-  catalogDownloadableCount?: number;
   importBusy?: boolean;
   zipBusy?: boolean;
   isShareOwner?: boolean;
@@ -35,7 +35,6 @@ export type ShareDownloadPanelProps = {
 
 export function ShareDownloadPanel({
   stats,
-  catalogDownloadableCount = 0,
   importBusy = false,
   zipBusy = false,
   isShareOwner = false,
@@ -44,7 +43,12 @@ export function ShareDownloadPanel({
   onZip,
   onSignIn,
 }: ShareDownloadPanelProps) {
-  const { total = 0, static: staticCount = 0, variable: variableCount = 0 } = stats || {};
+  const {
+    total = 0,
+    static: staticCount = 0,
+    variable: variableCount = 0,
+    external: externalCount = 0,
+  } = stats || {};
   const importLabel = isShareOwner ? 'Открыть в редакторе' : 'Сохранить в редактор';
   const importBusyLabel = isShareOwner ? 'Открываем…' : 'Сохранение…';
 
@@ -75,17 +79,12 @@ export function ShareDownloadPanel({
           {total}
         </p>
 
-        {staticCount > 0 || variableCount > 0 ? (
+        {staticCount > 0 || variableCount > 0 || externalCount > 0 ? (
           <div className="mt-8">
             {staticCount > 0 ? <StatRow label="Статических" value={staticCount} /> : null}
             {variableCount > 0 ? <StatRow label="Вариативных" value={variableCount} /> : null}
+            {externalCount > 0 ? <StatRow label="Внешние" value={externalCount} /> : null}
           </div>
-        ) : null}
-
-        {catalogDownloadableCount > 0 && catalogDownloadableCount < total ? (
-          <p className="mt-4 text-center text-[11px] font-medium uppercase leading-snug text-gray-400">
-            В архив и редактор: {catalogDownloadableCount} из каталога
-          </p>
         ) : null}
 
         <div className="mt-8 flex flex-col gap-3">

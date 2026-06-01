@@ -9,6 +9,7 @@ import {
   CATALOG_PREVIEW_FONT_SIZE_DEFAULT_PX,
   resolveCatalogGridCardMinHeightPx,
 } from '../../utils/catalogPreviewSample';
+import { isCatalogExternalDownloadButtonProps } from '../catalog/catalogExternalDownload';
 
 const PREVIEW_SAMPLE = 'AaBbCcDdEe';
 
@@ -193,7 +194,8 @@ export function SessionFontCard({
 
     const catalogHoverOverlay = useMemo(() => {
       if (batchSelected) return null;
-      const showOpen = typeof onOpen === 'function';
+      const showOpen =
+        typeof onOpen === 'function' && !isCatalogExternalDownloadButtonProps(downloadSplitButtonProps);
       const showDownload = Boolean(downloadSplitButtonProps);
       if (!showOpen && !showDownload) return null;
       return (

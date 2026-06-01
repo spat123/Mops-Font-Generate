@@ -12,6 +12,7 @@ export type ShareFontStats = {
   total: number;
   static: number;
   variable: number;
+  external: number;
   local: number;
   catalog: number;
 };
@@ -21,10 +22,16 @@ export function computeShareFontStats(rows: ShareFontStatsRow[] | null | undefin
   const list = Array.isArray(rows) ? rows : [];
   let staticCount = 0;
   let variableCount = 0;
+  let externalCount = 0;
   let localCount = 0;
 
   list.forEach((row) => {
     if (row?.kind === 'catalog-ref') {
+      const source = String((row.shareItem as ShareCatalogItem)?.source || '').toLowerCase();
+      if (source === 'fontshare' || source === 'fontfabric-trial') {
+        externalCount += 1;
+        return;
+      }
       if (isShareCatalogItemVariable(row.shareItem as ShareCatalogItem, row.libraryFont)) variableCount += 1;
       else staticCount += 1;
       return;
@@ -38,7 +45,8 @@ export function computeShareFontStats(rows: ShareFontStatsRow[] | null | undefin
     total: list.length,
     static: staticCount,
     variable: variableCount,
+    external: externalCount,
     local: localCount,
-    catalog: staticCount + variableCount,
+    catalog: staticCount + variableCount + externalCount,
   };
 }
