@@ -8,12 +8,27 @@ export type PerFontPreviewSnapshot = Record<string, unknown>;
 
 export type PerFontPreviewSetters = Record<string, ((value: unknown) => void) | undefined>;
 
+/** Не сохранять и не применять пустой текст превью (race при смене вкладки до гидратации). */
+export function resolvePreviewTextForStorage(text: unknown): string {
+  if (text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT) return ENTIRE_PRINTABLE_ASCII_SAMPLE;
+  if (typeof text === 'string' && text.trim()) return text;
+  return ENTIRE_PRINTABLE_ASCII_SAMPLE;
+}
+
+/** Текст для applyPerFontPreviewSnapshot; `undefined` — поле text в snapshot отсутствует. */
+export function resolvePreviewTextForApply(text: unknown): string | undefined {
+  if (text === undefined) return undefined;
+  if (text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT) return ENTIRE_PRINTABLE_ASCII_SAMPLE;
+  if (typeof text === 'string' && text.trim()) return text;
+  return ENTIRE_PRINTABLE_ASCII_SAMPLE;
+}
+
 /**
  * Снимок настроек превью / левой панели, хранимый на каждом шрифте (вкладка).
  */
 export function collectPerFontPreviewSnapshot(s: PerFontPreviewSnapshot): PerFontPreviewSnapshot {
   return {
-    text: s.text,
+    text: resolvePreviewTextForStorage(s.text),
     fontSize: s.fontSize,
     glyphsFontSize: s.glyphsFontSize,
     stylesFontSize: s.stylesFontSize,
@@ -89,15 +104,20 @@ export function applyPerFontPreviewSnapshot(
   } = setters;
 
   if (snapshot.text !== undefined && setText) {
-    const legacyMapped = snapshot.text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT;
-    const t = legacyMapped ? ENTIRE_PRINTABLE_ASCII_SAMPLE : snapshot.text;
-    previewTextDbg('applyPerFontPreviewSnapshot: setText', {
-      incomingLen: typeof snapshot.text === 'string' ? snapshot.text.length : -1,
-      legacyMapped,
-      resultLen: typeof t === 'string' ? t.length : -1,
-      snippet: previewTextSnippet(t, 120),
-    });
-    setText(t);
+    const t = resolvePreviewTextForApply(snapshot.text);
+    if (t !== undefined) {
+      const legacyMapped = snapshot.text === LEGACY_BASIC_ALNUM_PREVIEW_TEXT;
+      const emptyMapped =
+        typeof snapshot.text === 'string' && !snapshot.text.trim() && t === ENTIRE_PRINTABLE_ASCII_SAMPLE;
+      previewTextDbg('applyPerFontPreviewSnapshot: setText', {
+        incomingLen: typeof snapshot.text === 'string' ? snapshot.text.length : -1,
+        legacyMapped,
+        emptyMapped,
+        resultLen: t.length,
+        snippet: previewTextSnippet(t, 120),
+      });
+      setText(t);
+    }
   }
   if (snapshot.fontSize !== undefined && setFontSize) setFontSize(snapshot.fontSize);
   if (typeof setGlyphsFontSize === 'function' && snapshot.glyphsFontSize !== undefined) {

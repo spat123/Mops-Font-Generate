@@ -10,6 +10,7 @@ import {
 } from 'react';
 // Импортируем useSettings
 import { useSettings } from '../contexts/SettingsContext';
+import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
 import { previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 
 export type EditableTextProps = {
@@ -36,8 +37,11 @@ const EditableText = memo(({
 }: EditableTextProps) => {
   const { text, setText } = useSettings();
 
+  const effectiveText =
+    typeof text === 'string' && text.trim() ? text : ENTIRE_PRINTABLE_ASCII_SAMPLE;
+
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const localTextRef = useRef(text);
+  const localTextRef = useRef(effectiveText);
   const hasModificationsRef = useRef(false);
   const pendingReflowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevFontStyleKeyRef = useRef({
@@ -126,20 +130,20 @@ const EditableText = memo(({
 
   // Синхронизируем локальный текст с глобальным при изменении текста извне или смене режима
   useEffect(() => {
-    if (contentRef.current && localTextRef.current !== text) {
+    if (contentRef.current && localTextRef.current !== effectiveText) {
       previewTextDbg('EditableText: синхронизация DOM из глобального text', {
         syncId,
         viewMode,
         prevLocalLen: typeof localTextRef.current === 'string' ? localTextRef.current.length : 0,
-        nextLen: typeof text === 'string' ? text.length : 0,
-        nextSnippet: previewTextSnippet(text, 120),
+        nextLen: effectiveText.length,
+        nextSnippet: previewTextSnippet(effectiveText, 120),
       });
-      contentRef.current.innerText = text;
+      contentRef.current.innerText = effectiveText;
       resetHorizontalScroll(contentRef.current);
-      localTextRef.current = text;
+      localTextRef.current = effectiveText;
       hasModificationsRef.current = false;
     }
-  }, [text, viewMode, syncId, resetHorizontalScroll]);
+  }, [effectiveText, viewMode, syncId, resetHorizontalScroll]);
   
   // Функция для сохранения изменений в глобальное состояние
   const commitTextChanges = useCallback(() => {
@@ -207,9 +211,9 @@ const EditableText = memo(({
   // Устанавливаем начальное значение при монтировании и настраиваем обработчики событий
   useEffect(() => {
     if (contentRef.current) {
-      if (!contentRef.current.textContent && text) {
-        contentRef.current.innerText = text;
-        localTextRef.current = text;
+      if (!contentRef.current.textContent?.trim()) {
+        contentRef.current.innerText = effectiveText;
+        localTextRef.current = effectiveText;
       }
       
       resetHorizontalScroll(contentRef.current);
@@ -232,7 +236,7 @@ const EditableText = memo(({
         }
       };
     }
-  }, [text, isWaterfall, isStyles, resetHorizontalScroll]);
+  }, [effectiveText, isWaterfall, isStyles, resetHorizontalScroll]);
   
   return (
     <div

@@ -141,6 +141,40 @@ export function CatalogFontCard({
     }
   }, [selected]);
 
+  /** Скролл каталога без pointerleave оставляет showHoverUi на карточках под курсором. */
+  useEffect(() => {
+    const rootNode = rootRef.current;
+    if (!rootNode || typeof window === 'undefined') return undefined;
+    const scrollRoot = rootNode.closest('.catalog-scroll-area');
+    if (!scrollRoot) return undefined;
+
+    const resetHoverUnlessPinned = () => {
+      if (downloadUiPinned || openUiPinned) return;
+      setShowHoverUi(false);
+      setTouchUiPinned(false);
+    };
+
+    scrollRoot.addEventListener('scroll', resetHoverUnlessPinned, { passive: true });
+    return () => scrollRoot.removeEventListener('scroll', resetHoverUnlessPinned);
+  }, [downloadUiPinned, openUiPinned]);
+
+  useEffect(() => {
+    const rootNode = rootRef.current;
+    if (!rootNode || typeof IntersectionObserver === 'undefined') return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) return;
+        if (downloadUiPinned || openUiPinned) return;
+        setShowHoverUi(false);
+        setTouchUiPinned(false);
+      },
+      { root: rootNode.closest('.catalog-scroll-area'), threshold: 0 },
+    );
+    observer.observe(rootNode);
+    return () => observer.disconnect();
+  }, [downloadUiPinned, openUiPinned]);
+
   useEffect(() => {
     if (!touchUiPinned || downloadUiPinned || openUiPinned) return undefined;
     const onDocumentPointerDown = (event: globalThis.PointerEvent) => {
@@ -239,17 +273,14 @@ export function CatalogFontCard({
     );
   }, [hoverOverlay, handleRequestCloseHoverUi]);
 
-  const showHoverOverlay =
-    Boolean(resolvedHoverOverlay) && !selected && (hoverUiActive || pinActionsVisible);
+  // `pinActionsVisible` нужен только для верхних actions (например, «+» при пустых библиотеках),
+  // но НЕ должен форсировать отображение оверлея «Открыть/Скачать» (в dev часто выглядит как “всегда видно”).
+  const showHoverOverlay = Boolean(resolvedHoverOverlay) && !selected && hoverUiActive;
   // ВАЖНО: `will-change` и постоянные transforms на тысячах карточек могут разгонять Layerize/память/GC.
   // Для массового списка оставляем только opacity-переход.
   const hoverOverlayClassName =
     'absolute -inset-1 z-20 transition-opacity duration-75 ' +
-    (showHoverOverlay
-      ? pinActionsVisible
-        ? 'pointer-events-auto opacity-100'
-        : 'pointer-events-none opacity-100'
-      : 'pointer-events-none opacity-0');
+    (showHoverOverlay ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0');
 
   const rootMergedStyle = useMemo((): CSSProperties | undefined => {
     const merged = {

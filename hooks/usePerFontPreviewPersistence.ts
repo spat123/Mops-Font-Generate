@@ -1,4 +1,5 @@
 import { useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
 import { collectPerFontPreviewSnapshot, applyPerFontPreviewSnapshot } from '../utils/perFontPreviewSettings';
 import { updateFontSettings } from '../utils/db';
 import { EMPTY_PREFIX } from '../components/ui/EditorTabBar';
@@ -99,7 +100,16 @@ export function usePerFontPreviewPersistence({
           );
           lastAppliedTabForPreviewRef.current = nextTab;
         } else {
-          previewTextDbg('tab switch: previewSettings нет — не затираем дефолтом', { nextTab });
+          const currentText = previewSettingsValuesRef.current.text;
+          if (typeof currentText === 'string' && !currentText.trim()) {
+            previewTextDbg('tab switch: глобальный текст пуст — подставляем образец', { nextTab });
+            applyPerFontPreviewSnapshot(
+              { text: ENTIRE_PRINTABLE_ASCII_SAMPLE },
+              previewSettersRef.current as Record<string, (...args: unknown[]) => void>,
+            );
+          } else {
+            previewTextDbg('tab switch: previewSettings нет — не затираем дефолтом', { nextTab });
+          }
         }
       }
     } else if (nextTab === 'library' || nextTab.startsWith(EMPTY_PREFIX)) {

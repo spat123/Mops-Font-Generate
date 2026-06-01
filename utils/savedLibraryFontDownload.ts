@@ -27,6 +27,7 @@ import {
   parseFontfabricTrialEntrySlug,
   parseFontshareEntrySlug,
   parseFontsourceEntrySlug,
+  parseGoogleEntryFamily,
   resolveFontfabricTrialCatalogItem,
   resolveFontshareCatalogItem,
   resolveFontsourceCatalogItem,
@@ -124,7 +125,12 @@ export function buildSavedLibraryDownloadSplitButtonProps(
   const id = String(fontEntry.id || '').trim();
 
   if (source === 'google') {
-    const family = label;
+    const family =
+      parseGoogleEntryFamily(id) ||
+      String(label || '')
+        .trim()
+        .replace(/\s+\d+$/i, '')
+        .trim();
     const entry = resolveGoogleCatalogEntry(family);
     if (!entry?.family) {
       return wrapSavedLibraryDownloadProps(
@@ -322,7 +328,12 @@ function resolveSavedLibraryDownloadTarget(
   const id = String(fontEntry.id || '').trim();
 
   if (source === 'google') {
-    const family = label;
+    const family =
+      parseGoogleEntryFamily(id) ||
+      String(label || '')
+        .trim()
+        .replace(/\s+\d+$/i, '')
+        .trim();
     if (!family) return null;
     const entry = resolveGoogleCatalogEntry(family) || { family, subsets: [], isVariable: false };
     return { source: 'google', entry, label: family };

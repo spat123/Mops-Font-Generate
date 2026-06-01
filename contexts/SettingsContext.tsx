@@ -342,7 +342,10 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
       rawPreviewTextKey = null;
     }
     const storedText = getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT, DEFAULT_SETTINGS.TEXT);
-    const resolvedText = typeof storedText === 'string' ? storedText : DEFAULT_SETTINGS.TEXT;
+    const resolvedText =
+      typeof storedText === 'string' && storedText.trim()
+        ? storedText
+        : DEFAULT_SETTINGS.TEXT;
     let rawPreviewTextLen = 0;
     let jsonParseOk = null;
     let jsonParseError = null;

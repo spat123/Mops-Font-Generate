@@ -3,6 +3,7 @@ import type { SessionFontRecord } from '../types/editorFonts';
 import { toast } from '../utils/appNotify';
 import { getAllFonts, deleteAllFontsDB, updateFontSettings, saveFont } from '../utils/db';
 import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from '../utils/cssGenerator'; // Нужен для восстановления
+import { resolvePreviewTextForStorage } from '../utils/perFontPreviewSettings';
 import {
   FONTSOURCE_UNICODE_RANGE_CYRILLIC,
   FONTSOURCE_UNICODE_RANGE_LATIN,
@@ -228,12 +229,23 @@ function stageFontFromRecord(font) {
     if (typeof font.file.size === 'number' && font.file.size === 0) return null;
     const rawFamily = font.fontFamily || `font-${font.id}`;
     const fontFamilyToLoad = String(rawFamily).replace(/^['"]+|['"]+$/g, '').trim() || `font-${font.id}`;
+    const previewSettings =
+      font.previewSettings && typeof font.previewSettings === 'object'
+        ? {
+            ...font.previewSettings,
+            ...(font.previewSettings.text !== undefined
+              ? { text: resolvePreviewTextForStorage(font.previewSettings.text) }
+              : {}),
+          }
+        : font.previewSettings;
+
     return {
         ...font,
         url: undefined,
         fontFamily: fontFamilyToLoad,
         lastUsedPresetName: font.lastUsedPresetName || null,
         lastUsedVariableSettings: font.lastUsedVariableSettings || null,
+        previewSettings,
     };
 }
 
