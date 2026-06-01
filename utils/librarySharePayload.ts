@@ -1,6 +1,13 @@
 import { readGoogleFontCatalogCache } from './googleFontCatalogCache';
 import { readFontsourceCatalogCache } from './fontsourceCatalogCache';
 import { resolveCatalogIsVariable } from './libraryShareImport';
+import {
+  parseFontfabricTrialEntrySlug,
+  parseFontshareEntrySlug,
+  parseFontsourceEntrySlug,
+  parseGoogleEntryFamily,
+} from './catalogCacheLookup';
+import { resolvePreferredLibraryPickerEntry } from './libraryPickerCatalogSearch';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 import type { SavedLibraryFontEntry } from '../types/savedLibrary';
 import type { SessionFontRecord } from '../types/editorFonts';
@@ -49,26 +56,27 @@ export async function buildFontFingerprint({
 type CatalogRef = { source: string; key: string; family: string };
 
 function resolveCatalogRefForEntry(fontEntry: SavedLibraryFontEntry): CatalogRef | null {
-  const source = String(fontEntry?.source || '').trim().toLowerCase();
-  const id = String(fontEntry?.id || '').trim();
-  const label = String(fontEntry?.label || '').trim();
+  const preferredEntry = resolvePreferredLibraryPickerEntry(fontEntry) || fontEntry;
+  const source = String(preferredEntry?.source || '').trim().toLowerCase();
+  const id = String(preferredEntry?.id || '').trim();
+  const label = String(preferredEntry?.label || '').trim();
   if (source === 'google') {
-    const family = id.startsWith('google:') ? id.slice('google:'.length) : label;
+    const family = parseGoogleEntryFamily(id) || label.replace(/\s+\d+$/i, '').trim();
     if (!family) return null;
     return { source: 'google', key: family, family };
   }
   if (source === 'fontsource') {
-    const slug = id.startsWith('fontsource:') ? id.slice('fontsource:'.length) : '';
+    const slug = parseFontsourceEntrySlug(id);
     if (!slug) return null;
     return { source: 'fontsource', key: slug, family: label || slug };
   }
   if (source === 'fontshare') {
-    const slug = id.startsWith('fontshare:') ? id.slice('fontshare:'.length) : '';
+    const slug = parseFontshareEntrySlug(id);
     if (!slug) return null;
     return { source: 'fontshare', key: slug, family: label || slug };
   }
   if (source === 'fontfabric-trial') {
-    const slug = id.startsWith('fontfabric-trial:') ? id.slice('fontfabric-trial:'.length) : '';
+    const slug = parseFontfabricTrialEntrySlug(id);
     if (!slug) return null;
     return { source: 'fontfabric-trial', key: slug, family: label || slug };
   }
@@ -115,20 +123,6 @@ function detectCatalogMatchForLocal(fontEntry: SavedLibraryFontEntry): {
   if (!label) return null;
   const normalizedLabel = normalizeText(label);
 
-  const google = readGoogleFontCatalogCache();
-  const googleHit = (Array.isArray(google) ? google : []).find(
-    (entry) => normalizeText(entry?.family) === normalizedLabel,
-  );
-  if (googleHit?.family) {
-    return {
-      source: 'google',
-      key: String(googleHit.family),
-      family: String(googleHit.family),
-      confidence: 'name-exact',
-      needsFingerprintVerification: true,
-    };
-  }
-
   const fontsource = readFontsourceCatalogCache();
   const fontsourceHit = (Array.isArray(fontsource) ? fontsource : []).find(
     (entry) =>
@@ -141,6 +135,20 @@ function detectCatalogMatchForLocal(fontEntry: SavedLibraryFontEntry): {
       source: 'fontsource',
       key: slug,
       family: String(fontsourceHit.family || label),
+      confidence: 'name-exact',
+      needsFingerprintVerification: true,
+    };
+  }
+
+  const google = readGoogleFontCatalogCache();
+  const googleHit = (Array.isArray(google) ? google : []).find(
+    (entry) => normalizeText(entry?.family) === normalizedLabel,
+  );
+  if (googleHit?.family) {
+    return {
+      source: 'google',
+      key: String(googleHit.family),
+      family: String(googleHit.family),
       confidence: 'name-exact',
       needsFingerprintVerification: true,
     };

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { buildCatalogDownloadButtonProps } from '../components/catalog/buildCatalogDownloadButtonProps';
 import { SavedLibraryCatalogAddCorner } from '../components/library/SavedLibraryCatalogAddCorner';
-import { OpenExternalIcon, ShareIcon, TrashIcon } from '../components/ui/CommonIcons';
+import { DuplicateIcon, OpenExternalIcon, ShareIcon, TrashIcon } from '../components/ui/CommonIcons';
 import { moveAndSwapIconUrl } from '../components/ui/editIconUrls';
 import { buildSavedLibraryDownloadSplitButtonProps } from '../utils/savedLibraryFontDownload';
 import {
@@ -29,15 +29,6 @@ import type {
   SavedLibraryCatalogSearchRow,
 } from '../types/savedLibraryCard';
 import type { OpenLibraryFontEntryOptions } from './useOpenLibraryFontEntry';
-
-function DuplicateIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>
-      <rect x="7" y="3" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="3" y="5" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
 
 type SavedLibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
 
@@ -69,6 +60,10 @@ type UseSavedLibraryCardItemsParams = {
   openFontsourceSlugInEditorTab: (slug: string, isVariable?: boolean) => void;
   addFontEntryToLibrary: (libraryId: string, libraryEntry: SavedLibraryFontEntry) => boolean;
   duplicateLibraryFontEntryInLibrary: (libraryId: string, fontEntry: SavedLibraryFontEntry) => boolean;
+  moveSingleSavedLibraryFont: (
+    fontEntry: SavedLibraryFontEntry,
+    targetLibraryId: string,
+  ) => boolean | Promise<boolean>;
   savedLibraryCatalogAddBusyId: string | null;
   setSavedLibraryCatalogAddBusyId: (id: string | null) => void;
   savedLibraryCatalogRecentlyAddedSet: Set<string>;
@@ -100,6 +95,7 @@ export function useSavedLibraryCardItems({
   openFontsourceSlugInEditorTab,
   addFontEntryToLibrary,
   duplicateLibraryFontEntryInLibrary,
+  moveSingleSavedLibraryFont,
   savedLibraryCatalogAddBusyId,
   setSavedLibraryCatalogAddBusyId,
   savedLibraryCatalogRecentlyAddedSet,
@@ -196,11 +192,7 @@ export function useSavedLibraryCardItems({
                   key: `move-${library.id}`,
                   label: formatLibraryPickerLabel(library.name, matchCount),
                   onSelect: () => {
-                    if (matchCount > 0) {
-                      duplicateLibraryFontEntryInLibrary(library.id, font);
-                      return;
-                    }
-                    addFontEntryToLibrary(library.id, font);
+                    void moveSingleSavedLibraryFont(font, library.id);
                   },
                 };
               });
@@ -229,12 +221,14 @@ export function useSavedLibraryCardItems({
     });
   }, [
     activeSavedLibrary,
+    duplicateLibraryFontEntryInLibrary,
     filteredActiveSavedLibraryFonts,
     buildSavedLibraryCardMetaSplit,
     clearSavedLibraryLongPressTimer,
     fontLibraries,
     handleUpdateSavedLibrary,
     mainTab,
+    moveSingleSavedLibraryFont,
     onSavedLibrarySelectionCardClick,
     openLibraryFontEntry,
     openLibraryShareDialog,
@@ -376,7 +370,6 @@ export function useSavedLibraryCardItems({
   }, [
     activeSavedLibrary,
     addFontEntryToLibrary,
-    duplicateLibraryFontEntryInLibrary,
     buildSavedLibraryCardMetaSplit,
     catalogSearchResults,
     markSavedLibraryCatalogRecentlyAdded,

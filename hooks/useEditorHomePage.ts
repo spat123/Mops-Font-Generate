@@ -740,6 +740,7 @@ export function useEditorHomePage(router: NextRouter) {
       openFontsourceSlugInEditorTab,
       addFontEntryToLibrary,
       duplicateLibraryFontEntryInLibrary,
+      moveSingleSavedLibraryFont,
       savedLibraryCatalogAddBusyId,
       setSavedLibraryCatalogAddBusyId,
       savedLibraryCatalogRecentlyAddedSet,

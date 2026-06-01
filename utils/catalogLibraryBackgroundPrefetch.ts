@@ -4,6 +4,7 @@ import {
 } from './googleFontLoader';
 import { readGoogleFontCatalogCache } from './googleFontCatalogCache';
 import { readFontsourceCatalogCache } from './fontsourceCatalogCache';
+import { parseFontsourceEntrySlug, parseGoogleEntryFamily } from './catalogCacheLookup';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 
 type LibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
@@ -21,7 +22,12 @@ type GoogleCatalogRow = {
  * только прогрев сети/диска (HTTP-кэш) для последующего «Открыть».
  */
 export function prefetchGoogleLibraryFontEntry(fontEntry: LibraryFontEntry): void {
-  const family = String(fontEntry?.label || '').trim();
+  const family =
+    parseGoogleEntryFamily(String(fontEntry?.id || '')) ||
+    String(fontEntry?.label || '')
+      .trim()
+      .replace(/\s+\d+$/i, '')
+      .trim();
   if (!family) return;
   void (async () => {
     try {
@@ -65,7 +71,7 @@ function fontsourceRowBySlug(slug: string): Record<string, unknown> | null {
 
 export function prefetchFontsourceLibraryFontEntry(fontEntry: LibraryFontEntry): void {
   const entryId = String(fontEntry?.id || '').trim();
-  const slug = entryId.startsWith('fontsource:') ? entryId.slice('fontsource:'.length) : '';
+  const slug = parseFontsourceEntrySlug(entryId);
   if (!slug) return;
   void (async () => {
     try {

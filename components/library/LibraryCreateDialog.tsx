@@ -9,16 +9,17 @@ import { NATIVE_SELECT_FIELD_INTERACTIVE } from '../ui/nativeSelectFieldClasses'
 import { SearchClearButton } from '../ui/SearchClearButton';
 import { PopupDialogHeader } from '../ui/PopupDialogHeader';
 import { AppButton } from '../ui/AppButton';
-import { matchesSearch } from '../../utils/searchMatching';
-import { readGoogleFontCatalogCache } from '../../utils/googleFontCatalogCache';
-import { readFontsourceCatalogCache } from '../../utils/fontsourceCatalogCache';
+import { ensureCatalogCachesLoaded } from '../../utils/ensureCatalogCachesLoaded';
+import { normalizeLibraryText } from '../../utils/fontLibraryUtils';
 import {
-  mapFontsourceCatalogItemsToLibraryEntries,
-  mapGoogleCatalogItemsToLibraryEntries,
-  mapSessionFontsToLibraryEntries,
-  mergeLibraryEntries,
-  normalizeLibraryText,
-} from '../../utils/fontLibraryUtils';
+  buildLibraryPickerCatalogIndex,
+  normalizeLibraryEntriesForPicker,
+  readPreferredCatalogLibraryEntries,
+  resolvePreferredLibraryPickerEntry,
+  searchLibraryPickerCatalog,
+  searchSessionLocalFontsForPicker,
+  type LibraryPickerCatalogIndex,
+} from '../../utils/libraryPickerCatalogSearch';
 import {
   createEmptyLibraryDraft,
   createLibraryDraftWithFonts,
@@ -27,14 +28,6 @@ import {
 } from '../../utils/libraryCreateDraft';
 
 const LIBRARY_NAME_MAX_LENGTH = 32;
-const SEARCH_RESULTS_LIMIT = 24;
-
-function readCachedCatalogLibraryEntries() {
-  return mergeLibraryEntries(
-    mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache()),
-    mapFontsourceCatalogItemsToLibraryEntries(readFontsourceCatalogCache()),
-  );
-}
 
 export type LibraryCreateDialogProps = {
   sessionFonts?: SessionFontRecord[];
@@ -57,7 +50,9 @@ export function LibraryCreateDialog({
 }: LibraryCreateDialogProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<LibraryCreateDraft>(() => createEmptyLibraryDraft());
-  const [catalogEntries, setCatalogEntries] = useState(() => readCachedCatalogLibraryEntries());
+  const [catalogIndex, setCatalogIndex] = useState<LibraryPickerCatalogIndex | null>(() =>
+    buildLibraryPickerCatalogIndex(),
+  );
   const [isCatalogLoading, setIsCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
   const catalogFetchStartedRef = useRef(false);
@@ -143,7 +138,7 @@ export function LibraryCreateDialog({
       catalogFetchStartedRef.current = false;
       return undefined;
     }
-    if (catalogEntries.length > 0 || catalogFetchStartedRef.current) return undefined;
+    if (catalogFetchStartedRef.current) return undefined;
 
     catalogFetchStartedRef.current = true;
     let cancelled = false;
@@ -152,69 +147,81 @@ export function LibraryCreateDialog({
 
     (async () => {
       try {
-        const [googleRes, fontsourceRes] = await Promise.allSettled([
-          fetch('/api/google-fonts-catalog'),
-          fetch('/api/fontsource-catalog'),
-        ]);
-
-        const sessionEntries = mapSessionFontsToLibraryEntries(sessionFonts);
-        let googleItems = mapGoogleCatalogItemsToLibraryEntries(readGoogleFontCatalogCache());
-        let fontsourceItems = mapFontsourceCatalogItemsToLibraryEntries(readFontsourceCatalogCache());
-
-        if (googleItems.length === 0 && googleRes.status === 'fulfilled' && googleRes.value.ok) {
-          const data = await googleRes.value.json();
-          googleItems = mapGoogleCatalogItemsToLibraryEntries(Array.isArray(data.items) ? data.items : []);
-        }
-
-        if (fontsourceItems.length === 0 && fontsourceRes.status === 'fulfilled' && fontsourceRes.value.ok) {
-          const data = await fontsourceRes.value.json();
-          fontsourceItems = mapFontsourceCatalogItemsToLibraryEntries(
-            Array.isArray(data.items) ? data.items : [],
-          );
-        }
-
-        if (!cancelled) {
-          setCatalogEntries(mergeLibraryEntries(sessionEntries, googleItems, fontsourceItems));
-        }
+        await ensureCatalogCachesLoaded({
+          needsGoogle: true,
+          needsFontsource: true,
+          preferCompleteFontsource: true,
+        });
+        if (!cancelled) setCatalogIndex(buildLibraryPickerCatalogIndex());
       } catch {
-        if (!cancelled) {
-          setCatalogError('Не удалось загрузить список шрифтов');
-        }
+        if (!cancelled) setCatalogError('Не удалось загрузить каталог шрифтов');
       } finally {
-        if (!cancelled) {
-          setIsCatalogLoading(false);
-        }
+        if (!cancelled) setIsCatalogLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [catalogEntries.length, open, sessionFonts]);
+  }, [open]);
 
-  const availableEntries = useMemo(
-    () => mergeLibraryEntries(mapSessionFontsToLibraryEntries(sessionFonts), catalogEntries),
-    [catalogEntries, sessionFonts],
+  const pickerNormalizeOptions = useMemo(
+    () => ({ dedupeFamilies: !(mode === 'edit' && editingLibraryId) }),
+    [editingLibraryId, mode],
   );
 
-  const filteredEntries = useMemo(() => {
-    const selectedIds = new Set(selectedFonts.map((item) => item.id));
-    return availableEntries
-      .filter((item) => !selectedIds.has(item.id))
-      .filter((item) => matchesSearch(item.label, searchQuery))
-      .slice(0, SEARCH_RESULTS_LIMIT);
-  }, [availableEntries, searchQuery, selectedFonts]);
-
-  const addFontToDraft = useCallback((entry: SavedLibraryFontEntry) => {
+  /** Предвыбранные и уже добавленные записи — Fontsource, если есть в каталоге. */
+  useEffect(() => {
+    if (!open || !catalogIndex) return;
     setDraft((prev) => {
-      if (prev.selectedFonts.some((item) => item.id === entry.id)) return prev;
-      return {
-        ...prev,
-        selectedFonts: [...prev.selectedFonts, entry],
-      };
+      const normalized = normalizeLibraryEntriesForPicker(
+        prev.selectedFonts,
+        catalogIndex,
+        pickerNormalizeOptions,
+      );
+      if (
+        normalized.length === prev.selectedFonts.length &&
+        normalized.every((item, i) => item.id === prev.selectedFonts[i]?.id)
+      ) {
+        return prev;
+      }
+      return { ...prev, selectedFonts: normalized };
     });
-    searchInputRef.current?.focus();
-  }, []);
+  }, [catalogIndex, open, pickerNormalizeOptions]);
+
+  const searchQueryTrimmed = searchQuery.trim();
+
+  const filteredEntries = useMemo(() => {
+    if (!searchQueryTrimmed) return [];
+    const catalogHits = searchLibraryPickerCatalog({
+      searchQueryTrimmed,
+      selectedEntries: selectedFonts,
+      index: catalogIndex,
+    });
+    const localHits = searchSessionLocalFontsForPicker(sessionFonts, searchQueryTrimmed, selectedFonts);
+    const seen = new Set(catalogHits.map((item) => item.id));
+    const merged = [...catalogHits];
+    for (const item of localHits) {
+      if (!seen.has(item.id)) merged.push(item);
+    }
+    return merged;
+  }, [catalogIndex, searchQueryTrimmed, selectedFonts, sessionFonts]);
+
+  const addFontToDraft = useCallback(
+    (entry: SavedLibraryFontEntry) => {
+      const preferred = resolvePreferredLibraryPickerEntry(entry, catalogIndex) || entry;
+      setDraft((prev) => {
+        const normalized = normalizeLibraryEntriesForPicker([...prev.selectedFonts, preferred], catalogIndex);
+        return {
+          ...prev,
+          selectedFonts: normalized,
+          searchQuery: '',
+        };
+      });
+      searchInputRef.current?.focus();
+    },
+    [catalogIndex],
+  );
 
   const removeFontFromDraft = useCallback((entryId: string) => {
     setDraft((prev) => ({
@@ -227,16 +234,22 @@ export function LibraryCreateDialog({
     const normalized = normalizeLibraryText(libraryName);
     if (!normalized) return;
 
+    const fontsForSave = normalizeLibraryEntriesForPicker(
+      selectedFonts,
+      catalogIndex,
+      pickerNormalizeOptions,
+    );
+
     if (mode === 'edit' && editingLibraryId) {
       onUpdateLibrary?.(editingLibraryId, {
         name: normalized,
-        fonts: selectedFonts,
+        fonts: fontsForSave,
       });
       onOpenLibrary?.(editingLibraryId);
     } else {
       const created = onCreateLibrary?.({
         name: normalized,
-        fonts: selectedFonts,
+        fonts: fontsForSave,
       });
       if (created?.id) {
         onOpenLibrary?.(created.id);
@@ -245,6 +258,8 @@ export function LibraryCreateDialog({
 
     closeDialog(openRequest?.requestId);
   }, [
+    catalogIndex,
+    pickerNormalizeOptions,
     closeDialog,
     editingLibraryId,
     libraryName,
@@ -257,13 +272,15 @@ export function LibraryCreateDialog({
   ]);
 
   const isSubmitDisabled = normalizeLibraryText(libraryName).length === 0;
-  const hasSearchInput = searchQuery.trim().length > 0;
+  const hasSearchInput = searchQueryTrimmed.length > 0;
   const isEditMode = mode === 'edit' && editingLibraryId;
   const nameFieldClass = `box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-14 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${NATIVE_SELECT_FIELD_INTERACTIVE} focus:border-black/[0.14] focus:outline-none sm:pl-3`;
   const searchFieldClass = `box-border h-10 w-full rounded-md border border-transparent bg-gray-50 py-0 pl-2 pr-10 text-sm leading-normal uppercase font-semibold text-gray-900 placeholder:text-gray-900/40 ${NATIVE_SELECT_FIELD_INTERACTIVE} focus:border-black/[0.14] focus:outline-none sm:pl-3`;
 
   const dialogTitle = isEditMode ? 'Редактировать библиотеку' : 'Создать библиотеку шрифтов';
   const submitLabel = isEditMode ? 'Сохранить' : 'Создать';
+
+  const catalogReady = Boolean(catalogIndex) && readPreferredCatalogLibraryEntries(catalogIndex).length > 0;
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -297,14 +314,19 @@ export function LibraryCreateDialog({
               {libraryName.length}/{LIBRARY_NAME_MAX_LENGTH}
             </span>
           </div>
-          <div className="relative mt-4">
+
+          <p className="mt-3 text-xs uppercase text-gray-500">
+            В библиотеку добавляются шрифты Fontsource. Google — только если семейства нет в Fontsource.
+          </p>
+
+          <div className="relative mt-3">
             <input
               id="font-library-search"
               ref={searchInputRef}
               type="search"
               value={searchQuery}
               onChange={(event) => patchDraft({ searchQuery: event.target.value })}
-              placeholder="Начните вводить название шрифта"
+              placeholder="Имя, категория…"
               className={searchFieldClass}
               autoComplete="off"
               spellCheck={false}
@@ -337,39 +359,40 @@ export function LibraryCreateDialog({
             </div>
           ) : null}
 
-          {hasSearchInput ? (
-            <div className="mt-3 max-h-48 overflow-y-auto">
-              {catalogError ? (
-                <p className="text-sm text-red-600">{catalogError}</p>
-              ) : filteredEntries.length > 0 ? (
-                <>
-                  {isCatalogLoading ? (
-                    <p className="mb-2 text-xs text-gray-400">Догружаю полный список шрифтов...</p>
-                  ) : null}
-                  <div className="flex flex-wrap gap-2">
-                    {filteredEntries.map((entry) => (
-                      <SelectableChip
-                        key={entry.id}
-                        type="button"
-                        active={false}
-                        onClick={() => addFontToDraft(entry)}
-                      >
-                        <span className="truncate">{entry.label}</span>
-                      </SelectableChip>
-                    ))}
-                  </div>
-                </>
-              ) : availableEntries.length === 0 && selectedFonts.length === 0 ? (
-                <p className="text-sm text-gray-500">
-                  {isCatalogLoading ? 'Загружаю список шрифтов...' : 'Список шрифтов пока пуст.'}
-                </p>
-              ) : availableEntries.length === 0 && isCatalogLoading ? (
-                <p className="text-sm text-gray-500">Догружаю полный список шрифтов...</p>
-              ) : (
-                <p className="text-sm text-gray-500">По запросу ничего не найдено.</p>
-              )}
-            </div>
-          ) : null}
+          <div className="mt-3 max-h-56 overflow-y-auto">
+            {catalogError ? <p className="text-sm text-red-600">{catalogError}</p> : null}
+            {!hasSearchInput ? (
+              <p className="text-sm text-gray-500">
+                {isCatalogLoading
+                  ? 'Загружаю каталог…'
+                  : 'Начните вводить название — как в поиске каталога.'}
+              </p>
+            ) : filteredEntries.length > 0 ? (
+              <>
+                {isCatalogLoading ? (
+                  <p className="mb-2 text-xs text-gray-400">Обновляю каталог…</p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {filteredEntries.map((entry) => (
+                    <SelectableChip
+                      key={entry.id}
+                      type="button"
+                      active={false}
+                      onClick={() => addFontToDraft(entry)}
+                    >
+                      <span className="truncate">{entry.label}</span>
+                    </SelectableChip>
+                  ))}
+                </div>
+              </>
+            ) : isCatalogLoading ? (
+              <p className="text-sm text-gray-500">Ищу в каталоге…</p>
+            ) : catalogReady ? (
+              <p className="text-sm text-gray-500">По запросу ничего не найдено.</p>
+            ) : (
+              <p className="text-sm text-gray-500">Каталог ещё не загружен. Подождите или обновите страницу.</p>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0 items-stretch gap-3 border-t border-gray-200 bg-white px-6 py-4">

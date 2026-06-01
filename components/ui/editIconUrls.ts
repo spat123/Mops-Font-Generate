@@ -14,6 +14,7 @@ export const linkIconUrl = publicEditIcon('Link.svg');
 export const settingIconUrl = publicEditIcon('Setting.svg');
 export const notificationIconUrl = publicEditIcon('Notification.svg');
 export const moveAndSwapIconUrl = publicEditIcon('Move and swap.svg');
+export const duplicateIconUrl = publicEditIcon('Duplicate.svg');
 export const delIconUrl = publicEditIcon('Del.svg');
 export const shareIconUrl = publicEditIcon('Share.svg');
 export const searchIconUrl = publicEditIcon('Search.svg');

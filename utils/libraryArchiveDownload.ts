@@ -1,10 +1,12 @@
 import { toast } from './appNotify';
 import { buildSafeFileBase } from './fileDownloadUtils';
 import {
+  parseGoogleEntryFamily,
   parseFontsourceEntrySlug,
   resolveFontsourceCatalogItem,
   resolveGoogleCatalogEntry,
 } from './catalogCacheLookup';
+import { resolvePreferredLibraryPickerEntry } from './libraryPickerCatalogSearch';
 import {
   buildArchiveBlobFromEntries,
   getFontsourcePackageFiles,
@@ -33,10 +35,16 @@ export async function downloadLibraryAsZip(library: SavedLibraryRecord | null | 
   let skipped = 0;
 
   for (const fontEntry of fonts) {
-    const source = String(fontEntry?.source || 'session').trim();
+    const preferredEntry = resolvePreferredLibraryPickerEntry(fontEntry) || fontEntry;
+    const source = String(preferredEntry?.source || 'session').trim();
 
     if (source === 'google') {
-      const family = String(fontEntry?.label || '').trim();
+      const family =
+        parseGoogleEntryFamily(String(preferredEntry?.id || '')) ||
+        String(preferredEntry?.label || '')
+          .trim()
+          .replace(/\s+\d+$/i, '')
+          .trim();
       if (!family) {
         skipped += 1;
         continue;
@@ -59,7 +67,7 @@ export async function downloadLibraryAsZip(library: SavedLibraryRecord | null | 
     }
 
     if (source === 'fontsource') {
-      const slug = parseFontsourceEntrySlug(String(fontEntry?.id || ''));
+      const slug = parseFontsourceEntrySlug(String(preferredEntry?.id || ''));
       if (!slug) {
         skipped += 1;
         continue;
@@ -68,7 +76,7 @@ export async function downloadLibraryAsZip(library: SavedLibraryRecord | null | 
       const item = cached || {
         id: slug,
         slug,
-        family: String(fontEntry?.label || slug),
+        family: String(preferredEntry?.label || slug),
         isVariable: false,
       };
       try {

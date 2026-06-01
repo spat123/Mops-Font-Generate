@@ -1,4 +1,5 @@
-import { normalizeLibraryText, sanitizeLibraryFont } from './fontLibraryUtils';
+import { sanitizeLibraryFont } from './fontLibraryUtils';
+import { libraryEntryMatchesInput } from './libraryFontIdentity';
 import type { SavedLibraryFontEntry, SavedLibraryFontEntryInput } from '../types/savedLibrary';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 
@@ -7,34 +8,8 @@ export function createSavedLibraryFontEntryMatcher(fontEntry: SavedLibraryFontEn
   const entry = sanitizeLibraryFont(fontEntry);
   if (!entry) return null;
 
-  const entryId = String(entry.id || '').trim();
-  const entrySource = String(entry.source || '').trim();
-  const entryLabel = normalizeLibraryText(entry.label || '').toLowerCase();
-  const candidateIds = Array.isArray(fontEntry?.candidateIds)
-    ? fontEntry.candidateIds.map((value) => String(value || '').trim()).filter(Boolean)
-    : [];
-  const candidateLabels = Array.isArray(fontEntry?.candidateLabels)
-    ? fontEntry.candidateLabels
-        .map((value) => normalizeLibraryText(value || '').toLowerCase())
-        .filter(Boolean)
-    : [];
-
   const matchesEntry = (item: SavedLibraryFontEntry) => {
-    const itemId = String(item?.id || '').trim();
-    if (entryId && itemId === entryId) return true;
-    if (candidateIds.includes(itemId)) return true;
-    const itemSource = String(item?.source || '').trim();
-    const itemLabel = normalizeLibraryText(item?.label || '').toLowerCase();
-    if (entrySource && entryLabel && itemSource === entrySource && itemLabel === entryLabel) return true;
-    if (
-      entrySource &&
-      candidateLabels.length > 0 &&
-      itemSource === entrySource &&
-      candidateLabels.includes(itemLabel)
-    ) {
-      return true;
-    }
-    return false;
+    return libraryEntryMatchesInput(item, fontEntry);
   };
 
   return { entry, matchesEntry };

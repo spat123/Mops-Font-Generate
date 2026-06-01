@@ -1,5 +1,5 @@
 import { EditAssetIcon } from './EditAssetIcon';
-import { delIconUrl, linkIconUrl, searchIconUrl, shareIconUrl } from './editIconUrls';
+import { delIconUrl, duplicateIconUrl, linkIconUrl, searchIconUrl, shareIconUrl } from './editIconUrls';
 
 export type IconClassNameProps = {
   className?: string;
@@ -48,6 +48,10 @@ export function OpenExternalIcon({ className = 'h-4 w-4' }: IconClassNameProps) 
 
 export function ShareIcon({ className = 'h-4 w-4' }: IconClassNameProps) {
   return <EditAssetIcon src={shareIconUrl} className={className} />;
+}
+
+export function DuplicateIcon({ className = 'h-4 w-4' }: IconClassNameProps) {
+  return <EditAssetIcon src={duplicateIconUrl} className={className} />;
 }
 
 export function SearchIcon({ className = 'h-4 w-4' }: IconClassNameProps) {

@@ -1,5 +1,9 @@
 import { readGoogleFontCatalogCache, writeGoogleFontCatalogCache } from './googleFontCatalogCache';
-import { readFontsourceCatalogCache, writeFontsourceCatalogCache } from './fontsourceCatalogCache';
+import {
+  isFontsourceCatalogComplete,
+  readFontsourceCatalogCache,
+  writeFontsourceCatalogCache,
+} from './fontsourceCatalogCache';
 import { readFontshareCatalogCache, writeFontshareCatalogCache } from './fontshareCatalogCache';
 import {
   readFontfabricTrialCatalogCache,
@@ -11,6 +15,8 @@ export type EnsureCatalogCachesOptions = {
   needsFontsource?: boolean;
   needsFontshare?: boolean;
   needsFontfabricTrial?: boolean;
+  /** Для поиска/пикера: не считать урезанный fallback-каталог достаточным. */
+  preferCompleteFontsource?: boolean;
 };
 
 type LibraryFontRef = { source?: string; id?: string };
@@ -55,6 +61,7 @@ export async function ensureCatalogCachesLoaded(
   const needsFontsource = options.needsFontsource === true;
   const needsFontshare = options.needsFontshare === true;
   const needsFontfabricTrial = options.needsFontfabricTrial === true;
+  const preferCompleteFontsource = options.preferCompleteFontsource === true;
   let wrote = false;
 
   if (needsGoogle && readGoogleFontCatalogCache().length === 0) {
@@ -73,7 +80,13 @@ export async function ensureCatalogCachesLoaded(
     }
   }
 
-  if (needsFontsource && readFontsourceCatalogCache().length === 0) {
+  const currentFontsource = readFontsourceCatalogCache();
+  const shouldLoadFontsource =
+    needsFontsource &&
+    (currentFontsource.length === 0 ||
+      (preferCompleteFontsource && !isFontsourceCatalogComplete(currentFontsource)));
+
+  if (shouldLoadFontsource) {
     try {
       const res = await fetch('/api/fontsource-catalog');
       if (res.ok) {

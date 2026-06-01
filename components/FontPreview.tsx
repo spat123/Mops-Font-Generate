@@ -42,6 +42,8 @@ import { buildFontFeatureSettingsCss } from '../utils/openTypeFeatureSettings';
 import { fontStyleDbg } from '../utils/fontStyleDebugLog';
 import { buildCatalogDownloadButtonProps } from './catalog/buildCatalogDownloadButtonProps';
 import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
+import { resolvePreferredLibraryPickerEntry } from '../utils/libraryPickerCatalogSearch';
+import type { SavedLibraryFontEntry } from '../types/savedLibrary';
 import { resolveSessionFontDisplayLabel } from '../utils/fontSlug';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
@@ -849,22 +851,8 @@ export default function FontPreview({
           .filter(Boolean),
       ),
     );
-    if (selectedFont.source === 'google') {
-      const family = normalizeLibraryText(
-        selectedFont.displayName || selectedFont.name || selectedFont.fontFamily || '',
-      )
-        .replace(/\.woff2$/i, '')
-        .replace(/\s+variable$/i, '')
-        .trim();
-      if (!family) return null;
-      const entry = createCatalogLibraryEntry({ source: 'google', key: family, label: family });
-      if (!entry) return null;
-      return {
-        ...entry,
-        candidateIds: [`google:${family}`],
-        candidateLabels: Array.from(new Set([family, ...candidateLabels])),
-      };
-    }
+
+    let baseEntry: SavedLibraryFontEntry | null = null;
     if (selectedFont.source === 'fontsource') {
       const key = String(selectedFont.name || selectedFont.displayName || selectedFont.id || '').trim();
       const familyLabel = normalizeLibraryText(
@@ -873,36 +861,50 @@ export default function FontPreview({
         .replace(/\s+variable$/i, '')
         .trim();
       if (!key) return null;
-      const entry = createCatalogLibraryEntry({
+      baseEntry = createCatalogLibraryEntry({
         source: 'fontsource',
         key,
         label: familyLabel || key,
         isVariable: selectedFont.isVariableFont === true,
       });
-      if (!entry) return null;
-      return {
-        ...entry,
-        candidateIds: [`fontsource:${key}`],
-        candidateLabels: Array.from(new Set([familyLabel || key, ...candidateLabels])),
+    } else if (selectedFont.source === 'google') {
+      const family = normalizeLibraryText(
+        selectedFont.displayName || selectedFont.name || selectedFont.fontFamily || '',
+      )
+        .replace(/\.woff2$/i, '')
+        .replace(/\s+variable$/i, '')
+        .trim();
+      if (!family) return null;
+      baseEntry = createCatalogLibraryEntry({ source: 'google', key: family, label: family });
+    } else {
+      const fallbackId = String(selectedFont.id || selectedFont.name || label).trim();
+      if (!fallbackId) return null;
+      baseEntry = {
+        id: `session:${fallbackId}`,
+        label,
+        source: String(selectedFont.source || 'session'),
       };
     }
-    const fallbackId = String(selectedFont.id || selectedFont.name || label).trim();
-    if (!fallbackId) return null;
+    if (!baseEntry) return null;
+
+    const preferred = resolvePreferredLibraryPickerEntry(baseEntry) || baseEntry;
+    const preferredIds = new Set<string>([
+      preferred.id,
+      `google:${label}`,
+      `fontsource:${String(selectedFont.name || '')}`,
+    ]);
     return {
-      id: `session:${fallbackId}`,
-      label,
-      source: String(selectedFont.source || 'session'),
+      ...preferred,
       candidateIds: Array.from(
         new Set(
           [
+            ...preferredIds,
             selectedFont.id,
             selectedFont.name,
             selectedFont.displayName,
-            fallbackId,
           ]
             .map((value) => String(value || '').trim())
-            .filter(Boolean)
-            .map((value) => `session:${value}`),
+            .filter(Boolean),
         ),
       ),
       candidateLabels,

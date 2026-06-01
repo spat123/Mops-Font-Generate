@@ -13,10 +13,6 @@ import {
 } from '../utils/fontLibraryUtils';
 import { readLibraryFontDragData } from '../utils/libraryDragData';
 import { makeSavedLibraryTabId, readSavedLibraryId } from '../utils/savedLibraryTabIds';
-import {
-  createSavedLibraryFontEntryMatcher,
-  findCanonicalLibraryFontEntry,
-} from '../utils/savedLibraryFontEntryMatch';
 import { useLibraryEntryPrefetch } from './useLibraryEntryPrefetch';
 import type { LibraryCreateDialogRequest } from '../types/libraryCreateDialog';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
@@ -208,43 +204,10 @@ export function useSavedLibraryActions({
     [addFontEntryToLibrary, setFontsLibraryTab],
   );
 
+  /** Добавить шрифт в библиотеку, не снимая его с других библиотек (меню редактора / каталог). */
   const moveFontEntryToLibrary = useCallback(
-    (libraryId: string, fontEntry: LibraryFontEntry) => {
-      const matcher = createSavedLibraryFontEntryMatcher(fontEntry);
-      if (!matcher) return;
-      const { entry, matchesEntry } = matcher;
-
-      const targetLibrary = fontLibraries.find((library) => library.id === libraryId);
-      if (!targetLibrary) return;
-
-      const currentlyIn = fontLibraries.filter(
-        (library) => Array.isArray(library.fonts) && library.fonts.some(matchesEntry),
-      );
-      const canonicalEntry = findCanonicalLibraryFontEntry(fontLibraries, matchesEntry) || entry;
-      const movedEntry = stampLibraryFontAddedNow(canonicalEntry) || canonicalEntry;
-
-      if (currentlyIn.length === 1 && currentlyIn[0].id === targetLibrary.id) {
-        toast.info(`Шрифт «${canonicalEntry.label}» уже в библиотеке «${targetLibrary.name}»`);
-        return;
-      }
-
-      fontLibraries.forEach((library) => {
-        const fontsWithoutEntry = (Array.isArray(library.fonts) ? library.fonts : []).filter(
-          (item) => !matchesEntry(item),
-        );
-        const nextFonts =
-          library.id === targetLibrary.id ? [...fontsWithoutEntry, movedEntry] : fontsWithoutEntry;
-        const hasChanged =
-          nextFonts.length !== (library.fonts?.length || 0) ||
-          nextFonts.some((item, index) => item.id !== (library.fonts?.[index]?.id || ''));
-        if (hasChanged) {
-          handleUpdateSavedLibrary(library.id, { fonts: nextFonts });
-        }
-      });
-
-      toast.success(`Перенесен в «${targetLibrary.name}»`);
-    },
-    [fontLibraries, handleUpdateSavedLibrary],
+    (libraryId: string, fontEntry: LibraryFontEntry) => addFontEntryToLibrary(libraryId, fontEntry),
+    [addFontEntryToLibrary],
   );
 
   const requestCreateLibraryWithFonts = useCallback(

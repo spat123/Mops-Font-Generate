@@ -1,6 +1,10 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type { SavedLibraryFontEntry } from '../types/savedLibrary';
+import {
+  getLibraryEntryCatalogIdentityKey,
+  libraryFontIdentitiesMatch,
+} from './libraryFontIdentity';
 
 export function normalizeLibraryText(value: unknown): string {
   return String(value || '')
@@ -131,47 +135,20 @@ export type CreateCatalogLibraryEntryParams = {
   isVariable?: boolean;
 };
 
-function stripLibraryEntryDupSuffix(value: unknown): string {
-  return String(value || '')
-    .trim()
-    .replace(/:dup:\d+$/i, '')
-    .trim();
-}
-
 /** Ключ семейства каталога для записи библиотеки (без суффикса :dup:N). */
 export function getLibraryEntryCatalogKey(
   fontEntry: Pick<SavedLibraryFontEntry, 'id' | 'source'> | null | undefined,
 ): string | null {
-  const id = String(fontEntry?.id || '').trim();
-  const source = String(fontEntry?.source || '').trim();
-  if (!id || !source) return null;
-  if (source === 'google') {
-    const raw = stripLibraryEntryDupSuffix(id.replace(/^google:/i, ''));
-    return raw ? `google:${normalizeLibraryText(raw).toLowerCase()}` : null;
-  }
-  if (source === 'fontsource') {
-    const raw = stripLibraryEntryDupSuffix(id.replace(/^fontsource:/i, ''));
-    return raw ? `fontsource:${normalizeLibraryText(raw).toLowerCase()}` : null;
-  }
-  if (source === 'fontshare') {
-    const raw = stripLibraryEntryDupSuffix(id.replace(/^fontshare:/i, ''));
-    return raw ? `fontshare:${normalizeLibraryText(raw).toLowerCase()}` : null;
-  }
-  if (source === 'fontfabric-trial') {
-    const raw = stripLibraryEntryDupSuffix(id.replace(/^fontfabric-trial:/i, ''));
-    return raw ? `fontfabric-trial:${normalizeLibraryText(raw).toLowerCase()}` : null;
-  }
-  return `${source}:${stripLibraryEntryDupSuffix(id).toLowerCase()}`;
+  return getLibraryEntryCatalogIdentityKey(fontEntry);
 }
 
 export function countSameCatalogFontInLibrary(
   fontEntry: SavedLibraryFontEntry | null | undefined,
   libraryFonts: SavedLibraryFontEntry[] | null | undefined,
 ): number {
-  const key = getLibraryEntryCatalogKey(sanitizeLibraryFont(fontEntry) || fontEntry);
-  if (!key) return 0;
+  const target = sanitizeLibraryFont(fontEntry) || fontEntry;
   return (Array.isArray(libraryFonts) ? libraryFonts : []).filter(
-    (item) => getLibraryEntryCatalogKey(item) === key,
+    (item) => libraryFontIdentitiesMatch(item, target),
   ).length;
 }
 

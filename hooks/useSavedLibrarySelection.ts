@@ -146,7 +146,10 @@ export function useSavedLibrarySelection({
           normalizedEntries: selectedEntries,
           handleUpdateSavedLibrary,
         });
-        if (!ok) return false;
+        if (!ok) {
+          toast.info('Нечего переносить: выбранные шрифты уже есть в целевой библиотеке');
+          return false;
+        }
 
         setSelectedSavedLibraryFontIds(new Set());
         toast.success(
@@ -183,7 +186,10 @@ export function useSavedLibrarySelection({
           normalizedEntries: [normalizedEntry],
           handleUpdateSavedLibrary,
         });
-        if (!ok) return false;
+        if (!ok) {
+          toast.info(`Шрифт уже есть в «${targetName}»`);
+          return false;
+        }
 
         setSelectedSavedLibraryFontIds(new Set());
         toast.success(`Перенесен в «${targetName}»`);

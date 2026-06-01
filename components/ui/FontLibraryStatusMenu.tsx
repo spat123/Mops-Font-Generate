@@ -1,10 +1,10 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { normalizeLibraryText } from '../../utils/fontLibraryUtils';
 import {
   addLibraryEntryToLibrary,
   requestCreateLibraryFromEntry,
 } from '../../utils/libraryEntryActions';
+import { libraryEntryMatchesInput } from '../../utils/libraryFontIdentity';
 import { useDismissibleLayer } from './useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { Tooltip } from './Tooltip';
@@ -45,17 +45,6 @@ export function FontLibraryStatusMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const entryId = String(libraryEntry?.id || '');
-  const entrySource = String(libraryEntry?.source || '').trim();
-  const entryLabel = normalizeLibraryText(libraryEntry?.label || '').toLowerCase();
-  const candidateIds = Array.isArray(libraryEntry?.candidateIds)
-    ? libraryEntry.candidateIds.map((value) => String(value || '').trim()).filter(Boolean)
-    : [];
-  const candidateLabels = Array.isArray(libraryEntry?.candidateLabels)
-    ? libraryEntry.candidateLabels
-        .map((value) => normalizeLibraryText(value || '').toLowerCase())
-        .filter(Boolean)
-    : [];
   const availableLibraries = Array.isArray(libraries) ? libraries : [];
   const hasLibraries = availableLibraries.length > 0;
   const createMenuLabel = getLibraryCreateMenuLabel(hasLibraries);
@@ -63,34 +52,17 @@ export function FontLibraryStatusMenu({
     proLocked: isAuthenticated && !canCreateNewLibrary,
   });
   const attachedLibraryIds = useMemo(() => {
-    if (!entryId && !entryLabel && candidateIds.length === 0 && candidateLabels.length === 0) return new Set<string>();
+    if (!libraryEntry) return new Set<string>();
     return new Set(
       availableLibraries
         .filter(
           (lib) =>
             Array.isArray(lib?.fonts) &&
-            lib.fonts.some((f) => {
-              const fontId = String(f?.id || '').trim();
-              if (entryId && fontId === entryId) return true;
-              if (candidateIds.includes(fontId)) return true;
-              const fontSource = String(f?.source || '').trim();
-              const fontLabel = normalizeLibraryText(f?.label || '').toLowerCase();
-              if (
-                candidateLabels.length > 0 &&
-                entrySource &&
-                fontSource === entrySource &&
-                candidateLabels.includes(fontLabel)
-              ) {
-                return true;
-              }
-              return Boolean(
-                entryLabel && entrySource && fontSource === entrySource && fontLabel === entryLabel,
-              );
-            }),
+            lib.fonts.some((f) => libraryEntryMatchesInput(f, libraryEntry)),
         )
         .map((lib) => lib.id),
     );
-  }, [availableLibraries, candidateIds, candidateLabels, entryId, entryLabel, entrySource]);
+  }, [availableLibraries, libraryEntry]);
 
   useLayoutEffect(() => {
     if (!open) {

@@ -1,4 +1,9 @@
-import { sanitizeLibraryFont, stampLibraryFontAddedNow } from './fontLibraryUtils';
+import {
+  buildDuplicatedLibraryFontEntry,
+  countSameCatalogFontInLibrary,
+  sanitizeLibraryFont,
+  stampLibraryFontAddedNow,
+} from './fontLibraryUtils';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 
 type SavedLibraryFontEntry = NonNullable<SavedLibraryRecord['fonts']>[number];
@@ -44,16 +49,43 @@ export function applySavedLibraryFontMove({
     return { ok: false, movedCount: 0, targetName: '' };
   }
 
-  const selectedIdSet = new Set(entries.map((entry) => String(entry.id || '').trim()).filter(Boolean));
-  const sourceFonts = (sourceLibrary.fonts || []).filter(
-    (item) => !selectedIdSet.has(String(item?.id || '').trim()),
-  );
   const targetExistingIds = new Set(
-    (targetLibrary.fonts || []).map((item) => String(item?.id || '').trim()),
+    (targetLibrary.fonts || []).map((item) => String(item?.id || '').trim()).filter(Boolean),
   );
-  const movedEntries = entries
-    .filter((entry) => !targetExistingIds.has(String(entry.id || '').trim()))
-    .map((entry) => stampLibraryFontAddedNow(entry) || entry);
+  const idsToRemoveFromSource = new Set<string>();
+  const movedEntries: SavedLibraryFontEntry[] = [];
+  let targetFontsDraft = [...(targetLibrary.fonts || [])];
+
+  for (const entry of entries) {
+    const sourceId = String(entry.id || '').trim();
+    if (!sourceId) continue;
+    if (targetExistingIds.has(sourceId)) {
+      continue;
+    }
+
+    let entryToAdd = stampLibraryFontAddedNow(entry) || entry;
+    if (countSameCatalogFontInLibrary(entryToAdd, targetFontsDraft) > 0) {
+      const duplicate = buildDuplicatedLibraryFontEntry(entryToAdd, targetFontsDraft);
+      if (!duplicate) continue;
+      entryToAdd = duplicate;
+    }
+
+    const nextId = String(entryToAdd.id || '').trim();
+    if (!nextId || targetExistingIds.has(nextId)) continue;
+
+    movedEntries.push(entryToAdd);
+    idsToRemoveFromSource.add(sourceId);
+    targetExistingIds.add(nextId);
+    targetFontsDraft = [...targetFontsDraft, entryToAdd];
+  }
+
+  if (movedEntries.length === 0) {
+    return { ok: false, movedCount: 0, targetName: targetLibrary.name };
+  }
+
+  const sourceFonts = (sourceLibrary.fonts || []).filter(
+    (item) => !idsToRemoveFromSource.has(String(item?.id || '').trim()),
+  );
 
   handleUpdateSavedLibrary(sourceLibrary.id, { fonts: sourceFonts });
   handleUpdateSavedLibrary(targetLibraryId, {

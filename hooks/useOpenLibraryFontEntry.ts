@@ -14,6 +14,8 @@ import { openFontshareExternalDownload } from '../utils/fontshareDownloadActions
 import {
   parseFontfabricTrialEntrySlug,
   parseFontshareEntrySlug,
+  parseFontsourceEntrySlug,
+  parseGoogleEntryFamily,
   resolveFontfabricTrialCatalogItem,
   resolveFontshareCatalogItem,
 } from '../utils/catalogCacheLookup';
@@ -23,6 +25,7 @@ import {
   findGoogleFontInSession,
   focusSessionFontInEditor,
 } from '../utils/fontLibraryUtils';
+import { resolvePreferredLibraryPickerEntry } from '../utils/libraryPickerCatalogSearch';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type { EditorFontUploadInput, EditorFontUploadOptions } from './useEditorFontNav';
 
@@ -86,10 +89,13 @@ export function useOpenLibraryFontEntry({
     ) => {
       if (!fontEntry) return;
       const forceDuplicate = options.forceDuplicate === true;
-      const entryId = String(fontEntry.id || '').trim();
-      const entryLabel = String(fontEntry.label || '').trim();
-      const entrySource = String(fontEntry.source || 'editor').trim();
-      const sessionFont = resolveSessionFontForLibraryEntry(fontEntry);
+      const preferredEntry = resolvePreferredLibraryPickerEntry(fontEntry as LibraryFontEntry) || fontEntry;
+      const entryId = String(preferredEntry.id || '').trim();
+      const entryLabel = String(preferredEntry.label || '').trim();
+      const entrySource = String(preferredEntry.source || 'editor').trim();
+      const sessionFont =
+        resolveSessionFontForLibraryEntry(fontEntry) ||
+        (preferredEntry !== fontEntry ? resolveSessionFontForLibraryEntry(preferredEntry) : null);
 
       if (sessionFont && !forceDuplicate) {
         focusExisting(sessionFont);
@@ -107,7 +113,7 @@ export function useOpenLibraryFontEntry({
       }
 
       if (entrySource === 'fontsource') {
-        const slug = entryId.startsWith('fontsource:') ? entryId.slice('fontsource:'.length) : '';
+        const slug = parseFontsourceEntrySlug(entryId);
         if (!slug) {
           toast.info(`Не удалось определить пакет Fontsource для ${entryLabel || 'шрифта'}`);
           return;
@@ -135,7 +141,9 @@ export function useOpenLibraryFontEntry({
       }
 
       if (entrySource === 'google') {
-        const family = entryLabel;
+        const family =
+          parseGoogleEntryFamily(entryId) ||
+          entryLabel.replace(/\s+\d+$/i, '').trim();
         const existingInSession = findGoogleFontInSession(fonts, family);
         if (!forceDuplicate && existingInSession) {
           focusExisting(existingInSession);
