@@ -31,7 +31,7 @@ const HOME_JSON_LD = {
       operatingSystem: 'Web',
       url: 'https://dynamicfont.ru/',
       description:
-        'Онлайн-редактор для тестирования, сравнения и экспорта шрифтов, работы с Google Fonts, Fontsource, Fontshare и локальными файлами.',
+        'Онлайн-редактор для тестирования, сравнения и экспорта каталожных и локальных шрифтов.',
       offers: {
         '@type': 'Offer',
         price: '0',
@@ -59,47 +59,14 @@ function EditorTabBarSkeleton() {
 
 function EditorPendingContentSkeleton() {
   return (
-    <main className="min-h-0 flex-1 overflow-auto bg-gray-50">
-      <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center gap-6 px-6 py-10">
-        <section className="rounded-xl border border-gray-200 bg-white p-6 sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
-            Онлайн-инструмент для работы со шрифтами
-          </p>
-          <h1 className="mt-3 max-w-3xl text-2xl font-semibold uppercase tracking-tight text-gray-900 sm:text-4xl">
-            DINAMIC FONT — тестирование, сравнение и экспорт шрифтов
-          </h1>
-          <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
-            Проверяйте Google Fonts, Fontsource, Fontshare и локальные файлы в редакторе, сравнивайте
-            вариативные шрифты, собирайте библиотеки, делитесь подборками и экспортируйте результат для сайта.
-          </p>
-          <div className="mt-6 grid gap-3 text-sm text-gray-700 sm:grid-cols-3">
-            <div>
-              <h2 className="text-xs font-semibold uppercase text-gray-900">Каталоги</h2>
-              <p className="mt-1 leading-relaxed">Поиск и открытие семейств из Google Fonts, Fontsource и Fontshare.</p>
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold uppercase text-gray-900">Редактор</h2>
-              <p className="mt-1 leading-relaxed">Plain, waterfall, glyphs, styles и настройка осей variable fonts.</p>
-            </div>
-            <div>
-              <h2 className="text-xs font-semibold uppercase text-gray-900">Библиотеки</h2>
-              <p className="mt-1 leading-relaxed">Сохранение, сравнение, шаринг и скачивание подборок шрифтов.</p>
-            </div>
-          </div>
-          <nav className="mt-6 flex flex-wrap gap-3 text-xs font-semibold uppercase">
-            <a className="text-accent hover:text-accent-hover" href="/help">
-              База знаний
-            </a>
-            <a className="text-gray-700 hover:text-gray-950" href="/legal/terms">
-              Условия
-            </a>
-            <a className="text-gray-700 hover:text-gray-950" href="/legal/privacy">
-              Конфиденциальность
-            </a>
-          </nav>
-        </section>
+    <div className="min-h-0 flex-1 bg-gray-50" aria-hidden>
+      <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-3 px-6 py-6">
+        <div className="h-10 w-56 rounded-md bg-gray-100 animate-pulse" />
+        <div className="h-64 w-full rounded-xl bg-gray-100 animate-pulse" />
+        <div className="h-10 w-72 rounded-md bg-gray-100 animate-pulse" />
+        <div className="h-24 w-full rounded-xl bg-gray-100 animate-pulse" />
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -251,7 +218,7 @@ export function EditorHomeLayout({
         <title>DINAMIC FONT — тестирование и сравнение шрифтов</title>
         <meta
           name="description"
-          content="DINAMIC FONT — онлайн-редактор для тестирования, сравнения, библиотек и экспорта шрифтов из Google Fonts, Fontsource, Fontshare и локальных файлов."
+          content="DINAMIC FONT — онлайн-редактор для тестирования, сравнения, библиотек и экспорта каталожных и локальных шрифтов."
         />
         <script
           type="application/ld+json"

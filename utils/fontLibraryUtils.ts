@@ -267,7 +267,16 @@ export function getFontIdsToRemoveWhenLibraryDeleted(
 }
 
 function normalizeCatalogFamilyKey(value: unknown): string {
-  return String(value || '').trim().toLowerCase();
+  return String(value || '')
+    .replace(/\.woff2$/i, '')
+    .replace(/^fontsource:/i, '')
+    .replace(/^google:/i, '')
+    .replace(/^fontshare:/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+variable$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
 }
 
 function escapeRegExp(value: string): string {
@@ -356,8 +365,45 @@ export function findFontsourceFontInSession(
   if (!target) return null;
   return (
     (Array.isArray(fonts) ? fonts : []).find(
-      (font) => font?.source === 'fontsource' && normalizeCatalogFamilyKey(font.name) === target,
+      (font) =>
+        font?.source === 'fontsource' &&
+        [
+          font.name,
+          font.displayName,
+          font.originalName,
+          font.fontFamily,
+          font.originKey,
+        ].some((value) => normalizeCatalogFamilyKey(value) === target),
     ) || null
+  );
+}
+
+function catalogSessionFamilyKeys(font: SessionFontRecord): Set<string> {
+  const keys = new Set<string>();
+  const add = (value: unknown) => {
+    const key = normalizeCatalogFamilyKey(value);
+    if (key) keys.add(key);
+  };
+  add(font.name);
+  add(font.displayName);
+  add(font.originalName);
+  add(font.fontFamily);
+  add(font.originKey);
+  return keys;
+}
+
+export function findCatalogFontInSession(
+  fonts: SessionFontRecord[] | null | undefined,
+  familyOrSlug: string,
+): SessionFontRecord | null {
+  const target = normalizeCatalogFamilyKey(familyOrSlug);
+  if (!target) return null;
+  return (
+    (Array.isArray(fonts) ? fonts : []).find((font) => {
+      const source = String(font?.source || '').trim();
+      if (source !== 'google' && source !== 'fontsource' && source !== 'fontshare') return false;
+      return catalogSessionFamilyKeys(font).has(target);
+    }) || null
   );
 }
 

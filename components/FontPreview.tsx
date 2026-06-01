@@ -42,7 +42,7 @@ import { buildFontFeatureSettingsCss } from '../utils/openTypeFeatureSettings';
 import { fontStyleDbg } from '../utils/fontStyleDebugLog';
 import { buildCatalogDownloadButtonProps } from './catalog/buildCatalogDownloadButtonProps';
 import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText } from '../utils/fontLibraryUtils';
-import { resolvePreferredLibraryPickerEntry } from '../utils/libraryPickerCatalogSearch';
+import { resolvePreferredLibraryPickerEntry } from '@/utils/libraryPickerCatalogSearch';
 import type { SavedLibraryFontEntry } from '../types/savedLibrary';
 import { resolveSessionFontDisplayLabel } from '../utils/fontSlug';
 import { HexProgressLoader } from './ui/HexProgressLoader';
@@ -94,9 +94,9 @@ const EMPTY_STATE_CATALOG_WIDTH_CLASS = 'mx-auto w-full max-w-[min(100%,90rem)]'
 
 function getEmptyStateSearchLayoutClasses(isActive) {
   return {
-    viewportClassName: isActive ? 'items-center justify-start pt-6' : 'items-center justify-center',
-    widthClassName: isActive ? 'w-full py-8' : 'max-w-md py-8',
-    innerClassName: isActive ? 'text-left' : 'max-w-md text-center',
+    viewportClassName: isActive ? 'items-center justify-start pt-6' : 'items-center justify-start',
+    widthClassName: isActive ? 'w-full py-8' : 'max-w-md min-h-[calc(100vh-7rem)] py-8 flex flex-col justify-center',
+    innerClassName: isActive ? 'text-left' : 'text-center',
     catalogWidthClassName: EMPTY_STATE_CATALOG_WIDTH_CLASS,
     stickyClassName: isActive ? 'sticky top-0 z-20 bg-white py-2' : '',
     barJustifyClassName: isActive ? 'w-full justify-start' : 'justify-center',
@@ -163,11 +163,14 @@ export default function FontPreview({
   /** Общий скролл области превью; Glyphs подписывается на этот узел для виртуализации */
   const previewBodyScrollRef = useRef(null);
   const fullscreenScrollRef = useRef(null);
+  const emptyStateScrollRef = useRef(null);
   const emptyStateSearchWrapRef = useRef(null);
+  const closeEmptyStateSeoTimeoutRef = useRef(null);
 
   const [glyphFooterCount, setGlyphFooterCount] = useState(null);
   const [presetSearchQuery, setPresetSearchQuery] = useState('');
   const [isEmptyStateSearchExpanded, setIsEmptyStateSearchExpanded] = useState(false);
+  const [emptyStateSeoOpen, setEmptyStateSeoOpen] = useState(false);
   const [googleCatalogEntries, setGoogleCatalogEntries] = useState([]);
   const [hasEverMountedStylesMode, setHasEverMountedStylesMode] = useState(false);
   const [hasEverMountedGlyphsMode, setHasEverMountedGlyphsMode] = useState(false);
@@ -175,6 +178,15 @@ export default function FontPreview({
   /** После входа в plain fullscreen крестик слегка гаснет; по hover/focus снова виден */
   const [plainFullscreenCloseDimmed, setPlainFullscreenCloseDimmed] = useState(false);
   const emptyStateSearchInputRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      if (closeEmptyStateSeoTimeoutRef.current !== null) {
+        window.clearTimeout(closeEmptyStateSeoTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (viewMode !== 'glyphs') setGlyphFooterCount(null);
@@ -929,6 +941,43 @@ export default function FontPreview({
     });
   }, []);
 
+  useEffect(() => {
+    if (emptyStateSearchActive) {
+      if (closeEmptyStateSeoTimeoutRef.current !== null) {
+        window.clearTimeout(closeEmptyStateSeoTimeoutRef.current);
+        closeEmptyStateSeoTimeoutRef.current = null;
+      }
+      setEmptyStateSeoOpen(false);
+    }
+  }, [emptyStateSearchActive]);
+
+  const toggleEmptyStateSeo = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    if (closeEmptyStateSeoTimeoutRef.current !== null) {
+      window.clearTimeout(closeEmptyStateSeoTimeoutRef.current);
+      closeEmptyStateSeoTimeoutRef.current = null;
+    }
+    if (emptyStateSeoOpen) {
+      requestAnimationFrame(() => {
+        if (emptyStateScrollRef.current instanceof HTMLElement) {
+          emptyStateScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+      closeEmptyStateSeoTimeoutRef.current = window.setTimeout(() => {
+        setEmptyStateSeoOpen(false);
+        closeEmptyStateSeoTimeoutRef.current = null;
+      }, 450);
+      return;
+    }
+    setEmptyStateSeoOpen(true);
+    requestAnimationFrame(() => {
+      document.getElementById('dynamic-font-seo-info')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+  }, [emptyStateSeoOpen]);
+
   const handleEmptyStateSearchBlur = useCallback(
     (event) => {
       const nextFocusedElement = event.relatedTarget;
@@ -965,7 +1014,10 @@ export default function FontPreview({
     return (
       <div className="flex h-full min-h-0 w-full flex-1 flex-col bg-white">
         <div
-          className={`flex w-full min-h-0 flex-1 flex-col overflow-y-auto ${emptyStateLayout.viewportClassName}`}
+          ref={emptyStateScrollRef}
+          className={`flex w-full min-h-0 flex-1 flex-col ${
+            emptyStateSearchActive || emptyStateSeoOpen ? 'overflow-y-auto' : 'overflow-y-hidden'
+          } ${emptyStateLayout.viewportClassName}`}
         >
         <div
           className={`w-full px-6 ${emptyStateLayout.widthClassName}`}
@@ -1201,6 +1253,89 @@ export default function FontPreview({
             )}
           </div>
         </div>
+        {!emptyStateSearchActive ? (
+          <div className="sticky bottom-4 z-10 mt-[-3.5rem] flex justify-center pb-2">
+            <button
+              type="button"
+              onClick={toggleEmptyStateSeo}
+              aria-expanded={emptyStateSeoOpen}
+              aria-controls="dynamic-font-seo-info"
+              className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-semibold uppercase text-gray-900 backdrop-blur-sm transition-colors ${
+                emptyStateSeoOpen
+                  ? 'border-accent bg-accent text-white hover:border-accent-hover hover:bg-accent-hover'
+                  : 'border-gray-200 bg-white/95 text-gray-900 hover:border-gray-900'
+              }`}
+            >
+              О DINAMIC FONT
+              {emptyStateSeoOpen ? (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  className="h-3.5 w-3.5"
+                  aria-hidden
+                >
+                  <path
+                    d="M5 5l10 10M15 5L5 15"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <span aria-hidden>↓</span>
+              )}
+            </button>
+          </div>
+        ) : null}
+        {!emptyStateSearchActive ? (
+          <section
+            id="dynamic-font-seo-info"
+            className="mx-auto m-20 w-full max-w-5xl scroll-mt-8 rounded-xl border border-gray-200 bg-white p-6 text-left sm:p-8"
+            aria-hidden={!emptyStateSeoOpen}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+              Онлайн-инструмент для работы со шрифтами
+            </p>
+            <h1 className="mt-3 max-w-3xl text-2xl font-semibold uppercase tracking-tight text-gray-900 sm:text-4xl">
+              DINAMIC FONT — тестирование, сравнение и экспорт шрифтов
+            </h1>
+            <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
+              Примеряйте шрифты прямо в браузере: загружайте локальные файлы или выбирайте из каталогов. Тонко настраивайте вариативные оси, объединяйте гарнитуры в коллекции, делитесь подборками и экспортируйте готовый код для ваших проектов.
+            </p>
+            <div className="mt-6 grid gap-5 text-sm text-gray-700 sm:grid-cols-3">
+              <div>
+                <h2 className="text-xs font-semibold uppercase text-gray-900">Каталоги</h2>
+                <p className="mt-1 leading-relaxed">
+                  Поиск и открытие семейств из подключённых каталогов шрифтов.
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xs font-semibold uppercase text-gray-900">Редактор</h2>
+                <p className="mt-1 leading-relaxed">
+                  Plain, waterfall, glyphs, styles и настройка осей variable fonts.
+                </p>
+              </div>
+              <div>
+                <h2 className="text-xs font-semibold uppercase text-gray-900">Библиотеки</h2>
+                <p className="mt-1 leading-relaxed">
+                  Сохранение, сравнение, шаринг и скачивание подборок шрифтов.
+                </p>
+              </div>
+            </div>
+            <nav className="mt-6 flex flex-wrap gap-3 text-xs font-semibold uppercase">
+              <a className="text-accent hover:text-accent-hover" href="/help">
+                База знаний
+              </a>
+              <a className="text-gray-700 hover:text-gray-950" href="/legal/terms">
+                Условия
+              </a>
+              <a className="text-gray-700 hover:text-gray-950" href="/legal/privacy">
+                Конфиденциальность
+              </a>
+            </nav>
+          </section>
+        ) : null}
         </div>
         <EditorStatusBar
           leading={emptyLeading}

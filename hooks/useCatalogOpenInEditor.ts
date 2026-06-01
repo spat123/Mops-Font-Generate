@@ -1,7 +1,9 @@
 import { useCallback, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { toast } from '../utils/appNotify';
 import {
+  findCatalogFontInSession,
   findFontshareFontInSession,
+  findFontsourceFontInSession,
   findGoogleFontInSession,
   focusSessionFontInEditor,
 } from '../utils/fontLibraryUtils';
@@ -88,7 +90,7 @@ export function useCatalogOpenInEditor({
     async (catalogEntry: GoogleCatalogEntry) => {
       if (!catalogEntry?.family) return;
       const family = String(catalogEntry.family);
-      const existing = findGoogleFontInSession(fonts, family);
+      const existing = findGoogleFontInSession(fonts, family) || findCatalogFontInSession(fonts, family);
       if (existing) {
         focusExisting(existing);
         return;
@@ -147,11 +149,19 @@ export function useCatalogOpenInEditor({
   );
 
   const openFontsourceSlugInEditorTab = useCallback(
-    (slug: string, isVariable?: boolean) =>
+    async (slug: string, isVariable?: boolean) => {
+      const key = String(slug || '').trim();
+      if (!key) return null;
+      const existing = findFontsourceFontInSession(fonts, key) || findCatalogFontInSession(fonts, key);
+      if (existing) {
+        focusExisting(existing);
+        return existing;
+      }
       // Предпочитаем VF, если он доступен у семейства.
       // Если у семейства нет variable-пакета, загрузчик корректно упадёт обратно в static.
-      selectOrAddFontsourceFontWithNav(slug, true, { silent: true }),
-    [selectOrAddFontsourceFontWithNav],
+      return selectOrAddFontsourceFontWithNav(key, true, { silent: true });
+    },
+    [focusExisting, fonts, selectOrAddFontsourceFontWithNav],
   );
 
   const openFontshareSlugInEditorTab = useCallback(

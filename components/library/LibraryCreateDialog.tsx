@@ -315,10 +315,6 @@ export function LibraryCreateDialog({
             </span>
           </div>
 
-          <p className="mt-3 text-xs uppercase text-gray-500">
-            В библиотеку добавляются шрифты Fontsource. Google — только если семейства нет в Fontsource.
-          </p>
-
           <div className="relative mt-3">
             <input
               id="font-library-search"
