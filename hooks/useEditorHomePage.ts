@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import type { NextRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import { useFontContext } from '../contexts/FontContext';
@@ -21,6 +21,13 @@ import { useSavedLibraryFilters } from './useSavedLibraryFilters';
 import { useLibraryStatusBar } from './useLibraryStatusBar';
 import { useSavedLibraryActions } from './useSavedLibraryActions';
 import { useSavedLibraryDerivedState } from './useSavedLibraryDerivedState';
+import { useCatalogCachesWarmup } from './useCatalogCachesWarmup';
+import {
+  libraryNeedsFontfabricTrialCatalog,
+  libraryNeedsFontshareCatalog,
+  libraryNeedsFontsourceCatalog,
+  libraryNeedsGoogleCatalog,
+} from '../utils/ensureCatalogCachesLoaded';
 import { useSavedLibraryToolbarLayout } from './useSavedLibraryToolbarLayout';
 import { useCatalogOpenInEditor } from './useCatalogOpenInEditor';
 import { useOpenLibraryFontEntry } from './useOpenLibraryFontEntry';
@@ -468,6 +475,42 @@ export function useEditorHomePage(router: NextRouter) {
       resetLabel: savedLibraryResetLabel,
     } = useSavedLibraryToolbarLayout();
 
+    const activeLibraryFonts = useMemo(
+      () => (Array.isArray(activeSavedLibrary?.fonts) ? activeSavedLibrary.fonts : []),
+      [activeSavedLibrary],
+    );
+    const savedLibraryNeedsGoogleCatalog = useMemo(
+      () => libraryNeedsGoogleCatalog(activeLibraryFonts),
+      [activeLibraryFonts],
+    );
+    const savedLibraryNeedsFontsourceCatalog = useMemo(
+      () => libraryNeedsFontsourceCatalog(activeLibraryFonts),
+      [activeLibraryFonts],
+    );
+    const savedLibraryNeedsFontshareCatalog = useMemo(
+      () => libraryNeedsFontshareCatalog(activeLibraryFonts),
+      [activeLibraryFonts],
+    );
+    const savedLibraryNeedsFontfabricTrialCatalog = useMemo(
+      () => libraryNeedsFontfabricTrialCatalog(activeLibraryFonts),
+      [activeLibraryFonts],
+    );
+    const catalogCacheRevision = useCatalogCachesWarmup(
+      mainTab === 'library' &&
+        fontsLibraryTab !== 'catalog' &&
+        Boolean(activeSavedLibrary) &&
+        (savedLibraryNeedsGoogleCatalog ||
+          savedLibraryNeedsFontsourceCatalog ||
+          savedLibraryNeedsFontshareCatalog ||
+          savedLibraryNeedsFontfabricTrialCatalog),
+      {
+        needsGoogle: savedLibraryNeedsGoogleCatalog,
+        needsFontsource: savedLibraryNeedsFontsourceCatalog,
+        needsFontshare: savedLibraryNeedsFontshareCatalog,
+        needsFontfabricTrial: savedLibraryNeedsFontfabricTrialCatalog,
+      },
+    );
+
     const {
       savedLibrarySubsetOptions,
       buildSavedLibraryCardMetaSplit,
@@ -480,6 +523,7 @@ export function useEditorHomePage(router: NextRouter) {
       savedLibraryFilterSubsets,
       savedLibraryFilterVariable,
       savedLibraryFilterItalic,
+      catalogCacheRevision,
     });
 
     const {

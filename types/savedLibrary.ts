@@ -11,6 +11,8 @@ export type SavedLibraryFontEntryInput = SavedLibraryFontEntry & {
 export type SavedLibraryCatalogLookup = {
   googleByFamily: Map<string, Record<string, unknown>>;
   fontsourceBySlug: Map<string, Record<string, unknown>>;
+  fontshareBySlug: Map<string, Record<string, unknown>>;
+  fontfabricTrialBySlug: Map<string, Record<string, unknown>>;
 };
 
 export type SavedLibraryFontCatalogMeta = {

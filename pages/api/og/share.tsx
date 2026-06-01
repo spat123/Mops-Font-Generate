@@ -2,6 +2,11 @@ import { ImageResponse } from 'next/og';
 import { resolveSharePayloadForOg } from '../../../lib/share/resolveSharePayloadForOg';
 import { getShareOgDisplayData, SHARE_OG_HEIGHT, SHARE_OG_WIDTH } from '../../../utils/libraryShareOg';
 import { loadShareOgImageAssets, LOGO_HEIGHT, LOGO_WIDTH } from '../../../utils/ogImageAssets';
+import {
+  getInternalApiBaseForOg,
+  getPublicOriginForOg,
+  resolveRequestUrl,
+} from '../../../utils/ogRequestOrigin';
 
 export const config = {
   runtime: 'edge',
@@ -24,12 +29,17 @@ function badgeLabel(name: string | null, overflow: number) {
 
 export default async function handler(req: Request) {
   try {
-    const url = new URL(req.url);
-    const origin = `${url.protocol}//${url.host}`;
-    const payload = await resolveSharePayloadForOg(origin, {
-      id: url.searchParams.get('id'),
-      share: url.searchParams.get('share'),
-    });
+    const url = resolveRequestUrl(req);
+    const origin = getPublicOriginForOg(req);
+    const internalApiBase = getInternalApiBaseForOg();
+    const payload = await resolveSharePayloadForOg(
+      origin,
+      {
+        id: url.searchParams.get('id'),
+        share: url.searchParams.get('share'),
+      },
+      internalApiBase ? { internalApiBase } : undefined,
+    );
     if (!payload) {
       return Response.redirect(`${origin}/og.png`, 302);
     }

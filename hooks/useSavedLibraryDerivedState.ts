@@ -19,6 +19,8 @@ type UseSavedLibraryDerivedStateParams = {
   savedLibraryFilterSubsets: string[];
   savedLibraryFilterVariable: string;
   savedLibraryFilterItalic: boolean;
+  /** Инкремент после фоновой подгрузки каталога (см. useCatalogCachesWarmup). */
+  catalogCacheRevision?: number;
 };
 
 /**
@@ -31,8 +33,10 @@ export function useSavedLibraryDerivedState({
   savedLibraryFilterSubsets,
   savedLibraryFilterVariable,
   savedLibraryFilterItalic,
+  catalogCacheRevision = 0,
 }: UseSavedLibraryDerivedStateParams) {
   const catalogLookup = useMemo(() => buildSavedLibraryCatalogLookup(), [
+    catalogCacheRevision,
     activeSavedLibrary,
     savedLibraryFilterItalic,
     savedLibraryFilterSubsets,
@@ -68,6 +72,7 @@ export function useSavedLibraryDerivedState({
         isVariable,
         hasItalic,
         styleCount: meta.styleCount,
+        includeTrial: meta.source === 'fontfabric-trial',
       });
     },
     [catalogLookup],
@@ -103,7 +108,7 @@ export function useSavedLibraryDerivedState({
       searchQueryTrimmed: savedLibrarySearchQueryTrimmed,
       libraryFontIds,
     });
-  }, [activeSavedLibrary, savedLibrarySearchQueryTrimmed]);
+  }, [activeSavedLibrary, catalogCacheRevision, savedLibrarySearchQueryTrimmed]);
 
   return {
     catalogLookup,

@@ -8,6 +8,7 @@ import { decodeLibrarySharePayloadFromQueryParam } from '../../utils/libraryShar
 export async function resolveSharePayloadForOg(
   origin: string,
   query: { id?: string | null; share?: string | null },
+  options?: { internalApiBase?: string },
 ): Promise<LibrarySharePayload | null> {
   const legacyShareParam = String(query?.share || '').trim();
   const shortId = String(query?.id || '').trim();
@@ -20,8 +21,8 @@ export async function resolveSharePayloadForOg(
     return null;
   }
 
-  const base = String(origin).replace(/\/$/, '');
-  const res = await fetch(`${base}/api/share/${encodeURIComponent(shortId)}`, {
+  const apiBase = String(options?.internalApiBase || origin).replace(/\/$/, '');
+  const res = await fetch(`${apiBase}/api/share/${encodeURIComponent(shortId)}`, {
     headers: { Accept: 'application/json' },
     cache: 'no-store',
   });

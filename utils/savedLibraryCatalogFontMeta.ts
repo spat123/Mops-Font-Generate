@@ -1,3 +1,4 @@
+import { resolveCatalogCategory } from './fontCategoryLabels';
 import type {
   SavedLibraryCatalogLookup,
   SavedLibraryFontCatalogMeta,
@@ -6,7 +7,7 @@ import type {
 import type { SessionFontRecord } from '../types/editorFonts';
 
 /**
- * VF / italic / subsets для записи библиотеки по кэшу Google и Fontsource.
+ * VF / italic / subsets для записи библиотеки по кэшу каталогов.
  */
 export function resolveSavedLibraryFontCatalogMeta(
   font: SavedLibraryFontEntry,
@@ -42,6 +43,22 @@ export function resolveSavedLibraryFontCatalogMeta(
     const meta = lookup.fontsourceBySlug.get(slug);
     subsets = Array.isArray(meta?.subsets) ? (meta.subsets as string[]) : [];
     category = String(meta?.category || '').trim();
+    styleCount = Number(meta?.styleCount) || 0;
+    isVariable = isVariable || meta?.isVariable === true;
+    hasItalic = meta?.hasItalic === true;
+  } else if (source === 'fontshare') {
+    const slug = id.startsWith('fontshare:') ? id.slice('fontshare:'.length) : '';
+    const meta = lookup.fontshareBySlug.get(String(slug || '').toLowerCase());
+    subsets = Array.isArray(meta?.subsets) ? (meta.subsets as string[]) : [];
+    category = resolveCatalogCategory(meta) || String(meta?.category || '').trim();
+    styleCount = Number(meta?.styleCount) || 0;
+    isVariable = isVariable || meta?.isVariable === true;
+    hasItalic = meta?.hasItalic === true;
+  } else if (source === 'fontfabric-trial') {
+    const slug = id.startsWith('fontfabric-trial:') ? id.slice('fontfabric-trial:'.length) : '';
+    const meta = lookup.fontfabricTrialBySlug.get(String(slug || '').toLowerCase());
+    subsets = Array.isArray(meta?.subsets) ? (meta.subsets as string[]) : [];
+    category = resolveCatalogCategory(meta) || String(meta?.category || '').trim();
     styleCount = Number(meta?.styleCount) || 0;
     isVariable = isVariable || meta?.isVariable === true;
     hasItalic = meta?.hasItalic === true;

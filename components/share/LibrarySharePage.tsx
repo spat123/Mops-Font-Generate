@@ -28,14 +28,7 @@ import { toast } from '../../utils/appNotify';
 import { Tooltip } from '../ui/Tooltip';
 import { CatalogGridModeToggle } from '../catalog/CatalogGridModeToggle';
 import { ensureGoogleFontPreviewCss } from '../../utils/googleFontPreviewCss';
-import {
-  readFontsourceCatalogCache,
-  writeFontsourceCatalogCache,
-} from '../../utils/fontsourceCatalogCache';
-import {
-  readGoogleFontCatalogCache,
-  writeGoogleFontCatalogCache,
-} from '../../utils/googleFontCatalogCache';
+import { ensureCatalogCachesLoaded } from '../../utils/ensureCatalogCachesLoaded';
 import { pickFontsourcePreviewSubsetsForCardText } from '../../utils/catalogPreviewSample';
 import { loadFontsourcePreviewFamily } from '../../utils/fontsourcePreviewRuntimeCache';
 import { UnifiedCatalogCard } from '../catalog/UnifiedCatalogCard';
@@ -267,50 +260,17 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
     const needsFontsource = items.some(
       (it) => it?.kind === 'catalog-ref' && String(it.source || '').toLowerCase() === 'fontsource',
     );
+    const needsFontshare = items.some(
+      (it) => it?.kind === 'catalog-ref' && String(it.source || '').toLowerCase() === 'fontshare',
+    );
 
     let cancelled = false;
 
-    const run = async () => {
-      let wrote = false;
-
-      if (needsGoogle && readGoogleFontCatalogCache().length === 0) {
-        try {
-          const res = await fetch('/api/google-fonts-catalog');
-          if (!cancelled && res.ok) {
-            const data = await res.json();
-            const list = Array.isArray(data?.items) ? data.items : [];
-            if (list.length > 0) {
-              writeGoogleFontCatalogCache(list);
-              wrote = true;
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-
-      if (needsFontsource && readFontsourceCatalogCache().length === 0) {
-        try {
-          const res = await fetch('/api/fontsource-catalog');
-          if (!cancelled && res.ok) {
-            const data = await res.json();
-            const list = Array.isArray(data?.items) ? data.items : [];
-            if (list.length > 0) {
-              writeFontsourceCatalogCache(list);
-              wrote = true;
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-
+    void ensureCatalogCachesLoaded({ needsGoogle, needsFontsource, needsFontshare }).then((wrote) => {
       if (!cancelled && wrote) {
         setShareCatalogHydratedTick((n) => n + 1);
       }
-    };
-
-    void run();
+    });
     return () => {
       cancelled = true;
     };
@@ -590,7 +550,7 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
           <LibraryShareSplitLayout
             listPanel={
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <header className="shrink-0 border-b border-gray-200 px-4 py-3 sm:px-6">
+                <header className="shrink-0 border-b border-gray-200 px-2 py-3 sm:px-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <h1 className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm font-semibold uppercase tracking-wide text-gray-900">
                       <span className="min-w-0 truncate">{libraryTitle}</span>

@@ -15,6 +15,7 @@ export type CatalogCardHoverOverlayProps = {
 };
 import { CatalogDownloadSplitButton } from './CatalogDownloadSplitButton';
 import { CatalogOpenSplitButton } from './CatalogOpenSplitButton';
+import { isCatalogExternalDownloadButtonProps } from './catalogExternalDownload';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { linkIconUrl } from '../ui/editIconUrls';
 
@@ -289,6 +290,11 @@ export function CatalogCardHoverOverlay({
   );
   const useRowSplitDownload = centered && viewportW < 1280;
   const useRowIconOnlyActions = centered && viewportW < 1024;
+  /** Fontshare / trial: только primary «Скачать с источника», без пунктов меню. */
+  const showRowPrimaryDownloadButton =
+    useRowSplitDownload ||
+    rowDownloadItems.length === 0 ||
+    isCatalogExternalDownloadButtonProps(resolvedDownloadButtonProps);
 
   return centered ? (
     <div ref={rootRef} className="relative h-full w-full">
@@ -314,7 +320,7 @@ export function CatalogCardHoverOverlay({
             )
           )
         ) : null}
-        {useRowSplitDownload
+        {showRowPrimaryDownloadButton
           ? downloadButton
           : rowDownloadItems.map((item) => (
               <button

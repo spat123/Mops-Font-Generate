@@ -11,6 +11,9 @@ import {
   downloadFontsourceAsFormat,
   downloadFontsourcePackageZip,
   downloadFontsourceVariableVariant,
+  downloadFontshareAsFormat,
+  downloadFontsharePackageZip,
+  downloadFontshareVariableVariant,
   buildArchiveBlobFromEntries,
   saveArchiveBlob,
 } from './catalogDownloadActions';
@@ -18,8 +21,13 @@ import { convertBlobToFormat } from './fontFormatConvertClient';
 import { buildSafeFileBase, saveBlobAsFile } from './fileDownloadUtils';
 import { buildLocalStylePickerProps } from './fontDownloadStylePicker';
 import { buildCatalogDownloadButtonProps } from '../components/catalog/buildCatalogDownloadButtonProps';
+import { buildCatalogTrialDownloadProps } from '../components/catalog/buildCatalogSourceDownloadProps';
 import {
+  parseFontfabricTrialEntrySlug,
+  parseFontshareEntrySlug,
   parseFontsourceEntrySlug,
+  resolveFontfabricTrialCatalogItem,
+  resolveFontshareCatalogItem,
   resolveFontsourceCatalogItem,
   resolveGoogleCatalogEntry,
 } from './catalogCacheLookup';
@@ -170,6 +178,57 @@ export function buildSavedLibraryDownloadSplitButtonProps(
         onDownloadZip: downloadFontsourcePackageZip,
         onDownloadAsFormat: downloadFontsourceAsFormat,
         onDownloadVariableVariant: downloadFontsourceVariableVariant,
+      }),
+    );
+  }
+
+  if (source === 'fontshare') {
+    const slug = parseFontshareEntrySlug(id);
+    if (!slug) return null;
+    const item =
+      resolveFontshareCatalogItem(slug) ||
+      ({
+        id: slug,
+        slug,
+        family: label || slug,
+        pageUrl: `https://www.fontshare.com/fonts/${encodeURIComponent(slug)}`,
+      } as Record<string, unknown>);
+    const display = String(item.family || label || slug);
+    return wrapSavedLibraryDownloadProps(
+      buildCatalogDownloadButtonProps({
+        family: display,
+        item,
+        catalogEntry: item,
+        catalogSource: 'fontshare',
+        showVariable: item.isVariable === true,
+        onDownloadZip: downloadFontsharePackageZip,
+        onDownloadAsFormat: downloadFontshareAsFormat,
+        onDownloadVariableVariant: downloadFontshareVariableVariant,
+      }),
+    );
+  }
+
+  if (source === 'fontfabric-trial') {
+    const slug = parseFontfabricTrialEntrySlug(id);
+    if (!slug) return null;
+    const raw =
+      resolveFontfabricTrialCatalogItem(slug) ||
+      ({
+        slug,
+        family: label || slug,
+        trialUrl: `https://www.fontfabric.com/fonts/${encodeURIComponent(slug)}/`,
+      } as Record<string, unknown>);
+    const display = String(raw.family || label || slug);
+    return wrapSavedLibraryDownloadProps(
+      buildCatalogTrialDownloadProps({
+        displayName: display,
+        raw,
+        onOpenTrialPage: (trialRaw) => {
+          const url = String(trialRaw?.trialUrl || trialRaw?.link || '').trim();
+          if (typeof window !== 'undefined' && url) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
+        },
       }),
     );
   }

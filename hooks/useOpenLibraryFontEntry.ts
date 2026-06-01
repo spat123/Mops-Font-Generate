@@ -10,6 +10,13 @@ import {
   hasGoogleScriptGlyphSample,
 } from '../utils/googleFontCatalogSampleText';
 import { listGoogleCatalogDownloadStyles } from '../utils/googleFontDownloadStyles';
+import { openFontshareExternalDownload } from '../utils/fontshareDownloadActions';
+import {
+  parseFontfabricTrialEntrySlug,
+  parseFontshareEntrySlug,
+  resolveFontfabricTrialCatalogItem,
+  resolveFontshareCatalogItem,
+} from '../utils/catalogCacheLookup';
 import type { SavedLibraryRecord, SessionFontRecord } from '../types/editorFonts';
 import type { EditorFontUploadInput } from './useEditorFontNav';
 
@@ -136,6 +143,37 @@ export function useOpenLibraryFontEntry({
         } catch {
           toast.error(`Не удалось открыть ${family}`);
         }
+        return;
+      }
+
+      if (entrySource === 'fontshare') {
+        const slug = parseFontshareEntrySlug(entryId);
+        const item =
+          resolveFontshareCatalogItem(slug) ||
+          (slug
+            ? {
+                slug,
+                family: entryLabel || slug,
+                pageUrl: `https://www.fontshare.com/fonts/${encodeURIComponent(slug)}`,
+              }
+            : null);
+        if (!item) {
+          toast.info(`Не удалось открыть Fontshare: ${entryLabel || slug || 'шрифт'}`);
+          return;
+        }
+        openFontshareExternalDownload(item);
+        return;
+      }
+
+      if (entrySource === 'fontfabric-trial') {
+        const slug = parseFontfabricTrialEntrySlug(entryId);
+        const raw = slug ? resolveFontfabricTrialCatalogItem(slug) : null;
+        const url = String(raw?.trialUrl || raw?.link || '').trim();
+        if (!url || typeof window === 'undefined') {
+          toast.info(`Trial недоступен: ${entryLabel || slug || 'шрифт'}`);
+          return;
+        }
+        window.open(url, '_blank', 'noopener,noreferrer');
         return;
       }
 

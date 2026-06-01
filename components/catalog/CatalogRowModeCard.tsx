@@ -263,10 +263,11 @@ export function CatalogRowModeCard({
 
   const previewContent = editingPreview ? previewEditingInline : previewReadOnly;
 
-  const rowDividerClass = shareSurface ? 'border-gray-200' : 'border-gray-300';
+  const rowDividerClass = shareSurface ? '!border-b-gray-200' : '!border-b-gray-300';
   const rowCardClassName = [
     'rounded-none h-full min-h-0 bg-white',
-    `border-0 border-b ${rowDividerClass}`,
+    '!border-0 !border-b !border-solid',
+    rowDividerClass,
     shareSurface || selected
       ? ''
       : `hover:!bg-accent hover:!border-b-accent${canEditPreview ? ' focus-within:!bg-accent focus-within:!border-b-accent' : ''}`,

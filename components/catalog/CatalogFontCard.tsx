@@ -97,7 +97,11 @@ export function CatalogFontCard({
   const accentSurface = hoverSurface === 'accent';
   const accentSurfaceLive = accentSurface && !selected && hoverUiActive;
 
-  /** ROW: только нижний разделитель; полный `border border-transparent` перебивает `border-b`. */
+  /**
+   * ROW: без `border border-transparent` — иначе в скомпилированном CSS
+   * `border-transparent` перебивает `border-b` из className (порядок utilities, не class в HTML).
+   * Разделитель задаётся в `CatalogRowModeCard` через `!border-b-*`.
+   */
   const isRowShell = pinPreviewToBottom;
 
   const rootClassName = [
@@ -105,14 +109,12 @@ export function CatalogFontCard({
     selected
       ? ''
       : isRowShell
-        ? accentSurface
-          ? ''
-          : 'border-0 border-b border-gray-200 hover:bg-gray-50'
+        ? ''
         : accentSurface
           ? 'border border-transparent hover:!bg-accent hover:border-accent'
           : 'hover:bg-gray-50',
     accentSurfaceLive && !isRowShell ? '!bg-accent !border-accent' : '',
-    accentSurfaceLive && isRowShell ? '!bg-accent' : '',
+    accentSurfaceLive && isRowShell ? '!bg-accent !border-b-accent' : '',
     minHeightClass,
     className,
   ]
