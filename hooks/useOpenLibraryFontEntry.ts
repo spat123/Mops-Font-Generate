@@ -161,7 +161,9 @@ export function useOpenLibraryFontEntry({
           toast.info(`Не удалось открыть Fontshare: ${entryLabel || slug || 'шрифт'}`);
           return;
         }
-        openFontshareExternalDownload(item);
+        openFontshareExternalDownload(
+          item as Parameters<typeof openFontshareExternalDownload>[0],
+        );
         return;
       }
 
