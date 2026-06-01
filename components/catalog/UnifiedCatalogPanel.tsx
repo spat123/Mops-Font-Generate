@@ -628,11 +628,13 @@ export default function UnifiedCatalogPanel({
       const url = await copyCatalogItemShareLink(item, { openInEditor: true });
       if (url) {
         toast.success('Ссылка скопирована');
-      } else {
-        toast.info('Не удалось создать ссылку');
+        return true;
       }
+      toast.info('Не удалось создать ссылку');
+      return false;
     } catch {
       toast.error('Не удалось скопировать ссылку');
+      return false;
     }
   }, []);
 

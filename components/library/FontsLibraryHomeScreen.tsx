@@ -224,7 +224,7 @@ export const FontsLibraryHomeScreen = memo(function FontsLibraryHomeScreen({
                           String(savedLibraryFontsScope || 'all') === 'all' &&
                           !savedLibrarySearchQueryTrimmed
                         }
-                        className={`box-border h-10 whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent transition-all duration-300 disabled:cursor-default disabled:opacity-40 disabled:text-gray-900 ${
+                        className={`box-border h-10 flex-1 justify-left whitespace-nowrap px-2 text-sm font-semibold uppercase text-accent transition-all duration-300 disabled:cursor-default disabled:opacity-40 disabled:text-gray-900 ${
                           savedLibrarySearchActive
                             ? 'pointer-events-none w-0 min-w-0 flex-none overflow-hidden p-0 opacity-0'
                             : 'min-w-0 flex-1 opacity-100'

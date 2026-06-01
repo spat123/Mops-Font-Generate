@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, memo, Fragment } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo, Fragment } from 'react';
 import type { SiteSeoMeta } from '../../utils/siteSeo';
 import type { SavedLibraryRecord } from '../../types/editorFonts';
 import type { CatalogViewMode } from '../catalog/CatalogGridModeToggle';
@@ -51,7 +51,8 @@ import {
 } from '../../utils/editorShellStorage';
 import { makeSavedLibraryTabId } from '../../utils/savedLibraryTabIds';
 import { OpenGraphHead } from '../seo/OpenGraphHead';
-import { buildCatalogEditorOpenQuery } from '../../utils/catalogShareLink';
+import { ShareAutoEditorOverlay } from './ShareAutoEditorOverlay';
+import { buildShareAutoEditorOpenQueryFromPayload } from '../../utils/catalogShareLink';
 
 const SHARE_ROW_SAMPLE_TOOLTIP =
   'Дважды щёлкните, чтобы изменить образец в этой строке (только на этой странице)';
@@ -234,6 +235,8 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
   const [rowSampleByKey, setRowSampleByKey] = useState({});
   /** После записи каталога в session-кэш — перерисовать карточки с полными метаданными */
   const [shareCatalogHydratedTick, setShareCatalogHydratedTick] = useState(0);
+  const autoEditorRedirectedRef = useRef(false);
+  const [autoEditorRedirecting, setAutoEditorRedirecting] = useState(false);
 
   const rawShare =
     typeof router.query.share === 'string'
@@ -332,29 +335,19 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
     [rows, shareCatalogHydratedTick],
   );
 
-  /** Один шрифт Google/Fontsource + `?autoEditor=1` → сразу открыть вкладку в редакторе (SEO-ссылки). */
+  /** Клиентский fallback: share с `autoEditor=1` (если SSR-редирект не сработал). */
   useEffect(() => {
     if (!router.isReady || !payload) return;
     if (router.query.autoEditor !== '1') return;
-    const openable = rows.filter(
-      (r) =>
-        r.kind === 'catalog-ref' &&
-        (r.catalogSource === 'google' || r.catalogSource === 'fontsource'),
-    );
-    if (openable.length !== 1 || !openable[0]?.shareItem) return;
-    const row = openable[0];
-    const item = row.shareItem as ShareCatalogItem;
-    const sourceId = row.catalogSource === 'google' ? 'google' : 'fontsource';
-    const key = String(item.key || '').trim();
-    const isVariable = item.isVariable === true;
-    const raw =
-      sourceId === 'google'
-        ? { family: String(item.family || key) }
-        : { id: key, slug: key, family: String(item.family || key) };
-    const query = buildCatalogEditorOpenQuery(sourceId, raw, isVariable);
-    if (!query.openGoogle && !query.openFontsource) return;
-    void router.replace({ pathname: '/', query });
-  }, [router, router.isReady, router.query.autoEditor, payload, rows]);
+    if (autoEditorRedirectedRef.current) return;
+    const editorQuery = buildShareAutoEditorOpenQueryFromPayload(payload);
+    if (!editorQuery) return;
+    autoEditorRedirectedRef.current = true;
+    setAutoEditorRedirecting(true);
+    void router.replace({ pathname: '/', query: editorQuery }).finally(() => {
+      setAutoEditorRedirecting(false);
+    });
+  }, [router, router.isReady, router.query.autoEditor, payload]);
 
   const ownedShareLibrary = useMemo(
     () => (payload ? findOwnedShareLibrary(payload, savedLibraries) : null),
@@ -571,9 +564,14 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
     return null;
   };
 
+  const showAutoEditorOverlay =
+    Boolean(autoEditorRedirecting) ||
+    (router.isReady && router.query.autoEditor === '1' && Boolean(payload));
+
   return (
     <>
       <OpenGraphHead {...pageSeo} />
+      {showAutoEditorOverlay ? <ShareAutoEditorOverlay /> : null}
       <div className="min-h-screen bg-gray-50 text-gray-900">
         {!pageReady ? (
           <main className="flex min-h-screen items-center justify-center px-4 py-12">

@@ -4,6 +4,7 @@ import { buildSharePageSeo, getSiteOrigin } from '../utils/siteSeo';
 import type { SiteSeoMeta } from '../utils/siteSeo';
 import { resolveShareFromQuery } from '../lib/share/resolveShareFromQuery';
 import type { LibrarySharePayload } from '../utils/libraryShareLink';
+import { buildShareAutoEditorRedirectDestination } from '../utils/catalogShareLink';
 
 type SharePageProps = {
   seo: SiteSeoMeta;
@@ -19,6 +20,19 @@ export const getServerSideProps: GetServerSideProps<SharePageProps> = async ({ r
     shareParam: legacyShareParam || '',
     payload,
   });
+
+  const autoEditor = query.autoEditor === '1' || query.autoEditor === 'true';
+  if (autoEditor && payload) {
+    const destination = buildShareAutoEditorRedirectDestination(payload);
+    if (destination) {
+      return {
+        redirect: {
+          destination,
+          permanent: false,
+        },
+      };
+    }
+  }
 
   return {
     props: {

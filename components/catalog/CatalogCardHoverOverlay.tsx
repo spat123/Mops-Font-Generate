@@ -91,6 +91,7 @@ export function CatalogCardHoverOverlay({
   const rootRef = useRef<HTMLDivElement>(null);
 
   const [openState, setOpenState] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [shareState, setShareState] = useState<'idle' | 'loading' | 'done'>('idle');
   const [rowDownloadState, setRowDownloadState] = useState<{
     busyKey: string | null;
     doneKey: string | null;
@@ -100,6 +101,7 @@ export function CatalogCardHoverOverlay({
     typeof window !== 'undefined' ? window.innerWidth : 0,
   );
   const openDoneTimeoutRef = useRef<number | null>(null);
+  const shareDoneTimeoutRef = useRef<number | null>(null);
   const rowDoneTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -111,6 +113,10 @@ export function CatalogCardHoverOverlay({
       if (rowDoneTimeoutRef.current != null) {
         window.clearTimeout(rowDoneTimeoutRef.current);
         rowDoneTimeoutRef.current = null;
+      }
+      if (shareDoneTimeoutRef.current != null) {
+        window.clearTimeout(shareDoneTimeoutRef.current);
+        shareDoneTimeoutRef.current = null;
       }
     };
   }, []);
@@ -307,20 +313,50 @@ export function CatalogCardHoverOverlay({
     Boolean(downloadButtonProps) &&
     (showRowPrimaryDownloadButton || !centered);
 
-  const runShare = (event: MouseEvent<HTMLButtonElement>) => {
+  const runShareWithFeedback = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    void onShare?.();
+    if (!showShareButton) return;
+    if (shareState === 'loading') return;
+    if (shareDoneTimeoutRef.current != null) {
+      window.clearTimeout(shareDoneTimeoutRef.current);
+      shareDoneTimeoutRef.current = null;
+    }
+    setShareState('loading');
+    void (async () => {
+      try {
+        const result = onShare?.();
+        const ok = await Promise.resolve(result);
+        if (ok === false) {
+          setShareState('idle');
+          return;
+        }
+        setShareState('done');
+        shareDoneTimeoutRef.current = window.setTimeout(() => {
+          setShareState('idle');
+          shareDoneTimeoutRef.current = null;
+        }, 900);
+      } catch {
+        setShareState('idle');
+      }
+    })();
   };
+
+  const shareIcon = useMemo(() => {
+    if (shareState === 'loading') return <SpinnerIcon className="h-4 w-4" />;
+    if (shareState === 'done') return <CheckIcon className="h-4 w-4" />;
+    return <ShareIcon className="h-4 w-4" />;
+  }, [shareState]);
 
   const shareButton = (
     <button
       type="button"
       data-no-card-select="true"
-      onClick={runShare}
-      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md bg-white text-gray-800 transition-colors hover:bg-white active:bg-white"
+      onClick={runShareWithFeedback}
+      disabled={shareState === 'loading'}
+      className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md bg-white text-gray-800 transition-colors hover:bg-white active:bg-white disabled:cursor-default disabled:opacity-70"
       aria-label={shareAriaLabel}
     >
-      <ShareIcon className="h-4 w-4" />
+      {shareIcon}
     </button>
   );
 

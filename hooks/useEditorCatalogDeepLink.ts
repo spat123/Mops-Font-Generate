@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import type { NextRouter } from 'next/router';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 
+const editorDeepLinkTasks = new Map<string, Promise<void>>();
+
 type UseEditorCatalogDeepLinkParams = {
   router: NextRouter;
   openGoogleCatalogEntryInEditorTab: (entry: Record<string, unknown>) => Promise<void>;
@@ -35,7 +37,9 @@ export function useEditorCatalogDeepLink({
 
     if (!family && !slug) return;
 
-    let cancelled = false;
+    const linkKey = family ? `google:${family}:${googleVar ? '1' : '0'}` : `fontsource:${slug}:${fsVar ? '1' : '0'}`;
+    const existingTask = editorDeepLinkTasks.get(linkKey);
+    if (existingTask) return;
 
     const stripOpenQuery = async () => {
       const nextQuery = { ...router.query };
@@ -56,7 +60,7 @@ export function useEditorCatalogDeepLink({
       );
     };
 
-    (async () => {
+    const task = (async () => {
       try {
         if (family) {
           const list = readGoogleFontCatalogCache();
@@ -82,15 +86,16 @@ export function useEditorCatalogDeepLink({
           await openFontsourceSlugInEditorTab(slug, fsVar);
         }
       } finally {
-        if (!cancelled) {
-          await stripOpenQuery();
-        }
+        await stripOpenQuery();
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
+    editorDeepLinkTasks.set(linkKey, task);
+    void task.finally(() => {
+      if (editorDeepLinkTasks.get(linkKey) === task) {
+        editorDeepLinkTasks.delete(linkKey);
+      }
+    });
   }, [
     router,
     router.isReady,
