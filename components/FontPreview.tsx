@@ -45,6 +45,7 @@ import { createCatalogLibraryEntry, getLibrarySourceLabel, normalizeLibraryText 
 import { resolvePreferredLibraryPickerEntry } from '@/utils/libraryPickerCatalogSearch';
 import type { SavedLibraryFontEntry } from '../types/savedLibrary';
 import { resolveSessionFontDisplayLabel } from '../utils/fontSlug';
+import { getFontSubsetLabelRu } from '../utils/fontSubsetLabels';
 import { HexProgressLoader } from './ui/HexProgressLoader';
 import { PreviewEditTextHint } from './ui/PreviewEditTextHint';
 import { PreviewModeDock } from './ui/PreviewModeDock';
@@ -837,6 +838,12 @@ export default function FontPreview({
     return getLibrarySourceLabel(source);
   }, [selectedFont?.source]);
 
+  const previewSubsetLabel = useMemo(() => {
+    const subset = String((selectedFont as any)?.activeSubset || '').trim();
+    if (!subset) return '';
+    return getFontSubsetLabelRu(subset);
+  }, [selectedFont?.id, (selectedFont as any)?.activeSubset]);
+
   const previewWeightValue = useMemo(() => {
     if (!selectedFont) return null;
     if (selectedFont.isVariableFont) {
@@ -1411,6 +1418,11 @@ export default function FontPreview({
               <div className="flex items-center justify-center gap-2">
                 <span className="truncate">{previewFontLabel}</span>
                 {previewSourceLabel ? <span>{previewSourceLabel}</span> : null}
+                {previewSubsetLabel ? (
+                  <Tooltip content="Выбранный набор символов" className="pointer-events-auto">
+                    <span>{previewSubsetLabel}</span>
+                  </Tooltip>
+                ) : null}
                 {showVariableBadge ? (
                   <Tooltip content="Variable Font" className="pointer-events-auto">
                     <span>VF</span>
