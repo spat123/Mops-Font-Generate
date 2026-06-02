@@ -14,6 +14,7 @@ export function HelpPageLayout({
   onTabChange,
   sectionTitle,
   sectionDescription,
+  jsonLd,
   children,
 }: {
   seo: SiteSeoMeta;
@@ -21,13 +22,14 @@ export function HelpPageLayout({
   onTabChange: (tab: KnowledgeBaseTab) => void;
   sectionTitle?: string;
   sectionDescription?: string;
+  jsonLd?: Record<string, unknown>;
   children: ReactNode;
 }) {
   const sectionLabel = sectionTitle || 'Обзор базы знаний';
 
   return (
     <>
-      <HelpSeoHead tab={activeTab} seo={seo} />
+      <HelpSeoHead tab={activeTab} seo={seo} jsonLd={jsonLd} />
       <div className="min-h-screen bg-gray-50">
         <div className="border-b border-gray-200 bg-white">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">

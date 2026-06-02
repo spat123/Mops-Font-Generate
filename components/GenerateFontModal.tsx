@@ -227,7 +227,7 @@ export default function GenerateFontModal({
     }
     if (!isPro && !devUnlimitedGenerations && freeGenerationsUsed >= generationsLimit) {
       if (!isAuthenticated) {
-        toast.info('Вы исчерпали лимит генераций. Войдите в аккаунт — на Free будет 50 генераций в месяц.');
+        toast.info('Вы исчерпали лимит генераций. Войдите в аккаунт — в открытой бете полный доступ бесплатный.');
         requestSignIn?.();
         return;
       }
@@ -312,20 +312,24 @@ export default function GenerateFontModal({
   const handleProLockIconClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAuthenticated) return;
-    toast.info('Доступно только в Pro');
+    if (!isAuthenticated) {
+      toast.info('Войдите, чтобы открыть полный доступ в бете');
+      requestSignIn?.();
+      return;
+    }
+    toast.info('Полный доступ открыт для зарегистрированных пользователей в бете');
     openPlans?.();
   };
 
   const proLockIcon = (iconInactive) => (
     <div className="absolute inset-y-0 right-1 z-10 flex items-center sm:right-2">
-      <Tooltip content="Доступно только в Pro" openDelayMs={200}>
+      <Tooltip content="Войдите, чтобы открыть полный доступ в бете" openDelayMs={200}>
         <button
           type="button"
           disabled={iconInactive}
           onClick={handleProLockIconClick}
           className="group/pro-lock inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-200 text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-300 disabled:opacity-50"
-          aria-label="Доступно только в Pro"
+          aria-label="Войти для полного доступа"
         >
           <EditAssetIcon
             src={updateIconUrl}

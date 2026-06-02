@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { KNOWLEDGE_BASE_GUIDES } from '../../data/knowledgeBaseGuides';
+import { KNOWLEDGE_BASE_ARTICLES } from '../../data/knowledgeBaseArticles';
 import { HelpChevronDownIcon } from './HelpIcons';
 
 export function HelpGuidesSection() {
@@ -23,6 +25,26 @@ export function HelpGuidesSection() {
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {KNOWLEDGE_BASE_ARTICLES.map((article) => (
+          <Link
+            key={article.slug}
+            href={`/help/${article.slug}`}
+            className="group rounded-lg border border-gray-200 bg-gray-50/70 px-4 py-4 transition-colors hover:border-gray-300 hover:bg-white"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">
+              Статья · {article.readingTime}
+            </p>
+            <h3 className="mt-2 text-sm font-semibold tracking-tight text-gray-900 group-hover:text-accent">
+              {article.title}
+            </h3>
+            <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-gray-600">
+              {article.lead}
+            </p>
+          </Link>
+        ))}
+      </div>
+
       <label className="block">
         <span className="sr-only">Поиск по руководствам</span>
         <input

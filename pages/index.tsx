@@ -14,7 +14,7 @@ export default function Home() {
       <PlansDialog
         open={isPlansOpen}
         onClose={() => setIsPlansOpen(false)}
-        currentPlan={libraryAuthValue.isPro ? 'Pro' : 'Free'}
+        currentPlan={libraryAuthValue.planName || (libraryAuthValue.isPro ? 'Pro' : 'Free')}
       />
       <EditorHomeLayout {...layout} />
     </LibraryAuthProvider>

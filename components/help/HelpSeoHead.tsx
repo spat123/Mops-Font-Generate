@@ -5,8 +5,16 @@ import type { KnowledgeBaseTab } from './knowledgeBaseNav';
 import type { SiteSeoMeta } from '../../utils/siteSeo';
 
 /** SEO: title, description, OG/Twitter, canonical и JSON-LD для /help. */
-export function HelpSeoHead({ tab, seo }: { tab: KnowledgeBaseTab; seo: SiteSeoMeta }) {
-  const jsonLd = buildHelpPageJsonLd(tab, seo);
+export function HelpSeoHead({
+  tab,
+  seo,
+  jsonLd,
+}: {
+  tab: KnowledgeBaseTab;
+  seo: SiteSeoMeta;
+  jsonLd?: Record<string, unknown>;
+}) {
+  const resolvedJsonLd = jsonLd || buildHelpPageJsonLd(tab, seo);
 
   return (
     <>
@@ -25,7 +33,7 @@ export function HelpSeoHead({ tab, seo }: { tab: KnowledgeBaseTab; seo: SiteSeoM
       <Head>
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(resolvedJsonLd) }}
         />
       </Head>
     </>

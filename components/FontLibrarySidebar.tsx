@@ -53,12 +53,13 @@ export default function FontLibrarySidebar({
     librariesLimit,
   } = useLibraryAuth();
   const planBadgeTooltip = useMemo(() => {
+    if (isPro && planName === 'Beta') return 'Открытая бета — полный доступ после регистрации.';
     if (isPro) return 'Тариф Pro — расширенные возможности.';
     if (typeof librariesLimit === 'number' && librariesLimit > 0) {
       return `Доступно до ${librariesLimit} ${librariesWordAfterDo(librariesLimit)}`;
     }
     return 'Доступно несколько библиотек';
-  }, [isPro, librariesLimit]);
+  }, [isPro, librariesLimit, planName]);
 
   /** От 4 библиотек — скролл только списка, блок «Добавить» закреплён снизу панели. */
   const pinLibraryAddToBottom = libraries.length >= 4;
@@ -179,7 +180,7 @@ export default function FontLibrarySidebar({
                     isPro ? 'bg-gray-900 text-white' : 'bg-gray-200 text-gray-900'
                   }`}
                 >
-                  {isPro ? 'Pro' : planName || 'Free'}
+                  {planName || (isPro ? 'Pro' : 'Free')}
                 </span>
               </Tooltip>
             </div>

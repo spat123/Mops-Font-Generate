@@ -4,6 +4,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { NextAuthOptions, Session } from 'next-auth';
 import { getMaxSavedLibrariesForUser } from '../../../utils/authLibraryLimits';
+import { hasOpenBetaFullAccess } from '../../../utils/openBetaAccess';
 import { upsertOAuthUser, verifyCredentialsUser, findUserByEmail, findUserById } from '../../../lib/auth/userStore';
 import {
   matchEnvCredentialsUser,
@@ -223,7 +224,12 @@ export const authOptions = {
         session.user.isPro = plan === 'pro';
 
         applyDevProSimulation(session);
-        session.user.maxLibraries = getMaxSavedLibrariesForUser(Boolean(session.user.isPro));
+        session.user.maxLibraries = getMaxSavedLibrariesForUser(
+          hasOpenBetaFullAccess({
+            isAuthenticated: Boolean(session.user.id) && !session.user.needsLink,
+            isPro: Boolean(session.user.isPro),
+          }),
+        );
       }
       return session;
     },

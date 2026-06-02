@@ -14,6 +14,7 @@ import {
   getProPlanFeatures,
   getProPriceDisplay,
 } from '../../utils/billingPlans';
+import { getProjectSupportEmailLink, getProjectSupportLinks } from '../../utils/projectSupport';
 
 function CheckIcon({ className = 'h-4 w-4 text-accent' }) {
   return (
@@ -117,8 +118,14 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free', locale = 'RU'
   const savingsLabel = getAnnualSavingsLabel(locale);
   const freePrice = getFreePriceDisplay(locale);
   const proPrice = getProPriceDisplay(locale, billingPeriod);
-  const isFreeCurrent = currentPlan !== 'Pro';
+  const isFreeCurrent = currentPlan === 'Free';
   const isProCurrent = currentPlan === 'Pro';
+  const isBetaCurrent = currentPlan === 'Beta';
+  const supportLinks = getProjectSupportLinks();
+  const fallbackSupportLink = getProjectSupportEmailLink();
+  const fullAccessCurrent = isProCurrent || isBetaCurrent;
+  const fullAccessTitle = isBetaCurrent ? 'Beta' : copy.proPlanName;
+  const fullAccessPrice = isBetaCurrent ? { main: '0 ₽', suffix: '/ сейчас', sub: 'полный доступ после входа' } : proPrice;
 
   useDismissibleLayer({
     open,
@@ -161,7 +168,7 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free', locale = 'RU'
               className="w-full"
             />
             <span className="inline-flex items-center rounded-full border border-emerald-200/90 bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">
-              {savingsLabel}
+              {isBetaCurrent ? 'Открытая бета: бесплатно после регистрации' : savingsLabel}
             </span>
           </div>
 
@@ -189,23 +196,25 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free', locale = 'RU'
             />
 
             <PlanCard
-              title={copy.proPlanName}
-              priceMain={proPrice.main}
-              priceSuffix={proPrice.suffix}
-              priceSub={proPrice.sub}
+              title={fullAccessTitle}
+              priceMain={fullAccessPrice.main}
+              priceSuffix={fullAccessPrice.suffix}
+              priceSub={fullAccessPrice.sub}
               description={
-                locale === 'EN'
+                isBetaCurrent
+                  ? 'Полный доступ открыт на время беты. Поддержка проекта помогает развивать сервис быстрее.'
+                  : locale === 'EN'
                   ? 'For designers and teams who work with fonts every day.'
                   : 'Для дизайнеров и команд, которые постоянно работают со шрифтами.'
               }
               features={getProPlanFeatures(locale)}
-              isCurrent={isProCurrent}
+              isCurrent={fullAccessCurrent}
               highlight
-              badge={isProCurrent ? copy.currentPlanBadge : copy.recommendedBadge}
+              badge={fullAccessCurrent ? copy.currentPlanBadge : copy.recommendedBadge}
               action={
-                isProCurrent ? (
+                fullAccessCurrent ? (
                   <AppButton type="button" fullWidth variant="outline" disabled>
-                    {locale === 'EN' ? 'Your current plan' : 'Ваш текущий тариф'}
+                    {isBetaCurrent ? 'Полный доступ открыт' : locale === 'EN' ? 'Your current plan' : 'Ваш текущий тариф'}
                   </AppButton>
                 ) : (
                   <div className="space-y-2">
@@ -217,6 +226,34 @@ export function PlansDialog({ open, onClose, currentPlan = 'Free', locale = 'RU'
                 )
               }
             />
+          </div>
+
+          <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-tight text-gray-900">
+                  Поддержать проект
+                </h3>
+                <p className="mt-1 max-w-2xl text-xs leading-relaxed text-gray-500">
+                  DINAMIC FONT остаётся бесплатным в открытой бете. Если сервис помогает в работе,
+                  можно поддержать развитие донатом или написать нам.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(supportLinks.length > 0 ? supportLinks : [fallbackSupportLink]).map((link) => (
+                <a
+                  key={link.label}
+                  href={link.url}
+                  target={link.url.startsWith('mailto:') ? undefined : '_blank'}
+                  rel={link.url.startsWith('mailto:') ? undefined : 'noreferrer'}
+                  className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-gray-900 hover:bg-white"
+                  title={link.description}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       </div>

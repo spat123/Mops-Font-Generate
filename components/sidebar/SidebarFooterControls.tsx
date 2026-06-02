@@ -550,7 +550,7 @@ export default function SidebarFooterControls({
             <FeatureCard
               icon={IconGlobe}
               title="Три каталога шрифтов"
-              description="Локальные файлы, Google Fonts и Fontsource — всё в одном интерфейсе с быстрым поиском и фильтрами."
+              description="Локальные файлы и подключённые каталоги — всё в одном интерфейсе с быстрым поиском, фильтрами и открытием в редакторе."
               accent
             />
             <FeatureCard
@@ -570,7 +570,7 @@ export default function SidebarFooterControls({
             <FeatureCard
               icon={IconHeart}
               title="Поддержать проект"
-              description="Кнопка доната для пользователей, которым инструмент экономит время."
+              description="Открытая бета бесплатна после регистрации; поддержка пользователей помогает быстрее развивать редактор."
               accent
             />
             <FutureFeatureCard

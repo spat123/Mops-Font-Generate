@@ -51,6 +51,7 @@ import { PreviewModeDock } from './ui/PreviewModeDock';
 import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
 import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
+import { getProjectSupportEmailLink, getProjectSupportLinks } from '../utils/projectSupport';
 import {
   buildArchiveBlobFromEntries,
   buildGoogleFormatArchiveEntry,
@@ -63,6 +64,41 @@ import {
 } from '../utils/catalogDownloadActions';
 import { GLYPH_COUNT_UNAVAILABLE } from './GlyphsMode';
 import { shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
+
+function EmptyStateSupportBlock() {
+  const supportLinks = getProjectSupportLinks();
+  const fallbackLink = getProjectSupportEmailLink();
+  const links = supportLinks.length > 0 ? supportLinks : [fallbackLink];
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 px-5 py-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
+        Поддержать проект
+      </p>
+      <h2 className="mt-2 text-lg font-semibold uppercase tracking-tight text-gray-900">
+        Помогите развивать DINAMIC FONT
+      </h2>
+      <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
+        Открытая бета остаётся бесплатной после регистрации. Если инструмент экономит время,
+        можно поддержать разработку донатом или написать нам.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {links.map((link) => (
+          <a
+            key={link.label}
+            href={link.url}
+            target={link.url.startsWith('mailto:') ? undefined : '_blank'}
+            rel={link.url.startsWith('mailto:') ? undefined : 'noreferrer'}
+            className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-gray-900 hover:bg-gray-900 hover:text-white"
+            title={link.description}
+          >
+            {link.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -1260,10 +1296,10 @@ export default function FontPreview({
               onClick={toggleEmptyStateSeo}
               aria-expanded={emptyStateSeoOpen}
               aria-controls="dynamic-font-seo-info"
-              className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-semibold uppercase text-gray-900 backdrop-blur-sm transition-colors ${
+              className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-4 text-xs font-semibold uppercase text-gray-900 backdrop-blur-sm transition-colors ${
                 emptyStateSeoOpen
                   ? 'border-accent bg-accent text-white hover:border-accent-hover hover:bg-accent-hover'
-                  : 'border-gray-200 bg-white/95 text-gray-900 hover:border-gray-900'
+                  : 'border-gray-50 bg-gray-50 text-gray-900 hover:border-accent hover:bg-accent hover:text-white'
               }`}
             >
               О DINAMIC FONT
@@ -1335,6 +1371,15 @@ export default function FontPreview({
               </a>
             </nav>
           </section>
+        ) : null}
+        {!emptyStateSearchActive && emptyStateSeoOpen ? (
+          <div
+            id="dynamic-font-support"
+            className="mx-auto mb-20 w-full max-w-5xl scroll-mt-8 px-0"
+            aria-hidden={!emptyStateSeoOpen}
+          >
+            <EmptyStateSupportBlock />
+          </div>
         ) : null}
         </div>
         <EditorStatusBar

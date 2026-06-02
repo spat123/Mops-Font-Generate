@@ -61,7 +61,7 @@ export function useLibraryStatusBar({
       };
     }
 
-    const planBadgeShort = libraryAuthValue.isPro ? 'Pro' : libraryAuthValue.planName || 'Free';
+    const planBadgeShort = libraryAuthValue.planName || (libraryAuthValue.isPro ? 'Pro' : 'Free');
     return {
       leading: '',
       center: (

@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { toast } from '../utils/appNotify';
 import { getMaxSavedLibrariesForUser } from '../utils/authLibraryLimits';
 import { getBillingCopy } from '../utils/billingCopy';
+import { getOpenBetaPlanName, hasOpenBetaFullAccess } from '../utils/openBetaAccess';
 import { resolveLibraryAuthState } from '../utils/libraryAuthState';
 import type { SavedLibraryRecord } from '../types/editorFonts';
 
@@ -71,7 +72,11 @@ export function useLibraryAuth({ authStatus, session, needsLink, fontLibraries }
       if (needsLinkActive) void router.push('/auth/link');
       return false;
     }
-    const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
+    const hasFullAccess = hasOpenBetaFullAccess({
+      isAuthenticated: authState.isAuthenticated,
+      isPro: Boolean(session?.user?.isPro),
+    });
+    const maxLibs = getMaxSavedLibrariesForUser(hasFullAccess);
     if (fontLibraries.length >= maxLibs) {
       toast.info(getBillingCopy().librariesLimitToast);
       openPlans();
@@ -92,7 +97,11 @@ export function useLibraryAuth({ authStatus, session, needsLink, fontLibraries }
   ]);
 
   const libraryAuthValue = useMemo(() => {
-    const isPro = Boolean(session?.user?.isPro);
+    const actualIsPro = Boolean(session?.user?.isPro);
+    const isPro = hasOpenBetaFullAccess({
+      isAuthenticated: authState.isAuthenticated,
+      isPro: actualIsPro,
+    });
     const maxLibs = getMaxSavedLibrariesForUser(isPro);
     const librariesCount = fontLibraries.length;
     const libraryLimitReached =
@@ -101,7 +110,10 @@ export function useLibraryAuth({ authStatus, session, needsLink, fontLibraries }
       authLoading: authState.authLoading,
       isAuthenticated: authState.isAuthenticated,
       isPro,
-      planName: session?.user?.plan === 'pro' ? 'Pro' : 'Free',
+      planName: getOpenBetaPlanName({
+        isAuthenticated: authState.isAuthenticated,
+        isPro: actualIsPro || session?.user?.plan === 'pro',
+      }),
       librariesCount,
       librariesLimit: maxLibs,
       libraryLimitReached,

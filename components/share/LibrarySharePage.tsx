@@ -26,6 +26,7 @@ import {
 import { downloadLibraryAsZip } from '../../utils/libraryArchiveDownload';
 import { useFontLibraries } from '../../hooks/useFontLibraries';
 import { getMaxSavedLibrariesForUser } from '../../utils/authLibraryLimits';
+import { hasOpenBetaFullAccess } from '../../utils/openBetaAccess';
 import { toast } from '../../utils/appNotify';
 import { Tooltip } from '../ui/Tooltip';
 import { CatalogGridModeToggle } from '../catalog/CatalogGridModeToggle';
@@ -465,7 +466,12 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
       void signIn(undefined, { callbackUrl });
       return;
     }
-    const maxLibs = getMaxSavedLibrariesForUser(Boolean(session?.user?.isPro));
+    const maxLibs = getMaxSavedLibrariesForUser(
+      hasOpenBetaFullAccess({
+        isAuthenticated: status === 'authenticated',
+        isPro: Boolean(session?.user?.isPro),
+      }),
+    );
     if (savedLibraries.length >= maxLibs) {
       toast.info(
         `Достигнут лимит библиотек (${maxLibs}). Удалите одну на главной, чтобы импортировать ещё одну.`,

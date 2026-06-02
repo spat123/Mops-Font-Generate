@@ -1,5 +1,6 @@
 import { knowledgeBaseTabMeta, type KnowledgeBaseTab } from '../components/help/knowledgeBaseNav';
 import { legalMeta } from '../config/legal';
+import type { KnowledgeBaseArticle } from '../data/knowledgeBaseArticles';
 import { getDefaultOgImageUrl, getSiteOrigin, OG_IMAGE_HEIGHT, OG_IMAGE_WIDTH, type SiteSeoMeta } from './siteSeo';
 
 const SITE_NAME = legalMeta.serviceName;
@@ -42,6 +43,27 @@ export function buildHelpPageSeo(tab: KnowledgeBaseTab, origin?: string): SiteSe
   };
 }
 
+export function getHelpArticleCanonicalUrl(slug: string, origin?: string): string {
+  const base = String(origin || getSiteOrigin()).replace(/\/$/, '');
+  return `${base}/help/${encodeURIComponent(slug)}`;
+}
+
+export function buildHelpArticleSeo(article: KnowledgeBaseArticle, origin?: string): SiteSeoMeta {
+  const siteOrigin = String(origin || getSiteOrigin()).replace(/\/$/, '');
+  return {
+    title: article.seoTitle,
+    description: article.description,
+    canonicalUrl: getHelpArticleCanonicalUrl(article.slug, siteOrigin),
+    imageUrl: getDefaultOgImageUrl(siteOrigin),
+    imageWidth: OG_IMAGE_WIDTH,
+    imageHeight: OG_IMAGE_HEIGHT,
+    imageType: 'image/png',
+    imageAlt: `${SITE_NAME} — ${article.title}`,
+    siteName: SITE_NAME,
+    type: 'article',
+  };
+}
+
 export type HelpBreadcrumbItem = { name: string; item: string };
 
 export function buildHelpBreadcrumbs(tab: KnowledgeBaseTab, origin?: string): HelpBreadcrumbItem[] {
@@ -55,6 +77,16 @@ export function buildHelpBreadcrumbs(tab: KnowledgeBaseTab, origin?: string): He
     items.push({ name: label, item: getHelpCanonicalUrl(tab, base) });
   }
   return items;
+}
+
+export function buildHelpArticleBreadcrumbs(article: KnowledgeBaseArticle, origin?: string): HelpBreadcrumbItem[] {
+  const base = String(origin || getSiteOrigin()).replace(/\/$/, '');
+  return [
+    { name: 'Главная', item: `${base}/` },
+    { name: 'База знаний', item: `${base}/help` },
+    { name: 'Руководства', item: `${base}/help?tab=guides` },
+    { name: article.title, item: getHelpArticleCanonicalUrl(article.slug, base) },
+  ];
 }
 
 export function buildHelpPageJsonLd(tab: KnowledgeBaseTab, seo: SiteSeoMeta) {
@@ -74,6 +106,53 @@ export function buildHelpPageJsonLd(tab: KnowledgeBaseTab, seo: SiteSeoMeta) {
           url: String(originOrSite(seo.canonicalUrl)),
         },
         inLanguage: 'ru-RU',
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: breadcrumbs.map((crumb, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: crumb.name,
+          item: crumb.item,
+        })),
+      },
+    ],
+  };
+}
+
+export function buildHelpArticleJsonLd(article: KnowledgeBaseArticle, seo?: SiteSeoMeta) {
+  const resolvedSeo = seo || buildHelpArticleSeo(article);
+  const canonicalUrl = resolvedSeo.canonicalUrl || getHelpArticleCanonicalUrl(article.slug);
+  const siteOrigin = originOrSite(canonicalUrl);
+  const breadcrumbs = buildHelpArticleBreadcrumbs(article, siteOrigin);
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'TechArticle',
+        '@id': `${canonicalUrl}#article`,
+        url: canonicalUrl,
+        headline: article.title,
+        name: article.title,
+        description: article.description,
+        datePublished: article.publishedAt,
+        dateModified: article.updatedAt || article.publishedAt,
+        inLanguage: 'ru-RU',
+        author: {
+          '@type': 'Organization',
+          name: SITE_NAME,
+          url: String(siteOrigin),
+        },
+        publisher: {
+          '@type': 'Organization',
+          name: SITE_NAME,
+          url: String(siteOrigin),
+        },
+        isPartOf: {
+          '@type': 'WebSite',
+          name: SITE_NAME,
+          url: String(siteOrigin),
+        },
       },
       {
         '@type': 'BreadcrumbList',

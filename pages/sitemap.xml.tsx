@@ -1,4 +1,5 @@
 import type { GetServerSideProps } from 'next';
+import { KNOWLEDGE_BASE_ARTICLES } from '../data/knowledgeBaseArticles';
 import { getSiteOrigin } from '../utils/siteSeo';
 
 type SitemapEntry = {
@@ -30,7 +31,15 @@ function escapeXml(value: string): string {
 export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
   const origin = getSiteOrigin(req);
   const lastmod = new Date().toISOString().slice(0, 10);
-  const urls = SITEMAP_ENTRIES.map(({ path, changefreq, priority }) => {
+  const entries = [
+    ...SITEMAP_ENTRIES,
+    ...KNOWLEDGE_BASE_ARTICLES.map((article) => ({
+      path: `/help/${article.slug}`,
+      changefreq: 'monthly' as const,
+      priority: '0.7',
+    })),
+  ];
+  const urls = entries.map(({ path, changefreq, priority }) => {
     const loc = `${origin}${path}`;
     return [
       '  <url>',

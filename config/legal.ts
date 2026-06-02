@@ -7,7 +7,7 @@ export const legalMeta = {
   siteUrl: 'https://dynamicfont.ru',
   operatorFullName:
     process.env.LEGAL_OPERATOR_FULL_NAME?.trim() || 'Мочалов Игорь Сергеевич',
-  operatorInn: process.env.LEGAL_OPERATOR_INN?.trim() || '',
+  operatorInn: process.env.LEGAL_OPERATOR_INN?.trim() || '590705841187',
   operatorStatus:
     'самозанятый, применяющий специальный налоговый режим «Налог на профессиональный доход» (НПД)',
   supportEmail: process.env.LEGAL_SUPPORT_EMAIL?.trim() || 'support@dynamicfont.ru',

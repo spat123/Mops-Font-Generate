@@ -856,7 +856,7 @@ export default function Sidebar({
     previewResetSignal,
 } = useSettings();
 
-  const { isPro, openPlans } = useLibraryAuth();
+  const { isPro, openPlans, planName } = useLibraryAuth();
   const { resetSelectedFontState, fonts: sessionFonts } = useFontContext();
   const isGlyphsView = viewMode === 'glyphs';
   const isStylesView = viewMode === 'styles';
@@ -1997,7 +1997,7 @@ export default function Sidebar({
                     {
                       value: 'custom',
                       label: 'Своё значение',
-                      rightLabel: 'Pro',
+                      rightLabel: 'Войти',
                       disabled: !isPro,
                     },
                   ]}
@@ -2028,7 +2028,7 @@ export default function Sidebar({
                       className="shrink-0 rounded bg-gray-900/90 px-1.5 py-1 text-[9px] font-bold uppercase leading-none tracking-wide text-white"
                       title="Расширенная настройка шкалы"
                     >
-                      Pro
+                      {planName === 'Beta' ? 'Beta' : 'Pro'}
                     </span>
                   </div>
                 ) : null}

@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { findUserById } from './auth/userStore';
 import { isDevUnlimitedStaticGeneration } from '../utils/devUnlimitedStaticGeneration';
+import { hasOpenBetaFullAccess } from '../utils/openBetaAccess';
 import {
   FREE_STATIC_GENERATIONS_LIMIT,
   GUEST_STATIC_GENERATIONS_LIMIT,
@@ -73,7 +74,10 @@ function getBucket(store, subjectKey) {
  * @returns {Promise<{ ok: boolean, status?: number, limit?: number, used?: number, remaining?: number, period?: string, message?: string }>}
  */
 export async function consumeStaticGenerationQuota(req, { userId, isPro, guestQuotaId, dryRun = false }) {
-  if (isPro || isDevUnlimitedStaticGeneration()) {
+  if (
+    hasOpenBetaFullAccess({ isAuthenticated: Boolean(userId), isPro }) ||
+    isDevUnlimitedStaticGeneration()
+  ) {
     return { ok: true, limit: Infinity, used: 0, remaining: Infinity, period: getCurrentQuotaPeriod() };
   }
 
@@ -143,5 +147,9 @@ export async function resolveGenerationQuotaActor(req) {
     }
   }
   const guestQuotaId = String(req.headers['x-guest-quota-id'] || '').trim();
-  return { userId, isPro, guestQuotaId };
+  return {
+    userId,
+    isPro: hasOpenBetaFullAccess({ isAuthenticated: Boolean(userId), isPro }),
+    guestQuotaId,
+  };
 }

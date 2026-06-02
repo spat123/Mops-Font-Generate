@@ -1243,7 +1243,7 @@ export function CollapsedSidebarControls({
                   ? `Waterfall scale: ${activeWaterfallScalePreset.label}`
                   : isPro
                     ? `Waterfall scale: ${Number(waterfallScaleRatio).toFixed(3)} (своё)`
-                    : 'Своё значение шкалы — только Pro. Выберите пресет из списка.'
+                    : 'Своё значение шкалы доступно после входа. Выберите пресет из списка.'
               }
               as="div"
               className="w-full"

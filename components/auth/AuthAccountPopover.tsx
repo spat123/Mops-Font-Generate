@@ -218,8 +218,8 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   }, [isSidebarCollapsed]);
 
   const loading = status === 'loading';
-  const planLabel = isPro ? billing.proPlanName : planName || billing.freePlanName;
-  const menuPlanLabel = isPro ? billing.proPlanName : billing.freePlanName;
+  const planLabel = planName || (isPro ? billing.proPlanName : billing.freePlanName);
+  const menuPlanLabel = planName || billing.freePlanName;
   const limitText =
     typeof librariesCount === 'number' && typeof librariesLimit === 'number'
       ? `${librariesCount}/${librariesLimit}`
@@ -228,7 +228,9 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
     typeof librariesCount === 'number' && typeof librariesLimit === 'number' ? librariesCount >= librariesLimit : false;
 
   const planBlurb = isPro
-    ? 'Расширенные лимиты, своё значение шкалы Waterfall и без лимита шрифтов в «Поделиться».'
+    ? planName === 'Beta'
+      ? 'Открытая бета: полный доступ после регистрации, без оплаты на время тестирования.'
+      : 'Расширенные лимиты, своё значение шкалы Waterfall и без лимита шрифтов в «Поделиться».'
     : typeof librariesLimit === 'number'
       ? `До ${librariesLimit} библиотек, ${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц, до ${MAX_SHARE_FONTS_FREE} шрифтов в ссылке «Поделиться». Waterfall — только пресеты шкалы.`
       : 'Лимиты тарифа Free: библиотеки, генерации, «Поделиться», Waterfall — пресеты шкалы.';

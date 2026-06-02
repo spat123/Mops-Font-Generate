@@ -4,6 +4,7 @@ import { PopupDialogHeader } from './PopupDialogHeader';
 import { SegmentedControl } from './SegmentedControl';
 import { EditAssetIcon } from './EditAssetIcon';
 import { notificationIconUrl } from './editIconUrls';
+import { BugReportDialog } from './BugReportDialog';
 import {
   EDITOR_NEWS_FEED,
   getEditorFeedByKind,
@@ -168,6 +169,7 @@ function NotificationsEmpty({ kind }: { kind: EditorNewsKind }) {
  */
 export function NewsNotificationsDock() {
   const [open, setOpen] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
   const [hasUnread, setHasUnread] = useState(false);
   const [hasUnreadUpdates, setHasUnreadUpdates] = useState(false);
   const [activeKind, setActiveKind] = useState<EditorNewsKind>('news');
@@ -317,6 +319,18 @@ export function NewsNotificationsDock() {
                   </>
                 ) : null}
               </div>
+              <div className="shrink-0 border-t border-gray-200 bg-white p-4">
+                <button
+                  type="button"
+                  onClick={() => setBugReportOpen(true)}
+                  className="flex w-full items-center justify-center rounded-md border border-gray-50 bg-gray-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                >
+                  Сообщить об ошибке
+                </button>
+                <p className="mt-2 text-center text-[11px] leading-relaxed text-gray-500">
+                  Опишите проблему, и мы получим письмо с контекстом страницы.
+                </p>
+              </div>
             </div>
           </>,
           document.body,
@@ -354,6 +368,7 @@ export function NewsNotificationsDock() {
         )}
       </button>
       {portal}
+      <BugReportDialog open={bugReportOpen} onClose={() => setBugReportOpen(false)} />
     </>
   );
 }
