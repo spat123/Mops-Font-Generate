@@ -208,7 +208,7 @@ export function EmptyStateAboutSection({
         <EmptyStateSupportWidget />
       </div>
 
-      <nav className="mt-[8rem] flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-500">
+      <nav className="mt-[6rem] flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-500">
         <a className="transition-colors hover:text-gray-900" href="/legal/terms">
           {legalMeta.termsTitle}
         </a>
