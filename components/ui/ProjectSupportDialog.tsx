@@ -1,20 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   getPrimaryProjectSupportLink,
   getProjectSupportEmailLink,
   getProjectSupportLinks,
-  getSupportAmountPresets,
+  getSupportQuickAmounts,
   openSupportDonation,
 } from '../../utils/projectSupport';
-import { AppButton } from './AppButton';
 import { EditAssetIcon } from './EditAssetIcon';
 import { heartIconUrl } from './editIconUrls';
 import { PopupDialogHeader } from './PopupDialogHeader';
 import { useDismissibleLayer } from './useDismissibleLayer';
 
-function formatRub(amount: number) {
-  return `${new Intl.NumberFormat('ru-RU').format(amount)} ₽`;
+function formatRubLabel(amount: number) {
+  return `${new Intl.NumberFormat('ru-RU').format(amount)} руб.`;
 }
 
 export type ProjectSupportDialogProps = {
@@ -24,10 +23,15 @@ export type ProjectSupportDialogProps = {
 
 export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const presets = getSupportAmountPresets();
+  const quickAmounts = useMemo(() => getSupportQuickAmounts(), []);
+  const [selection, setSelection] = useState<number | 'custom'>(() => quickAmounts[0] ?? 100);
+  const [customAmount, setCustomAmount] = useState('');
   const primaryLink = getPrimaryProjectSupportLink();
   const extraLinks = getProjectSupportLinks().slice(primaryLink ? 1 : 0);
   const fallbackLink = getProjectSupportEmailLink();
+  const resolvedAmount =
+    selection === 'custom' ? Number.parseInt(customAmount.replace(/\s/g, ''), 10) : selection;
+  const canDonate = Number.isFinite(resolvedAmount) && resolvedAmount > 0;
 
   useDismissibleLayer({
     open,
@@ -49,8 +53,9 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
     };
   }, [onClose, open]);
 
-  const handleAmountClick = (amountRub: number) => {
-    openSupportDonation(amountRub);
+  const handleDonate = () => {
+    if (!canDonate) return;
+    openSupportDonation(resolvedAmount);
     onClose();
   };
 
@@ -95,21 +100,64 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-3">
-            {presets.map((amount) => (
-              <AppButton
-                key={amount}
-                type="button"
-                variant="outline"
-                size="md"
-                fullWidth
-                className="!h-12 !text-base !font-semibold !tabular-nums hover:!border-accent hover:!bg-accent hover:!text-white"
-                onClick={() => handleAmountClick(amount)}
-              >
-                {formatRub(amount)}
-              </AppButton>
-            ))}
+          <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {quickAmounts.map((amount) => {
+              const selected = selection === amount;
+              return (
+                <button
+                  key={amount}
+                  type="button"
+                  aria-pressed={selected}
+                  className={`inline-flex h-11 items-center justify-center rounded-xl border bg-white px-2 text-[11px] font-semibold uppercase tracking-tight transition-colors sm:text-xs ${
+                    selected
+                      ? 'border-accent text-accent'
+                      : 'border-gray-200 text-gray-900 hover:border-gray-400'
+                  }`}
+                  onClick={() => setSelection(amount)}
+                >
+                  {formatRubLabel(amount)}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              aria-pressed={selection === 'custom'}
+              className={`inline-flex h-11 items-center justify-center rounded-xl border bg-white px-2 text-[11px] font-semibold uppercase tracking-tight transition-colors sm:text-xs ${
+                selection === 'custom'
+                  ? 'border-accent text-accent'
+                  : 'border-gray-200 text-gray-900 hover:border-gray-400'
+              }`}
+              onClick={() => setSelection('custom')}
+            >
+              Иная сумма
+            </button>
           </div>
+
+          {selection === 'custom' ? (
+            <label className="mt-3 block">
+              <span className="sr-only">Сумма доната в рублях</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                value={customAmount}
+                onChange={(event) => setCustomAmount(event.target.value)}
+                placeholder="Укажите сумму, ₽"
+                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={!canDonate}
+            className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-accent bg-accent text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:border-accent-hover hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleDonate}
+          >
+            <EditAssetIcon src={heartIconUrl} className="h-4 w-4" />
+            Поддержать проект
+          </button>
 
           {primaryLink ? (
             <p className="mt-4 text-center text-xs leading-relaxed text-gray-500">

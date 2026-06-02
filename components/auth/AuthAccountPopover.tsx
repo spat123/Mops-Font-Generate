@@ -524,7 +524,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   ) : null}
                   <button
                     type="button"
-                    className="mt-3 flex h-8 w-full items-center justify-center gap-2 rounded-sm border border-gray-200 bg-white text-xs font-semibold text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
+                    className="mt-3 flex h-8 w-full items-center justify-center gap-2 rounded-sm border border-gray-200 bg-white text-xs font-medium text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
                     onClick={() => {
                       setMenuOpen(false);
                       setSupportOpen(true);
