@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { formatEditorNewsDate } from '../../data/editorNewsFeed';
 import { isEditorNewsImageCached, prefetchEditorNewsImage } from '../../utils/editorNewsImageCache';
+import { EditorNewsBodyContent } from './EditorNewsBodyContent';
 
 type HelpNewsItem = {
   id: string;
@@ -86,7 +87,7 @@ function HelpNewsCard({
             </time>
           ) : null}
         </h3>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{item.body}</p>
+        <EditorNewsBodyContent body={item.body} featured={featured} />
       </div>
     </article>
   );
