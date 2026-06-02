@@ -74,7 +74,7 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
         role="dialog"
         aria-modal="true"
         aria-label="Поддержать проект"
-        className="flex w-full max-w-md flex-col overflow-hidden bg-white shadow-xl"
+        className="flex w-full max-w-xl flex-col overflow-hidden bg-white shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
         <PopupDialogHeader
@@ -163,11 +163,7 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
             <p className="mt-4 text-center text-xs leading-relaxed text-gray-500">
               Оплата через {primaryLink.label}. Сумму можно изменить на странице платёжного сервиса.
             </p>
-          ) : (
-            <p className="mt-4 text-center text-xs leading-relaxed text-gray-500">
-              Ссылка на донат пока не настроена — выберите сумму, чтобы написать нам.
-            </p>
-          )}
+          ) : null}
 
           {extraLinks.length > 0 ? (
             <div className="mt-5 flex flex-wrap justify-center gap-x-3 gap-y-2 border-t border-gray-100 pt-5">
