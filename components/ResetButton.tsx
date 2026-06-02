@@ -457,89 +457,92 @@ function ResetButton({ onResetSelectedFont, compact = false }) {
       setIsPendingReset(true);
       setPendingTargetFontId(selectedFont.id);
       setProgressActive(false);
-      resetTimeoutRef.current = window.setTimeout(() => {
+      resetTimeoutRef.current = window.setTimeout(async () => {
         resetTimeoutRef.current = null;
-        setIsPendingReset(false);
-        setPendingTargetFontId(null);
-        setProgressActive(false);
-        if (hasPreviewChanges) {
-          const cur = previewStateRef.current;
-          const snapshotToApply = buildMergedResetSnapshot(
-            defaultPreviewSettings,
-            cur,
-            viewModeRef.current,
-          );
-          applyPerFontPreviewSnapshot(snapshotToApply, {
-            setText,
-            setFontSize,
-            setGlyphsFontSize,
-            setStylesFontSize,
-            setLineHeight,
-            setLetterSpacing,
-            setStylesLetterSpacing,
-            setOpenTypeFeatureOverrides,
-            setTextColor,
-            setBackgroundColor,
-            setViewMode,
-            setTextDirection,
-            setTextAlignment,
-            setTextCase,
-            setTextDecoration,
-            setListStyle,
-            setTextColumns,
-            setTextColumnGap,
-            setWaterfallRows,
-            setWaterfallBaseSize,
-            setWaterfallEditTarget,
-            setWaterfallHeadingPresetName,
-            setWaterfallBodyPresetName,
-            setWaterfallHeadingLineHeight,
-            setWaterfallBodyLineHeight,
-            setWaterfallHeadingLetterSpacing,
-            setWaterfallBodyLetterSpacing,
-            setWaterfallScaleRatio,
-            setWaterfallUnit,
-            setWaterfallRoundPx,
-            setVerticalAlignment,
-            setTextFill,
-            setTextCenter,
-          });
-          setPreviewBackgroundImage(snapshotToApply.previewBackgroundImage ?? null);
-          // “Сбросить текст” в Plain должен возвращать к дефолтной латинице/ASCII,
-          // а не к последнему выбранному subset-образцу.
-          if (viewModeRef.current === 'plain') {
-            setTextResetBaseline(String(snapshotToApply.text ?? defaultPreviewSettings.text ?? ''));
+        try {
+          if (hasPreviewChanges) {
+            const cur = previewStateRef.current;
+            const snapshotToApply = buildMergedResetSnapshot(
+              defaultPreviewSettings,
+              cur,
+              viewModeRef.current,
+            );
+            applyPerFontPreviewSnapshot(snapshotToApply, {
+              setText,
+              setFontSize,
+              setGlyphsFontSize,
+              setStylesFontSize,
+              setLineHeight,
+              setLetterSpacing,
+              setStylesLetterSpacing,
+              setOpenTypeFeatureOverrides,
+              setTextColor,
+              setBackgroundColor,
+              setViewMode,
+              setTextDirection,
+              setTextAlignment,
+              setTextCase,
+              setTextDecoration,
+              setListStyle,
+              setTextColumns,
+              setTextColumnGap,
+              setWaterfallRows,
+              setWaterfallBaseSize,
+              setWaterfallEditTarget,
+              setWaterfallHeadingPresetName,
+              setWaterfallBodyPresetName,
+              setWaterfallHeadingLineHeight,
+              setWaterfallBodyLineHeight,
+              setWaterfallHeadingLetterSpacing,
+              setWaterfallBodyLetterSpacing,
+              setWaterfallScaleRatio,
+              setWaterfallUnit,
+              setWaterfallRoundPx,
+              setVerticalAlignment,
+              setTextFill,
+              setTextCenter,
+            });
+            setPreviewBackgroundImage(snapshotToApply.previewBackgroundImage ?? null);
+            // “Сбросить текст” в Plain должен возвращать к дефолтной латинице/ASCII,
+            // а не к последнему выбранному subset-образцу.
+            if (viewModeRef.current === 'plain') {
+              setTextResetBaseline(String(snapshotToApply.text ?? defaultPreviewSettings.text ?? ''));
+            }
+            signalPreviewReset?.();
           }
-          signalPreviewReset?.();
-        }
 
-        // Важно: если пользователь был на кириллице/греческом subset (Fontsource),
-        // то ASCII-текст после “Сбросить Plain” отображается fallback-гарнитурой.
-        // Поэтому при сбросе Plain возвращаем activeSubset на latin (если шрифт это поддерживает).
-        if (
-          viewModeRef.current === 'plain' &&
-          selectedFont?.source === 'fontsource' &&
-          typeof applyCatalogSubset === 'function'
-        ) {
-          const allowed = Array.isArray(selectedFont?.catalogSubsets)
-            ? selectedFont.catalogSubsets.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean)
-            : [];
-          const hasLatin = allowed.includes('latin');
-          const current = String(selectedFont?.activeSubset || '').trim().toLowerCase();
-          if (hasLatin && current && current !== 'latin') {
-            void applyCatalogSubset('latin');
+          // Важно: если пользователь был на кириллице/греческом subset (Fontsource),
+          // то ASCII-текст после “Сбросить Plain” отображается fallback-гарнитурой.
+          // Поэтому при сбросе Plain возвращаем activeSubset на latin (если шрифт это поддерживает).
+          if (
+            viewModeRef.current === 'plain' &&
+            selectedFont?.source === 'fontsource' &&
+            typeof applyCatalogSubset === 'function'
+          ) {
+            const allowed = Array.isArray(selectedFont?.catalogSubsets)
+              ? selectedFont.catalogSubsets.map((s) => String(s || '').trim().toLowerCase()).filter(Boolean)
+              : [];
+            const hasLatin = allowed.includes('latin');
+            const current = String(selectedFont?.activeSubset || '').trim().toLowerCase();
+            if (hasLatin && current && current !== 'latin') {
+              await applyCatalogSubset('latin');
+            }
           }
-        }
 
-        if (hasFontSpecificChanges) {
-          onResetSelectedFont();
-        } else if (hasPreviewChanges) {
-          const modeLabel = getPerViewResetShortLabel(viewModeRef.current);
-          toast.success(
-            selectedFont?.name
-              ? `${modeLabel}: «${selectedFont.name}»`
-              : `${modeLabel}: настройки превью`,
-          );
+          if (hasFontSpecificChanges) {
+            onResetSelectedFont();
+          } else if (hasPreviewChanges) {
+            const modeLabel = getPerViewResetShortLabel(viewModeRef.current);
+            toast.success(
+              selectedFont?.name
+                ? `${modeLabel}: «${selectedFont.name}»`
+                : `${modeLabel}: настройки превью`,
+            );
+          }
+        } finally {
+          setIsPendingReset(false);
+          setPendingTargetFontId(null);
+          setProgressActive(false);
         }
       }, RESET_DELAY_MS);
       return;

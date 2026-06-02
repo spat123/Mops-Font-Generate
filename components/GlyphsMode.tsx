@@ -21,6 +21,21 @@ function isFontBinary(file) {
   );
 }
 
+function buildGlyphDataCacheKey(font) {
+  if (!font) return '';
+  const subset = String(font?.activeSubset || '').trim().toLowerCase();
+  const fileSize = font?.file instanceof Blob ? font.file.size : 0;
+  const url = typeof font?.url === 'string' ? font.url : '';
+  return [
+    String(font?.id || ''),
+    subset,
+    String(font?.currentWeight ?? ''),
+    String(font?.currentStyle ?? ''),
+    String(fileSize),
+    url ? url.slice(0, 80) : '',
+  ].join('|');
+}
+
 /** Квадратная сетка: размер ячейки зависит от размера шрифта и ширины контейнера. */
 function computeGlyphSquareGrid(innerWidthPx, fontSizePx) {
   const W = Math.max(64, innerWidthPx);
@@ -85,6 +100,7 @@ function GlyphsMode({
     // Состояние и ref для загрузки глифов
     const [glyphsLoaded, setGlyphsLoaded] = useState(false);
     const [glyphsData, setGlyphsData] = useState(null);
+    const [glyphsDataCacheKey, setGlyphsDataCacheKey] = useState('');
     const [glyphErrors, setGlyphErrors] = useState([]);
     const [glyphsLoading, setGlyphsLoading] = useState(false);
     // Ref to track active request and prevent race conditions.
@@ -102,6 +118,7 @@ function GlyphsMode({
         if (currentAttemptLoadId === currentLoadId.current) {
            setGlyphsLoaded(false);
            setGlyphsData(null);
+           setGlyphsDataCacheKey('');
            setGlyphErrors([]);
         }
 
@@ -110,6 +127,7 @@ function GlyphsMode({
           const cachedData = glyphDataCache.get(attemptFontId);
           if (currentAttemptLoadId === currentLoadId.current) {
               setGlyphsData(cachedData);
+              setGlyphsDataCacheKey(attemptFontId);
               setGlyphsLoaded(true);
               setGlyphErrors(cachedData.errors || []);
               setGlyphsLoading(false);
@@ -133,6 +151,7 @@ function GlyphsMode({
 
         glyphDataCache.set(attemptFontId, data); // Use attemptFontId as cache key.
         setGlyphsData(data);
+        setGlyphsDataCacheKey(attemptFontId);
         setGlyphsLoaded(true);
         setGlyphErrors(data.errors || []);
         setGlyphsLoading(false);
@@ -142,6 +161,7 @@ function GlyphsMode({
         toast.error(`Не удалось загрузить данные глифов: ${error.message}`);
         if (currentAttemptLoadId === currentLoadId.current) {
             setGlyphsData(null);
+            setGlyphsDataCacheKey('');
             setGlyphsLoaded(false);
             setGlyphErrors([]);
             setGlyphsLoading(false);
@@ -160,13 +180,14 @@ function GlyphsMode({
         return;
       }
 
-      const fontId = selectedFont?.id;
+      const fontCacheKey = buildGlyphDataCacheKey(selectedFont);
       const loadId = Math.random().toString(36).substring(2, 10);
       currentLoadId.current = loadId; 
 
       const resetState = () => {
         setGlyphsLoaded(false);
         setGlyphsData(null);
+        setGlyphsDataCacheKey('');
         setGlyphErrors([]);
         setGlyphsLoading(false);
       };
@@ -189,12 +210,16 @@ function GlyphsMode({
       }
 
       // --- Запуск загрузки через debounce ---
-      const isDataLoadedInState = glyphsLoaded && glyphsData && glyphsData.allGlyphs;
+      const isDataLoadedInState =
+        glyphsLoaded &&
+        glyphsData &&
+        glyphsData.allGlyphs &&
+        glyphsDataCacheKey === fontCacheKey;
 
       if (!isDataLoadedInState) {
         // Поднимаем флаг загрузки перед вызовом debounced-функции
         setGlyphsLoading(true);
-        debouncedLoadGlyphs(loadId, selectedFont, fontId);
+        debouncedLoadGlyphs(loadId, selectedFont, fontCacheKey);
       } else {
         setGlyphsLoading(false);
       }
@@ -207,7 +232,7 @@ function GlyphsMode({
           // currentLoadId.current = null; // Не сбрасываем здесь, чтобы завершить последний актуальный вызов
       };
 
-    }, [selectedFont, isActive, debouncedLoadGlyphs]);
+    }, [selectedFont, isActive, debouncedLoadGlyphs, glyphsLoaded, glyphsData, glyphsDataCacheKey]);
 
     // Styles for enlarged glyph in modal.
     const largeGlyphStyle = useMemo(() => {
