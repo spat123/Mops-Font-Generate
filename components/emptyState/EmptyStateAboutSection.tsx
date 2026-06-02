@@ -164,7 +164,7 @@ export function EmptyStateAboutSection({
             Онлайн-инструмент для работы со шрифтами
           </p>
           <h1 className="mt-3 text-4xl font-semibold uppercase leading-tight tracking-tight text-gray-900 sm:text-[3rem] sm:leading-tight">
-            DINAMIC FONT — <br /><b>проверка, создание и анимация шрифтов</b>
+            DINAMIC FONT — <br />проверка, создание и анимация шрифтов
           </h1>
           <p className="mt-4 max-w-4xl text-sm leading-relaxed text-gray-700 sm:text-base">
             Примеряйте шрифты прямо в браузере: загружайте локальные файлы или выбирайте из каталогов.
