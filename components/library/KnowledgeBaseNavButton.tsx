@@ -6,7 +6,7 @@ const OUTLINE_LINK_CLASS =
   'inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-black/[0.9] hover:bg-black/[0.9] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20';
 
 /** Lucide `book-open` (ISC) — привычная иконка «база знаний / документация». */
-function BookOpenIcon({ className = 'h-5 w-5' }: { className?: string }) {
+export function BookOpenIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

@@ -123,3 +123,26 @@ export function getPrimaryProjectSupportLink(): ProjectSupportLink | null {
   const links = getProjectSupportLinks();
   return links[0] ?? null;
 }
+
+export function resolveSupportDonationUrl(amountRub: number): string {
+  const primaryLink = getPrimaryProjectSupportLink();
+  if (primaryLink) {
+    return buildSupportDonationUrl(primaryLink.url, amountRub);
+  }
+  return buildSupportEmailUrlForAmount(amountRub);
+}
+
+export function openSupportDonation(amountRub: number) {
+  const href = resolveSupportDonationUrl(amountRub);
+  if (!href) return;
+  if (href.startsWith('mailto:')) {
+    window.location.href = href;
+  } else {
+    window.open(href, '_blank', 'noopener,noreferrer');
+  }
+}
+
+export function getSupportQuickAmounts(): number[] {
+  const quick = getSupportAmountPresets().slice(0, 3);
+  return quick.length > 0 ? quick : [100, 300, 500];
+}

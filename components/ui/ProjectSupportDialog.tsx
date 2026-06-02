@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  buildSupportDonationUrl,
-  buildSupportEmailUrlForAmount,
   getPrimaryProjectSupportLink,
   getProjectSupportEmailLink,
   getProjectSupportLinks,
   getSupportAmountPresets,
+  openSupportDonation,
 } from '../../utils/projectSupport';
 import { AppButton } from './AppButton';
 import { EditAssetIcon } from './EditAssetIcon';
@@ -50,21 +49,8 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
     };
   }, [onClose, open]);
 
-  const resolveAmountUrl = (amountRub: number) => {
-    if (primaryLink) {
-      return buildSupportDonationUrl(primaryLink.url, amountRub);
-    }
-    return buildSupportEmailUrlForAmount(amountRub);
-  };
-
   const handleAmountClick = (amountRub: number) => {
-    const href = resolveAmountUrl(amountRub);
-    if (!href) return;
-    if (href.startsWith('mailto:')) {
-      window.location.href = href;
-    } else {
-      window.open(href, '_blank', 'noopener,noreferrer');
-    }
+    openSupportDonation(amountRub);
     onClose();
   };
 

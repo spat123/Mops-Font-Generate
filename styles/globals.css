@@ -239,6 +239,16 @@ input[type='search']::-ms-reveal {
   display: none;
 }
 
+/* Пустая вкладка: скролл включается только программно на время анимации about-блока. */
+.empty-state-programmatic-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.empty-state-programmatic-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 @supports (overflow: overlay) {
   .editor-sidebar-scroll {
     overflow-y: overlay;
