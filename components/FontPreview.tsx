@@ -52,6 +52,7 @@ import { isInteractiveTarget } from '../utils/dom/isInteractiveTarget';
 import { useLongPressMultiSelect } from './ui/useLongPressMultiSelect';
 import { useSelectionActionsEffect } from './ui/useSelectionActionsEffect';
 import { getProjectSupportEmailLink, getProjectSupportLinks } from '../utils/projectSupport';
+import { legalMeta } from '../config/legal';
 import {
   buildArchiveBlobFromEntries,
   buildGoogleFormatArchiveEntry,
@@ -1364,7 +1365,7 @@ export default function FontPreview({
                 База знаний
               </a>
               <a className="text-gray-700 hover:text-gray-950" href="/legal/terms">
-                Условия
+                {legalMeta.termsTitle}
               </a>
               <a className="text-gray-700 hover:text-gray-950" href="/legal/privacy">
                 Конфиденциальность

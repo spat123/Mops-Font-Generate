@@ -88,7 +88,7 @@ export function HelpPageLayout({
                 <span>© {new Date().getFullYear()} {legalMeta.serviceName}</span>
                 <span aria-hidden>·</span>
                 <Link href="/legal/terms" className="hover:text-gray-800">
-                  Условия
+                  {legalMeta.termsTitle}
                 </Link>
                 <span aria-hidden>·</span>
                 <Link href="/legal/privacy" className="hover:text-gray-800">

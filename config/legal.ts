@@ -5,6 +5,7 @@
 export const legalMeta = {
   serviceName: 'DINAMIC FONT',
   siteUrl: 'https://dynamicfont.ru',
+  termsTitle: 'Пользовательское соглашение',
   operatorFullName:
     process.env.LEGAL_OPERATOR_FULL_NAME?.trim() || 'Мочалов Игорь Сергеевич',
   operatorInn: process.env.LEGAL_OPERATOR_INN?.trim() || '590705841187',

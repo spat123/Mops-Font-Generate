@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { legalMeta } from '../../config/legal';
 import { EDITOR_BETA_VERSION } from '../../data/editorNewsFeed';
 import { FONT_LICENSE_DEFINITIONS } from '../../config/fontLicenses';
 import { KNOWLEDGE_BASE_GUIDES } from '../../data/knowledgeBaseGuides';
@@ -87,7 +88,7 @@ export function HelpOverview({ onNavigate }: { onNavigate: (tab: KnowledgeBaseTa
               href="/legal/terms"
               className="inline-flex rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-tight text-gray-800 transition-colors hover:border-gray-400 hover:bg-gray-50"
             >
-              Условия использования
+              {legalMeta.termsTitle}
             </Link>
           </li>
           <li>

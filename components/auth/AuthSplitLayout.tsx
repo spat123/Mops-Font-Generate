@@ -1,5 +1,6 @@
 import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import Link from 'next/link';
+import { legalMeta } from '../../config/legal';
 import { AuthAnimatedLetters } from './AuthAnimatedLetters';
 
 /** Поля формы: светло-серый фон, без OpenType-фич в наследовании от корня. */
@@ -167,7 +168,7 @@ export function AuthLegalFooter() {
         href="/legal/terms"
         className="font-semibold text-gray-600 underline-offset-2 hover:text-accent hover:underline"
       >
-        Условиями использования
+        Пользовательским соглашением
       </Link>{' '}
       и{' '}
       <Link

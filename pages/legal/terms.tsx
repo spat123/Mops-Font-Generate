@@ -17,12 +17,12 @@ export default function TermsPage() {
 
   return (
     <LegalPageLayout
-      title="Условия использования"
-      description="Условия использования веб-сервиса DINAMIC FONT"
+      title={legalMeta.termsTitle}
+      description={`${legalMeta.termsTitle} веб-сервиса DINAMIC FONT`}
       canonicalPath="/legal/terms"
     >
       <LegalP>
-        Настоящие Условия регулируют использование веб-сервиса{' '}
+        Настоящее Пользовательское соглашение регулирует использование веб-сервиса{' '}
         <strong className="font-medium text-gray-800">{legalMeta.serviceName}</strong> ({' '}
         <a href={legalMeta.siteUrl} className="text-gray-800 underline-offset-2 hover:text-accent">
           {legalMeta.siteUrl}
@@ -30,8 +30,8 @@ export default function TermsPage() {
         ). Оператор сервиса: <strong className="font-medium text-gray-800">{operator}</strong>.
       </LegalP>
       <LegalP>
-        Регистрируясь или продолжая пользоваться сервисом, вы подтверждаете, что прочитали настоящие
-        Условия и <LegalLink href="/legal/privacy">Политику конфиденциальности</LegalLink>.
+        Регистрируясь или продолжая пользоваться сервисом, вы подтверждаете, что прочитали настоящее
+        Соглашение и <LegalLink href="/legal/privacy">Политику конфиденциальности</LegalLink>.
       </LegalP>
 
       <LegalSection title="1. О сервисе">
@@ -54,7 +54,7 @@ export default function TermsPage() {
         </LegalP>
         <LegalP>
           Подтверждение email может быть обязательным для входа. Оператор вправе ограничить или
-          удалить аккаунт при нарушении Условий, попытках злоупотреблений или по требованию закона.
+          удалить аккаунт при нарушении Соглашения, попытках злоупотреблений или по требованию закона.
         </LegalP>
       </LegalSection>
 
@@ -106,7 +106,7 @@ export default function TermsPage() {
           Библиотеки, подборки шрифтов, тексты превью и иные данные, которые вы создаёте в сервисе,
           остаются вашим контентом. Вы предоставляете оператору неисключительное право хранить и
           обрабатывать этот контент исключительно для работы сервиса (хостинг, резервное копирование,
-          поддержка, исполнение Условий).
+          поддержка, исполнение Соглашения).
         </LegalP>
         <LegalP>
           Запрещено размещать незаконный контент, нарушать права третьих лиц, использовать сервис
@@ -138,7 +138,7 @@ export default function TermsPage() {
 
       <LegalSection title="8. Изменение и прекращение">
         <LegalP>
-          Условия могут обновляться. Актуальная версия публикуется на этой странице с указанием даты.
+          Соглашение может обновляться. Актуальная версия публикуется на этой странице с указанием даты.
           Продолжение использования после публикации изменений означает согласие с новой редакцией,
           если иное не требуется законом.
         </LegalP>
@@ -155,7 +155,7 @@ export default function TermsPage() {
           не установлено законом.
         </LegalP>
         <LegalP>
-          По вопросам сервиса и Условий:{' '}
+          По вопросам сервиса и Соглашения:{' '}
           <a
             href={`mailto:${legalMeta.supportEmail}`}
             className="font-medium text-gray-800 underline-offset-2 hover:text-accent"

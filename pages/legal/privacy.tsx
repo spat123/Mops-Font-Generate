@@ -29,7 +29,7 @@ export default function PrivacyPage() {
       </LegalP>
       <LegalP>
         Используя сервис и создавая аккаунт, вы ознакомляетесь с этой Политикой и{' '}
-        <LegalLink href="/legal/terms">Условиями использования</LegalLink>.
+        <LegalLink href="/legal/terms">Пользовательским соглашением</LegalLink>.
       </LegalP>
 
       <LegalSection title="1. Какие данные мы обрабатываем">
