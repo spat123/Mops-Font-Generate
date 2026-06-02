@@ -55,8 +55,6 @@ const SAMPLE_QUICK_PRESETS = [
 const GLYPH_QUICK_PRESETS = [
   { key: 'macos', label: 'Mac OS' },
   { key: 'windows1252', label: 'Windows' },
-  { key: 'latin_extended', label: 'Latin Ext. A' },
-  { key: 'latin_supplement', label: 'Latin-1 доп.' },
 ];
 
 function getSidebarFontSizeControl({

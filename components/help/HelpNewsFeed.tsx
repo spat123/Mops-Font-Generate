@@ -9,8 +9,6 @@ type HelpNewsItem = {
   date?: string;
   title?: string;
   body?: string;
-  ctaLabel?: string;
-  ctaHref?: string;
 };
 
 function HelpNewsCard({
@@ -89,14 +87,6 @@ function HelpNewsCard({
           ) : null}
         </h3>
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">{item.body}</p>
-        {item.ctaHref && item.ctaLabel ? (
-          <a
-            href={item.ctaHref}
-            className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
-          >
-            {item.ctaLabel}
-          </a>
-        ) : null}
       </div>
     </article>
   );

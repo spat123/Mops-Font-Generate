@@ -70,6 +70,7 @@ type EditorNewsItem = {
   imageUrl?: string;
   date?: string;
   title?: string;
+  summary?: string;
   body?: string;
   ctaLabel?: string;
   ctaHref?: string;
@@ -88,6 +89,7 @@ function NewsCard({ item, eagerImage }: { item: EditorNewsItem; eagerImage?: boo
   const imagePlaceholder =
     item.kind === 'updates' ? 'Превью обновления' : 'Изображение';
   const imageUrl = item.imageUrl ? String(item.imageUrl) : '';
+  const previewText = item.summary || item.body || '';
   const [imageReady, setImageReady] = useState(
     () => !imageUrl || isEditorNewsImageCached(imageUrl),
   );
@@ -111,7 +113,7 @@ function NewsCard({ item, eagerImage }: { item: EditorNewsItem; eagerImage?: boo
   }, [imageUrl]);
 
   return (
-    <article className="overflow-hidden rounded-md border border-gray-200 bg-white">
+    <article className="group overflow-hidden rounded-md border border-gray-200 bg-white">
       <div className="relative aspect-[21/9] min-h-[7rem] w-full overflow-hidden border-b border-gray-100 bg-gray-50">
         {imageUrl ? (
           <>
@@ -148,14 +150,16 @@ function NewsCard({ item, eagerImage }: { item: EditorNewsItem; eagerImage?: boo
             </time>
           ) : null}
         </h3>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">{item.body}</p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">{previewText}</p>
         {item.ctaHref && item.ctaLabel ? (
-          <a
-            href={item.ctaHref}
-            className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
-          >
-            {item.ctaLabel}
-          </a>
+          <div className="max-h-0 overflow-hidden opacity-0 transition-all duration-200 group-hover:max-h-12 group-hover:opacity-100 group-focus-within:max-h-12 group-focus-within:opacity-100">
+            <a
+              href={item.ctaHref}
+              className="mt-1 inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
+            >
+              {item.ctaLabel}
+            </a>
+          </div>
         ) : null}
       </div>
     </article>
