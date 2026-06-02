@@ -3,6 +3,7 @@
  * Ключи — коды subset из metadata (нижний регистр).
  */
 import { CATALOG_PREVIEW_PANGRAM_RU } from './catalogPreviewSample';
+import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from './previewSampleStrings';
 import { scriptUnicodeGlyphSample } from './scriptUnicodeSampleText';
 import isoScriptToSubset from './googleIsoScriptToSubset.json';
 import subsetPreviewSamplesRaw from '../data/subsetPreviewSamples.json';
@@ -14,6 +15,7 @@ export const LATIN_PREVIEW = 'AaBbCcDdEe';
 /** Полная латиница + цифры для UI-образца (как пресет «Entire Font»), не для короткого text= Google. */
 export const FULL_LATIN_ALPHANUM =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const DEFAULT_LATIN_EDITOR_SAMPLE = ENTIRE_PRINTABLE_ASCII_SAMPLE;
 
 export type GoogleCatalogSampleEntry = {
   family?: string;
@@ -185,21 +187,21 @@ export function resolveEditorSidebarGlyphText(subset: string, key: EditorSidebar
 /** Глифовый дефолт для сабсета (когда исходный текст был ASCII). */
 export function buildEditorSubsetGlyphPreviewText(subset: string): string {
   const key = String(subset || '').trim().toLowerCase();
-  if (!key) return FULL_LATIN_ALPHANUM;
+  if (!key) return DEFAULT_LATIN_EDITOR_SAMPLE;
   if (key === 'vietnamese') return VIETNAMESE_ALPHABET_SAMPLE;
   const jsonGlyphs =
     findSubsetBlockText(key, 'Glyphs') ||
     findSubsetBlockText(key, 'Набор букв') ||
     findSubsetBlockText(key, '常用字样本');
   const body = jsonGlyphs || nativeScriptGlyphBody(key);
-  if (!body) return FULL_LATIN_ALPHANUM;
+  if (!body) return DEFAULT_LATIN_EDITOR_SAMPLE;
   const filtered = filterToFontsourceSubset(body, key);
   const out = filtered || body;
   // Для “надстроечных” сабсетов (latin-ext/vietnamese/кириллица/греческий)
   // хотим видеть базовую латиницу + спецсимволы сабсета.
   if (LATIN_TYPOGRAPHY_EXTRAS.has(key)) {
     const tail = String(out || '').trim();
-    return tail ? `${FULL_LATIN_ALPHANUM} ${tail}` : FULL_LATIN_ALPHANUM;
+    return tail ? `${DEFAULT_LATIN_EDITOR_SAMPLE} ${tail}` : DEFAULT_LATIN_EDITOR_SAMPLE;
   }
   return out;
 }

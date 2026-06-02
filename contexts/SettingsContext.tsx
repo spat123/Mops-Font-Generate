@@ -7,7 +7,10 @@ import {
   type ReactNode,
 } from 'react';
 import { useIsomorphicLayoutEffect } from '../hooks/useIsomorphicLayoutEffect';
-import { ENTIRE_PRINTABLE_ASCII_SAMPLE } from '../utils/previewSampleStrings';
+import {
+  ENTIRE_PRINTABLE_ASCII_SAMPLE,
+  LEGACY_BASIC_ALNUM_PREVIEW_TEXT,
+} from '../utils/previewSampleStrings';
 import { isPreviewTextDebugEnabled, previewTextDbg, previewTextSnippet } from '../utils/previewTextDebugLog';
 import type {
   ListStyle,
@@ -343,9 +346,11 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     }
     const storedText = getLocalStorageItem(LOCAL_STORAGE_KEYS.TEXT, DEFAULT_SETTINGS.TEXT);
     const resolvedText =
-      typeof storedText === 'string' && storedText.trim()
-        ? storedText
-        : DEFAULT_SETTINGS.TEXT;
+      storedText === LEGACY_BASIC_ALNUM_PREVIEW_TEXT
+        ? DEFAULT_SETTINGS.TEXT
+        : typeof storedText === 'string' && storedText.trim()
+          ? storedText
+          : DEFAULT_SETTINGS.TEXT;
     let rawPreviewTextLen = 0;
     let jsonParseOk = null;
     let jsonParseError = null;
