@@ -169,7 +169,7 @@ export function useSavedLibraryCardItems({
             : []),
           {
             key: 'move',
-            label: 'В библиотеку',
+            label: 'Переместить',
             icon: (
               <img
                 src={moveAndSwapIconUrl}

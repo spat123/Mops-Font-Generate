@@ -1298,7 +1298,7 @@ export default function FontPreview({
               Онлайн-инструмент для работы со шрифтами
             </p>
             <h1 className="mt-3 max-w-3xl text-2xl font-semibold uppercase tracking-tight text-gray-900 sm:text-4xl">
-              DINAMIC FONT — тестирование, сравнение и экспорт шрифтов
+              DINAMIC FONT — проверка, создание и анимация шрифтов
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-relaxed text-gray-600 sm:text-base">
               Примеряйте шрифты прямо в браузере: загружайте локальные файлы или выбирайте из каталогов. Тонко настраивайте вариативные оси, объединяйте гарнитуры в коллекции, делитесь подборками и экспортируйте готовый код для ваших проектов.

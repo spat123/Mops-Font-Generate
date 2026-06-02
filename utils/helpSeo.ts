@@ -8,7 +8,7 @@ const HELP_TAB_DESCRIPTIONS: Record<KnowledgeBaseTab, string> = {
   overview:
     'База знаний DINAMIC FONT: руководства по каталогу и редактору, справочник лицензий шрифтов (OFL, MIT, GPL, Creative Commons), новости и история обновлений.',
   guides:
-    'Руководства DINAMIC FONT: каталог Google Fonts и Fontsource, библиотеки шрифтов, редактор и превью, вариативные шрифты, загрузка локальных файлов.',
+    'Руководства DINAMIC FONT: каталог шрифтов, библиотеки, редактор и превью, вариативные шрифты, загрузка локальных файлов.',
   licenses:
     'Справочник лицензий шрифтов для каталога DINAMIC FONT: SIL OFL, Apache 2.0, MIT, Creative Commons и другие — коммерческое использование, NC и copyleft.',
   news: 'Новости и анонсы DINAMIC FONT: обновления сервиса, каталогов и редактора шрифтов.',

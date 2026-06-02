@@ -4,6 +4,7 @@ import {
   addLibraryEntryToLibrary,
   requestCreateLibraryFromEntry,
 } from '../../utils/libraryEntryActions';
+import { countSameCatalogFontInLibrary } from '../../utils/fontLibraryUtils';
 import { libraryEntryMatchesInput } from '../../utils/libraryFontIdentity';
 import { useDismissibleLayer } from './useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
@@ -116,6 +117,7 @@ export function FontLibraryStatusMenu({
               <>
                 {availableLibraries.map((library, index) => {
                   const isAdded = attachedLibraryIds.has(library.id);
+                  const matchCount = countSameCatalogFontInLibrary(libraryEntry, library.fonts || []);
                   return (
                     <button
                       key={library.id}
@@ -130,16 +132,20 @@ export function FontLibraryStatusMenu({
                         });
                         setOpen(false);
                       }}
-                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
                         isAdded
                           ? 'bg-accent text-white'
                           : 'text-gray-900 hover:bg-accent hover:text-white'
                       } ${index > 0 ? 'border-t border-gray-200' : ''}`}
                     >
-                      <span className="truncate">{library.name}</span>
-                      {isAdded ? (
-                        <span className="ml-2 shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] uppercase text-gray-900">
-                          здесь
+                      <span className="min-w-0 truncate">{library.name}</span>
+                      {matchCount > 0 ? (
+                        <span
+                          className={`shrink-0 tabular-nums text-[11px] font-bold ${
+                            isAdded ? 'text-white/90' : 'text-gray-500'
+                          }`}
+                        >
+                          {matchCount}
                         </span>
                       ) : null}
                     </button>

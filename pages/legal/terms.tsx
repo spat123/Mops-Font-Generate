@@ -36,7 +36,7 @@ export default function TermsPage() {
 
       <LegalSection title="1. О сервисе">
         <LegalP>
-          {legalMeta.serviceName} — онлайн-инструмент для тестирования, сравнения и работы со шрифтами:
+          {legalMeta.serviceName} — онлайн-инструмент для проверки, создания и анимации шрифтов:
           загрузка локальных файлов, каталоги Google Fonts и Fontsource, режимы превью, экспорт и
           вспомогательные функции для вариативных шрифтов (VF).
         </LegalP>

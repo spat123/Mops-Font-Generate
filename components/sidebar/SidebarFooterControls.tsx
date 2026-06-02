@@ -361,7 +361,7 @@ function HeroCard() {
             DINAMIC FONT
           </p>
           <p className="mt-0.5 text-base font-semibold text-gray-950">
-            Тестирование, сравнение и работа со шрифтами
+            Проверка, создание и анимация шрифтов
           </p>
           <p className="mt-2 text-sm leading-relaxed text-gray-600">
             Инструмент для быстрой загрузки шрифтов, сравнения начертаний,

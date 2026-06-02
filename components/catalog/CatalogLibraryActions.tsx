@@ -31,6 +31,7 @@ export function CatalogLibraryActions({
   return (
     <CatalogAddTargetMenu
       libraries={libraries}
+      libraryEntry={libraryEntry}
       busy={busy}
       busyIndicator={busyIndicator}
       appearance={appearance}

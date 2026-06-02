@@ -7,9 +7,9 @@ const SITE_NAME = 'DINAMIC FONT';
 const DEFAULT_OG_IMAGE_PATH = '/og.png';
 export const OG_IMAGE_WIDTH = 525;
 export const OG_IMAGE_HEIGHT = 225;
-const DEFAULT_TITLE = 'DINAMIC FONT — тестирование и сравнение шрифтов';
-const DEFAULT_DESCRIPTION =
-  'Тестирование, сравнение и работа со шрифтами: библиотеки, каталоги Google Fonts и Fontsource, экспорт.';
+export const DEFAULT_TITLE = 'DINAMIC FONT — проверка, создание и анимация шрифтов';
+export const DEFAULT_DESCRIPTION =
+  'Онлайн-редактор шрифтов: сравнивайте начертания, собирайте библиотеки, загружайте свои файлы и экспортируйте результат.';
 
 export type SiteSeoMeta = {
   title: string;

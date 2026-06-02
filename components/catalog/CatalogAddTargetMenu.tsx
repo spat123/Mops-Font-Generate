@@ -1,10 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { SavedLibraryRecord } from '../../types/editorFonts';
+import type { SavedLibraryFontEntry } from '../../types/savedLibrary';
+import { countSameCatalogFontInLibrary } from '../../utils/fontLibraryUtils';
 
 export type CatalogAddTargetAppearance = 'default' | 'row';
 
+type MenuPosition = {
+  top: number;
+  left: number;
+  ready: boolean;
+};
+
+const MENU_Z_INDEX_CLASS = 'z-[300]';
+
 export type CatalogAddTargetMenuProps = {
   libraries?: SavedLibraryRecord[];
+  libraryEntry?: SavedLibraryFontEntry | null;
   busy?: boolean;
   onAddToSession?: () => boolean | Promise<boolean>;
   onAddToLibrary?: (libraryId: string) => boolean | Promise<boolean>;
@@ -53,6 +65,7 @@ function CheckIcon({ className = 'h-4 w-4' }: { className?: string }) {
 
 export function CatalogAddTargetMenu({
   libraries = [],
+  libraryEntry = null,
   busy = false,
   onAddToSession,
   onAddToLibrary,
@@ -65,9 +78,12 @@ export function CatalogAddTargetMenu({
   stateKey = '',
 }: CatalogAddTargetMenuProps) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition>({ top: 0, left: 0, ready: false });
   const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
   const completedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { authLoading, isAuthenticated, canCreateNewLibrary, requestSignIn, assertCanCreateNewLibrary } =
     useLibraryAuth();
@@ -139,9 +155,53 @@ export function CatalogAddTargetMenu({
     setSelectedLibraryId(libraries[0]?.id || null);
   }, [libraries, selectedLibraryId]);
 
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition((prev) => ({ ...prev, ready: false }));
+      return undefined;
+    }
+
+    const updatePosition = () => {
+      const anchorEl = anchorRef.current;
+      if (!anchorEl) return;
+      const triggerRect = anchorEl.getBoundingClientRect();
+      const menuEl = menuRef.current;
+      const menuWidth = Math.max(208, menuEl?.offsetWidth || 208);
+      const menuHeight = Math.max(40, menuEl?.offsetHeight || 180);
+      const viewportW = window.innerWidth || 0;
+      const viewportH = window.innerHeight || 0;
+      const edgeGap = 8;
+      const offsetY = 8;
+      const spaceBelow = viewportH - triggerRect.bottom - edgeGap;
+      const spaceAbove = triggerRect.top - edgeGap;
+      const openDown = spaceBelow >= menuHeight || spaceBelow >= spaceAbove;
+      let top = openDown
+        ? triggerRect.bottom + offsetY
+        : Math.max(edgeGap, triggerRect.top - menuHeight - offsetY);
+      if (top + menuHeight > viewportH - edgeGap) {
+        top = Math.max(edgeGap, viewportH - edgeGap - menuHeight);
+      }
+      let left = triggerRect.right - menuWidth;
+      if (left < edgeGap) left = edgeGap;
+      if (left + menuWidth > viewportW - edgeGap) {
+        left = Math.max(edgeGap, viewportW - edgeGap - menuWidth);
+      }
+      setMenuPosition({ top, left, ready: true });
+    };
+
+    const raf = requestAnimationFrame(updatePosition);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, libraries.length]);
+
   useDismissibleLayer({
     open,
-    refs: [rootRef],
+    refs: [rootRef, menuRef],
     onDismiss: () => setOpen(false),
   });
 
@@ -200,9 +260,121 @@ export function CatalogAddTargetMenu({
   const selectedLibrary = libraries.find((library) => library.id === selectedLibraryId) || null;
   const currentLabel = selectedLibrary?.name || primaryLabel;
 
+  const menuNode =
+    open && menuPosition.ready && typeof document !== 'undefined'
+      ? createPortal(
+          <div
+            ref={menuRef}
+            className={`fixed min-w-[13rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg ${MENU_Z_INDEX_CLASS}`}
+            style={{
+              top: menuPosition.top,
+              left: menuPosition.left,
+              visibility: menuPosition.ready ? 'visible' : 'hidden',
+            }}
+            role="menu"
+          >
+            <div className={libraries.length > 8 ? 'max-h-64 overflow-y-auto overscroll-contain' : ''}>
+              {libraries.map((library, index) => {
+                const matchCount = libraryEntry
+                  ? countSameCatalogFontInLibrary(libraryEntry, library.fonts || [])
+                  : 0;
+                return (
+                  <button
+                    key={library.id}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selectedLibraryId === library.id}
+                    onClick={() => {
+                      setOpen(false);
+                      setSelectedLibraryId(library.id);
+                      if (!busy) {
+                        void runAction(() => runAddToLibrary(library.id));
+                      }
+                    }}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
+                      selectedLibraryId === library.id
+                        ? 'bg-accent text-white'
+                        : 'text-gray-900 hover:bg-accent hover:text-white'
+                    } ${index < libraries.length - 1 ? 'border-b border-gray-200' : ''}`}
+                  >
+                    <span className="min-w-0 truncate">{library.name}</span>
+                    {matchCount > 0 ? (
+                      <span
+                        className={`shrink-0 tabular-nums text-[11px] font-bold ${
+                          selectedLibraryId === library.id ? 'text-white/90' : 'text-gray-500'
+                        }`}
+                      >
+                        {matchCount}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="border-t border-gray-200 p-1">
+              <Tooltip
+                as="div"
+                className="block w-full"
+                content={createActionHintAuthenticated}
+                openDelayMs={150}
+              >
+                <button
+                  type="button"
+                  disabled={isAuthenticated && !canCreateNewLibrary}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    setOpen(false);
+                    if (!isAuthenticated) {
+                      requestSignIn();
+                      return;
+                    }
+                    if (!canCreateNewLibrary) {
+                      void assertCanCreateNewLibrary();
+                      return;
+                    }
+                    onCreateLibrary?.();
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
+                    isAuthenticated && !canCreateNewLibrary
+                      ? 'cursor-not-allowed text-gray-400'
+                      : 'text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="h-4 w-4 shrink-0"
+                    aria-hidden
+                  >
+                    <path
+                      d="M12 4.5v15m7.5-7.5h-15"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="min-w-0 flex-1 truncate text-center">{createMenuLabel}</span>
+                  {isAuthenticated && !canCreateNewLibrary ? (
+                    <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
+                      Pro
+                    </span>
+                  ) : null}
+                </button>
+              </Tooltip>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
+    <>
     <div ref={rootRef} className={`relative inline-flex max-w-full items-center ${className}`.trim()}>
       <button
+        ref={anchorRef}
         type="button"
         aria-label="Выбрать, куда добавить шрифт"
         aria-haspopup="menu"
@@ -231,95 +403,8 @@ export function CatalogAddTargetMenu({
         {busy ? busyIndicator : completed ? <CheckIcon className={plusIconClassName} /> : <PlusIcon className={plusIconClassName} />}
       </button>
 
-      {open ? (
-        <div
-          className="absolute right-0 top-full z-30 mt-2 min-w-[13rem] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
-          role="menu"
-        >
-          <div
-            className={
-              libraries.length > 8 ? 'max-h-64 overflow-y-auto overscroll-contain' : ''
-            }
-          >
-            {libraries.map((library, index) => (
-              <button
-                key={library.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={selectedLibraryId === library.id}
-                onClick={() => {
-                  setOpen(false);
-                  setSelectedLibraryId(library.id);
-                  if (!busy) {
-                    void runAction(() => runAddToLibrary(library.id));
-                  }
-                }}
-                className={`flex w-full items-center px-3 py-2 text-left text-xs font-semibold uppercase transition-colors ${
-                  selectedLibraryId === library.id
-                    ? 'bg-accent text-white'
-                    : 'text-gray-900 hover:bg-accent hover:text-white'
-                } ${index < libraries.length - 1 ? 'border-b border-gray-200' : ''}`}
-              >
-                <span className="truncate">{library.name}</span>
-              </button>
-            ))}
-          </div>
-          <div className="border-t border-gray-200 p-1">
-            <Tooltip
-              as="div"
-              className="block w-full"
-              content={createActionHintAuthenticated}
-              openDelayMs={150}
-            >
-              <button
-                type="button"
-                disabled={isAuthenticated && !canCreateNewLibrary}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  event.preventDefault();
-                  setOpen(false);
-                  if (!isAuthenticated) {
-                    requestSignIn();
-                    return;
-                  }
-                  if (!canCreateNewLibrary) {
-                    void assertCanCreateNewLibrary();
-                    return;
-                  }
-                  onCreateLibrary?.();
-                }}
-                className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-xs font-semibold uppercase transition-colors ${
-                  isAuthenticated && !canCreateNewLibrary
-                    ? 'cursor-not-allowed text-gray-400'
-                    : 'text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  className="h-4 w-4 shrink-0"
-                  aria-hidden
-                >
-                  <path
-                    d="M12 4.5v15m7.5-7.5h-15"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="min-w-0 flex-1 truncate text-center">{createMenuLabel}</span>
-                {isAuthenticated && !canCreateNewLibrary ? (
-                  <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-gray-600">
-                    Pro
-                  </span>
-                ) : null}
-              </button>
-            </Tooltip>
-          </div>
-        </div>
-      ) : null}
     </div>
+    {menuNode}
+    </>
   );
 }

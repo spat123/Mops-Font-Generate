@@ -1,7 +1,7 @@
 {
   "name": "dinamic-font",
   "version": "1.0.2",
-  "description": "DINAMIC FONT — веб-приложение для тестирования, сравнения и работы со шрифтами",
+  "description": "DINAMIC FONT — веб-приложение для проверки, создания и анимации шрифтов",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

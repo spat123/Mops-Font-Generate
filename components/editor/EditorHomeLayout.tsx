@@ -10,6 +10,7 @@ import { FontsLibraryHomeScreen } from '../library/FontsLibraryHomeScreen';
 import { LibraryCreateDialog } from '../library/LibraryCreateDialog';
 import { EDITOR_MAIN_TAB_PENDING } from '../../utils/editorShellStorage';
 import { EDITOR_SAMPLE_TEXTS } from '../../constants/editorSampleTexts';
+import { DEFAULT_DESCRIPTION } from '../../utils/siteSeo';
 import type { EditorHomeLayoutProps } from '../../types/editorHome';
 import type { SessionFontRecord } from '../../types/editorFonts';
 
@@ -30,8 +31,7 @@ const HOME_JSON_LD = {
       applicationCategory: 'DesignApplication',
       operatingSystem: 'Web',
       url: 'https://dynamicfont.ru/',
-      description:
-        'Онлайн-редактор для тестирования, сравнения и экспорта каталожных и локальных шрифтов.',
+      description: DEFAULT_DESCRIPTION,
       offers: {
         '@type': 'Offer',
         price: '0',
@@ -215,11 +215,6 @@ export function EditorHomeLayout({
   return (
     <div className="flex h-screen min-h-0 flex-row overflow-hidden bg-gray-50">
       <Head>
-        <title>DINAMIC FONT — тестирование и сравнение шрифтов</title>
-        <meta
-          name="description"
-          content="DINAMIC FONT — онлайн-редактор для тестирования, сравнения, библиотек и экспорта каталожных и локальных шрифтов."
-        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(HOME_JSON_LD) }}
