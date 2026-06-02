@@ -5,7 +5,7 @@ import { PlusIcon } from '../ui/CommonIcons';
 
 function CheckMarkIcon() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-white" aria-hidden>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>
       <path
         d="M4.5 10.5L8.25 14.25L15.5 7"
         stroke="currentColor"

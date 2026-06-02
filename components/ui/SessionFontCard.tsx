@@ -103,6 +103,7 @@ export type SessionFontCardProps = {
   onPointerCancel?: PointerEventHandler<HTMLDivElement>;
   onRemove?: () => void;
   cornerAction?: ReactNode;
+  pinCornerActionVisible?: boolean;
   menuItems?: CardActionMenuItem[];
   downloadSplitButtonProps?: CatalogDownloadButtonProps | null;
   variant?: 'default' | 'tall' | 'catalog';
@@ -136,6 +137,7 @@ export function SessionFontCard({
   onPointerCancel,
   onRemove,
   cornerAction,
+  pinCornerActionVisible = false,
   menuItems,
   downloadSplitButtonProps,
   variant = 'default',
@@ -221,6 +223,7 @@ export function SessionFontCard({
           rootStyle={{ minHeight: `${catalogMinHeightPx}px` }}
           containIntrinsicHeightPx={catalogMinHeightPx}
           fadeFooterWithHoverUi={Boolean(catalogHoverOverlay)}
+          pinActionsVisible={pinCornerActionVisible}
           title={titleNode}
           preview={
             <div

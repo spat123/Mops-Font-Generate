@@ -50,6 +50,7 @@ export function SortableFontCardGrid({
             onPointerCancel={item.onPointerCancel}
             onRemove={item.onRemove}
             cornerAction={item.cornerAction}
+            pinCornerActionVisible={item.pinCornerActionVisible === true}
             menuItems={item.menuItems}
             downloadSplitButtonProps={item.downloadSplitButtonProps}
             variant={item.variant}

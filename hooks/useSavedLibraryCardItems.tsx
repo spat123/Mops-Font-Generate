@@ -243,30 +243,28 @@ export function useSavedLibraryCardItems({
     if (!activeSavedLibrary) return [];
     if (!savedLibrarySearchQueryTrimmed) return [];
 
-    const buildCorner = (
-      row: SavedLibraryCatalogSearchRow,
-      libraryEntry: SavedLibraryFontEntry,
-      doneClassName: string,
-    ) => {
+    const buildCorner = (row: SavedLibraryCatalogSearchRow, libraryEntry: SavedLibraryFontEntry) => {
       const cornerBusy = savedLibraryCatalogAddBusyId === row.id;
       const cornerDone = row.alreadyInLibrary || savedLibraryCatalogRecentlyAddedSet.has(row.id);
-      return (
-        <SavedLibraryCatalogAddCorner
-          alreadyInLibrary={row.alreadyInLibrary}
-          busy={cornerBusy}
-          done={cornerDone}
-          doneClassName={doneClassName}
-          onAdd={() => {
-            if (!activeSavedLibrary?.id) return;
-            setSavedLibraryCatalogAddBusyId(row.id);
-            const ok = addFontEntryToLibrary(activeSavedLibrary.id, libraryEntry);
-            if (ok) {
-              markSavedLibraryCatalogRecentlyAdded(row.id, 900);
-            }
-            setSavedLibraryCatalogAddBusyId(null);
-          }}
-        />
-      );
+      return {
+        cornerAction: (
+          <SavedLibraryCatalogAddCorner
+            alreadyInLibrary={row.alreadyInLibrary}
+            busy={cornerBusy}
+            done={cornerDone}
+            onAdd={() => {
+              if (!activeSavedLibrary?.id) return;
+              setSavedLibraryCatalogAddBusyId(row.id);
+              const ok = addFontEntryToLibrary(activeSavedLibrary.id, libraryEntry);
+              if (ok) {
+                markSavedLibraryCatalogRecentlyAdded(row.id, 900);
+              }
+              setSavedLibraryCatalogAddBusyId(null);
+            }}
+          />
+        ),
+        pinCornerActionVisible: cornerDone,
+      };
     };
 
     const downloadBase = {
@@ -316,7 +314,7 @@ export function useSavedLibraryCardItems({
               showVariable: entry?.isVariable === true,
             }),
           },
-          cornerAction: buildCorner(row, libraryEntry, '!bg-accent !text-white [&_svg]:!text-white'),
+          ...buildCorner(row, libraryEntry),
         };
       }
 
@@ -360,11 +358,7 @@ export function useSavedLibraryCardItems({
             showVariable: Boolean(item?.isVariable),
           }),
         },
-        cornerAction: buildCorner(
-          row,
-          libraryEntry,
-          '!bg-red-600 !text-white hover:!bg-red-600 [&_svg]:!text-white',
-        ),
+        ...buildCorner(row, libraryEntry),
       };
     });
   }, [

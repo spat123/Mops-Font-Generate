@@ -154,6 +154,9 @@ export function usePerFontPreviewPersistence({
         textLen: typeof snap.text === 'string' ? snap.text.length : 0,
         snippet: previewTextSnippet(snap.text as string, 120),
       });
+      setFonts((fs) =>
+        fs.map((f) => (f.id === tabId ? { ...f, previewSettings: { ...snap } } : f)),
+      );
       updateFontSettings(tabId, { previewSettings: snap })
         .then(() => previewTextDbg('debounced: IDB OK', { tabId }))
         .catch((err) => previewTextDbg('debounced: IDB FAIL', { tabId, err: String(err) }));

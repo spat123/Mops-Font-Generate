@@ -103,6 +103,8 @@ export function useEditorHomePage(router: NextRouter) {
       setVerticalAlignment,
       textFill,
       setTextFill,
+      previewBackgroundImage,
+      setPreviewBackgroundImage,
     } = useSettings();
     
     
@@ -333,6 +335,7 @@ export function useEditorHomePage(router: NextRouter) {
         waterfallRoundPx,
         verticalAlignment,
         textFill,
+        previewBackgroundImage,
       }),
       getPreviewSettingsSetters: () => ({
         setText,
@@ -368,6 +371,7 @@ export function useEditorHomePage(router: NextRouter) {
         setTextCenter,
         setVerticalAlignment,
         setTextFill,
+        setPreviewBackgroundImage,
       }),
       previewSettingsDeps: [
         text,
@@ -402,6 +406,7 @@ export function useEditorHomePage(router: NextRouter) {
         waterfallRoundPx,
         verticalAlignment,
         textFill,
+        previewBackgroundImage,
       ],
       hasRestoredEditorMainTab,
       isInitialLoadComplete,

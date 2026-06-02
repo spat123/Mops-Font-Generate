@@ -32,6 +32,8 @@ export type SavedLibraryCardViewItem = {
   downloadSplitButtonProps?: Record<string, unknown> | null;
   menuItems?: SavedLibraryCardMenuItem[];
   cornerAction?: ReactNode;
+  /** Держать cornerAction видимым без hover (например, галочка «уже в библиотеке»). */
+  pinCornerActionVisible?: boolean;
   variant?: 'default' | 'tall' | 'catalog';
   previewClassName?: string;
 };

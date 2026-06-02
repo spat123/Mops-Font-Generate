@@ -38,6 +38,7 @@ export function collectPerFontPreviewSnapshot(s: PerFontPreviewSnapshot): PerFon
     openTypeFeatureOverrides: s.openTypeFeatureOverrides,
     textColor: s.textColor,
     backgroundColor: s.backgroundColor,
+    previewBackgroundImage: s.previewBackgroundImage,
     textDirection: s.textDirection,
     textAlignment: s.textAlignment,
     textCase: s.textCase,
@@ -79,6 +80,7 @@ export function applyPerFontPreviewSnapshot(
     setOpenTypeFeatureOverrides,
     setTextColor,
     setBackgroundColor,
+    setPreviewBackgroundImage,
     setTextDirection,
     setTextAlignment,
     setTextCase,
@@ -147,6 +149,9 @@ export function applyPerFontPreviewSnapshot(
   }
   if (snapshot.textColor !== undefined && setTextColor) setTextColor(snapshot.textColor);
   if (snapshot.backgroundColor !== undefined && setBackgroundColor) setBackgroundColor(snapshot.backgroundColor);
+  if (snapshot.previewBackgroundImage !== undefined && setPreviewBackgroundImage) {
+    setPreviewBackgroundImage(snapshot.previewBackgroundImage ?? null);
+  }
   if (snapshot.textDirection !== undefined && setTextDirection) setTextDirection(snapshot.textDirection);
   if (snapshot.textAlignment !== undefined && setTextAlignment) setTextAlignment(snapshot.textAlignment);
   if (snapshot.textCase !== undefined && setTextCase) setTextCase(snapshot.textCase);
