@@ -153,10 +153,10 @@ function NewsCard({ item, eagerImage }: { item: EditorNewsItem; eagerImage?: boo
         <div className="relative">
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">{previewText}</p>
           {item.ctaHref && item.ctaLabel ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-start bg-gradient-to-t from-white via-white/95 to-transparent pt-10 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-end bg-gradient-to-t from-white via-white/95 to-transparent pt-10 opacity-0 transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
               <a
                 href={item.ctaHref}
-                className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 shadow-sm transition-colors hover:border-accent hover:bg-accent hover:text-white"
+                className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-200 bg-white px-3 text-xs font-semibold uppercase tracking-tight text-gray-900 transition-colors hover:border-black hover:bg-black hover:text-white"
               >
                 {item.ctaLabel}
               </a>
