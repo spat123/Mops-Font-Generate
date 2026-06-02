@@ -12,7 +12,7 @@ import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { useLibraryAuth } from '../../contexts/LibraryAuthContext';
 import { toast } from '../../utils/appNotify';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
-import { loginIconUrl, updateIconUrl, userIconUrl } from '../ui/editIconUrls';
+import { loginIconUrl, userIconUrl } from '../ui/editIconUrls';
 import {
   FREE_STATIC_GENERATIONS_LIMIT,
   readFreeStaticGenerationsUsed,
@@ -20,6 +20,7 @@ import {
 import { getBillingCopy } from '../../utils/billingCopy';
 import { MAX_SHARE_FONTS_FREE } from '../../utils/libraryShareLimits';
 import { SelectChevronIcon } from '../ui/SelectChevronIcon';
+import { ProjectSupportAmountPanel } from '../ui/ProjectSupportAmountPanel';
 
 const AVATAR_CLASS = 'h-4 w-4 shrink-0 rounded-full object-cover';
 
@@ -159,6 +160,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const { planName, isPro, librariesCount, librariesLimit, openPlans } = useLibraryAuth();
   const billing = getBillingCopy();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuView, setMenuView] = useState<'account' | 'support'>('account');
   const [profileOpen, setProfileOpen] = useState(false);
   const rootRef = useRef(null);
   const menuRef = useRef(null);
@@ -213,9 +215,16 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   useEffect(() => {
     if (isSidebarCollapsed) {
       setMenuOpen(false);
+      setMenuView('account');
       setProfileOpen(false);
     }
   }, [isSidebarCollapsed]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      setMenuView('account');
+    }
+  }, [menuOpen]);
 
   const loading = status === 'loading';
   const planLabel = planName || (isPro ? billing.proPlanName : billing.freePlanName);
@@ -504,6 +513,12 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
             }}
           >
             {authenticated ? (
+              menuView === 'support' ? (
+                <ProjectSupportAmountPanel
+                  onBack={() => setMenuView('account')}
+                  onClose={() => setMenuOpen(false)}
+                />
+              ) : (
               <div>
                 <div className="border-b border-gray-100 px-4 py-4">
                   {displayName || session.user.email ? (
@@ -522,12 +537,11 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   <button
                     type="button"
                     className="mt-3 flex h-8 w-full items-center justify-center gap-2 rounded-sm border border-gray-200 bg-white text-xs font-semibold text-gray-900 transition-colors hover:border-accent hover:bg-accent hover:text-white"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      openPlans?.();
-                    }}
+                    onClick={() => setMenuView('support')}
                   >
-                    <EditAssetIcon src={updateIconUrl} className="h-3.5 w-3.5" />
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                      <path d="M10 16.5S3.5 11.8 3.5 7.4A3.4 3.4 0 0 1 10 5.1a3.4 3.4 0 0 1 6.5 2.3c0 4.4-6.5 9.1-6.5 9.1Z" />
+                    </svg>
                     {billing.menuButton}
                   </button>
                 </div>
@@ -553,6 +567,7 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                   </AccountMenuItem>
                 </div>
               </div>
+              )
             ) : loading ? (
               <p className="px-4 py-6 text-center text-xs uppercase text-gray-500">Загрузка…</p>
             ) : (

@@ -84,3 +84,42 @@ export function getProjectSupportEmailLink(): ProjectSupportLink {
     description: 'Если хотите поддержать проект другим способом.',
   };
 }
+
+export const SUPPORT_AMOUNT_PRESETS_RUB = [100, 300, 500, 1000] as const;
+
+export function getSupportAmountPresets(): number[] {
+  const raw = process.env.NEXT_PUBLIC_SUPPORT_AMOUNT_PRESETS?.trim();
+  if (!raw) return [...SUPPORT_AMOUNT_PRESETS_RUB];
+  const parsed = raw
+    .split(/[,;\s]+/)
+    .map((part) => Number(part.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  return parsed.length > 0 ? parsed : [...SUPPORT_AMOUNT_PRESETS_RUB];
+}
+
+export function buildSupportDonationUrl(baseUrl: string, amountRub: number): string {
+  const base = baseUrl.trim();
+  if (!base) return '';
+  if (base.includes('{amount}')) {
+    return base.replace(/\{amount\}/g, String(amountRub));
+  }
+  try {
+    const url = new URL(base);
+    if (url.hostname.includes('yoomoney.ru') && !url.searchParams.has('sum')) {
+      url.searchParams.set('sum', String(amountRub));
+    }
+    return url.toString();
+  } catch {
+    return base;
+  }
+}
+
+export function buildSupportEmailUrlForAmount(amountRub: number): string {
+  const subject = encodeURIComponent(`Поддержка ${legalMeta.serviceName} — ${amountRub} ₽`);
+  return `mailto:${legalMeta.supportEmail}?subject=${subject}`;
+}
+
+export function getPrimaryProjectSupportLink(): ProjectSupportLink | null {
+  const links = getProjectSupportLinks();
+  return links[0] ?? null;
+}

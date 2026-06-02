@@ -25,7 +25,7 @@ export type BillingCopyStrings = {
 export const billingCopy: Record<BillingLocale, BillingCopyStrings> = {
   RU: {
     dialogTitle: 'Открытая бета',
-    menuButton: 'Тарифы',
+    menuButton: 'Поддержать проект',
     showPlans: 'Показать тарифы',
     upgradeHint: 'Войдите в аккаунт, чтобы получить полный доступ на время открытой беты.',
     upgradeHintReceive: 'Войдите в аккаунт, чтобы получить полный доступ на время открытой беты.',
@@ -46,7 +46,7 @@ export const billingCopy: Record<BillingLocale, BillingCopyStrings> = {
   },
   EN: {
     dialogTitle: 'Open beta',
-    menuButton: 'Plans',
+    menuButton: 'Support project',
     showPlans: 'Show plans',
     upgradeHint: 'Sign in to get full access during the open beta.',
     upgradeHintReceive: 'Sign in to get full access during the open beta.',
