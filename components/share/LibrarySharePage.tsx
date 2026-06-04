@@ -53,6 +53,7 @@ import {
 import { makeSavedLibraryTabId } from '../../utils/savedLibraryTabIds';
 import { OpenGraphHead } from '../seo/OpenGraphHead';
 import { ShareAutoEditorOverlay } from './ShareAutoEditorOverlay';
+import { ProjectSupportDialog } from '../ui/ProjectSupportDialog';
 import { buildShareAutoEditorOpenQueryFromPayload } from '../../utils/catalogShareLink';
 
 const SHARE_ROW_SAMPLE_TOOLTIP =
@@ -238,6 +239,7 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
   const [shareCatalogHydratedTick, setShareCatalogHydratedTick] = useState(0);
   const autoEditorRedirectedRef = useRef(false);
   const [autoEditorRedirecting, setAutoEditorRedirecting] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
 
   const rawShare =
     typeof router.query.share === 'string'
@@ -674,11 +676,13 @@ export function LibrarySharePage({ seo, initialPayload = null }: LibrarySharePag
                 onImport={handleImport}
                 onZip={handleZipAll}
                 onSignIn={handleSignInForImport}
+                onSupportProject={() => setSupportOpen(true)}
               />
             }
           />
         )}
       </div>
+      <ProjectSupportDialog open={supportOpen} onClose={() => setSupportOpen(false)} />
     </>
   );
 }

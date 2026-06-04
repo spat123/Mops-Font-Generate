@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useSupportDonation } from '../../hooks/useSupportDonation';
 import {
   getPrimaryProjectSupportLink,
-  getProjectSupportEmailLink,
   getProjectSupportLinks,
   getSupportQuickAmounts,
 } from '../../utils/projectSupport';
@@ -28,7 +27,6 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
   const [customAmount, setCustomAmount] = useState('');
   const primaryLink = getPrimaryProjectSupportLink();
   const extraLinks = getProjectSupportLinks().slice(primaryLink ? 1 : 0);
-  const fallbackLink = getProjectSupportEmailLink();
   const { donate, isSubmitting, error, providerLabel } = useSupportDonation();
   const resolvedAmount =
     selection === 'custom' ? Number.parseInt(customAmount.replace(/\s/g, ''), 10) : selection;
@@ -190,17 +188,6 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
               ))}
             </div>
           ) : null}
-
-          <div className={`${extraLinks.length > 0 ? 'mt-3' : 'mt-5 border-t border-gray-100 pt-5'} text-center`}>
-            <a
-              href={fallbackLink.url}
-              className="text-xs font-semibold uppercase tracking-wide text-gray-600 underline-offset-2 transition-colors hover:text-accent hover:underline"
-              title={fallbackLink.description}
-              onClick={onClose}
-            >
-              {fallbackLink.label} на {fallbackLink.url.replace('mailto:', '')}
-            </a>
-          </div>
         </div>
       </div>
     </div>,

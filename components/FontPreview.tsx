@@ -65,6 +65,8 @@ import {
 import { GLYPH_COUNT_UNAVAILABLE } from './GlyphsMode';
 import { shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
 import { EmptyStateAboutSection, EmptyStateAboutToggle } from './emptyState/EmptyStateAboutSection';
+import { ProjectSupportDialog } from './ui/ProjectSupportDialog';
+import { SupportProjectButton } from './ui/SupportProjectButton';
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -176,6 +178,7 @@ export default function FontPreview({
   const [isEmptyStateSearchExpanded, setIsEmptyStateSearchExpanded] = useState(false);
   const [emptyStateSeoOpen, setEmptyStateSeoOpen] = useState(false);
   const [emptyStateSeoAnimating, setEmptyStateSeoAnimating] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [googleCatalogEntries, setGoogleCatalogEntries] = useState([]);
   const [hasEverMountedStylesMode, setHasEverMountedStylesMode] = useState(false);
   const [hasEverMountedGlyphsMode, setHasEverMountedGlyphsMode] = useState(false);
@@ -1069,6 +1072,7 @@ export default function FontPreview({
           : 'Шрифт не выбран';
 
     return (
+      <>
       <div className="relative flex h-full min-h-0 w-full flex-1 flex-col bg-white">
         <div
           ref={emptyStateScrollRef}
@@ -1289,20 +1293,25 @@ export default function FontPreview({
                   <FontUploader onFontsUploaded={handleFontsUploaded} />
                 </div>
                 {filteredPresetFonts.length > 0 ? (
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    {filteredPresetFonts.map((fontName) => (
-                      <AppButton
-                        key={fontName}
-                        type="button"
-                        variant="outline"
-                        fullWidth
-                        className="!normal-case px-4 py-3 font-sans font-medium"
-                        onClick={() => loadPresetFont(fontName)}
-                      >
-                        {fontName}
-                      </AppButton>
-                    ))}
-                  </div>
+                  <>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      {filteredPresetFonts.map((fontName) => (
+                        <AppButton
+                          key={fontName}
+                          type="button"
+                          variant="outline"
+                          fullWidth
+                          className="!normal-case px-4 py-3 font-sans font-medium"
+                          onClick={() => loadPresetFont(fontName)}
+                        >
+                          {fontName}
+                        </AppButton>
+                      ))}
+                    </div>
+                    <div className="mt-6 flex justify-center">
+                      <SupportProjectButton onClick={() => setSupportOpen(true)} />
+                    </div>
+                  </>
                 ) : (
                   <p className="mt-4 text-sm text-gray-500">Ничего не найдено. Попробуйте другой запрос.</p>
                 )}
@@ -1331,6 +1340,8 @@ export default function FontPreview({
           center={<span className="truncate">Новая вкладка</span>}
         />
       </div>
+      <ProjectSupportDialog open={supportOpen} onClose={() => setSupportOpen(false)} />
+      </>
     );
   }
 

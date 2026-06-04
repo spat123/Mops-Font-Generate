@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { AuthLogoLink } from '../auth/AuthSplitLayout';
 import { EDITOR_BETA_VERSION } from '../../data/editorNewsFeed';
 import { PlusIcon } from '../ui/CommonIcons';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
-import { downloudIconUrl, heartIconUrl } from '../ui/editIconUrls';
+import { downloudIconUrl } from '../ui/editIconUrls';
+import { SupportProjectButton } from '../ui/SupportProjectButton';
 import { AppButton } from '../ui/AppButton';
 
 export type ShareFontStats = {
@@ -31,6 +31,7 @@ export type ShareDownloadPanelProps = {
   onImport?: () => void;
   onZip?: () => void;
   onSignIn?: () => void;
+  onSupportProject?: () => void;
 };
 
 export function ShareDownloadPanel({
@@ -42,6 +43,7 @@ export function ShareDownloadPanel({
   onImport,
   onZip,
   onSignIn,
+  onSupportProject,
 }: ShareDownloadPanelProps) {
   const {
     total = 0,
@@ -119,13 +121,7 @@ export function ShareDownloadPanel({
       </div>
 
       <div className="mt-auto mx-auto shrink-0 pt-10">
-        <Link
-          href="/"
-          className="inline-flex h-12 cursor-pointer items-center justify-center gap-2 bg-white px-4 text-xs font-bold uppercase text-gray-900 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
-        >
-          <EditAssetIcon src={heartIconUrl} className="h-4 w-4 shrink-0" aria-hidden />
-          <span className="truncate">Поддержать проект</span>
-        </Link>
+        <SupportProjectButton onClick={() => onSupportProject?.()} />
       </div>
     </div>
   );

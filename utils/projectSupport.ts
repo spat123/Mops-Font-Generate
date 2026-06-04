@@ -150,8 +150,14 @@ export async function startSupportDonation(amountRub: number): Promise<void> {
   });
 
   if (response.status === 503) {
-    openSupportDonation(amountRub);
-    return;
+    const primaryLink = getPrimaryProjectSupportLink();
+    if (primaryLink) {
+      openSupportDonation(amountRub);
+      return;
+    }
+    throw new Error(
+      'Приём платежей через ЮKassa не настроен на сервере. Проверьте YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY в переменных окружения.',
+    );
   }
 
   const payload = (await response.json().catch(() => ({}))) as {
