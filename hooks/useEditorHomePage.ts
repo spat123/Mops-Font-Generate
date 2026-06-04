@@ -45,6 +45,7 @@ import { useEditorShellPersistence } from './useEditorShellPersistence';
 import { useSessionFontTabsPreviewCache } from './useSessionFontTabsPreviewCache';
 import { buildEditorHomeLayoutProps } from './buildEditorHomeLayoutProps';
 import type { EditorHomeLayoutProps } from '../types/editorHome';
+import { slugifyFontKey } from '../utils/fontSlug';
 
 export function useEditorHomePage(
   router: NextRouter,
@@ -448,6 +449,40 @@ export function useEditorHomePage(
         setSelectedFont(fresh);
       }
     }, [fonts, selectedFont, setSelectedFont]);
+
+    useEffect(() => {
+      if (typeof window === 'undefined') return;
+      if (router.pathname.startsWith('/fonts')) return;
+      const source = String(selectedFont?.source || '').trim().toLowerCase();
+      const originKey = String(selectedFont?.originKey || '').trim();
+      let slug = '';
+
+      if (source === 'fontsource') {
+        slug = slugifyFontKey(
+          originKey.startsWith('fontsource:')
+            ? originKey.slice('fontsource:'.length)
+            : String(selectedFont?.fontsourceSlug || selectedFont?.name || ''),
+        );
+      } else if (source === 'google') {
+        slug = slugifyFontKey(
+          originKey.startsWith('google:')
+            ? originKey.slice('google:'.length)
+            : String(selectedFont?.name || selectedFont?.displayName || ''),
+        );
+      }
+
+      if (!slug) return;
+      const nextPath = `/fonts/${slug}`;
+      if (window.location.pathname === nextPath) return;
+      window.history.replaceState(window.history.state, '', nextPath);
+    }, [
+      router.pathname,
+      selectedFont?.displayName,
+      selectedFont?.fontsourceSlug,
+      selectedFont?.name,
+      selectedFont?.originKey,
+      selectedFont?.source,
+    ]);
 
     /** При клике по вкладке шрифта — восстановить selectedFont и настройки превью. */
     useEffect(() => {

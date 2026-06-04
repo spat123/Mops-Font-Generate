@@ -17,7 +17,6 @@ import {
 import { resolveServerDiskCacheFile } from './serverDiskCachePath';
 import { fetchGoogleFontCssFacesForFamily } from './googleApiRouteHelpers';
 import { CHROME_UA } from './googleFontsCssShared';
-import { parseFontBuffer } from './fontParser';
 import {
   applyFontNameTableToSeoPage,
   extractFontNameTableFromParsedFont,
@@ -92,8 +91,36 @@ function cacheKeyForPage(page: FontSeoPage): string {
 }
 
 async function parseNameTableFromBuffer(buf: Buffer, fontName: string): Promise<FontNameTable | null> {
+  const { parseFontBuffer } = await import('./fontParser');
   const parsed = await parseFontBuffer(bufferToArrayBuffer(buf), fontName);
   return extractFontNameTableFromParsedFont(parsed);
+}
+
+function familyFromSlug(slug: string): string {
+  return String(slug || '')
+    .split('-')
+    .map((part) => {
+      const text = part.trim();
+      return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : '';
+    })
+    .filter(Boolean)
+    .join(' ');
+}
+
+function buildFallbackGoogleSeoPage(slug: string): FontSeoPage | null {
+  const normalized = slugifyFontKey(slug);
+  if (!normalized) return null;
+  const family = familyFromSlug(normalized);
+  if (!family) return null;
+
+  return buildGeneratedGoogleFontSeoPageFromCatalog({
+    family,
+    isVariable: false,
+    hasItalic: false,
+    subsets: [],
+    styleCount: 1,
+    category: '',
+  });
 }
 
 function pickBestGoogleFace(faces: Array<{ url: string; unicodeRange?: string | null; style?: string }>) {
@@ -202,7 +229,11 @@ export async function findFontSeoPageServer(slug: string): Promise<FontSeoPage |
   const manual = findFontSeoPage(normalized);
   if (manual) return enrichFontSeoPageWithNameTable(manual);
 
-  const pages = await getAllFontSeoPages();
+  const pages = await getAllFontSeoPages().catch((error) => {
+    console.warn('[fontSeoPagesServer] catalog lookup failed:', error instanceof Error ? error.message : String(error));
+    return [];
+  });
   const page = pages.find((item) => item.slug === normalized) || null;
-  return page ? enrichFontSeoPageWithNameTable(page) : null;
+  const fallback = page || buildFallbackGoogleSeoPage(normalized);
+  return fallback ? enrichFontSeoPageWithNameTable(fallback) : null;
 }
