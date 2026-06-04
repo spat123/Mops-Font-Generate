@@ -92,7 +92,7 @@ export default function MyApp({
         <AuthReturningUserMarker />
         <SettingsProvider>
           <FontProvider>
-            <Component {...pageProps} />
+            <Component {...pageProps} seo={pageSeo} />
             <ToastContainer
               position="bottom-right"
               theme="light"
