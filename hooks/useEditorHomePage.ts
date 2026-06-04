@@ -49,7 +49,11 @@ import { slugifyFontKey } from '../utils/fontSlug';
 
 export function useEditorHomePage(
   router: NextRouter,
-  options: { initialOpenQuery?: Record<string, string> | null } = {},
+  options: {
+    initialOpenQuery?: Record<string, string> | null;
+    routeInitialMainTab?: string | null;
+    routeInitialFontsLibraryTab?: string | null;
+  } = {},
 ) {
   useShareRouteRedirect(router);
 
@@ -298,6 +302,8 @@ export function useEditorHomePage(
       emptySlotIds,
       closedLibraryFontIds,
       fontsLibraryTab,
+      routeInitialMainTab: options.routeInitialMainTab || null,
+      routeInitialFontsLibraryTab: options.routeInitialFontsLibraryTab || null,
       setMainTab,
       setEmptySlotIds,
       setClosedLibraryFontIds,
@@ -459,7 +465,13 @@ export function useEditorHomePage(
       const currentPath = window.location.pathname;
 
       if (!isActiveFontTab) {
-        if (hasSyncedFontSeoUrlRef.current && currentPath.startsWith('/fonts/')) {
+        if (mainTab === 'library' && fontsLibraryTab === 'catalog') {
+          if (currentPath === '/fonts') return;
+          if (currentPath.startsWith('/fonts/') && !hasSyncedFontSeoUrlRef.current) return;
+          window.history.replaceState(window.history.state, '', '/fonts');
+          return;
+        }
+        if (currentPath === '/fonts' || (hasSyncedFontSeoUrlRef.current && currentPath.startsWith('/fonts/'))) {
           window.history.replaceState(window.history.state, '', '/');
         }
         return;
@@ -497,6 +509,7 @@ export function useEditorHomePage(
       selectedFont?.name,
       selectedFont?.originKey,
       selectedFont?.source,
+      fontsLibraryTab,
     ]);
 
     /** При клике по вкладке шрифта — восстановить selectedFont и настройки превью. */

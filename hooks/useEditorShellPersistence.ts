@@ -21,6 +21,8 @@ type UseEditorShellPersistenceParams = {
   emptySlotIds: string[];
   closedLibraryFontIds: string[];
   fontsLibraryTab: string;
+  routeInitialMainTab?: string | null;
+  routeInitialFontsLibraryTab?: string | null;
   setMainTab: Dispatch<SetStateAction<string>>;
   setEmptySlotIds: Dispatch<SetStateAction<string[]>>;
   setClosedLibraryFontIds: Dispatch<SetStateAction<string[]>>;
@@ -38,6 +40,8 @@ export function useEditorShellPersistence({
   emptySlotIds,
   closedLibraryFontIds,
   fontsLibraryTab,
+  routeInitialMainTab = null,
+  routeInitialFontsLibraryTab = null,
   setMainTab,
   setEmptySlotIds,
   setClosedLibraryFontIds,
@@ -96,6 +100,9 @@ export function useEditorShellPersistence({
       if (catalogEditorDeepLink) {
         previewTextDbg('shell: deep link openGoogle/openFontsource — mainTab pending, без вкладки «каталог»', {});
         setMainTab(EDITOR_MAIN_TAB_PENDING);
+      } else if (routeInitialMainTab) {
+        previewTextDbg('shell: route override mainTab', { mainTab: routeInitialMainTab });
+        setMainTab(routeInitialMainTab);
       } else {
         previewTextDbg('shell: восстановление mainTab из localStorage (до этого per-font snapshot мог ждать)', {
           mainTab: shell.mainTab,
@@ -105,6 +112,9 @@ export function useEditorShellPersistence({
     } else {
       editorShellDbg('layout#1: readEditorShellFromStorage вернул null', {});
       previewTextDbg('shell: readEditorShellFromStorage null — mainTab из shell не выставлен', {});
+      if (routeInitialMainTab) {
+        setMainTab(routeInitialMainTab);
+      }
     }
     try {
       localStorage.removeItem('editorClosedFontTabIds');
@@ -130,7 +140,9 @@ export function useEditorShellPersistence({
 
     try {
       const inner = localStorage.getItem(FONTS_LIBRARY_INNER_TAB_LS_KEY);
-      if (inner === 'catalog' || inner?.startsWith(SAVED_LIBRARY_TAB_PREFIX)) {
+      if (routeInitialFontsLibraryTab) {
+        setFontsLibraryTab(routeInitialFontsLibraryTab);
+      } else if (inner === 'catalog' || inner?.startsWith(SAVED_LIBRARY_TAB_PREFIX)) {
         setFontsLibraryTab(inner);
       } else if (inner === 'session') {
         setFontsLibraryTab('catalog');
@@ -154,6 +166,8 @@ export function useEditorShellPersistence({
     previewTextDbg('shell: hasRestoredEditorMainTab = true (можно применять дефолтный snapshot для library/empty)', {});
   }, [
     initialSessionFontOrderIdsRef,
+    routeInitialFontsLibraryTab,
+    routeInitialMainTab,
     setClosedLibraryFontIds,
     setEmptySlotIds,
     setFontsLibraryTab,
