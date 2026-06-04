@@ -12,6 +12,7 @@ export type PreviewModeDockProps = {
  */
 export function PreviewModeDock({ bottomOffsetPx = 52, className = '' }: PreviewModeDockProps) {
   const { viewMode, setViewMode } = useSettings();
+  const infoActive = viewMode === 'info';
 
   const bottom = Math.max(0, Number(bottomOffsetPx) || 0) + 10;
 
@@ -27,15 +28,29 @@ export function PreviewModeDock({ bottomOffsetPx = 52, className = '' }: Preview
             <div className="flex h-[10px] items-center justify-center" aria-hidden>
               <div className="h-1.5 w-10 rounded-full bg-gray-300/80" />
             </div>
-            <div className="flex h-[54px] items-center justify-center">
+            <div className="flex h-[54px] items-center justify-center gap-2">
               <SegmentedControl
-                value={viewMode}
+                value={infoActive ? '' : viewMode}
                 onChange={setViewMode}
                 options={VIEW_MODE_OPTIONS}
                 variant="surface"
                 label="Режим превью"
                 className="w-[320px] min-w-0"
               />
+              <button
+                type="button"
+                aria-label="Информация о шрифте"
+                aria-pressed={infoActive}
+                title="Информация о шрифте"
+                onClick={() => setViewMode('info')}
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-0 text-sm font-bold italic leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 ${
+                  infoActive
+                    ? 'bg-accent text-white'
+                    : 'bg-gray-50 text-gray-800 hover:bg-gray-100 hover:text-accent'
+                }`}
+              >
+                i
+              </button>
             </div>
           </div>
         </div>

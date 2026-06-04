@@ -26,7 +26,7 @@ import {
 let cachedPages: { loadedAt: number; pages: FontSeoPage[] } | null = null;
 const CACHE_MS = 60 * 60 * 1000;
 const FONTSOURCE_DISK_CACHE_MIN = 500;
-const NAME_TABLE_CACHE_FILE = 'font-name-table-v1.json';
+const NAME_TABLE_CACHE_FILE = 'font-name-table-v2.json';
 
 type FontNameTableDiskCache = {
   updatedAt?: number;
@@ -188,18 +188,21 @@ async function fetchNameTableForPage(page: FontSeoPage): Promise<FontNameTable |
 async function enrichFontSeoPageWithNameTable(page: FontSeoPage): Promise<FontSeoPage> {
   const cache = await readNameTableDiskCache();
   const key = cacheKeyForPage(page);
-  if (cache.entries && key in cache.entries) {
-    return applyFontNameTableToSeoPage(page, cache.entries[key] || null);
+  const cachedTable = cache.entries?.[key];
+  if (cachedTable) {
+    return applyFontNameTableToSeoPage(page, cachedTable);
   }
 
   const table = await fetchNameTableForPage(page).catch((error) => {
     console.warn('[fontSeoPagesServer] name table failed:', page.slug, error instanceof Error ? error.message : String(error));
     return null;
   });
-  cache.entries = { ...(cache.entries || {}), [key]: table };
-  await writeNameTableDiskCache(cache).catch((error) => {
-    console.warn('[fontSeoPagesServer] name table cache write failed:', error instanceof Error ? error.message : String(error));
-  });
+  if (table) {
+    cache.entries = { ...(cache.entries || {}), [key]: table };
+    await writeNameTableDiskCache(cache).catch((error) => {
+      console.warn('[fontSeoPagesServer] name table cache write failed:', error instanceof Error ? error.message : String(error));
+    });
+  }
   return applyFontNameTableToSeoPage(page, table);
 }
 

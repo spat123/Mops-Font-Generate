@@ -128,8 +128,34 @@ const WaterfallMode = ({
   const [scrollParentEl, setScrollParentEl] = useState(null);
 
   useLayoutEffect(() => {
-    const el = scrollParentRef?.current;
-    setScrollParentEl(el instanceof HTMLElement ? el : null);
+    let frameOne = 0;
+    let frameTwo = 0;
+    let observer = null;
+
+    const syncScrollParent = () => {
+      const el = scrollParentRef?.current;
+      setScrollParentEl(el instanceof HTMLElement ? el : null);
+    };
+
+    syncScrollParent();
+    frameOne = window.requestAnimationFrame(() => {
+      syncScrollParent();
+      frameTwo = window.requestAnimationFrame(syncScrollParent);
+    });
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const el = scrollParentRef?.current;
+      if (el instanceof HTMLElement) {
+        observer = new ResizeObserver(syncScrollParent);
+        observer.observe(el);
+      }
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frameOne);
+      window.cancelAnimationFrame(frameTwo);
+      observer?.disconnect?.();
+    };
   }, [scrollParentRef]);
 
   const baseTextStyle = useMemo(() => {
