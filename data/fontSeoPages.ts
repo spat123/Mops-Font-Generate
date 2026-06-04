@@ -1,5 +1,6 @@
 import { slugifyFontKey } from '../utils/fontSlug';
 import type { SessionFontRecord } from '../types/editorFonts';
+import type { FontNameTable } from '../utils/fontNameTable';
 
 export type FontLicenseColumn = {
   title: string;
@@ -41,6 +42,7 @@ export type FontSeoPage = {
   externalLinks?: FontExternalLink[];
   licenseColumns: FontLicenseColumn[];
   additionalInfo: FontAdditionalInfoRow[];
+  nameTable?: FontNameTable;
 };
 
 const APACHE_2_COLUMNS: FontLicenseColumn[] = [

@@ -8,6 +8,7 @@ import { loadFontFaceIfNeeded, buildVariableFontFaceDescriptors } from './cssGen
 import type { SessionFontRecord } from '../types/editorFonts';
 import { resolveDefaultCatalogSubset } from './catalogActiveSubset';
 import type { FvarAxisMeta } from './fontParser';
+import { extractFontNameTableFromParsedFont, type FontNameTable } from './fontNameTable';
 
 export type GoogleFontSlice = {
   blob?: Blob;
@@ -45,6 +46,7 @@ type LocalFontCacheEntry = {
   supportedAxes?: Record<string, CachedAxisInfo>;
   instanceStyles?: FontInstanceStyle[];
   os2WeightClass?: number | null;
+  nameTable?: FontNameTable | null;
 };
 
 const localFontCache: Record<string, LocalFontCacheEntry> = {};
@@ -308,6 +310,7 @@ export const processLocalFont = async (
         file: file, // Оставляем файл для возможного повторного использования
         url: objectUrl, // Keep blob URL for FontFace API.
         fontFamily: fontFamilyName, // Keep generated family name.
+        nameTable: cachedMetadata.nameTable || null,
       };
 
       // Восстанавливаем оси и стили из кэшированных метаданных
@@ -478,11 +481,13 @@ export const processLocalFont = async (
       // Используем данные из parsedFontData (результат opentype.parse)
       // Получаем имена (предпочтительно английские)
       const names = parsedFontData.names || {};
+      const nameTable = extractFontNameTableFromParsedFont(parsedFontData);
       const preferredFamily = names.preferredFamily?.en || names.fontFamily?.en;
       const preferredSubfamily = names.preferredSubfamily?.en || names.fontSubfamily?.en || 'Regular';
 
       fontObj.name = preferredFamily || fontObj.name;
       fontObj.isVariableFont = isVariableFont(parsedFontData); // Используем isVariableFont
+      fontObj.nameTable = nameTable;
 
       const fvarAxes = parsedFontData.tables?.fvar?.axes;
       if (fontObj.isVariableFont && Array.isArray(fvarAxes)) {
@@ -609,6 +614,7 @@ export const processLocalFont = async (
               const inst = fontObj.fontInstanceStyles;
               return Array.isArray(inst) && inst.length > 0 ? inst : null;
             })(),
+            nameTable,
         };
         localFontCache[cacheKey] = metadataToCache;
       }

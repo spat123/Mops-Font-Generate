@@ -5,6 +5,7 @@ import { PopupDialogHeader } from '../ui/PopupDialogHeader';
 import { useDismissibleLayer } from '../ui/useDismissibleLayer';
 import { findFontSeoPageForFont, type FontSeoPage } from '../../data/fontSeoPages';
 import { resolveSessionFontDisplayLabel } from '../../utils/fontSlug';
+import { fontNameTableToAdditionalInfoRows } from '../../utils/fontNameTable';
 import { pluralRu } from '../../utils/pluralRu';
 import type { SessionFontRecord } from '../../types/editorFonts';
 
@@ -60,6 +61,7 @@ function countLabel(count: unknown, one: string, few: string, many: string): str
 
 function buildGenericInfo(font?: SessionFontRecord | null): ResolvedFontInfo {
   const title = resolveSessionFontDisplayLabel(font);
+  const nameTable = font?.nameTable || null;
   const subsets = asStringList(font?.catalogSubsets || font?.subsets);
   const styles = Array.isArray(font?.availableStyles)
     ? font.availableStyles
@@ -80,10 +82,13 @@ function buildGenericInfo(font?: SessionFontRecord | null): ResolvedFontInfo {
       'Для этого шрифта пока нет расширенной SEO-карточки. DINAMIC FONT показывает доступные технические данные из файла и каталога: вариативность, начертания, языковые наборы и текущий источник.',
     ],
     chips,
-    licenseName: 'Лицензия не указана',
+    licenseName: nameTable?.license ? 'Лицензия из файла шрифта' : 'Лицензия не указана',
     licenseDescription:
+      nameTable?.license ||
       'Проверьте условия лицензии у автора или в исходном каталоге шрифта перед коммерческим использованием.',
-    designers: [],
+    copyright: nameTable?.copyright,
+    studio: nameTable?.manufacturer,
+    designers: nameTable?.designer ? [nameTable.designer] : [],
     externalLinks: [],
     licenseColumns: [
       { title: 'Права доступа', items: ['Зависят от лицензии исходного файла'] },
@@ -96,6 +101,7 @@ function buildGenericInfo(font?: SessionFontRecord | null): ResolvedFontInfo {
       { label: 'File name', value: String(font?.originalName || font?.filename || font?.name || title) },
       { label: 'Variable', value: font?.isVariableFont ? 'Yes' : 'No' },
       { label: 'Active subset', value: String(font?.activeSubset || '') },
+      ...fontNameTableToAdditionalInfoRows(nameTable),
     ].filter((row) => row.value),
   };
 }
@@ -103,6 +109,7 @@ function buildGenericInfo(font?: SessionFontRecord | null): ResolvedFontInfo {
 export function resolveFontInfo(font?: SessionFontRecord | null, page?: FontSeoPage | null): ResolvedFontInfo {
   const seo = page || findFontSeoPageForFont(font);
   if (!seo) return buildGenericInfo(font);
+  const nameTable = font?.nameTable || seo.nameTable || null;
 
   const chips = [
     seo.isVariable ? 'Вариативный шрифт' : 'Статический шрифт',
@@ -119,13 +126,19 @@ export function resolveFontInfo(font?: SessionFontRecord | null, page?: FontSeoP
     description: seo.description,
     chips,
     licenseName: seo.licenseName,
-    licenseDescription: seo.licenseDescription,
-    copyright: seo.copyright,
-    studio: seo.studio,
-    designers: seo.designers || [],
+    licenseDescription: nameTable?.license || seo.licenseDescription,
+    copyright: nameTable?.copyright || seo.copyright,
+    studio: nameTable?.manufacturer || seo.studio,
+    designers: nameTable?.designer ? [nameTable.designer] : seo.designers || [],
     externalLinks: seo.externalLinks || [],
     licenseColumns: seo.licenseColumns,
-    additionalInfo: seo.additionalInfo,
+    additionalInfo: [
+      ...fontNameTableToAdditionalInfoRows(nameTable),
+      ...seo.additionalInfo,
+    ].filter((row, index, rows) => {
+      const key = String(row.label || '').trim().toLowerCase();
+      return Boolean(row.value) && rows.findIndex((item) => String(item.label || '').trim().toLowerCase() === key) === index;
+    }),
   };
 }
 

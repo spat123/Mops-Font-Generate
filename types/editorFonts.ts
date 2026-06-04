@@ -1,3 +1,5 @@
+import type { FontNameTable } from '../utils/fontNameTable';
+
 /** Шрифт в сессии редактора (IndexedDB + runtime). */
 export type SessionFontRecord = {
   id: string;
@@ -25,6 +27,7 @@ export type SessionFontRecord = {
   currentWeight?: number;
   currentStyle?: string;
   availableStyles?: Array<{ name?: string; weight?: number; style?: string; coordinates?: Record<string, number> }>;
+  nameTable?: FontNameTable | null;
   arrayBuffer?: ArrayBuffer;
   [key: string]: unknown;
 };

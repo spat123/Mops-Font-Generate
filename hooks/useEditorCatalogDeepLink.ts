@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { NextRouter } from 'next/router';
 import { readGoogleFontCatalogCache } from '../utils/googleFontCatalogCache';
 
@@ -11,6 +11,7 @@ type UseEditorCatalogDeepLinkParams = {
   openGoogleCatalogEntryInEditorTab: (entry: Record<string, unknown>) => Promise<void>;
   openFontsourceSlugInEditorTab: (slug: string, isVariable?: boolean) => Promise<unknown>;
   setViewMode?: (mode: string) => void;
+  initialOpenQuery?: Record<string, string> | null;
 };
 
 /**
@@ -22,31 +23,39 @@ export function useEditorCatalogDeepLink({
   openGoogleCatalogEntryInEditorTab,
   openFontsourceSlugInEditorTab,
   setViewMode,
+  initialOpenQuery = null,
 }: UseEditorCatalogDeepLinkParams): void {
+  const openedInitialLinkKeyRef = useRef('');
+
   useLayoutEffect(() => {
     if (!router.isReady) return;
     if (!isInitialLoadComplete) return;
-    const rawG = router.query.openGoogle;
-    const rawFs = router.query.openFontsource;
+    const rawG = router.query.openGoogle ?? initialOpenQuery?.openGoogle;
+    const rawFs = router.query.openFontsource ?? initialOpenQuery?.openFontsource;
     const family = typeof rawG === 'string' ? rawG.trim() : '';
     const slug = typeof rawFs === 'string' ? rawFs.trim() : '';
-    const googleVarRaw = router.query.openGoogleVar;
+    const googleVarRaw = router.query.openGoogleVar ?? initialOpenQuery?.openGoogleVar;
     const googleVar =
       googleVarRaw === '1' ||
       googleVarRaw === 'true' ||
       (Array.isArray(googleVarRaw) && googleVarRaw.includes('true'));
-    const fsVarRaw = router.query.fontsourceVar;
+    const fsVarRaw = router.query.fontsourceVar ?? initialOpenQuery?.fontsourceVar;
     const fsVar =
       fsVarRaw === '1' ||
       fsVarRaw === 'true' ||
       (Array.isArray(fsVarRaw) && fsVarRaw.includes('true'));
-    const openView = typeof router.query.openView === 'string' ? router.query.openView.trim().toLowerCase() : '';
+    const rawOpenView = router.query.openView ?? initialOpenQuery?.openView;
+    const openView = typeof rawOpenView === 'string' ? rawOpenView.trim().toLowerCase() : '';
+    const hasUrlOpenQuery = Boolean(router.query.openGoogle || router.query.openFontsource);
+    const isInitialOpenQuery = !hasUrlOpenQuery && Boolean(initialOpenQuery && (family || slug));
 
     if (!family && !slug) return;
 
     const linkKey = family ? `google:${family}:${googleVar ? '1' : '0'}` : `fontsource:${slug}:${fsVar ? '1' : '0'}`;
+    if (isInitialOpenQuery && openedInitialLinkKeyRef.current === linkKey) return;
     if (editorDeepLinkInFlight.has(linkKey)) return;
     editorDeepLinkInFlight.add(linkKey);
+    if (isInitialOpenQuery) openedInitialLinkKeyRef.current = linkKey;
     const existingTask = editorDeepLinkTasks.get(linkKey);
     if (existingTask) {
       editorDeepLinkInFlight.delete(linkKey);
@@ -102,7 +111,9 @@ export function useEditorCatalogDeepLink({
           await openFontsourceSlugInEditorTab(slug, fsVar);
         }
       } finally {
-        await stripOpenQuery();
+        if (hasUrlOpenQuery) {
+          await stripOpenQuery();
+        }
       }
     })();
 
@@ -122,6 +133,7 @@ export function useEditorCatalogDeepLink({
     router.query.openFontsource,
     router.query.fontsourceVar,
     router.query.openView,
+    initialOpenQuery,
     openGoogleCatalogEntryInEditorTab,
     openFontsourceSlugInEditorTab,
     setViewMode,

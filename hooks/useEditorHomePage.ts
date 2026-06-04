@@ -46,7 +46,10 @@ import { useSessionFontTabsPreviewCache } from './useSessionFontTabsPreviewCache
 import { buildEditorHomeLayoutProps } from './buildEditorHomeLayoutProps';
 import type { EditorHomeLayoutProps } from '../types/editorHome';
 
-export function useEditorHomePage(router: NextRouter) {
+export function useEditorHomePage(
+  router: NextRouter,
+  options: { initialOpenQuery?: Record<string, string> | null } = {},
+) {
   useShareRouteRedirect(router);
 
     // Получаем настройки из контекста
@@ -634,6 +637,7 @@ export function useEditorHomePage(router: NextRouter) {
       openGoogleCatalogEntryInEditorTab,
       openFontsourceSlugInEditorTab,
       setViewMode,
+      initialOpenQuery: options.initialOpenQuery || null,
     });
 
     const openLibraryFontEntry = useOpenLibraryFontEntry({
