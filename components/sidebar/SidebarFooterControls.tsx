@@ -6,6 +6,7 @@ import { PopupDialogHeader } from "../ui/PopupDialogHeader";
 import { AuthAccountPopover } from "../auth/AuthAccountPopover";
 import { AppButton } from "../ui/AppButton";
 import { Tooltip } from "../ui/Tooltip";
+import { legalMeta } from "../../config/legal";
 
 function IconSettings(props) {
   return (
@@ -80,14 +81,6 @@ function IconUsers({ className }) {
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 00-3-3.87" />
       <path d="M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  );
-}
-
-function IconTelegram({ className }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
     </svg>
   );
 }
@@ -402,8 +395,11 @@ function ContactCard({
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    if (url) {
-      navigator.clipboard.writeText(url);
+    const copyValue = url?.startsWith("mailto:")
+      ? url.replace(/^mailto:/i, "")
+      : url;
+    if (copyValue) {
+      navigator.clipboard.writeText(copyValue);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -429,7 +425,13 @@ function ContactCard({
         <div className="flex border-t border-gray-100">
           <button
             type="button"
-            onClick={() => window.open(url, "_blank")}
+            onClick={() => {
+              if (url.startsWith("mailto:")) {
+                window.location.href = url;
+              } else {
+                window.open(url, "_blank");
+              }
+            }}
             className="flex flex-1 items-center justify-center gap-1.5 border-r border-gray-100 px-4 py-2.5 text-xs font-medium text-gray-700 transition-colors hover:bg-accent/5 hover:text-accent"
           >
             <IconExternalLink className="h-3.5 w-3.5" />
@@ -584,38 +586,12 @@ export default function SidebarFooterControls({
 
           <div className="grid gap-4">
             <ContactCard
-              icon={IconTelegram}
-              label="Telegram"
-              title="Канал обновлений"
-              description="Новости продукта, опросы по фичам и быстрый фидбек."
-              placeholder
-            />
-            <ContactCard
               icon={IconMail}
               label="Email"
-              title="Прямой контакт"
-              description="Деловые запросы, коллаборации и вопросы вне соцсетей."
-              placeholder
+              title={legalMeta.supportEmail}
+              description="Баг-репорты, вопросы по сервису, коллаборации и предложения по улучшению."
+              url={`mailto:${legalMeta.supportEmail}`}
             />
-          </div>
-
-          <div className="rounded-md border border-dashed border-gray-300 bg-gray-50 p-4">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-              <svg
-                className="h-4 w-4 text-gray-400"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              <span>
-                Контактные данные будут добавлены после запуска проекта
-              </span>
-            </div>
           </div>
         </div>
       );
