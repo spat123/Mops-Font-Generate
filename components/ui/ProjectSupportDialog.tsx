@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSupportDonation } from '../../hooks/useSupportDonation';
 import {
   getPrimaryProjectSupportLink,
   getProjectSupportEmailLink,
   getProjectSupportLinks,
   getSupportQuickAmounts,
-  openSupportDonation,
 } from '../../utils/projectSupport';
 import { EditAssetIcon } from './EditAssetIcon';
 import { heartIconUrl } from './editIconUrls';
@@ -29,6 +29,7 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
   const primaryLink = getPrimaryProjectSupportLink();
   const extraLinks = getProjectSupportLinks().slice(primaryLink ? 1 : 0);
   const fallbackLink = getProjectSupportEmailLink();
+  const { donate, isSubmitting, error, providerLabel } = useSupportDonation();
   const resolvedAmount =
     selection === 'custom' ? Number.parseInt(customAmount.replace(/\s/g, ''), 10) : selection;
   const canDonate = Number.isFinite(resolvedAmount) && resolvedAmount > 0;
@@ -54,9 +55,10 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
   }, [onClose, open]);
 
   const handleDonate = () => {
-    if (!canDonate) return;
-    openSupportDonation(resolvedAmount);
-    onClose();
+    if (!canDonate || isSubmitting) return;
+    void donate(resolvedAmount).then((ok) => {
+      if (ok) onClose();
+    });
   };
 
   if (!open || typeof document === 'undefined') return null;
@@ -151,17 +153,23 @@ export function ProjectSupportDialog({ open, onClose }: ProjectSupportDialogProp
 
           <button
             type="button"
-            disabled={!canDonate}
+            disabled={!canDonate || isSubmitting}
             className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-accent bg-accent text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:border-accent-hover hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
             onClick={handleDonate}
           >
             <EditAssetIcon src={heartIconUrl} className="h-4 w-4" />
-            Поддержать проект
+            {isSubmitting ? 'Переход к оплате…' : 'Поддержать проект'}
           </button>
 
-          {primaryLink ? (
+          {error ? (
+            <p className="mt-3 text-center text-xs leading-relaxed text-red-600" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          {providerLabel ? (
             <p className="mt-4 text-center text-xs leading-relaxed text-gray-500">
-              Оплата через {primaryLink.label}. Сумму можно изменить на странице платёжного сервиса.
+              Оплата через {providerLabel}. Донат добровольный и не является оплатой товара или услуги.
             </p>
           ) : null}
 

@@ -3,8 +3,8 @@ import { legalMeta } from '../../config/legal';
 import { BookOpenIcon } from '../library/KnowledgeBaseNavButton';
 import {
   getSupportQuickAmounts,
-  openSupportDonation,
 } from '../../utils/projectSupport';
+import { useSupportDonation } from '../../hooks/useSupportDonation';
 import { EditAssetIcon } from '../ui/EditAssetIcon';
 import { heartIconUrl } from '../ui/editIconUrls';
 
@@ -58,6 +58,7 @@ function EmptyStateSupportWidget() {
   const quickAmounts = useMemo(() => getSupportQuickAmounts(), []);
   const [selection, setSelection] = useState<number | 'custom'>(() => quickAmounts[0] ?? 100);
   const [customAmount, setCustomAmount] = useState('');
+  const { donate, isSubmitting, error, providerLabel } = useSupportDonation();
 
   const resolvedAmount =
     selection === 'custom' ? Number.parseInt(customAmount.replace(/\s/g, ''), 10) : selection;
@@ -65,8 +66,8 @@ function EmptyStateSupportWidget() {
   const canDonate = Number.isFinite(resolvedAmount) && resolvedAmount > 0;
 
   const handleDonate = () => {
-    if (!canDonate) return;
-    openSupportDonation(resolvedAmount);
+    if (!canDonate || isSubmitting) return;
+    void donate(resolvedAmount);
   };
 
   return (
@@ -127,13 +128,25 @@ function EmptyStateSupportWidget() {
 
       <button
         type="button"
-        disabled={!canDonate}
+        disabled={!canDonate || isSubmitting}
         className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-accent bg-accent text-sm font-semibold uppercase tracking-wide text-white transition-colors hover:border-accent-hover hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         onClick={handleDonate}
       >
         <EditAssetIcon src={heartIconUrl} className="h-4 w-4" />
-        Поддержать проект
+        {isSubmitting ? 'Переход к оплате…' : 'Поддержать проект'}
       </button>
+
+      {error ? (
+        <p className="mt-3 text-center text-xs leading-relaxed text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {providerLabel ? (
+        <p className="mt-3 text-center text-xs leading-relaxed text-gray-500">
+          Оплата через {providerLabel}. Донат добровольный и не является оплатой товара или услуги.
+        </p>
+      ) : null}
     </div>
   );
 }

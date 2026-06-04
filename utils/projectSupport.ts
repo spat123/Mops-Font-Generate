@@ -142,6 +142,30 @@ export function openSupportDonation(amountRub: number) {
   }
 }
 
+export async function startSupportDonation(amountRub: number): Promise<void> {
+  const response = await fetch('/api/support/yookassa/create-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amountRub }),
+  });
+
+  if (response.status === 503) {
+    openSupportDonation(amountRub);
+    return;
+  }
+
+  const payload = (await response.json().catch(() => ({}))) as {
+    confirmationUrl?: string;
+    error?: string;
+  };
+
+  if (!response.ok || !payload.confirmationUrl) {
+    throw new Error(payload.error || 'Не удалось создать платёж');
+  }
+
+  window.location.assign(payload.confirmationUrl);
+}
+
 export function getSupportQuickAmounts(): number[] {
   const quick = getSupportAmountPresets().slice(0, 3);
   return quick.length > 0 ? quick : [100, 300, 500];
