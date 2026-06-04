@@ -542,7 +542,7 @@ export default function SidebarFooterControls({
             <FeatureCard
               icon={IconPalette}
               title="Гибкие режимы предпросмотра"
-              description="Текстовый режим, галерея глифов, таблица стилей и каскад размеров — для полной проверки шрифта."
+              description="Текстовый режим, галерея глифов, таблица стилей и Type Scale — для полной проверки шрифта."
             />
             <FeatureCard
               icon={IconCode}

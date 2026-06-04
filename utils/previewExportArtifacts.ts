@@ -1,5 +1,5 @@
 /**
- * Генерация вспомогательных файлов экспорта по режимам превью (plain / waterfall / glyphs / styles).
+ * Генерация вспомогательных файлов экспорта по режимам превью (plain / type scale / glyphs / styles).
  */
 
 import { parseFontBuffer } from './fontParser';
@@ -242,7 +242,7 @@ export function buildWaterfallLadderPlainText(meta: WaterfallLadderMeta | null |
   const { rows, base, unit, r, editTarget, sizesPx } = getWaterfallLadderSizes(meta);
   const target = editTarget === 'heading' ? 'Heading' : 'Body';
   const lines = [
-    `Waterfall — ${name}`,
+    `Type Scale — ${name}`,
     `Строк: ${rows}, база: ${base}px, шаг: ${r}, подписи: ${unit}, слой: ${target}`,
     '',
     'Размеры по строкам (px):',
@@ -254,7 +254,7 @@ export function buildWaterfallLadderPlainText(meta: WaterfallLadderMeta | null |
   return lines.join('\n');
 }
 
-/** Блок комментариев для Waterfall CSS: параметры лестницы и размеры строк. */
+/** Блок комментариев для Type Scale CSS: параметры лестницы и размеры строк. */
 export function buildWaterfallLadderCssComments(
   meta: WaterfallLadderMeta | null | undefined,
   fontName: string,
@@ -263,7 +263,7 @@ export function buildWaterfallLadderCssComments(
   const { rows, base, unit, r, editTarget, sizesPx } = getWaterfallLadderSizes(meta);
   const target = editTarget === 'heading' ? 'Heading' : 'Body';
   const lines = [
-    '/* --- Waterfall: лестница размеров --- */',
+    '/* --- Type Scale: лестница размеров --- */',
     `/* Шрифт: ${name} */`,
     `/* Строк: ${rows}, база: ${base}px, шаг: ${r}, подписи: ${unit}, слой: ${target} */`,
     '/* font-size по строкам (сверху вниз): */',

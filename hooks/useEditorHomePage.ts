@@ -140,6 +140,7 @@ export function useEditorHomePage(
       EMPTY_SELECTION_TOOLBAR_ACTIONS,
     );
     const [catalogPreviewSlotsById, setCatalogPreviewSlotsById] = useState({});
+    const hasSyncedFontSeoUrlRef = useRef(false);
     const {
       libraries: fontLibraries,
       createLibrary: createFontLibrary,
@@ -452,7 +453,18 @@ export function useEditorHomePage(
 
     useEffect(() => {
       if (typeof window === 'undefined') return;
-      if (router.pathname.startsWith('/fonts')) return;
+      if (!isInitialLoadComplete) return;
+      if (mainTab === EDITOR_MAIN_TAB_PENDING) return;
+      const isActiveFontTab = isFontTabId(mainTab) && selectedFont?.id === mainTab;
+      const currentPath = window.location.pathname;
+
+      if (!isActiveFontTab) {
+        if (hasSyncedFontSeoUrlRef.current && currentPath.startsWith('/fonts/')) {
+          window.history.replaceState(window.history.state, '', '/');
+        }
+        return;
+      }
+
       const source = String(selectedFont?.source || '').trim().toLowerCase();
       const originKey = String(selectedFont?.originKey || '').trim();
       let slug = '';
@@ -473,12 +485,15 @@ export function useEditorHomePage(
 
       if (!slug) return;
       const nextPath = `/fonts/${slug}`;
-      if (window.location.pathname === nextPath) return;
+      hasSyncedFontSeoUrlRef.current = true;
+      if (currentPath === nextPath) return;
       window.history.replaceState(window.history.state, '', nextPath);
     }, [
-      router.pathname,
+      isInitialLoadComplete,
+      mainTab,
       selectedFont?.displayName,
       selectedFont?.fontsourceSlug,
+      selectedFont?.id,
       selectedFont?.name,
       selectedFont?.originKey,
       selectedFont?.source,

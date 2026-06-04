@@ -9,7 +9,7 @@ export const OG_IMAGE_WIDTH = 525;
 export const OG_IMAGE_HEIGHT = 225;
 export const DEFAULT_TITLE = 'DINAMIC FONT — проверка, создание и анимация шрифтов';
 export const DEFAULT_DESCRIPTION =
-  'Онлайн-редактор шрифтов: сравнивайте начертания, собирайте библиотеки, загружайте свои файлы и экспортируйте результат.';
+  'DINAMIC FONT — онлайн-редактор шрифтов: проверяйте текст, glyphs и Type Scale, работайте с variable fonts, собирайте библиотеки и экспортируйте результат.';
 
 export type SiteSeoMeta = {
   title: string;

@@ -133,7 +133,7 @@ function getSidebarCountControl({
   if (isWaterfallView) {
     return {
       value: waterfallRows,
-      ariaLabel: 'Количество рядов Waterfall',
+      ariaLabel: 'Количество рядов Type Scale',
       incAriaLabel: 'Увеличить ряды',
       decAriaLabel: 'Уменьшить ряды',
       onChange: (nextValue) => setWaterfallRows(clampWaterfallRows(nextValue)),
@@ -2018,7 +2018,7 @@ export default function Sidebar({
                     },
                   ]}
                   className={sidebarSelectClass}
-                  aria-label="Waterfall: шкала"
+                  aria-label="Type Scale: шкала"
                 />
                 {isPro && waterfallScaleSelectKey === 'custom' ? (
                   <div className="flex min-w-0 items-center gap-2">
@@ -2038,7 +2038,7 @@ export default function Sidebar({
                         setWaterfallScaleRatio(clamped);
                       }}
                       className="no-arrows h-8 min-w-0 flex-1 rounded-md border border-gray-50 bg-gray-50 px-2 text-xs tabular-nums text-gray-800 focus:border-black/[0.14] focus:outline-none"
-                      aria-label="Waterfall: коэффициент"
+                      aria-label="Type Scale: коэффициент"
                     />
                     <span
                       className="shrink-0 rounded bg-gray-900/90 px-1.5 py-1 text-[9px] font-bold uppercase leading-none tracking-wide text-white"
@@ -2067,7 +2067,7 @@ export default function Sidebar({
                       variant="toolbar"
                       pressed={waterfallRoundEnabled}
                       aria-pressed={waterfallRoundEnabled}
-                      aria-label="Переключить округление размеров Waterfall"
+                      aria-label="Переключить округление размеров Type Scale"
                       onClick={() => setWaterfallRoundPx((v) => !v)}
                     >
                       <IconRoundingUp className="h-4 w-4 shrink-0" />

@@ -1,4 +1,4 @@
-/** Пресеты типографической шкалы Waterfall (модульная scale ratio). */
+/** Пресеты Type Scale (модульная scale ratio). */
 
 export type WaterfallScalePreset = {
   key: string;

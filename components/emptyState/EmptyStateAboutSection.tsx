@@ -25,6 +25,7 @@ export function EmptyStateAboutToggle({
       onClick={onToggle}
       aria-expanded={open}
       aria-controls="dynamic-font-about"
+      data-nosnippet
       className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-4 text-xs font-semibold uppercase backdrop-blur-sm transition-colors ${
         open
           ? 'border-accent bg-accent text-white hover:border-accent-hover hover:bg-accent-hover'
@@ -48,7 +49,21 @@ export function EmptyStateAboutToggle({
           />
         </svg>
       ) : (
-        <span aria-hidden>↓</span>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="none"
+          className="h-3.5 w-3.5"
+          aria-hidden
+        >
+          <path
+            d="M5 7.5 10 12.5 15 7.5"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       )}
     </button>
   );

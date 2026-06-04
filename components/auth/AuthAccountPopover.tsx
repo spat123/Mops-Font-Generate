@@ -233,10 +233,10 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
   const planBlurb = isPro
     ? planName === 'Beta'
       ? 'Открытая бета: полный доступ после регистрации, без оплаты на время тестирования.'
-      : 'Расширенные лимиты, своё значение шкалы Waterfall и без лимита шрифтов в «Поделиться».'
+      : 'Расширенные лимиты, своё значение шкалы Type Scale и без лимита шрифтов в «Поделиться».'
     : typeof librariesLimit === 'number'
-      ? `До ${librariesLimit} библиотек, ${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц, до ${MAX_SHARE_FONTS_FREE} шрифтов в ссылке «Поделиться». Waterfall — только пресеты шкалы.`
-      : 'Лимиты тарифа Free: библиотеки, генерации, «Поделиться», Waterfall — пресеты шкалы.';
+      ? `До ${librariesLimit} библиотек, ${FREE_STATIC_GENERATIONS_LIMIT} генераций VF → статик в месяц, до ${MAX_SHARE_FONTS_FREE} шрифтов в ссылке «Поделиться». Type Scale — только пресеты шкалы.`
+      : 'Лимиты тарифа Free: библиотеки, генерации, «Поделиться», Type Scale — пресеты шкалы.';
 
   const accountTriggerTooltip = loading
     ? 'Загрузка сессии…'
@@ -390,13 +390,13 @@ export function AuthAccountPopover({ isSidebarCollapsed = false }) {
                                   Поделиться:{' '}
                                   <span className="tabular-nums text-gray-800">до {MAX_SHARE_FONTS_FREE} в ссылке</span>
                                 </span>
-                                <span className="text-gray-600">Waterfall: пресеты шкалы</span>
+                                <span className="text-gray-600">Type Scale: пресеты шкалы</span>
                               </>
                             ) : (
                               <>
                                 <span className="text-gray-600">Генерация: без лимита</span>
                                 <span className="text-gray-600">Поделиться: без лимита</span>
-                                <span className="text-gray-600">Waterfall: своё значение шкалы</span>
+                                <span className="text-gray-600">Type Scale: своё значение шкалы</span>
                               </>
                             )}
                           </>

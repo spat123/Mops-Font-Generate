@@ -145,8 +145,8 @@ export const VIEW_MODE_OPTIONS = [
   },
   {
     value: 'waterfall',
-    label: 'Waterfall',
-    title: 'Waterfall — каскад размеров',
+    label: 'Type Scale',
+    title: 'Type Scale — типографская шкала размеров',
     Icon: IconViewWaterfall,
   },
   {

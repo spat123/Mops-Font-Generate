@@ -899,7 +899,7 @@ export function CollapsedSidebarControls({
       </Tooltip>
       {isWaterfallView ? (
         <Tooltip
-          content={`Waterfall цель: ${waterfallEditTarget === 'heading' ? 'Heading' : 'Body'}`}
+          content={`Type Scale цель: ${waterfallEditTarget === 'heading' ? 'Heading' : 'Body'}`}
           as="div"
           className="w-full"
         >
@@ -907,7 +907,7 @@ export function CollapsedSidebarControls({
             type="button"
             onClick={(event) => cycleWaterfallEditTargetCollapsed(event.currentTarget)}
             className="inline-flex h-8 w-full items-center justify-center rounded-md bg-accent px-2 text-[11px] font-semibold uppercase text-white transition-colors hover:bg-accent-hover"
-            aria-label="Переключить цель редактирования Waterfall"
+            aria-label="Переключить цель редактирования Type Scale"
           >
             {waterfallEditTarget === 'heading' ? 'H' : 'Body'}
           </button>
@@ -1240,9 +1240,9 @@ export function CollapsedSidebarControls({
             <Tooltip
               content={
                 activeWaterfallScalePreset?.label
-                  ? `Waterfall scale: ${activeWaterfallScalePreset.label}`
+                  ? `Type Scale: ${activeWaterfallScalePreset.label}`
                   : isPro
-                    ? `Waterfall scale: ${Number(waterfallScaleRatio).toFixed(3)} (своё)`
+                    ? `Type Scale: ${Number(waterfallScaleRatio).toFixed(3)} (своё)`
                     : 'Своё значение шкалы доступно после входа. Выберите пресет из списка.'
               }
               as="div"
@@ -1255,7 +1255,7 @@ export function CollapsedSidebarControls({
                 className="inline-flex h-8 w-full items-center justify-center rounded-md bg-gray-50 px-2 text-[11px] font-semibold tabular-nums text-black transition-colors hover:text-accent"
                 aria-haspopup="menu"
                 aria-expanded={isCollapsedScaleMenuOpen}
-                aria-label="Выбрать scale Waterfall"
+                aria-label="Выбрать шкалу Type Scale"
               >
                 {activeWaterfallScalePreset
                   ? Number(activeWaterfallScalePreset.ratio).toFixed(3)
@@ -1268,7 +1268,7 @@ export function CollapsedSidebarControls({
               type="button"
               onClick={(event) => cycleWaterfallUnitCollapsed(event.currentTarget)}
               className="inline-flex h-8 w-full items-center justify-center rounded-md bg-accent text-[11px] font-semibold uppercase text-white transition-colors hover:bg-accent-hover"
-              aria-label="Переключить единицы Waterfall"
+              aria-label="Переключить единицы Type Scale"
             >
               {String(waterfallUnit).toUpperCase()}
             </button>
@@ -1282,7 +1282,7 @@ export function CollapsedSidebarControls({
                   ? 'bg-accent text-white hover:bg-accent-hover'
                   : 'bg-gray-50 text-gray-800 hover:text-accent'
               }`}
-              aria-label="Переключить округление размеров Waterfall"
+              aria-label="Переключить округление размеров Type Scale"
               aria-pressed={waterfallRoundEnabled}
             >
               {RoundingIcon ? <RoundingIcon className="h-4 w-4 shrink-0" /> : null}

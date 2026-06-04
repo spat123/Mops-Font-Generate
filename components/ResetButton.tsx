@@ -61,7 +61,7 @@ function areValuesEqual(currentValue, defaultValue) {
   return currentValue === defaultValue;
 }
 
-/** Поля Waterfall — сброс в WF не трогает размер/типографику Plain. */
+/** Поля Type Scale — сброс в этом режиме не трогает размер/типографику Plain. */
 const WATERFALL_PREVIEW_RESET_KEYS = new Set([
   'waterfallRows',
   'waterfallBaseSize',
@@ -77,7 +77,7 @@ const WATERFALL_PREVIEW_RESET_KEYS = new Set([
   'waterfallRoundPx',
 ]);
 
-/** Plain / Text: типографика и фон превью (без полей Waterfall). */
+/** Plain / Text: типографика и фон превью (без полей Type Scale). */
 const PLAIN_TEXT_PREVIEW_RESET_KEYS = new Set([
   'fontSize',
   'lineHeight',
@@ -141,7 +141,7 @@ function getPerViewResetShortLabel(viewMode) {
     case 'plain':
       return 'Сбросить Plain';
     case 'waterfall':
-      return 'Сбросить Waterfall';
+      return 'Сбросить Type Scale';
     case 'styles':
       return 'Сбросить Styles';
     case 'glyphs':

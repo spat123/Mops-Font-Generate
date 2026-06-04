@@ -159,19 +159,38 @@ type FontSeoSeed = {
   description?: string[];
 };
 
+function buildFontSeoTitle(family: string): string {
+  return `${family} шрифт онлайн: проверить и скачать | DINAMIC FONT`;
+}
+
+function buildFontSeoDescription(family: string): string {
+  return `Шрифт ${family}: проверьте текст, кириллицу, начертания, glyphs и Type Scale онлайн. Лицензия, данные из файла шрифта и открытие ${family} в редакторе DINAMIC FONT.`;
+}
+
+function buildFontSeoSummary(family: string, sourceLabel: string): string {
+  return `${family} шрифт из ${sourceLabel}: онлайн-проверка текста, кириллицы, начертаний, glyphs, Type Scale и лицензии в DINAMIC FONT.`;
+}
+
+function buildFontSeoDescriptionBlocks(family: string, supportsCyrillic = true): string[] {
+  const cyrillicPart = supportsCyrillic ? 'кириллицу, ' : '';
+  return [
+    `Шрифт ${family} можно открыть в DINAMIC FONT, чтобы проверить свой текст, ${cyrillicPart}набор начертаний, размеры, glyphs и Type Scale перед использованием в интерфейсе, сайте или брендовой графике.`,
+    `На странице ${family} собраны лицензия, условия использования, технические данные из файла шрифта и постоянная ссылка для быстрого открытия шрифта в редакторе.`,
+  ];
+}
+
 const ROBOTO_PAGE: FontSeoPage = {
   slug: 'roboto',
   family: 'Roboto',
   source: 'google',
   openQuery: googleQuery('Roboto', true),
-  title: 'Roboto',
-  seoTitle: 'Roboto — скачать и проверить шрифт онлайн | DINAMIC FONT',
-  seoDescription:
-    'Проверьте Roboto онлайн: превью, начертания, кириллица, лицензия Apache 2.0, информация о дизайнере и быстрая загрузка в редактор DINAMIC FONT.',
-  summary: 'Roboto вариативный шрифт. Относится к семейству шрифтов Roboto.',
+  title: 'Roboto шрифт',
+  seoTitle: buildFontSeoTitle('Roboto'),
+  seoDescription: buildFontSeoDescription('Roboto'),
+  summary: buildFontSeoSummary('Roboto', 'Google Fonts'),
   description: [
-    'Roboto вариативный шрифт. Относится к семейству шрифтов Roboto. Гарнитура содержит 2 файла и поддерживает 71 язык. Лицензия Apache 2.0.',
-    'Семейство шрифтов Roboto является одним из самых распространённых в современном цифровом пространстве. Разработано компанией Google для мобильной операционной системы Android в 2011 году и с 2014 распространяется под лицензией Apache. Можно использовать в коммерческой и не коммерческой деятельности. Разработка Roboto велась Christian Robertson в Google.',
+    'Roboto шрифт можно открыть в DINAMIC FONT, чтобы проверить свой текст, кириллицу, набор начертаний, размеры, glyphs и Type Scale перед использованием в интерфейсе, сайте или брендовой графике.',
+    'Roboto — одно из самых распространённых семейств для цифровых интерфейсов. На странице доступны лицензия, условия использования, технические данные из файла шрифта и постоянная ссылка для быстрого открытия Roboto в редакторе.',
   ],
   isVariable: true,
   styleCount: 12,
@@ -342,22 +361,19 @@ function buildPopularGoogleFontPage(seed: FontSeoSeed): FontSeoPage {
   const hasItalic = seed.hasItalic === true;
   const summary =
     seed.summary ||
-    `${family} — популярный шрифт из каталога Google Fonts для проверки текста, начертаний и визуального характера в DINAMIC FONT.`;
+    buildFontSeoSummary(family, 'Google Fonts');
   const description =
     seed.description ||
-    [
-      `${family} можно открыть в DINAMIC FONT, чтобы быстро проверить внешний вид текста, поддержку кириллицы, набор начертаний и пригодность шрифта для интерфейса, сайта или брендовой графики.`,
-      `На этой странице можно посмотреть основную информацию о ${family}, уточнить лицензию и сразу перейти к тестированию шрифта в редакторе.`,
-    ];
+    buildFontSeoDescriptionBlocks(family);
 
   return {
     slug: slugifyFontKey(family),
     family,
     source: 'google',
     openQuery: googleQuery(family, isVariable),
-    title: family,
-    seoTitle: `${family} — проверить шрифт онлайн | DINAMIC FONT`,
-    seoDescription: `Проверьте ${family} онлайн в DINAMIC FONT: превью текста, начертания, кириллица, лицензия и быстрое открытие шрифта в редакторе.`,
+    title: `${family} шрифт`,
+    seoTitle: buildFontSeoTitle(family),
+    seoDescription: buildFontSeoDescription(family),
     summary,
     description,
     isVariable,
@@ -388,14 +404,11 @@ export function buildGeneratedGoogleFontSeoPageFromCatalog(row: Record<string, u
     family,
     source: 'google',
     openQuery: googleQuery(family, isVariable),
-    title: family,
-    seoTitle: `${family} — проверить шрифт онлайн | DINAMIC FONT`,
-    seoDescription: `Проверьте ${family} онлайн в DINAMIC FONT: превью текста, начертания, кириллица, лицензия и быстрое открытие шрифта в редакторе.`,
-    summary: `${family} — шрифт из каталога Google Fonts для проверки текста, начертаний и визуального характера в DINAMIC FONT.`,
-    description: [
-      `${family} можно открыть в DINAMIC FONT, чтобы быстро проверить внешний вид текста, поддержку кириллицы, набор начертаний и пригодность шрифта для интерфейса, сайта или брендовой графики.`,
-      `На этой странице можно посмотреть основную информацию о ${family}, уточнить лицензию и сразу перейти к тестированию шрифта в редакторе.`,
-    ],
+    title: `${family} шрифт`,
+    seoTitle: buildFontSeoTitle(family),
+    seoDescription: buildFontSeoDescription(family),
+    summary: buildFontSeoSummary(family, 'Google Fonts'),
+    description: buildFontSeoDescriptionBlocks(family),
     isVariable,
     hasItalic,
     languageCount,
@@ -430,14 +443,11 @@ export function buildGeneratedFontsourceSeoPageFromCatalog(row: Record<string, u
     family,
     source: 'fontsource',
     openQuery: fontsourceQuery(slug, isVariable),
-    title: family,
-    seoTitle: `${family} — проверить шрифт онлайн | DINAMIC FONT`,
-    seoDescription: `Проверьте ${family} онлайн в DINAMIC FONT: превью текста, начертания, лицензия Fontsource и быстрое открытие шрифта в редакторе.`,
-    summary: `${family} — шрифт из каталога Fontsource для проверки текста, начертаний и визуального характера в DINAMIC FONT.`,
-    description: [
-      `${family} можно открыть в DINAMIC FONT, чтобы быстро проверить внешний вид текста, доступные начертания и пригодность шрифта для интерфейса, сайта или брендовой графики.`,
-      `На этой странице можно посмотреть основную информацию о ${family}, уточнить лицензию и сразу перейти к тестированию шрифта в редакторе.`,
-    ],
+    title: `${family} шрифт`,
+    seoTitle: buildFontSeoTitle(family),
+    seoDescription: buildFontSeoDescription(family),
+    summary: buildFontSeoSummary(family, 'Fontsource'),
+    description: buildFontSeoDescriptionBlocks(family, false),
     isVariable,
     hasItalic,
     languageCount,
