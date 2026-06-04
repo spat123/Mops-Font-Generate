@@ -633,6 +633,7 @@ export function useEditorHomePage(router: NextRouter) {
       isInitialLoadComplete,
       openGoogleCatalogEntryInEditorTab,
       openFontsourceSlugInEditorTab,
+      setViewMode,
     });
 
     const openLibraryFontEntry = useOpenLibraryFontEntry({

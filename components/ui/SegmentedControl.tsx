@@ -326,7 +326,6 @@ export function SegmentedControl<T extends string = string>({
   if (variant === 'surface') {
     const n = options.length;
     const activeIndexRaw = options.findIndex((o) => o.value === value);
-    const activeIndex = activeIndexRaw >= 0 ? activeIndexRaw : 0;
     return (
       <div
         className={`group flex min-w-0 overflow-hidden rounded-full bg-gray-50 transition-colors ${disabled ? '' : 'hover:bg-gray-100'} ${className}`.trim()}
@@ -334,10 +333,10 @@ export function SegmentedControl<T extends string = string>({
         aria-label={label}
       >
         <div className="relative flex min-w-0 flex-1 overflow-hidden rounded-full">
-          {n > 0 ? (
+          {n > 0 && activeIndexRaw >= 0 ? (
             <div
               className="absolute inset-y-0 left-0 rounded-full bg-accent transition-transform duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]"
-              style={{ width: `${100 / n}%`, transform: `translateX(${activeIndex * 100}%)` }}
+              style={{ width: `${100 / n}%`, transform: `translateX(${activeIndexRaw * 100}%)` }}
               aria-hidden
             />
           ) : null}

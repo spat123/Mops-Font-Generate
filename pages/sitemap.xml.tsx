@@ -1,5 +1,6 @@
 import type { GetServerSideProps } from 'next';
 import { KNOWLEDGE_BASE_ARTICLES } from '../data/knowledgeBaseArticles';
+import { getAllFontSeoPages } from '../utils/fontSeoPagesServer';
 import { getSiteOrigin } from '../utils/siteSeo';
 
 type SitemapEntry = {
@@ -31,12 +32,21 @@ function escapeXml(value: string): string {
 export const getServerSideProps: GetServerSideProps = async ({ req, res }) => {
   const origin = getSiteOrigin(req);
   const lastmod = new Date().toISOString().slice(0, 10);
+  const fontSeoPages = await getAllFontSeoPages().catch((error) => {
+    console.warn('[sitemap] font SEO pages failed:', error instanceof Error ? error.message : String(error));
+    return [];
+  });
   const entries = [
     ...SITEMAP_ENTRIES,
     ...KNOWLEDGE_BASE_ARTICLES.map((article) => ({
       path: `/help/${article.slug}`,
       changefreq: 'monthly' as const,
       priority: '0.7',
+    })),
+    ...fontSeoPages.map((page) => ({
+      path: `/fonts/${page.slug}`,
+      changefreq: 'monthly' as const,
+      priority: '0.8',
     })),
   ];
   const urls = entries.map(({ path, changefreq, priority }) => {

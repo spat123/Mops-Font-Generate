@@ -1651,13 +1651,31 @@ export default function Sidebar({
           role="toolbar"
           aria-label="Режим превью"
         >
-          <SegmentedControl
-            value={viewMode}
-            onChange={setViewMode}
-            options={VIEW_MODE_OPTIONS}
-            variant="surface"
-            className="w-full min-w-0"
-          />
+          <div className="flex w-full min-w-0 items-center gap-2">
+            <SegmentedControl
+              value={viewMode === 'info' ? '' : viewMode}
+              onChange={setViewMode}
+              options={VIEW_MODE_OPTIONS}
+              variant="surface"
+              className="min-w-0 flex-1"
+            />
+            <Tooltip content={selectedFont ? 'Информация о шрифте' : 'Выберите шрифт'}>
+              <button
+                type="button"
+                disabled={!selectedFont}
+                aria-label="Информация о шрифте"
+                aria-pressed={viewMode === 'info'}
+                onClick={() => setViewMode('info')}
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full p-0 text-sm font-bold italic leading-none transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  viewMode === 'info'
+                    ? 'bg-accent text-white'
+                    : 'bg-gray-50 text-gray-800 hover:bg-gray-100 hover:text-accent'
+                }`}
+              >
+                i
+              </button>
+            </Tooltip>
+          </div>
         </div>
         <div
           ref={sidebarScrollRef}

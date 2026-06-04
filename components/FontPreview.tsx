@@ -67,6 +67,7 @@ import { shouldApplyCssWeightStyleForFont } from '../utils/fontUtilsCommon';
 import { EmptyStateAboutSection, EmptyStateAboutToggle } from './emptyState/EmptyStateAboutSection';
 import { ProjectSupportDialog } from './ui/ProjectSupportDialog';
 import { SupportProjectButton } from './ui/SupportProjectButton';
+import { FontInfoContent } from './fontInfo/FontInfoDialog';
 
 // --- Ленивая загрузка компонентов режимов ---
 const PlainTextMode = lazy(() => import('./PlainTextMode'));
@@ -1419,6 +1420,14 @@ export default function FontPreview({
                   />
                 </Suspense>
               )}
+
+              {viewMode === 'info' && (
+                <div className="min-h-full w-full px-6 py-6">
+                  <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-6 sm:p-8">
+                    <FontInfoContent font={selectedFont} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1564,6 +1573,14 @@ export default function FontPreview({
                 variationSettingsValue={variationSettingsValue}
               />
             </Suspense>
+          )}
+
+          {viewMode === 'info' && (
+            <div className="min-h-full w-full px-6 py-6">
+              <div className="mx-auto w-full max-w-5xl rounded-2xl bg-white p-6 sm:p-8">
+                <FontInfoContent font={selectedFont} />
+              </div>
+            </div>
           )}
         </div>
       </div>

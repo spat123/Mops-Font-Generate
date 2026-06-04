@@ -10,6 +10,7 @@ type UseEditorCatalogDeepLinkParams = {
   isInitialLoadComplete: boolean;
   openGoogleCatalogEntryInEditorTab: (entry: Record<string, unknown>) => Promise<void>;
   openFontsourceSlugInEditorTab: (slug: string, isVariable?: boolean) => Promise<unknown>;
+  setViewMode?: (mode: string) => void;
 };
 
 /**
@@ -20,6 +21,7 @@ export function useEditorCatalogDeepLink({
   isInitialLoadComplete,
   openGoogleCatalogEntryInEditorTab,
   openFontsourceSlugInEditorTab,
+  setViewMode,
 }: UseEditorCatalogDeepLinkParams): void {
   useLayoutEffect(() => {
     if (!router.isReady) return;
@@ -38,6 +40,7 @@ export function useEditorCatalogDeepLink({
       fsVarRaw === '1' ||
       fsVarRaw === 'true' ||
       (Array.isArray(fsVarRaw) && fsVarRaw.includes('true'));
+    const openView = typeof router.query.openView === 'string' ? router.query.openView.trim().toLowerCase() : '';
 
     if (!family && !slug) return;
 
@@ -56,6 +59,7 @@ export function useEditorCatalogDeepLink({
       delete nextQuery.openGoogleVar;
       delete nextQuery.openFontsource;
       delete nextQuery.fontsourceVar;
+      delete nextQuery.openView;
       const clean: Record<string, string | string[]> = {};
       Object.keys(nextQuery).forEach((k) => {
         const v = nextQuery[k];
@@ -71,6 +75,9 @@ export function useEditorCatalogDeepLink({
 
     const task = (async () => {
       try {
+        if (openView === 'plain') {
+          setViewMode?.('plain');
+        }
         if (family) {
           const list = readGoogleFontCatalogCache();
           const cached = Array.isArray(list)
@@ -114,7 +121,9 @@ export function useEditorCatalogDeepLink({
     router.query.openGoogleVar,
     router.query.openFontsource,
     router.query.fontsourceVar,
+    router.query.openView,
     openGoogleCatalogEntryInEditorTab,
     openFontsourceSlugInEditorTab,
+    setViewMode,
   ]);
 }
